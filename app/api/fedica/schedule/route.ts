@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { uploadMultipleMedia } from "@/lib/fedica";
 
 export async function POST(req: NextRequest) {
   try {
-    const { postId, content, pipelineId, mediaUrls } = await req.json();
+    const { postId, content, pipelineId, mediaUrls, scheduledAt } =
+      await req.json();
 
     if (!postId || !content) {
       return NextResponse.json(
@@ -20,24 +22,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Note: Media upload to Fedica requires the full init/upload/finalize flow.
-    // For MVP we schedule text-only and user can attach media later in Fedica UI,
-    // or we can expand this later.
-    const body = {
-      PipelineId: Number(pipelineId) || 42303,
-      Posts: [
+    // 1. Upload media to Fedica if provided
+    let mediaIds: string[] = [];
+    if (mediaUrls && Array.isArray(mediaUrls) && mediaUrls.length > 0) {
+      try {
+        mediaIds = await uploadMultipleMedia(mediaUrls);
+      } catch (mediaErr: any) {
+        console.error("Fedica media upload failed:", mediaErr);
+        return NextResponse.json(
+          {
+            error: `미디어 업로드 실패: ${mediaErr.message}. 텍스트만으로 재시도하거나 미디어를 확인해주세요.`,
+          },
+          { status: 502 }
+        );
+      }
+    }
+
+    // 2. Build post body
+    const postBody: any = {
+      Accounts: [
         {
-          Accounts: [
-            {
-              Platform: "Twitter",
-              AccountId: "Seung4680",
-            },
-          ],
-          Messages: [content],
-          // MediaId will be added when full media pipeline is implemented
+          Platform: "Twitter",
+          AccountId: "Seung4680",
         },
       ],
+      Messages: [content],
     };
+
+    if (mediaIds.length > 0) {
+      postBody.MediaId = mediaIds;
+    }
+
+    const body: any = {
+      PipelineId: Number(pipelineId) || 42303,
+      Posts: [postBody],
+    };
+
+    // Optional specific DateTime (ISO 8601)
+    if (scheduledAt) {
+      body.DateTime = scheduledAt;
+    }
 
     const res = await fetch("https://fedica.com/api/publish/post", {
       method: "POST",
@@ -57,19 +81,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update post status in Supabase
+    // 3. Update post status in Supabase
     const supabase = await createClient();
-    await supabase
-      .from("SeungContent")
-      .update({
-        status: "scheduled",
-        fedica_post_id: String(data.Id),
-      })
-      .eq("id", postId);
+    const updatePayload: any = {
+      status: "scheduled",
+      fedica_post_id: String(data.Id),
+    };
+    if (scheduledAt) {
+      updatePayload.scheduled_at = scheduledAt;
+    }
+
+    await supabase.from("SeungContent").update(updatePayload).eq("id", postId);
 
     return NextResponse.json({
       success: true,
       fedicaId: data.Id,
+      mediaIds,
     });
   } catch (err: any) {
     console.error(err);
