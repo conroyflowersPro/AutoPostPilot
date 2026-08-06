@@ -51,16 +51,15 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.1.1
+            v1.1.3
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          날짜를 정하면 특화 Grok이 X 알고리즘 기준으로 약 3일치 한국어
-          포스트를 자동으로 작성합니다. 허위 경험/에피소드는 쓰지 않습니다.
-          생성된 글은 draft로 저장되며, 각 포스트에 추천 미디어가 표시됩니다.
+          한국어 전용. 특화 Grok이 약 3일치 초안을 작성합니다. 영어 문장·허위
+          에피소드는 쓰지 않습니다.
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -113,6 +112,11 @@ export default function GeneratePage() {
               <p className="font-medium text-emerald-300">
                 {result.count}개 포스트가 draft로 저장되었습니다.
               </p>
+              {result.droppedEnglish > 0 && (
+                <p className="mt-1 text-xs text-amber-300">
+                  영어 비율 높은 초안 {result.droppedEnglish}개 제외됨
+                </p>
+              )}
               {result.keywordRequest && (
                 <p className="mt-2 text-amber-300 text-xs">
                   Grok 요청: {result.keywordRequest}
