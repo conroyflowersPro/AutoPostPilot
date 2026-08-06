@@ -21,7 +21,12 @@ export default async function HomePage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
+            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+              v1.0.0
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">{user.email}</span>
             <form action="/auth/signout" method="post">
@@ -79,6 +84,9 @@ export default async function HomePage() {
                       {post.pipeline_id === "42303" ? "KR" : "EN"}
                     </span>
                   )}
+                  {post.media_urls && post.media_urls.length > 0 && (
+                    <span>📷 {post.media_urls.length}</span>
+                  )}
                 </div>
               </Link>
             ))}
@@ -98,7 +106,9 @@ function StatusBadge({ status }: { status: string }) {
   };
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${colors[status] || colors.draft}`}
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
+        colors[status] || colors.draft
+      }`}
     >
       {status}
     </span>

@@ -39,7 +39,6 @@ export default function PostActions({ post }: { post: Post }) {
       if (!res.ok) throw new Error(data.error || "검수 실패");
       setReview(data);
 
-      // Update status to reviewed
       await supabase
         .from("SeungContent")
         .update({ status: "reviewed" })
@@ -84,7 +83,7 @@ export default function PostActions({ post }: { post: Post }) {
         .update({ media_urls: urls })
         .eq("id", post.id);
 
-      setMessage("미디어 업로드 완료");
+      setMessage("미디어 업로드 완료 — 이제 스케줄링 가능");
       router.refresh();
     } catch (err: any) {
       setMessage(err.message || "업로드 실패");
@@ -110,7 +109,11 @@ export default function PostActions({ post }: { post: Post }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "스케줄 실패");
 
-      setMessage(`스케줄 완료 (Fedica ID: ${data.fedicaId})`);
+      const mediaNote =
+        data.mediaIds && data.mediaIds.length > 0
+          ? ` (미디어 ${data.mediaIds.length}개 첨부됨)`
+          : " (텍스트만)";
+      setMessage(`스케줄 완료 (Fedica ID: ${data.fedicaId})${mediaNote}`);
       router.refresh();
     } catch (err: any) {
       setMessage(err.message);
@@ -119,12 +122,14 @@ export default function PostActions({ post }: { post: Post }) {
     }
   }
 
+  const hasMedia = post.media_urls && post.media_urls.length > 0;
+
   return (
     <div className="space-y-4">
       {/* Grok Review */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium">특화 Grok 검수</h3>
+          <h3 className="text-sm font-medium">특화 Grok 검수 · 관리</h3>
           <button
             onClick={handleReview}
             disabled={loadingReview}
@@ -147,7 +152,7 @@ export default function PostActions({ post }: { post: Post }) {
                     : "text-red-400"
                 }`}
               >
-                {review.score.toFixed(1)}
+                {review.score?.toFixed?.(1) ?? review.score}
               </span>
             </div>
 
@@ -187,7 +192,9 @@ export default function PostActions({ post }: { post: Post }) {
 
       {/* Media Upload */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-        <h3 className="mb-3 text-sm font-medium">미디어 업로드</h3>
+        <h3 className="mb-3 text-sm font-medium">
+          미디어 업로드 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
+        </h3>
         <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-800/50 px-4 py-6 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200">
           <input
             type="file"
@@ -198,8 +205,13 @@ export default function PostActions({ post }: { post: Post }) {
             disabled={uploading}
             className="hidden"
           />
-          {uploading ? "업로드 중..." : "📷 사진/영상 선택 (폰 카메라 가능)"}
+          {uploading
+            ? "업로드 중..."
+            : "📷 사진/영상 선택 (폰 카메라 가능)"}
         </label>
+        <p className="mt-2 text-[11px] text-zinc-500">
+          업로드 후 스케줄링하면 Fedica에 미디어가 함께 첨부됩니다.
+        </p>
       </div>
 
       {/* Schedule */}
@@ -209,10 +221,12 @@ export default function PostActions({ post }: { post: Post }) {
         className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
       >
         {scheduling
-          ? "스케줄링 중..."
+          ? "스케줄링 중... (미디어 업로드 포함)"
           : post.status === "scheduled"
           ? "이미 스케줄됨"
-          : "Fedica로 스케줄링"}
+          : hasMedia
+          ? "Fedica로 스케줄링 (미디어 포함)"
+          : "Fedica로 스케줄링 (텍스트만)"}
       </button>
 
       {message && (
