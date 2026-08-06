@@ -34,11 +34,7 @@ async function compressImage(file: File): Promise<Blob> {
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
     return new Promise((resolve) => {
-      canvas.toBlob(
-        (b) => resolve(b || file),
-        "image/jpeg",
-        0.78
-      );
+      canvas.toBlob((b) => resolve(b || file), "image/jpeg", 0.78);
     });
   } catch {
     return file;
@@ -67,10 +63,47 @@ export default function PostActions({
   );
   const [message, setMessage] = useState<string | null>(null);
   const [justUploaded, setJustUploaded] = useState(false);
+  const [movingNext, setMovingNext] = useState(false);
   const router = useRouter();
   const supabase = createClient();
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+
+  const hasMedia = !!(post.media_urls && post.media_urls.length > 0);
+  const mediaLocked = post.status === "scheduled";
+
+  /** Next = mark reviewed (if media) then navigate */
+  async function goNext(forceWithoutMedia = false) {
+    if (movingNext) return;
+    setMovingNext(true);
+    setMessage(null);
+
+    try {
+      if (post.status !== "scheduled" && post.status !== "published") {
+        if (hasMedia) {
+          const { error } = await supabase
+            .from("SeungContent")
+            .update({ status: "reviewed" })
+            .eq("id", post.id);
+          if (error) throw error;
+        } else if (!forceWithoutMedia) {
+          setMessage("미디어를 올린 뒤 다음을 누르면 reviewed로 들어갑니다.");
+          setMovingNext(false);
+          return;
+        }
+      }
+
+      if (nextId) {
+        router.push(`/posts/${nextId}`);
+      } else {
+        router.push("/");
+      }
+      router.refresh();
+    } catch (err: any) {
+      setMessage(err.message || "다음 이동 실패");
+      setMovingNext(false);
+    }
+  }
 
   async function handleReview() {
     setLoadingReview(true);
@@ -162,7 +195,7 @@ export default function PostActions({
         .eq("id", post.id);
       if (error) throw error;
 
-      setMessage("미디어 업로드 완료");
+      setMessage("미디어 업로드 완료 — 다음을 누르면 reviewed");
       setJustUploaded(true);
       router.refresh();
     } catch (err: any) {
@@ -289,8 +322,6 @@ export default function PostActions({
     }
   }
 
-  const hasMedia = post.media_urls && post.media_urls.length > 0;
-  const mediaLocked = post.status === "scheduled";
   const candidates: string[] =
     genResult?.candidates?.length > 0
       ? genResult.candidates
@@ -302,7 +333,7 @@ export default function PostActions({
     <div className="space-y-4 pb-24">
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium">특화 Grok 검수 · 관리</h3>
+          <h3 className="text-sm font-medium">특화 Grok 검수 (선택)</h3>
           <button
             onClick={handleReview}
             disabled={loadingReview}
@@ -311,9 +342,13 @@ export default function PostActions({
             {loadingReview ? "검수 중..." : "검수 요청"}
           </button>
         </div>
+        <p className="text-[11px] text-zinc-500">
+          점수·수정 제안이 필요할 때만. 평소에는 미디어 후 <strong>다음</strong>만
+          누르면 reviewed 됩니다.
+        </p>
 
         {review && (
-          <div className="space-y-3 text-sm">
+          <div className="mt-3 space-y-3 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-zinc-400">종합 점수</span>
               <span
@@ -353,9 +388,7 @@ export default function PostActions({
                   disabled={applyingRevision || mediaLocked}
                   className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
                 >
-                  {applyingRevision
-                    ? "적용 중..."
-                    : "✓ 수정 제안 적용"}
+                  {applyingRevision ? "적용 중..." : "✓ 수정 제안 적용"}
                 </button>
               </div>
             )}
@@ -433,7 +466,7 @@ export default function PostActions({
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          업로드 전 자동 압축합니다. 일괄 스케줄 = 홈에서만.
+          미디어 후 <strong>다음</strong> → reviewed → 홈에서 선택 일괄 스케줄
         </p>
 
         <button
@@ -472,17 +505,23 @@ export default function PostActions({
         )}
       </div>
 
-      {justUploaded && nextId && (
-        <Link
-          href={`/posts/${nextId}`}
-          className="block w-full rounded-xl bg-indigo-600 py-4 text-center text-sm font-semibold hover:bg-indigo-500"
+      {(justUploaded || hasMedia) && (
+        <button
+          type="button"
+          onClick={() => goNext()}
+          disabled={movingNext}
+          className="w-full rounded-xl bg-indigo-600 py-4 text-center text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
         >
-          다음 포스트로 →
-        </Link>
+          {movingNext
+            ? "처리 중…"
+            : nextId
+            ? "다음 포스트 → (reviewed)"
+            : "완료 · 홈으로 (reviewed)"}
+        </button>
       )}
 
       <p className="text-center text-[11px] text-zinc-500">
-        Fedica 스케줄은 홈 <strong className="text-emerald-400">일괄만</strong>
+        Fedica 스케줄은 홈에서 <strong className="text-emerald-400">선택 일괄</strong>
       </p>
 
       <button
@@ -499,7 +538,6 @@ export default function PostActions({
         </p>
       )}
 
-      {/* Sticky bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl gap-2 px-4 py-3">
           {prevId ? (
@@ -514,21 +552,18 @@ export default function PostActions({
               ← 이전
             </span>
           )}
-          {nextId ? (
-            <Link
-              href={`/posts/${nextId}`}
-              className="flex-[1.4] rounded-lg bg-indigo-600 py-3 text-center text-sm font-semibold hover:bg-indigo-500"
-            >
-              다음 포스트 →
-            </Link>
-          ) : (
-            <Link
-              href="/"
-              className="flex-[1.4] rounded-lg bg-emerald-700 py-3 text-center text-sm font-semibold hover:bg-emerald-600"
-            >
-              홈 · 일괄 스케줄
-            </Link>
-          )}
+          <button
+            type="button"
+            onClick={() => goNext()}
+            disabled={movingNext}
+            className="flex-[1.4] rounded-lg bg-indigo-600 py-3 text-center text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {movingNext
+              ? "…"
+              : nextId
+              ? "다음 → (reviewed)"
+              : "홈 · 일괄 스케줄"}
+          </button>
         </div>
       </div>
     </div>
