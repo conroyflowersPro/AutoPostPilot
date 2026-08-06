@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       dayOffset = 0,
       keywords,
       mergedKeywords,
+      themes,
     } = body;
 
     const xaiKey = process.env.XAI_API_KEY;
@@ -41,9 +42,12 @@ export async function POST(req: NextRequest) {
       (typeof mergedKeywords === "string" && mergedKeywords.trim()) ||
       (typeof keywords === "string" && keywords.trim()) ||
       "";
+    const themeStr = Array.isArray(themes)
+      ? themes.filter(Boolean).join(", ")
+      : "";
 
     const textPart = `한국어 포스트 정확히 ${total}개. dayOffset=${offset}. 시작일: ${startDate || "오늘"}.
-주제: ${topic || "FSD, 소유 팁, LAFC, 솔직한 관찰"}
+주제: ${themeStr || topic || "FSD, 소유 팁, LAFC, 솔직한 관찰"}
 추론 OK / 허위 경험 금지 / 답글 질문 필수. JSON만.`;
 
     const controller = new AbortController();
@@ -111,7 +115,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Soft filter: keep Korean posts; don't drop for self-score
     const qualityPosts = parsed.posts
       .filter((p: any) => {
         const t = (p.content || "").trim();

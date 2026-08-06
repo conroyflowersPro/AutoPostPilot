@@ -51,6 +51,18 @@ async function readJson(res: Response) {
   return data;
 }
 
+/** Split n into chunks of max 3 */
+function chunkCounts(n: number): number[] {
+  const out: number[] = [];
+  let left = n;
+  while (left > 0) {
+    const c = Math.min(3, left);
+    out.push(c);
+    left -= c;
+  }
+  return out.length ? out : [3];
+}
+
 export default function GeneratePage() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -123,8 +135,10 @@ export default function GeneratePage() {
     return urls;
   }
 
-  async function generateDay(
-    day: number,
+  async function generateBatch(
+    dayOffset: number,
+    count: number,
+    themes: string[],
     mergedKeywords: string,
     attempt = 1
   ): Promise<{ posts: any[]; error?: string }> {
@@ -134,19 +148,25 @@ export default function GeneratePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startDate,
-          count: 3,
-          dayOffset: day,
+          count,
+          dayOffset,
           keywords: keywords.trim() || undefined,
           mergedKeywords: mergedKeywords || undefined,
+          themes,
         }),
       });
       const data = await readJson(genRes);
       return { posts: data.posts || [] };
     } catch (err: any) {
       if (attempt < 2) {
-        setPhase(`Day ${day + 1}/3 재시도 중...`);
-        await new Promise((r) => setTimeout(r, 1500));
-        return generateDay(day, mergedKeywords, attempt + 1);
+        await new Promise((r) => setTimeout(r, 1200));
+        return generateBatch(
+          dayOffset,
+          count,
+          themes,
+          mergedKeywords,
+          attempt + 1
+        );
       }
       return { posts: [], error: err.message || "실패" };
     }
@@ -185,19 +205,58 @@ export default function GeneratePage() {
         }
       }
 
-      const allPosts: any[] = [];
-      const dayErrors: string[] = [];
+      // Plan: Grok decides daily counts
+      setPhase("X 알고리즘 기준 일별 개수 계획 중...");
+      let planDays: { dayOffset: number; count: number; themes: string[] }[] =
+        [];
+      let rationale: string | null = null;
+      try {
+        const planRes = await fetch("/api/grok/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            startDate,
+            keywords: keywords.trim() || undefined,
+            mergedKeywords: mergedKeywords || undefined,
+          }),
+        });
+        const planData = await readJson(planRes);
+        planDays = planData.days || [];
+        rationale = planData.rationale || null;
+      } catch {
+        planDays = [
+          { dayOffset: 0, count: 5, themes: [] },
+          { dayOffset: 1, count: 4, themes: [] },
+          { dayOffset: 2, count: 5, themes: [] },
+        ];
+        rationale = "계획 API 실패 — 기본 4~5개/일";
+      }
 
-      for (let day = 0; day < 3; day++) {
-        setPhase(`Day ${day + 1}/3 작성 중... (누적 ${allPosts.length}개)`);
-        const { posts, error: dayErr } = await generateDay(day, mergedKeywords);
-        if (posts.length) allPosts.push(...posts);
-        if (dayErr) dayErrors.push(`Day ${day + 1}: ${dayErr}`);
+      const allPosts: any[] = [];
+      const batchErrors: string[] = [];
+
+      for (let di = 0; di < planDays.length; di++) {
+        const day = planDays[di];
+        const chunks = chunkCounts(day.count);
+        for (let bi = 0; bi < chunks.length; bi++) {
+          setPhase(
+            `Day ${di + 1}/3 · 묶음 ${bi + 1}/${chunks.length} 작성 중... (목표 ${day.count}개 · 누적 ${allPosts.length})`
+          );
+          const { posts, error: err } = await generateBatch(
+            day.dayOffset,
+            chunks[bi],
+            day.themes || [],
+            mergedKeywords
+          );
+          if (posts.length) allPosts.push(...posts);
+          if (err)
+            batchErrors.push(`D${di + 1}B${bi + 1}: ${err}`);
+        }
       }
 
       if (allPosts.length === 0) {
         throw new Error(
-          dayErrors.join(" / ") || "생성된 포스트가 없습니다. 다시 시도하세요."
+          batchErrors.join(" / ") || "생성된 포스트가 없습니다."
         );
       }
 
@@ -206,7 +265,9 @@ export default function GeneratePage() {
         count: allPosts.length,
         posts: allPosts,
         mergedKeywords,
-        dayErrors,
+        plan: planDays,
+        rationale,
+        batchErrors,
         model: "grok-4.5",
       });
     } catch (err: any) {
@@ -226,14 +287,15 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.6
+            v1.4.7
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          Day1→2→3 분할 생성 (각 3개, 실패 시 해당 Day만 재시도). 목표 약 9개.
+          Grok이 일별 KR 개수(3~6)를 정한 뒤, 많은 날은 묶음 분할 생성합니다.
+          하루 전체 목표 5~10(영 최대 2 가정).
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -258,7 +320,7 @@ export default function GeneratePage() {
               type="text"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
-              placeholder="예: FSD 주차, LAFC, Cybertruck 짐"
+              placeholder="원하는 주제 입력 (비우면 Grok이 믹스)"
               className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500"
             />
           </div>
@@ -334,14 +396,26 @@ export default function GeneratePage() {
               <p className="font-medium text-emerald-300">
                 {result.count}개 포스트가 draft로 저장되었습니다.
               </p>
-              {result.mergedKeywords && (
+              {result.plan && (
                 <p className="mt-2 text-xs text-zinc-300">
-                  사용 키워드: {result.mergedKeywords}
+                  계획:{" "}
+                  {result.plan
+                    .map(
+                      (d: any) =>
+                        `D${d.dayOffset + 1}=${d.count}개` +
+                        (d.themes?.length
+                          ? `(${d.themes.slice(0, 2).join(", ")})`
+                          : "")
+                    )
+                    .join(" · ")}
                 </p>
               )}
-              {result.dayErrors?.length > 0 && (
+              {result.rationale && (
+                <p className="mt-1 text-xs text-zinc-400">{result.rationale}</p>
+              )}
+              {result.batchErrors?.length > 0 && (
                 <p className="mt-1 text-xs text-amber-300">
-                  일부 Day 실패: {result.dayErrors.join(" · ")}
+                  일부 묶음 실패: {result.batchErrors.join(" · ")}
                 </p>
               )}
               <button
