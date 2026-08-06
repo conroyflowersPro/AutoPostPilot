@@ -68,7 +68,7 @@ Keywords (follower interest signals only): ${topic || "(FSD, ownership, Elon vis
 Each day 5–8 slots (prefer 5–6). One clear primaryTopic per slot. No repeated detailed topics/examples across days. JSON only.`;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), 20000);
 
     let response: Response;
     try {
@@ -85,7 +85,7 @@ Each day 5–8 slots (prefer 5–6). One clear primaryTopic per slot. No repeate
             { role: "user", content: user },
           ],
           temperature: 0.5,
-          reasoning_effort: "medium",
+          reasoning_effort: "low",
         }),
         signal: controller.signal,
       });
@@ -175,10 +175,30 @@ Each day 5–8 slots (prefer 5–6). One clear primaryTopic per slot. No repeate
     });
   } catch (err: any) {
     console.error(err);
-    const msg =
-      err?.name === "AbortError"
-        ? "계획 시간 초과"
-        : err.message || "Internal error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // Timeout/failure: return usable default plan so generation continues
+    const topics = ["FSD 관찰", "Cybertruck 일상", "Robotaxi 시각", "LAFC", "소유 팁"];
+    const angles = ["실사용 체감", "디테일 관찰", "장기 전망", "경기/분위기", "유용한 팁"];
+    const fallbackDays = [0, 1, 2].map((i) => ({
+      dayOffset: i,
+      posts: topics.map((t, n) => ({
+        slotId: `D${i + 1}P${n + 1}`,
+        primaryTopic: t,
+        angle: angles[n],
+        contentType: "observation",
+        allowedContext: [],
+        forbiddenTopics: ["주가", "등락", "매매"],
+        targetLength: "medium",
+      })),
+    }));
+    return NextResponse.json({
+      success: true,
+      model: MODEL,
+      generationDays: 3,
+      days: fallbackDays,
+      rationale: "계획 지연 — 기본 슬롯 캘린더 사용",
+      totalPlanned: 15,
+      fallback: true,
+      detail: err?.name === "AbortError" ? "timeout" : String(err?.message || err).slice(0, 120),
+    });
   }
 }
