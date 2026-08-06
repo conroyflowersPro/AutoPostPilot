@@ -1,56 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export const maxDuration = 60;
+export const maxDuration = 26;
 
 const MODEL = "grok-4.5";
 
-const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for @Seung4680.
-You WRITE posts on behalf of the account for X growth automation.
-You may REASON and form opinions. You must NOT lie or show off.
+const SYSTEM_PROMPT = `You write X posts for @Seung4680 (Korean only).
+Persona: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | honest tips | Dogecoin & gaming
+Tone: 해요체 + casual. No pure 반말.
 
-Account persona (facts only):
-Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH (Los Angeles) | Real-world drives, tips & honest takes | Dogecoin & gaming
+X priority: conversation question (must), first-line hook, follow reason, authenticity.
+OK: reasoned opinion, tips, comparisons, questions.
+BAN: fake personal episodes/sensory stories, bragging, English sentences (proper nouns OK: FSD, Cybertruck, Tesla, Model 3/S/Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X).
 
-Tone: 해요체 + casual. Honest, practical. Light ㅋㅋ when natural.
-
-=== X ALGORITHM PRIORITY ===
-1. Conversation (40%) — real reply invitation
-2. Velocity & dwell (25%) — strong first-line hook
-3. Follow incentive (15%)
-4. Authenticity (15%) — no fake personal episodes; no bragging; reasoned opinion OK
-5. Media (5%) — suggestedMedia in Korean
-
-=== HARD BAN ===
-- No invented personal events or sensory stories
-- No superiority / flex tone
-- Korean only (proper nouns OK: FSD, Cybertruck, Tesla, Model 3/S/Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X)
-
-Mix formats: opinion / tip / comparison / question. Score >= 8.0 only.
-
-JSON only:
-{
-  "posts": [
-    {
-      "content": "한국어 본문",
-      "score": number,
-      "scores": { "conversation": number, "velocity": number, "profile": number, "authenticity": number, "media": number },
-      "suggestedMedia": "한국어",
-      "dayOffset": 0,
-      "slot": 1
-    }
-  ],
-  "extractedKeywords": [],
-  "keywordRequest": null
-}`;
+Only score>=8.0 posts. Mix formats. JSON only:
+{"posts":[{"content":"한국어","score":number,"suggestedMedia":"한국어","dayOffset":0,"slot":1}]}`;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       startDate,
-      days = 3,
-      countPerDay = 3,
+      count = 3,
+      dayOffset = 0,
       keywords,
       mergedKeywords,
     } = body;
@@ -63,21 +35,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Cap volume to reduce latency / timeout risk
-    const total = Math.min(Number(days) * Number(countPerDay) || 9, 9);
+    // Hard cap: 3 posts per request for Netlify ~26s limit
+    const total = Math.min(Math.max(Number(count) || 3, 1), 3);
+    const offset = typeof dayOffset === "number" ? dayOffset : 0;
     const topic =
       (typeof mergedKeywords === "string" && mergedKeywords.trim()) ||
       (typeof keywords === "string" && keywords.trim()) ||
       "";
 
-    const textPart = `대신 작성. X용 한국어 포스트 ${total}개. ~${days}일, 시작 ${startDate || "오늘"}.
-키워드/주제: ${topic || "(계정 기본 주제 믹스: FSD, 소유 팁, LAFC, 솔직한 관찰)"}
-
-추론·의견 OK. 허위 에피소드·잘난 척 금지. 형식 다양화.
-점수 8.0+만. JSON만.`;
+    const textPart = `한국어 포스트 ${total}개. dayOffset=${offset} 고정. 시작일 참고: ${startDate || "오늘"}.
+주제: ${topic || "FSD, 소유 팁, LAFC, 솔직한 관찰 믹스"}
+추론 OK / 허위 경험·잘난 척 금지 / 답글 질문 필수.
+JSON만.`;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 55000);
+    const timer = setTimeout(() => controller.abort(), 22000);
 
     let response: Response;
     try {
@@ -126,7 +98,10 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     } catch {
       return NextResponse.json(
-        { error: "Failed to parse Grok response", raw: String(raw).slice(0, 500) },
+        {
+          error: "Failed to parse Grok response",
+          raw: String(raw).slice(0, 500),
+        },
         { status: 502 }
       );
     }
@@ -144,9 +119,9 @@ export async function POST(req: NextRequest) {
       const latinChars = (t.match(/[A-Za-z]/g) || []).length;
       const totalChars = t.replace(/\s/g, "").length || 1;
       if (latinChars / totalChars >= 0.35) return false;
-      const score = typeof p.score === "number" ? p.score : 0;
-      return score >= 8.0;
-    });
+      const score = typeof p.score === "number" ? p.score : 8;
+      return score >= 7.5;
+    }).slice(0, total);
 
     const supabase = await createClient();
     const {
@@ -158,7 +133,6 @@ export async function POST(req: NextRequest) {
 
     const inserted = [];
     for (const p of qualityPosts) {
-      const dayOffset = typeof p.dayOffset === "number" ? p.dayOffset : 0;
       const { data: row, error } = await supabase
         .from("SeungContent")
         .insert({
@@ -174,9 +148,8 @@ export async function POST(req: NextRequest) {
         inserted.push({
           ...row,
           score: p.score,
-          scores: p.scores,
           suggestedMedia: p.suggestedMedia,
-          dayOffset,
+          dayOffset: offset,
           slot: p.slot,
         });
       }
@@ -187,10 +160,9 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       count: inserted.length,
       posts: inserted,
-      extractedKeywords: parsed.extractedKeywords || [],
+      dayOffset: offset,
       mergedKeywords: topic,
-      keywordRequest: parsed.keywordRequest || null,
-      droppedLowQuality: parsed.posts.length - qualityPosts.length,
+      droppedLowQuality: Math.max(0, parsed.posts.length - qualityPosts.length),
     });
   } catch (err: any) {
     console.error(err);

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 async function compressImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const maxSide = 960;
+  const maxSide = 800;
   let { width, height } = bitmap;
   if (width > maxSide || height > maxSide) {
     const scale = maxSide / Math.max(width, height);
@@ -26,7 +26,7 @@ async function compressImage(file: File): Promise<Blob> {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("compress failed"))),
       "image/jpeg",
-      0.75
+      0.7
     );
   });
 }
@@ -38,13 +38,13 @@ async function readJson(res: Response) {
     data = JSON.parse(rawText);
   } catch {
     throw new Error(
-      `서버 응답 오류 (${res.status}): ${rawText.slice(0, 120) || "빈 응답/타임아웃"}`
+      `서버 응답 오류 (${res.status}): ${rawText.slice(0, 100) || "타임아웃"}`
     );
   }
   if (!res.ok) {
     throw new Error(
       data.detail
-        ? `${data.error}: ${String(data.detail).slice(0, 200)}`
+        ? `${data.error}: ${String(data.detail).slice(0, 180)}`
         : data.error || `요청 실패 (${res.status})`
     );
   }
@@ -69,7 +69,7 @@ export default function GeneratePage() {
 
   function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    const max = 2;
+    const max = 1;
     const room = max - files.length;
     if (room <= 0) return;
 
@@ -131,47 +131,62 @@ export default function GeneratePage() {
     setPhase(null);
 
     try {
-      let imageUrls: string[] = [];
       let mergedKeywords = keywords.trim();
 
-      // Step 1: upload + extract keywords (only if screenshots)
+      // Optional screenshot → keywords (fail soft)
       if (files.length > 0) {
-        setPhase("스샷 업로드 중...");
-        imageUrls = await uploadKeywordImages();
+        try {
+          setPhase("스샷 업로드 중...");
+          const imageUrls = await uploadKeywordImages();
+          setPhase("키워드 추출 중...");
+          const extractRes = await fetch("/api/grok/extract-keywords", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              images: imageUrls,
+              keywords: keywords.trim() || undefined,
+            }),
+          });
+          const extractData = await readJson(extractRes);
+          mergedKeywords =
+            extractData.mergedKeywords ||
+            (extractData.keywords || []).join(", ") ||
+            keywords.trim();
+        } catch {
+          // continue with text keywords only
+          setPhase("스샷 분석 생략 — 텍스트 키워드로 진행");
+        }
+      }
 
-        setPhase("키워드 추출 중...");
-        const extractRes = await fetch("/api/grok/extract-keywords", {
+      // 3 sequential day batches × 3 posts = ~9 posts total
+      const allPosts: any[] = [];
+      let dropped = 0;
+
+      for (let day = 0; day < 3; day++) {
+        setPhase(`Day ${day + 1}/3 작성 중... (${allPosts.length}개 완료)`);
+        const genRes = await fetch("/api/grok/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            images: imageUrls,
+            startDate,
+            count: 3,
+            dayOffset: day,
             keywords: keywords.trim() || undefined,
+            mergedKeywords: mergedKeywords || undefined,
           }),
         });
-        const extractData = await readJson(extractRes);
-        mergedKeywords =
-          extractData.mergedKeywords ||
-          (extractData.keywords || []).join(", ") ||
-          keywords.trim();
+        const data = await readJson(genRes);
+        if (data.posts?.length) allPosts.push(...data.posts);
+        dropped += data.droppedLowQuality || 0;
       }
 
-      // Step 2: text-only generation (no images in this request)
-      setPhase("포스트 작성 중...");
-      const genRes = await fetch("/api/grok/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startDate,
-          days: 3,
-          countPerDay: 3,
-          keywords: keywords.trim() || undefined,
-          mergedKeywords: mergedKeywords || undefined,
-        }),
-      });
-      const data = await readJson(genRes);
       setResult({
-        ...data,
-        mergedKeywords: data.mergedKeywords || mergedKeywords,
+        success: true,
+        count: allPosts.length,
+        posts: allPosts,
+        mergedKeywords,
+        droppedLowQuality: dropped,
+        model: "grok-4.5",
       });
     } catch (err: any) {
       setError(err.message || "알 수 없는 오류");
@@ -190,15 +205,14 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.4
+            v1.4.5
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          스샷 → 키워드 추출 → 본문 작성 (요청 분리로 타임아웃 방지). 한 번에
-          최대 약 9개.
+          3일치를 Day별로 나눠 생성합니다 (요청당 3개 · Netlify 26초 한도).
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -230,7 +244,7 @@ export default function GeneratePage() {
 
           <div>
             <label className="mb-1.5 block text-xs text-zinc-400">
-              키워드 스크린샷 (선택, 최대 2장)
+              키워드 스크린샷 (선택, 1장)
             </label>
             <button
               type="button"
@@ -243,7 +257,6 @@ export default function GeneratePage() {
               ref={fileRef}
               type="file"
               accept="image/*"
-              multiple
               onChange={(e) => {
                 handleFiles(e.target.files);
                 e.target.value = "";
@@ -307,7 +320,7 @@ export default function GeneratePage() {
               )}
               {result.droppedLowQuality > 0 && (
                 <p className="mt-1 text-xs text-amber-300">
-                  8점 미만 {result.droppedLowQuality}개 제외
+                  품질 미달 {result.droppedLowQuality}개 제외
                 </p>
               )}
               <button

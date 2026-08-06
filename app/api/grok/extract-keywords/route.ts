@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const maxDuration = 60;
+export const maxDuration = 26;
 
 const FAST_MODEL = "grok-4-fast-non-reasoning";
-const FALLBACK_MODEL = "grok-4.5";
 
 function isHttpUrl(s: string) {
   try {
@@ -11,40 +10,6 @@ function isHttpUrl(s: string) {
     return u.protocol === "http:" || u.protocol === "https:";
   } catch {
     return false;
-  }
-}
-
-async function callExtract(xaiKey: string, model: string, userContent: any[]) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 45000);
-  try {
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${xaiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Extract short Korean topic keywords for X posts. JSON only: { \"keywords\": [\"...\"] }. No posts.",
-          },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0.2,
-      }),
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    if (!response.ok) {
-      throw new Error(`Grok ${response.status}: ${text.slice(0, 250)}`);
-    }
-    return JSON.parse(text);
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -63,19 +28,18 @@ export async function POST(req: NextRequest) {
     const imageList: string[] = Array.isArray(images)
       ? images
           .filter((u: unknown) => typeof u === "string" && isHttpUrl(u as string))
-          .slice(0, 2)
+          .slice(0, 1)
       : [];
 
     const textKw =
       typeof keywords === "string" && keywords.trim() ? keywords.trim() : "";
 
-    if (imageList.length === 0 && !textKw) {
-      return NextResponse.json({ keywords: [], mergedKeywords: "" });
-    }
-
     if (imageList.length === 0) {
+      const kws = textKw
+        ? textKw.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean)
+        : [];
       return NextResponse.json({
-        keywords: textKw.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean),
+        keywords: kws,
         mergedKeywords: textKw,
       });
     }
@@ -83,20 +47,62 @@ export async function POST(req: NextRequest) {
     const userContent: any[] = [
       {
         type: "text",
-        text: `Extract 5–10 short Korean topic keywords from these screenshots for @Seung4680 (Tesla, FSD, Cybertruck, LAFC, honest tips). Discard off-brand.
-${textKw ? `Also include text keywords: ${textKw}` : ""}
+        text: `Extract 5–8 short Korean topic keywords for @Seung4680 (Tesla/FSD/Cybertruck/LAFC). Discard off-brand.
+${textKw ? `Merge text: ${textKw}` : ""}
 JSON only: { "keywords": ["..."] }`,
       },
+      { type: "image_url", image_url: { url: imageList[0] } },
     ];
-    for (const url of imageList) {
-      userContent.push({ type: "image_url", image_url: { url } });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 18000);
+
+    let response: Response;
+    try {
+      response = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${xaiKey}`,
+        },
+        body: JSON.stringify({
+          model: FAST_MODEL,
+          messages: [
+            {
+              role: "system",
+              content: "Extract keywords only. JSON only.",
+            },
+            { role: "user", content: userContent },
+          ],
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const text = await response.text();
+    if (!response.ok) {
+      // Fail soft — return text keywords
+      return NextResponse.json({
+        keywords: textKw
+          ? textKw.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean)
+          : [],
+        mergedKeywords: textKw,
+        warning: `vision extract failed: ${text.slice(0, 120)}`,
+      });
     }
 
     let data: any;
     try {
-      data = await callExtract(xaiKey, FAST_MODEL, userContent);
+      data = JSON.parse(text);
     } catch {
-      data = await callExtract(xaiKey, FALLBACK_MODEL, userContent);
+      return NextResponse.json({
+        keywords: textKw ? [textKw] : [],
+        mergedKeywords: textKw,
+        warning: "vision non-JSON",
+      });
     }
 
     const raw = data.choices?.[0]?.message?.content || "{}";
@@ -114,7 +120,7 @@ JSON only: { "keywords": ["..."] }`,
     const fromText = textKw
       ? textKw.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean)
       : [];
-    const merged = Array.from(new Set([...fromImages, ...fromText])).slice(0, 12);
+    const merged = Array.from(new Set([...fromImages, ...fromText])).slice(0, 10);
 
     return NextResponse.json({
       success: true,
@@ -124,10 +130,15 @@ JSON only: { "keywords": ["..."] }`,
     });
   } catch (err: any) {
     console.error(err);
-    const msg =
-      err?.name === "AbortError"
-        ? "키워드 추출 시간 초과. 스샷 1장만 넣어 보세요."
-        : err.message || "Internal error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // Always fail soft so generate can continue
+    const textKw =
+      typeof (await req.clone().json().catch(() => ({}))).keywords === "string"
+        ? (await req.clone().json().catch(() => ({}))).keywords
+        : "";
+    return NextResponse.json({
+      keywords: [],
+      mergedKeywords: "",
+      warning: err?.name === "AbortError" ? "extract timeout" : err.message,
+    });
   }
 }
