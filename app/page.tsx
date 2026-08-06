@@ -15,7 +15,7 @@ export default async function HomePage() {
   const { data: posts } = await supabase
     .from("SeungContent")
     .select("*")
-    .order("scheduled_at", { ascending: true, nullsFirst: false });
+    .order("created_at", { ascending: false });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -42,20 +42,30 @@ export default async function HomePage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Posts</h2>
-          <Link
-            href="/posts/new"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
-          >
-            + New Post
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/generate"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
+            >
+              ✨ Grok 자동 생성
+            </Link>
+            <Link
+              href="/posts/new"
+              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600"
+            >
+              + 직접 작성
+            </Link>
+          </div>
         </div>
 
         {!posts || posts.length === 0 ? (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
             <p>아직 포스트가 없습니다.</p>
-            <p className="mt-2 text-sm">새 포스트를 만들어보세요.</p>
+            <p className="mt-2 text-sm">
+              「Grok 자동 생성」으로 3일치 초안을 만들어보세요.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
