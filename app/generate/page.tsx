@@ -3,6 +3,34 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+
+/** Resize/compress image file → JPEG blob under ~1.2MB */
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 1280;
+  let { width, height } = bitmap;
+  if (width > maxSide || height > maxSide) {
+    const scale = maxSide / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas failed");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("compress failed"))),
+      "image/jpeg",
+      0.82
+    );
+  });
+}
 
 export default function GeneratePage() {
   const [startDate, setStartDate] = useState(() => {
@@ -11,33 +39,68 @@ export default function GeneratePage() {
   });
   const [keywords, setKeywords] = useState("");
   const [previews, setPreviews] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const supabase = createClient();
 
-  function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
+  function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
     const max = 4;
-    const remaining = max - previews.length;
-    if (remaining <= 0) return;
+    const room = max - files.length;
+    if (room <= 0) return;
 
-    Array.from(files)
-      .slice(0, remaining)
+    const nextFiles: File[] = [];
+    Array.from(list)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, room)
       .forEach((file) => {
-        if (!file.type.startsWith("image/")) return;
+        nextFiles.push(file);
         const reader = new FileReader();
         reader.onload = () => {
-          const dataUrl = reader.result as string;
-          setPreviews((prev) => [...prev, dataUrl].slice(0, max));
+          setPreviews((prev) => [...prev, reader.result as string].slice(0, max));
         };
         reader.readAsDataURL(file);
       });
+    setFiles((prev) => [...prev, ...nextFiles].slice(0, max));
   }
 
   function removePreview(index: number) {
     setPreviews((prev) => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadKeywordImages(): Promise<string[]> {
+    const urls: string[] = [];
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("로그인이 필요합니다");
+
+    for (let i = 0; i < files.length; i++) {
+      const blob = await compressImage(files[i]);
+      const path = `keywords/${user.id}/${Date.now()}-${i}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("media")
+        .upload(path, blob, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (upErr) throw new Error(`스샷 업로드 실패: ${upErr.message}`);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("media").getPublicUrl(path);
+
+      if (!publicUrl || !publicUrl.startsWith("http")) {
+        throw new Error("공개 URL 생성 실패");
+      }
+      urls.push(publicUrl);
+    }
+    return urls;
   }
 
   async function handleGenerate(e: React.FormEvent) {
@@ -47,6 +110,11 @@ export default function GeneratePage() {
     setResult(null);
 
     try {
+      let imageUrls: string[] | undefined;
+      if (files.length > 0) {
+        imageUrls = await uploadKeywordImages();
+      }
+
       const res = await fetch("/api/grok/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -55,14 +123,27 @@ export default function GeneratePage() {
           days: 3,
           countPerDay: 4,
           keywords: keywords.trim() || undefined,
-          images: previews.length > 0 ? previews : undefined,
+          images: imageUrls,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "생성 실패");
+
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("서버 응답을 읽지 못했습니다");
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail
+            ? `${data.error}: ${String(data.detail).slice(0, 200)}`
+            : data.error || `생성 실패 (${res.status})`
+        );
+      }
       setResult(data);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "알 수 없는 오류");
     } finally {
       setLoading(false);
     }
@@ -77,15 +158,15 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.2.0
+            v1.4.1
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          한국어 전용. 키워드 텍스트 또는 스크린샷을 넣으면 특화 Grok이 계정
-          성격에 맞게 합쳐서 약 3일치 초안을 작성합니다.
+          한국어 · grok-4.5 · X 알고리즘 기준. 스샷은 압축 후 업로드되어
+          Grok이 분석합니다.
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -141,7 +222,10 @@ export default function GeneratePage() {
             {previews.length > 0 && (
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {previews.map((src, i) => (
-                  <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700">
+                  <div
+                    key={i}
+                    className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={src}
@@ -160,8 +244,8 @@ export default function GeneratePage() {
               </div>
             )}
             <p className="mt-1.5 text-[11px] text-zinc-500">
-              스샷을 올리면 Grok이 내용을 보고 계정 톤에 맞는 키워드로
-              합칩니다.
+              생성 시 스샷을 서버에 올린 뒤 Grok이 URL로 분석합니다 (용량
+              오류 방지).
             </p>
           </div>
 
@@ -177,7 +261,9 @@ export default function GeneratePage() {
             className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
           >
             {loading
-              ? "특화 Grok이 작성 중..."
+              ? files.length
+                ? "스샷 업로드 후 작성 중..."
+                : "특화 Grok이 작성 중..."
               : "3일치 한국어 포스트 자동 생성"}
           </button>
         </form>
@@ -188,15 +274,17 @@ export default function GeneratePage() {
               <p className="font-medium text-emerald-300">
                 {result.count}개 포스트가 draft로 저장되었습니다.
               </p>
+              {result.model && (
+                <p className="mt-1 text-xs text-zinc-400">model: {result.model}</p>
+              )}
               {result.extractedKeywords?.length > 0 && (
                 <p className="mt-2 text-xs text-zinc-300">
-                  추출·병합 키워드:{" "}
-                  {result.extractedKeywords.join(", ")}
+                  추출·병합 키워드: {result.extractedKeywords.join(", ")}
                 </p>
               )}
-              {result.droppedEnglish > 0 && (
+              {result.droppedLowQuality > 0 && (
                 <p className="mt-1 text-xs text-amber-300">
-                  영어 비율 높은 초안 {result.droppedEnglish}개 제외됨
+                  8점 미만 {result.droppedLowQuality}개 제외됨
                 </p>
               )}
               {result.keywordRequest && (
@@ -208,7 +296,7 @@ export default function GeneratePage() {
                 onClick={() => router.push("/")}
                 className="mt-3 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs hover:bg-emerald-600"
               >
-                목록으로 가서 미디어 올리고 스케줄하기 →
+                목록으로 →
               </button>
             </div>
 

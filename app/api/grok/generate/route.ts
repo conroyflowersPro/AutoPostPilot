@@ -12,27 +12,21 @@ Tone: 해요체 + casual. Honest, practical, light ㅋㅋ when it fits. No pure 
 === X ALGORITHM WRITING RULES (priority) ===
 1. Conversation Potential (40%) — MUST invite replies.
    - End with a real question or 2–3 choice options people can answer in one line.
-   - Ask about their setup, habit, preference, or disagree/agree — not rhetorical fluff.
 2. Early Velocity & Dwell (25%) — First line must hook in under 1 second.
-   - Strong opening observation or tension. Avoid soft openers like "오늘은요", "문득".
-   - Keep readable on mobile; short paragraphs / line breaks OK.
-3. Profile & Follow Incentive (15%) — Subtle signal why following this account is useful
-   (owner tips, FSD reality, LAFC fan, honest takes) without hard sell.
+3. Profile & Follow Incentive (15%)
 4. Authenticity & Brand Fit (15%) — HARD FILTER
-   - NEVER invent specific personal events (no fake mountain drives, no "어제 ~했다" false stories).
-   - General patterns OK: "주차할 때 느끼는 점", "FSD 쓰다 보면".
-5. Media (5%) — every post needs concrete phone-shootable suggestedMedia in Korean.
+   - NEVER invent specific personal events (no fake stories).
+   - General patterns OK.
+5. Media (5%) — concrete phone-shootable suggestedMedia in Korean.
 
 === LANGUAGE ===
 - Korean only in content. English only as proper nouns: FSD, Cybertruck, Tesla, Model 3/S/Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X.
 
 === QUALITY BAR ===
-- Only output posts you would score >= 8.0 weighted.
-- Reject bland generic Tesla news. Mix FSD tips, ownership observations, LAFC, light daily honest takes.
-- Prefer one sharp idea per post over laundry lists.
+- Only posts scoring >= 8.0 weighted.
+- One sharp idea per post. Mix topics.
 
-=== GOOD STRUCTURE EXAMPLE (pattern, not copy) ===
-Hook line → 1–2 concrete observations → question that invites reply.
+When images are provided: they are keyword/theme screenshots. Extract topics, merge with text keywords, fit account voice.
 
 Respond JSON only, no markdown:
 {
@@ -56,6 +50,15 @@ Respond JSON only, no markdown:
   "keywordRequest": null
 }`;
 
+function isHttpUrl(s: string) {
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -76,21 +79,20 @@ export async function POST(req: NextRequest) {
     }
 
     const total = Math.min(days * countPerDay, 12);
+
+    // Only accept public http(s) URLs — reject raw data: URLs (too large / pattern issues)
     const imageList: string[] = Array.isArray(images)
-      ? images.filter((u: string) => typeof u === "string" && u.length > 0).slice(0, 4)
+      ? images
+          .filter((u: unknown) => typeof u === "string" && isHttpUrl(u as string))
+          .slice(0, 4)
       : [];
 
     const textPart = `X 알고리즘 최적화 한국어 포스트 ${total}개 (@Seung4680). ~${days}일, 시작 ${startDate || "오늘"}.
 dayOffset / slot 배분.
 ${keywords ? `키워드: ${keywords}` : ""}
-${imageList.length > 0 ? `첨부 이미지 ${imageList.length}장 분석 후 계정에 맞는 키워드만 병합.` : ""}
+${imageList.length > 0 ? `키워드 스크린샷 URL ${imageList.length}개 첨부. 이미지에서 주제 추출 후 계정에 맞게 병합.` : ""}
 
-필수:
-- content 100% 한국어 + 답글 유도 질문
-- 첫 줄 훅
-- 허위 에피소드 금지
-- 가중 점수 8.0 미만 글은 출력하지 말 것
-- suggestedMedia 한국어
+필수: 한국어, 답글 질문, 첫줄 훅, 허위 에피소드 금지, 점수 8.0+, suggestedMedia 한국어.
 JSON만.`;
 
     const userContent: any[] = [{ type: "text", text: textPart }];
@@ -138,7 +140,7 @@ JSON만.`;
       parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     } catch {
       return NextResponse.json(
-        { error: "Failed to parse Grok response", raw },
+        { error: "Failed to parse Grok response", raw: String(raw).slice(0, 500) },
         { status: 502 }
       );
     }
@@ -204,6 +206,7 @@ JSON만.`;
       extractedKeywords: parsed.extractedKeywords || [],
       keywordRequest: parsed.keywordRequest || null,
       droppedLowQuality: parsed.posts.length - qualityPosts.length,
+      imageCount: imageList.length,
     });
   } catch (err: any) {
     console.error(err);
