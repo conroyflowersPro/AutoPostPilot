@@ -25,7 +25,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v2.0.0
+              v2.1.0
             </span>
           </div>
           <div className="flex items-center gap-3">
