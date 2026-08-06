@@ -51,16 +51,15 @@ async function readJson(res: Response) {
   return data;
 }
 
-/** Split n into chunks of max 3 */
+/** Always 1 post per call — reliable with long system prompt + Edge Function */
 function chunkCounts(n: number): number[] {
   const out: number[] = [];
-  let left = n;
+  let left = Math.max(1, n);
   while (left > 0) {
-    const c = Math.min(3, left);
-    out.push(c);
-    left -= c;
+    out.push(1);
+    left -= 1;
   }
-  return out.length ? out : [3];
+  return out.length ? out : [1];
 }
 
 export default function GeneratePage() {
@@ -143,18 +142,37 @@ export default function GeneratePage() {
     attempt = 1
   ): Promise<{ posts: any[]; error?: string }> {
     try {
-      const genRes = await fetch("/api/grok/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startDate,
-          count,
-          dayOffset,
-          keywords: keywords.trim() || undefined,
-          mergedKeywords: mergedKeywords || undefined,
-          themes,
-        }),
-      });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("로그인이 필요합니다");
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error("NEXT_PUBLIC_SUPABASE_URL 없음");
+      }
+
+      const genRes = await fetch(
+        `${supabaseUrl}/functions/v1/generate-post`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+          },
+          body: JSON.stringify({
+            startDate,
+            count: 1,
+            dayOffset,
+            keywords: keywords.trim() || undefined,
+            mergedKeywords: mergedKeywords || undefined,
+            themes,
+          }),
+        }
+      );
       const data = await readJson(genRes);
       return { posts: data.posts || [] };
     } catch (err: any) {
@@ -205,7 +223,6 @@ export default function GeneratePage() {
         }
       }
 
-      // Plan: Grok decides daily counts
       setPhase("X 알고리즘 기준 일별 개수 계획 중...");
       let planDays: { dayOffset: number; count: number; themes: string[] }[] =
         [];
@@ -249,8 +266,7 @@ export default function GeneratePage() {
             mergedKeywords
           );
           if (posts.length) allPosts.push(...posts);
-          if (err)
-            batchErrors.push(`D${di + 1}B${bi + 1}: ${err}`);
+          if (err) batchErrors.push(`D${di + 1}B${bi + 1}: ${err}`);
         }
       }
 
@@ -287,15 +303,14 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.7
+            v2.2.0
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          Grok이 일별 KR 개수(3~6)를 정한 뒤, 많은 날은 묶음 분할 생성합니다.
-          하루 전체 목표 5~10(영 최대 2 가정).
+          Grok이 일별 개수를 정한 뒤 1개씩 순차 생성합니다 (Supabase Edge Function).
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
