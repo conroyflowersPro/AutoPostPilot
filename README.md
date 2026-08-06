@@ -1,10 +1,10 @@
-# AutoPostPilot v2.0.0
+# AutoPostPilot v2.2.0
 
 Specialized content management PWA for **@Seung4680**.
 
 특화 Grok이 콘텐츠를 편집·관리하는 주체입니다.
 
-## v2.0.0
+## v2.2.0
 
 - 사용자가 날짜를 선택하면 3일치 한국어 포스트를 특화 Grok이 생성
 - X 알고리즘 기반 점수 + 미디어 제안
@@ -27,18 +27,18 @@ Specialized content management PWA for **@Seung4680**.
 ## Tech Stack
 
 - Next.js 15 (App Router) + TypeScript
-- Supabase (Auth + PostgreSQL + Storage)
+- Supabase (Auth + PostgreSQL + Storage + Edge Functions)
 - Tailwind CSS
 - xAI Grok API
 - Fedica Publishing API
-- Netlify hosting
+- Netlify hosting (UI only)
 
 ## Environment Variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://ihhiyecifxrqxfpyylpt.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-XAI_API_KEY=...
+XAI_API_KEY=...   # Netlify env + Supabase secrets
 FEDICA_API_TOKEN=...
 ```
 
@@ -47,10 +47,20 @@ FEDICA_API_TOKEN=...
 - id, content, scheduled_at, status (draft / reviewed / scheduled / published)
 - pipeline_id, fedica_post_id, media_urls, user_id, created_at, updated_at
 
-## Next (remaining for full v1.0.0 UX)
+## v2.2.0 — Generation on Supabase Edge Function
 
-- Date picker + 3-day batch generation by specialized Grok
-- 3.5h minimum gap auto-scheduling logic
-- Date status / calendar view
-- Grok media edit (user-provided only, natural look)
-- Keyword request flow when needed
+- Post generation runs on **Supabase Edge Function** (`generate-post`)
+- **1 post per API call** (stable with long system prompt)
+- Netlify hosts UI only — no more 26s generation timeout
+
+### Deploy the Edge Function
+
+```bash
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+supabase functions deploy generate-post
+supabase secrets set XAI_API_KEY=YOUR_REAL_KEY_HERE
+```
+
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically.
+Do not hardcode any API keys in the repo.
