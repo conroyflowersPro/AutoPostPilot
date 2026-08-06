@@ -1,10 +1,10 @@
-# AutoPostPilot v1.0.0
+# AutoPostPilot v2.0.0
 
 Specialized content management PWA for **@Seung4680**.
 
 특화 Grok이 콘텐츠를 편집·관리하는 주체입니다.
 
-## v1.0.0 Goals
+## v2.0.0
 
 - 사용자가 날짜를 선택하면 3일치 한국어 포스트를 특화 Grok이 생성
 - X 알고리즘 기반 점수 + 미디어 제안
