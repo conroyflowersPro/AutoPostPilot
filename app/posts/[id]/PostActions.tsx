@@ -17,12 +17,16 @@ type Post = {
 export default function PostActions({ post }: { post: Post }) {
   const [review, setReview] = useState<any>(null);
   const [loadingReview, setLoadingReview] = useState(false);
+  const [applyingRevision, setApplyingRevision] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<any>(null);
+  const [selectingCandidate, setSelectingCandidate] = useState<number | null>(
+    null
+  );
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
@@ -54,6 +58,30 @@ export default function PostActions({ post }: { post: Post }) {
       setMessage(err.message);
     } finally {
       setLoadingReview(false);
+    }
+  }
+
+  async function handleApplyRevision() {
+    if (!review?.revisedContent) return;
+    if (!confirm("수정 제안으로 본문을 바꿀까요?")) return;
+
+    setApplyingRevision(true);
+    setMessage(null);
+    try {
+      const { error } = await supabase
+        .from("SeungContent")
+        .update({
+          content: review.revisedContent,
+          status: "reviewed",
+        })
+        .eq("id", post.id);
+      if (error) throw error;
+      setMessage("수정 제안이 본문에 적용되었습니다.");
+      router.refresh();
+    } catch (err: any) {
+      setMessage(err.message || "적용 실패");
+    } finally {
+      setApplyingRevision(false);
     }
   }
 
@@ -153,24 +181,42 @@ export default function PostActions({ post }: { post: Post }) {
 
       setGenResult(data);
 
-      if (data.imageUrl) {
-        const urls = [...(post.media_urls || []), data.imageUrl];
-        await supabase
-          .from("SeungContent")
-          .update({ media_urls: urls })
-          .eq("id", post.id);
-        setMessage("AI 이미지 생성 후 첨부 완료");
-        router.refresh();
+      if (data.candidates?.length) {
+        setMessage(
+          `샘플 ${data.candidates.length}장 준비됨 — 원하는 이미지를 선택하세요.`
+        );
+      } else if (data.imageUrl) {
+        setMessage("이미지 1장 생성됨 — 아래에서 선택하세요.");
       } else {
         setMessage(
           data.message ||
-            "프롬프트가 준비되었습니다. 폰 촬영 후 업로드하세요."
+            "생성 제한. 폰으로 촬영해 업로드하거나 프롬프트를 사용하세요."
         );
       }
     } catch (err: any) {
       setMessage(err.message);
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleSelectCandidate(url: string, index: number) {
+    if (post.status === "scheduled") return;
+    setSelectingCandidate(index);
+    setMessage(null);
+    try {
+      const urls = [...(post.media_urls || []), url];
+      const { error } = await supabase
+        .from("SeungContent")
+        .update({ media_urls: urls })
+        .eq("id", post.id);
+      if (error) throw error;
+      setMessage("선택한 이미지가 첨부되었습니다.");
+      router.refresh();
+    } catch (err: any) {
+      setMessage(err.message || "첨부 실패");
+    } finally {
+      setSelectingCandidate(null);
     }
   }
 
@@ -236,6 +282,12 @@ export default function PostActions({ post }: { post: Post }) {
   const hasMedia = post.media_urls && post.media_urls.length > 0;
   const canSchedule = post.status === "reviewed";
   const mediaLocked = post.status === "scheduled";
+  const candidates: string[] =
+    genResult?.candidates?.length > 0
+      ? genResult.candidates
+      : genResult?.imageUrl
+      ? [genResult.imageUrl]
+      : [];
 
   return (
     <div className="space-y-4">
@@ -296,6 +348,16 @@ export default function PostActions({ post }: { post: Post }) {
                 <p className="whitespace-pre-wrap text-xs leading-relaxed">
                   {review.revisedContent}
                 </p>
+                <button
+                  type="button"
+                  onClick={handleApplyRevision}
+                  disabled={applyingRevision || mediaLocked}
+                  className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {applyingRevision
+                    ? "적용 중..."
+                    : "✓ 수정 제안 적용 (본문 교체)"}
+                </button>
               </div>
             )}
           </div>
@@ -372,8 +434,7 @@ export default function PostActions({ post }: { post: Post }) {
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          잘못 올린 이미지는 ✕ 삭제로 제거할 수 있습니다. 일괄 스케줄에는
-          미디어가 필요합니다.
+          잘못 올린 이미지는 ✕ 삭제로 제거. 일괄 스케줄에는 미디어 필요.
         </p>
 
         <button
@@ -383,13 +444,42 @@ export default function PostActions({ post }: { post: Post }) {
           className="mt-3 w-full rounded-lg border border-indigo-800/60 bg-indigo-950/40 py-2.5 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
         >
           {generating
-            ? "Grok 이미지 생성 중..."
-            : "✨ Grok으로 이미지 생성 (선택)"}
+            ? "Grok 샘플 생성 중 (최대 4장)..."
+            : "✨ Grok 이미지 샘플 생성"}
         </button>
 
-        {genResult?.prompt && !genResult.imageUrl && (
+        {candidates.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-zinc-400">
+              샘플 중 원하는 이미지를 탭해서 첨부하세요 ({candidates.length}장)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {candidates.map((url, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleSelectCandidate(url, i)}
+                  disabled={selectingCandidate !== null || mediaLocked}
+                  className="relative aspect-square overflow-hidden rounded-lg border border-indigo-700/50 bg-zinc-900 ring-offset-2 ring-offset-zinc-950 hover:ring-2 hover:ring-indigo-500 disabled:opacity-50"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`candidate-${i}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
+                    {selectingCandidate === i ? "첨부 중…" : `선택 ${i + 1}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {genResult?.prompt && candidates.length === 0 && (
           <div className="mt-2 rounded-lg bg-zinc-800/80 p-2 text-[11px] text-zinc-400">
-            <p className="mb-1 text-zinc-500">생성 프롬프트:</p>
+            <p className="mb-1 text-zinc-500">생성 프롬프트 (참고):</p>
             <p className="whitespace-pre-wrap">{genResult.prompt}</p>
           </div>
         )}
