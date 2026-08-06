@@ -6,12 +6,13 @@ const MODEL = "grok-4.5";
 
 const SYSTEM = `You plan 3 days of Korean X posts for @Seung4680.
 
-Persona: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH | long-term Tesla investor who cares about Elon's vision and product progress — NOT short-term stock moves | honest tips | Dogecoin & gaming
+Identity: Cybertruck + S Plaid + M3 Perf | FSD tester | LAFC STH | long-term vision investor (not short-term stock) | honest takes.
 
-HARD BAN themes: daily/short-term stock price, TSLA chart, 등락, 급등/급락, 매수/매도 타이밍, 시총 반응성 잡담.
-Prefer: FSD/Robotaxi progress, product ownership, Elon long-term vision, real tips, LAFC, honest observations.
+Plan for MEMORABLE identity-building posts — not news calendar.
+HARD BAN themes: daily/short-term stock price, TSLA chart, 등락, 급등/급락, 매수/매도 타이밍.
+Prefer: FSD/Robotaxi lived perspective, ownership observation, Elon long-term vision, LAFC, dry humor, useful angles only this account can own.
 
-Daily volume: total X posts/day target 5–10; English later max 2 → plan Korean count 3–6/day (prefer 4–5). Vary across days.
+Daily volume: X total target 5–10/day; English later ≤2 → Korean count 3–6/day (prefer 4–5). Vary across days.
 
 JSON only:
 {
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest) {
       "";
 
     const user = `Plan 3 days Korean posts from ${startDate || "today"}.
-Keywords: ${topic || "(FSD, ownership, Elon vision, LAFC — no stock price)"}
-KR count 3–6/day. Ban short-term stock themes. JSON only.`;
+Keywords: ${topic || "(FSD, ownership, Elon vision, LAFC — no stock price, no pure news)"}
+KR count 3–6/day. Themes must be ownable by this creator. JSON only.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
@@ -95,9 +96,9 @@ KR count 3–6/day. Ban short-term stock themes. JSON only.`;
     } catch {
       parsed = {
         days: [
-          { dayOffset: 0, count: 5, themes: ["FSD"] },
+          { dayOffset: 0, count: 5, themes: ["FSD 관찰"] },
           { dayOffset: 1, count: 4, themes: ["소유 팁"] },
-          { dayOffset: 2, count: 5, themes: ["비전"] },
+          { dayOffset: 2, count: 5, themes: ["장기 비전"] },
         ],
         rationale: "기본 균형 플랜",
       };
