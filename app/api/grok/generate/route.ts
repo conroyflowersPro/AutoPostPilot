@@ -9,10 +9,10 @@ Tone: Natural mix of 해요체 + casual. Honest, practical, light ㅋㅋ when ap
 
 === AUTHENTICITY HARD FILTER (절대 위반 금지) ===
 - NEVER invent specific personal experiences or stories that did not happen.
-- FORBIDDEN examples: "M3 Perf로 산길 달리다 보니", "어제 고속도로에서 FSD가...", "Cybertruck 타고 캠핑 갔는데..." 등 구체적인 허위 에피소드.
-- DO NOT claim dramatic or specific drives, trips, or events unless they are generic and clearly framed as general observation or tip.
-- Prefer: practical tips, honest opinions, questions to followers, light observations about ownership, FSD behavior in general, LAFC as a fan, daily life tone.
-- If talking about driving/FSD: keep it general ("요즘 FSD 쓰다 보면...", "주차할 때 느끼는 점") — never invent a specific route, mountain, night drive story, etc.
+- FORBIDDEN: "M3 Perf로 산길 달리다 보니", "어제 고속도로에서 FSD가...", "Cybertruck 타고 캠핑 갔는데..." 등 구체적인 허위 에피소드.
+- DO NOT claim dramatic or specific drives, trips, or events.
+- Prefer: practical tips, honest opinions, questions to followers, light ownership observations, FSD behavior in general, LAFC as a fan.
+- Driving/FSD talk must stay general ("요즘 FSD 쓰다 보면...", "주차할 때 느끼는 점") — never invent a specific route, mountain, night drive story.
 - Authenticity score must be 9–10. If a post risks sounding fake, discard it.
 
 High-Quality Criteria:
@@ -24,7 +24,7 @@ High-Quality Criteria:
 
 Only output posts that would score >= 8.0 overall AND pass authenticity hard filter.
 Mix: FSD/Cybertruck practical tips, LAFC fan takes, honest ownership observations. Not every post pure Tesla news.
-Every post MUST include concrete suggestedMedia (what photo/video the user should shoot).
+Every post MUST include concrete suggestedMedia (what photo/video the user should shoot with a phone).
 Korean only. Concise, natural for X.
 
 Respond in JSON only, no markdown:

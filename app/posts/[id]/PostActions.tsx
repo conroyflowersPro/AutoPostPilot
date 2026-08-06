@@ -19,6 +19,7 @@ export default function PostActions({ post }: { post: Post }) {
   const [loadingReview, setLoadingReview] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
@@ -119,6 +120,26 @@ export default function PostActions({ post }: { post: Post }) {
       setMessage(err.message);
     } finally {
       setScheduling(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("이 포스트를 삭제할까요? (Fedica에는 올라가지 않은 draft만 삭제됩니다)")) {
+      return;
+    }
+    setDeleting(true);
+    setMessage(null);
+    try {
+      const { error } = await supabase
+        .from("SeungContent")
+        .delete()
+        .eq("id", post.id);
+      if (error) throw error;
+      router.push("/");
+      router.refresh();
+    } catch (err: any) {
+      setMessage(err.message || "삭제 실패");
+      setDeleting(false);
     }
   }
 
@@ -227,6 +248,15 @@ export default function PostActions({ post }: { post: Post }) {
           : hasMedia
           ? "Fedica로 스케줄링 (미디어 포함)"
           : "Fedica로 스케줄링 (텍스트만)"}
+      </button>
+
+      {/* Delete */}
+      <button
+        onClick={handleDelete}
+        disabled={deleting || post.status === "scheduled"}
+        className="w-full rounded-xl border border-red-900/60 bg-red-950/40 py-2.5 text-sm text-red-300 hover:bg-red-900/40 disabled:opacity-40"
+      >
+        {deleting ? "삭제 중..." : "포스트 삭제"}
       </button>
 
       {message && (
