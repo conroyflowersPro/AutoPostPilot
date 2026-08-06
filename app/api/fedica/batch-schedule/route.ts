@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { uploadMultipleMedia } from "@/lib/fedica";
 import {
   computeKRBatchStartISO,
+  computeStartISOForDate,
   assignSlotsWithGrok,
+  buildDaySpreadSlots,
 } from "@/lib/schedule";
 
 export async function POST(req: NextRequest) {
@@ -14,6 +16,12 @@ export async function POST(req: NextRequest) {
     const postIds: string[] = Array.isArray(body.postIds)
       ? body.postIds.map(String)
       : [];
+    const startDate =
+      typeof body.startDate === "string" ? body.startDate.trim() : "";
+    const maxPerDay = Math.min(
+      8,
+      Math.max(3, Number(body.maxPerDay) || 5)
+    );
 
     const token = process.env.FEDICA_API_TOKEN;
     const xaiKey = process.env.XAI_API_KEY;
@@ -63,18 +71,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const startISO = computeKRBatchStartISO();
+    const startISO = startDate
+      ? computeStartISOForDate(startDate)
+      : computeKRBatchStartISO();
+
     const slots = xaiKey
       ? await assignSlotsWithGrok(
           eligible.map((p) => ({ id: p.id, content: p.content })),
           startISO,
-          xaiKey
+          xaiKey,
+          maxPerDay
         )
-      : eligible.map((_: any, i: number) =>
-          new Date(
-            new Date(startISO).getTime() + i * 3 * 60 * 60 * 1000
-          ).toISOString()
-        );
+      : buildDaySpreadSlots(startISO, eligible.length, maxPerDay);
 
     const results: any[] = [];
     const failures: any[] = [];
@@ -138,10 +146,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       startISO,
+      startDate: startDate || null,
+      maxPerDay,
       scheduled: results,
       failed: failures,
       total: eligible.length,
-      message: `${results.length}/${eligible.length}개 스케줄 완료`,
+      message: `${results.length}/${eligible.length}개 스케줄 (시작 ${startDate || "오늘"}, 하루 최대 ${maxPerDay})`,
     });
   } catch (err: any) {
     console.error(err);

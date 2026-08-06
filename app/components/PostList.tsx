@@ -32,9 +32,17 @@ function formatLA(iso: string) {
   });
 }
 
+function todayLA() {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Los_Angeles",
+  });
+}
+
 export default function PostList({ posts }: { posts: Post[] }) {
   const [filter, setFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [startDate, setStartDate] = useState(todayLA);
+  const [maxPerDay, setMaxPerDay] = useState(5);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [scheduleResult, setScheduleResult] = useState<any>(null);
@@ -79,7 +87,11 @@ export default function PostList({ posts }: { posts: Post[] }) {
 
   async function handleDelete(id: string, status: string) {
     if (status === "scheduled") {
-      if (!confirm("이미 스케줄된 포스트입니다. 앱에서만 삭제할까요? (Fedica 쪽은 수동 확인)"))
+      if (
+        !confirm(
+          "이미 스케줄된 포스트입니다. 앱에서만 삭제할까요? (Fedica 쪽은 수동 확인)"
+        )
+      )
         return;
     } else if (!confirm("이 포스트를 삭제할까요?")) {
       return;
@@ -112,7 +124,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 일괄 스케줄할까요?\n(17:00 LA 기준, 최소 3시간 간격)`
+        `선택한 ${ids.length}개를 Fedica 일괄 스케줄할까요?\n시작일: ${startDate} (LA)\n하루 최대 ${maxPerDay}개 · 최소 3시간 간격`
       )
     )
       return;
@@ -128,6 +140,8 @@ export default function PostList({ posts }: { posts: Post[] }) {
           pipelineId: "42303",
           requireMedia: true,
           postIds: ids,
+          startDate,
+          maxPerDay,
         }),
       });
       const data = await res.json();
@@ -145,7 +159,6 @@ export default function PostList({ posts }: { posts: Post[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Status summary */}
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
@@ -163,12 +176,39 @@ export default function PostList({ posts }: { posts: Post[] }) {
         ))}
       </div>
 
-      {/* Selection + batch */}
       <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-3">
         <p className="text-xs text-zinc-400">
           Fedica는 <strong className="text-emerald-300">선택한 포스트만</strong>{" "}
-          일괄 스케줄 (reviewed + 미디어)
+          · 시작일 기준으로 일자 분산
         </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] text-zinc-500">
+              스케줄 시작일 (LA)
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-zinc-500">
+              하루 최대 개수
+            </label>
+            <input
+              type="number"
+              min={3}
+              max={8}
+              value={maxPerDay}
+              onChange={(e) => setMaxPerDay(Number(e.target.value) || 5)}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-2 text-xs">
           <button
             type="button"
@@ -184,24 +224,26 @@ export default function PostList({ posts }: { posts: Post[] }) {
           >
             선택 해제
           </button>
-          <span className="self-center text-zinc-500">
-            선택 {selected.size}개
-          </span>
+          <span className="self-center text-zinc-500">선택 {selected.size}개</span>
         </div>
+
         <button
           type="button"
           onClick={handleBatchSchedule}
           disabled={busy || selected.size === 0}
           className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 sm:w-auto sm:px-5"
         >
-          {busy ? "처리 중…" : `선택 ${selected.size}개 Fedica 일괄 스케줄`}
+          {busy
+            ? "처리 중…"
+            : `선택 ${selected.size}개 · ${startDate}부터 일괄 스케줄`}
         </button>
+
         {msg && <p className="text-xs text-zinc-400">{msg}</p>}
         {scheduleResult?.scheduled?.length > 0 && (
-          <ul className="space-y-1 text-xs text-zinc-300">
+          <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-zinc-300">
             {scheduleResult.scheduled.map((s: any) => (
               <li key={s.id}>
-                예정 {formatLA(s.scheduledAt)}
+                예정 {formatLA(s.scheduledAt)} LA
                 {s.mediaCount ? ` · 미디어 ${s.mediaCount}` : ""}
               </li>
             ))}
@@ -226,9 +268,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
               <div
                 key={post.id}
                 className={`rounded-xl border bg-zinc-900/60 p-4 ${
-                  checked
-                    ? "border-emerald-600"
-                    : "border-zinc-800"
+                  checked ? "border-emerald-600" : "border-zinc-800"
                 }`}
               >
                 <div className="flex items-start gap-3">
