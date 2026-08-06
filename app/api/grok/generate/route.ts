@@ -7,14 +7,14 @@ const MODEL = "grok-4.5";
 
 const SYSTEM_PROMPT = `You write X posts for @Seung4680 (Korean only).
 Persona: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | honest tips | Dogecoin & gaming
-Tone: 해요체 + casual. No pure 반말.
+Tone: 해요체 + casual.
 
-X priority: conversation question (must), first-line hook, follow reason, authenticity.
-OK: reasoned opinion, tips, comparisons, questions.
-BAN: fake personal episodes/sensory stories, bragging, English sentences (proper nouns OK: FSD, Cybertruck, Tesla, Model 3/S/Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X).
+Must: reply-inviting question, first-line hook.
+OK: opinion, tips, comparisons.
+BAN: fake personal episodes, bragging, English sentences (proper nouns OK).
 
-Only score>=8.0 posts. Mix formats. JSON only:
-{"posts":[{"content":"한국어","score":number,"suggestedMedia":"한국어","dayOffset":0,"slot":1}]}`;
+Return exactly the requested number of posts. JSON only:
+{"posts":[{"content":"한국어","score":8,"suggestedMedia":"한국어","slot":1}]}`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hard cap: 3 posts per request for Netlify ~26s limit
     const total = Math.min(Math.max(Number(count) || 3, 1), 3);
     const offset = typeof dayOffset === "number" ? dayOffset : 0;
     const topic =
@@ -43,10 +42,9 @@ export async function POST(req: NextRequest) {
       (typeof keywords === "string" && keywords.trim()) ||
       "";
 
-    const textPart = `한국어 포스트 ${total}개. dayOffset=${offset} 고정. 시작일 참고: ${startDate || "오늘"}.
-주제: ${topic || "FSD, 소유 팁, LAFC, 솔직한 관찰 믹스"}
-추론 OK / 허위 경험·잘난 척 금지 / 답글 질문 필수.
-JSON만.`;
+    const textPart = `한국어 포스트 정확히 ${total}개. dayOffset=${offset}. 시작일: ${startDate || "오늘"}.
+주제: ${topic || "FSD, 소유 팁, LAFC, 솔직한 관찰"}
+추론 OK / 허위 경험 금지 / 답글 질문 필수. JSON만.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 22000);
@@ -65,7 +63,7 @@ JSON만.`;
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: textPart },
           ],
-          temperature: 0.7,
+          temperature: 0.75,
         }),
         signal: controller.signal,
       });
@@ -113,15 +111,16 @@ JSON만.`;
       );
     }
 
-    const qualityPosts = parsed.posts.filter((p: any) => {
-      const t = (p.content || "").trim();
-      if (!t) return false;
-      const latinChars = (t.match(/[A-Za-z]/g) || []).length;
-      const totalChars = t.replace(/\s/g, "").length || 1;
-      if (latinChars / totalChars >= 0.35) return false;
-      const score = typeof p.score === "number" ? p.score : 8;
-      return score >= 7.5;
-    }).slice(0, total);
+    // Soft filter: keep Korean posts; don't drop for self-score
+    const qualityPosts = parsed.posts
+      .filter((p: any) => {
+        const t = (p.content || "").trim();
+        if (!t) return false;
+        const latinChars = (t.match(/[A-Za-z]/g) || []).length;
+        const totalChars = t.replace(/\s/g, "").length || 1;
+        return latinChars / totalChars < 0.4;
+      })
+      .slice(0, total);
 
     const supabase = await createClient();
     const {
@@ -162,13 +161,12 @@ JSON만.`;
       posts: inserted,
       dayOffset: offset,
       mergedKeywords: topic,
-      droppedLowQuality: Math.max(0, parsed.posts.length - qualityPosts.length),
     });
   } catch (err: any) {
     console.error(err);
     const msg =
       err?.name === "AbortError"
-        ? "포스트 생성 시간 초과. 잠시 후 다시 시도하세요."
+        ? "포스트 생성 시간 초과"
         : err.message || "Internal error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

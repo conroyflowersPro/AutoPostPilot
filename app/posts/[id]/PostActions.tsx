@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Post = {
   id: string;
@@ -20,7 +21,6 @@ export default function PostActions({ post }: { post: Post }) {
   const [applyingRevision, setApplyingRevision] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
-  const [scheduling, setScheduling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<any>(null);
@@ -220,41 +220,6 @@ export default function PostActions({ post }: { post: Post }) {
     }
   }
 
-  async function handleSchedule() {
-    if (post.status !== "reviewed") {
-      setMessage("검수(reviewed) 완료 후에만 스케줄할 수 있습니다.");
-      return;
-    }
-
-    setScheduling(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/fedica/schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postId: post.id,
-          content: post.content,
-          pipelineId: post.pipeline_id,
-          mediaUrls: post.media_urls,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "스케줄 실패");
-
-      const mediaNote =
-        data.mediaIds && data.mediaIds.length > 0
-          ? ` (미디어 ${data.mediaIds.length}개)`
-          : " (텍스트만)";
-      setMessage(`스케줄 완료 (Fedica ID: ${data.fedicaId})${mediaNote}`);
-      router.refresh();
-    } catch (err: any) {
-      setMessage(err.message);
-    } finally {
-      setScheduling(false);
-    }
-  }
-
   async function handleDelete() {
     if (
       !confirm(
@@ -280,7 +245,6 @@ export default function PostActions({ post }: { post: Post }) {
   }
 
   const hasMedia = post.media_urls && post.media_urls.length > 0;
-  const canSchedule = post.status === "reviewed";
   const mediaLocked = post.status === "scheduled";
   const candidates: string[] =
     genResult?.candidates?.length > 0
@@ -434,7 +398,7 @@ export default function PostActions({ post }: { post: Post }) {
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          잘못 올린 이미지는 ✕ 삭제로 제거. 일괄 스케줄에는 미디어 필요.
+          일괄 스케줄에는 미디어 + 검수(reviewed) 필요.
         </p>
 
         <button
@@ -451,7 +415,7 @@ export default function PostActions({ post }: { post: Post }) {
         {candidates.length > 0 && (
           <div className="mt-3 space-y-2">
             <p className="text-xs text-zinc-400">
-              샘플 중 원하는 이미지를 탭해서 첨부하세요 ({candidates.length}장)
+              샘플 중 원하는 이미지를 탭해서 첨부 ({candidates.length}장)
             </p>
             <div className="grid grid-cols-2 gap-2">
               {candidates.map((url, i) => (
@@ -476,32 +440,20 @@ export default function PostActions({ post }: { post: Post }) {
             </div>
           </div>
         )}
-
-        {genResult?.prompt && candidates.length === 0 && (
-          <div className="mt-2 rounded-lg bg-zinc-800/80 p-2 text-[11px] text-zinc-400">
-            <p className="mb-1 text-zinc-500">생성 프롬프트 (참고):</p>
-            <p className="whitespace-pre-wrap">{genResult.prompt}</p>
-          </div>
-        )}
       </div>
 
-      <button
-        onClick={handleSchedule}
-        disabled={
-          scheduling || post.status === "scheduled" || !canSchedule
-        }
-        className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-      >
-        {scheduling
-          ? "업로드 중… (Fedica)"
-          : post.status === "scheduled"
-          ? "이미 스케줄됨"
-          : !canSchedule
-          ? "검수 완료 후 스케줄 가능"
-          : hasMedia
-          ? "Fedica로 스케줄링 (미디어 포함)"
-          : "Fedica로 스케줄링 (텍스트만)"}
-      </button>
+      <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-center">
+        <p className="text-xs text-emerald-200/90">
+          Fedica 스케줄은 <strong>홈 화면 일괄 스케줄</strong>만 사용합니다.
+          (단건 스케줄 제거됨)
+        </p>
+        <Link
+          href="/"
+          className="mt-2 inline-block rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium hover:bg-emerald-600"
+        >
+          홈에서 일괄 스케줄 →
+        </Link>
+      </div>
 
       <button
         onClick={handleDelete}

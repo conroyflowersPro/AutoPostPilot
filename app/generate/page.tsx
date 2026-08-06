@@ -123,6 +123,35 @@ export default function GeneratePage() {
     return urls;
   }
 
+  async function generateDay(
+    day: number,
+    mergedKeywords: string,
+    attempt = 1
+  ): Promise<{ posts: any[]; error?: string }> {
+    try {
+      const genRes = await fetch("/api/grok/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate,
+          count: 3,
+          dayOffset: day,
+          keywords: keywords.trim() || undefined,
+          mergedKeywords: mergedKeywords || undefined,
+        }),
+      });
+      const data = await readJson(genRes);
+      return { posts: data.posts || [] };
+    } catch (err: any) {
+      if (attempt < 2) {
+        setPhase(`Day ${day + 1}/3 재시도 중...`);
+        await new Promise((r) => setTimeout(r, 1500));
+        return generateDay(day, mergedKeywords, attempt + 1);
+      }
+      return { posts: [], error: err.message || "실패" };
+    }
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -133,7 +162,6 @@ export default function GeneratePage() {
     try {
       let mergedKeywords = keywords.trim();
 
-      // Optional screenshot → keywords (fail soft)
       if (files.length > 0) {
         try {
           setPhase("스샷 업로드 중...");
@@ -153,31 +181,24 @@ export default function GeneratePage() {
             (extractData.keywords || []).join(", ") ||
             keywords.trim();
         } catch {
-          // continue with text keywords only
-          setPhase("스샷 분석 생략 — 텍스트 키워드로 진행");
+          setPhase("스샷 생략 — 텍스트 키워드로 진행");
         }
       }
 
-      // 3 sequential day batches × 3 posts = ~9 posts total
       const allPosts: any[] = [];
-      let dropped = 0;
+      const dayErrors: string[] = [];
 
       for (let day = 0; day < 3; day++) {
-        setPhase(`Day ${day + 1}/3 작성 중... (${allPosts.length}개 완료)`);
-        const genRes = await fetch("/api/grok/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            startDate,
-            count: 3,
-            dayOffset: day,
-            keywords: keywords.trim() || undefined,
-            mergedKeywords: mergedKeywords || undefined,
-          }),
-        });
-        const data = await readJson(genRes);
-        if (data.posts?.length) allPosts.push(...data.posts);
-        dropped += data.droppedLowQuality || 0;
+        setPhase(`Day ${day + 1}/3 작성 중... (누적 ${allPosts.length}개)`);
+        const { posts, error: dayErr } = await generateDay(day, mergedKeywords);
+        if (posts.length) allPosts.push(...posts);
+        if (dayErr) dayErrors.push(`Day ${day + 1}: ${dayErr}`);
+      }
+
+      if (allPosts.length === 0) {
+        throw new Error(
+          dayErrors.join(" / ") || "생성된 포스트가 없습니다. 다시 시도하세요."
+        );
       }
 
       setResult({
@@ -185,7 +206,7 @@ export default function GeneratePage() {
         count: allPosts.length,
         posts: allPosts,
         mergedKeywords,
-        droppedLowQuality: dropped,
+        dayErrors,
         model: "grok-4.5",
       });
     } catch (err: any) {
@@ -205,14 +226,14 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.5
+            v1.4.6
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          3일치를 Day별로 나눠 생성합니다 (요청당 3개 · Netlify 26초 한도).
+          Day1→2→3 분할 생성 (각 3개, 실패 시 해당 Day만 재시도). 목표 약 9개.
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -318,9 +339,9 @@ export default function GeneratePage() {
                   사용 키워드: {result.mergedKeywords}
                 </p>
               )}
-              {result.droppedLowQuality > 0 && (
+              {result.dayErrors?.length > 0 && (
                 <p className="mt-1 text-xs text-amber-300">
-                  품질 미달 {result.droppedLowQuality}개 제외
+                  일부 Day 실패: {result.dayErrors.join(" · ")}
                 </p>
               )}
               <button

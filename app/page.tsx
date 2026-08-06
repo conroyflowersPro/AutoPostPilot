@@ -34,7 +34,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.4.5
+              v1.4.6
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -70,9 +70,10 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+        <div className="mb-6 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
           <p className="mb-3 text-xs text-zinc-400">
-            한국어 일괄 스케줄: reviewed + 미디어 · 17:00 LA · 최소 3시간
+            Fedica는 <strong className="text-emerald-300">일괄 스케줄만</strong> ·
+            reviewed + 미디어 · 17:00 LA · 최소 3시간
           </p>
           <BatchScheduleButton reviewedCount={reviewedReady} />
         </div>
