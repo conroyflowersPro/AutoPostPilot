@@ -7,6 +7,7 @@
  */
 
 const TZ = "America/Los_Angeles";
+const MODEL = "grok-4.5";
 
 export function getLAParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -23,7 +24,6 @@ export function getLAParts(date = new Date()) {
     parts.find((p) => p.type === type)?.value || "0";
 
   let hour = parseInt(get("hour"), 10);
-  // Intl may return 24 for midnight in some engines
   if (hour === 24) hour = 0;
 
   return {
@@ -35,7 +35,6 @@ export function getLAParts(date = new Date()) {
   };
 }
 
-/** Build a Date that represents a LA wall-clock time as UTC ISO for Fedica */
 export function laWallTimeToISO(
   year: number,
   month: number,
@@ -43,8 +42,7 @@ export function laWallTimeToISO(
   hour: number,
   minute = 0
 ): string {
-  // Iterate to find UTC instant whose LA local matches
-  const guess = new Date(Date.UTC(year, month - 1, day, hour + 8, minute)); // PDT approx
+  const guess = new Date(Date.UTC(year, month - 1, day, hour + 8, minute));
   for (let i = 0; i < 48; i++) {
     const p = getLAParts(guess);
     if (
@@ -59,7 +57,6 @@ export function laWallTimeToISO(
     const targetMin = hour * 60 + minute;
     const actualMin = p.hour * 60 + p.minute;
     let diff = targetMin - actualMin;
-    // day boundary rough adjust
     if (p.day !== day || p.month !== month) {
       diff += (day - p.day) * 24 * 60;
     }
@@ -68,7 +65,6 @@ export function laWallTimeToISO(
   return guess.toISOString();
 }
 
-/** First eligible start time for KR batch */
 export function computeKRBatchStartISO(now = new Date()): string {
   const p = getLAParts(now);
   const anchorHour = 17;
@@ -77,23 +73,20 @@ export function computeKRBatchStartISO(now = new Date()): string {
     return laWallTimeToISO(p.year, p.month, p.day, anchorHour, 0);
   }
 
-  // Past 17:00 → next full hour
   let hour = p.minute > 0 ? p.hour + 1 : p.hour;
   let day = p.day;
   let month = p.month;
   let year = p.year;
 
   if (p.minute === 0 && p.hour >= anchorHour) {
-    // exactly on the hour → use this hour if >= 17, else already handled
     hour = p.hour;
   }
 
   if (hour >= 24) {
     hour = 0;
-    const next = new Date(Date.UTC(year, month - 1, day + 1));
-    const np = getLAParts(next);
-    // simpler: add 1 day via Date
-    const tmp = new Date(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T12:00:00Z`);
+    const tmp = new Date(
+      `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T12:00:00Z`
+    );
     tmp.setUTCDate(tmp.getUTCDate() + 1);
     const tp = getLAParts(tmp);
     year = tp.year;
@@ -105,13 +98,12 @@ export function computeKRBatchStartISO(now = new Date()): string {
   return laWallTimeToISO(year, month, day, hour, 0);
 }
 
-/** Fallback evenly spaced slots if Grok fails: min 3h gap */
 export function fallbackSlots(startISO: string, count: number): string[] {
   const slots: string[] = [];
   let t = new Date(startISO).getTime();
   for (let i = 0; i < count; i++) {
     slots.push(new Date(t).toISOString());
-    t += 3 * 60 * 60 * 1000; // +3h minimum
+    t += 3 * 60 * 60 * 1000;
   }
   return slots;
 }
@@ -124,21 +116,18 @@ export async function assignSlotsWithGrok(
   if (posts.length === 0) return [];
 
   const system = `You are a specialized Growth & Content Agent for @Seung4680.
-Assign optimal X (Twitter) posting times in America/Los_Angeles.
+Assign optimal X posting times in America/Los_Angeles for maximum early engagement.
 
 Rules:
-- First post must be at or after ${startISO}
+- First post at or after ${startISO}
 - Minimum 3 hours between consecutive posts
-- Prefer high-engagement windows for X (evenings, commute-ish, late evening), avoid dead hours when possible
-- Return ISO 8601 UTC times
-- One time per post, same order as input
+- Prefer X high-activity windows; avoid dead hours when possible
+- ISO 8601 UTC times, one per post, same order
 
-JSON only:
-{ "times": ["2026-08-06T00:00:00.000Z", ...] }`;
+JSON only: { "times": ["..."] }`;
 
-  const user = `Assign ${posts.length} schedule times starting from ${startISO} (min 3h gap).
-Posts (order must be preserved):
-${posts.map((p, i) => `${i + 1}. id=${p.id} | ${p.content.slice(0, 120)}`).join("\n")}`;
+  const user = `Assign ${posts.length} times from ${startISO} (min 3h gap).
+${posts.map((p, i) => `${i + 1}. ${p.id} | ${p.content.slice(0, 100)}`).join("\n")}`;
 
   try {
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
@@ -148,7 +137,7 @@ ${posts.map((p, i) => `${i + 1}. id=${p.id} | ${p.content.slice(0, 120)}`).join(
         Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: "grok-3",
+        model: MODEL,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -169,14 +158,14 @@ ${posts.map((p, i) => `${i + 1}. id=${p.id} | ${p.content.slice(0, 120)}`).join(
       return fallbackSlots(startISO, posts.length);
     }
 
-    // Validate min 3h and start bound; fix if broken
     const startMs = new Date(startISO).getTime();
     const fixed: string[] = [];
     let last = startMs - 3 * 60 * 60 * 1000;
 
     for (let i = 0; i < times.length; i++) {
       let ms = new Date(times[i]).getTime();
-      if (isNaN(ms) || ms < startMs) ms = Math.max(startMs, last + 3 * 60 * 60 * 1000);
+      if (isNaN(ms) || ms < startMs)
+        ms = Math.max(startMs, last + 3 * 60 * 60 * 1000);
       if (ms < last + 3 * 60 * 60 * 1000) ms = last + 3 * 60 * 60 * 1000;
       fixed.push(new Date(ms).toISOString());
       last = ms;

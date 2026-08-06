@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for the X account @Seung4680.
+const MODEL = "grok-4.5";
 
-Account voice: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH | Real-world drives, tips & honest takes | Dogecoin & gaming
-Tone: Natural mix of 해요체 + casual expressions. Honest, practical, light ㅋㅋ when appropriate.
+const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for @Seung4680.
+Score posts strictly for X algorithm fit.
 
-High-Quality Criteria (priority order):
-1. Conversation Potential (40%) - Does it invite replies?
-2. Early Velocity & Dwell (25%)
+Account: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | honest practical takes
+Tone: 해요체 + casual.
+
+Weighted criteria:
+1. Conversation Potential (40%) — Does it invite real replies?
+2. Early Velocity & Dwell (25%) — Hook in first line? Mobile dwell?
 3. Profile & Follow Incentive (15%)
-4. Authenticity & Brand Fit (15%) - HARD FILTER
-5. Media & Format Advantage (5%)
+4. Authenticity & Brand Fit (15%) — HARD FILTER. Fake personal stories → authenticity <= 4 and overall fails.
+5. Media & Format (5%)
 
-Score each 1-10. Weighted average. Only recommend if >= 8.0.
+Score each 1–10. Weighted average.
+Be honest: bland generic posts should land 5–7. Only strong conversation+hook posts reach 8+.
+If overall < 8, always provide revisedContent that would score 8+ (Korean, same rules, no fake stories).
 
-Respond in JSON only:
+JSON only:
 {
   "score": number,
   "scores": {
@@ -24,9 +29,9 @@ Respond in JSON only:
     "authenticity": number,
     "media": number
   },
-  "feedback": "string in Korean",
-  "suggestedMedia": "what kind of image/video is needed",
-  "revisedContent": "improved version if needed, otherwise null"
+  "feedback": "한국어 피드백",
+  "suggestedMedia": "한국어 미디어 제안",
+  "revisedContent": "개선본 또는 null"
 }`;
 
 export async function POST(req: NextRequest) {
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: "grok-3",
+        model: MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -62,7 +67,7 @@ export async function POST(req: NextRequest) {
             content: `Track: ${track}\n\nPost to review:\n\n${content}`,
           },
         ],
-        temperature: 0.3,
+        temperature: 0.25,
       }),
     });
 
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
       const errText = await response.text();
       console.error("xAI error:", errText);
       return NextResponse.json(
-        { error: "Grok API failed" },
+        { error: "Grok API failed", detail: errText.slice(0, 300) },
         { status: 502 }
       );
     }
@@ -78,7 +83,6 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const raw = data.choices?.[0]?.message?.content || "{}";
 
-    // Extract JSON from possible markdown code block
     let parsed;
     try {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -93,7 +97,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    return NextResponse.json(parsed);
+    return NextResponse.json({ ...parsed, model: MODEL });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json(

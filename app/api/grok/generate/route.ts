@@ -1,46 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+const MODEL = "grok-4.5";
+
 const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for the X account @Seung4680.
-You WRITE and MANAGE the content. You are the editor and manager of this account's posts.
+You WRITE posts optimized for the X ranking algorithm. You are the editor and manager.
 
 Account: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH (Los Angeles) | Real-world drives, tips & honest takes | Dogecoin & gaming
-Tone: Natural mix of 해요체 + casual. Honest, practical, light ㅋㅋ when appropriate. No pure 반말, no overly formal.
+Tone: 해요체 + casual. Honest, practical, light ㅋㅋ when it fits. No pure 반말, no stiff formal speech.
 
-=== LANGUAGE HARD RULE ===
-- KOREAN TRACK ONLY. content must be entirely Korean.
-- NO English sentences. Allowed English only as proper nouns: FSD, Cybertruck, Tesla, Model 3, Model S, Model Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X.
-- suggestedMedia must be in Korean.
+=== X ALGORITHM WRITING RULES (priority) ===
+1. Conversation Potential (40%) — MUST invite replies.
+   - End with a real question or 2–3 choice options people can answer in one line.
+   - Ask about their setup, habit, preference, or disagree/agree — not rhetorical fluff.
+2. Early Velocity & Dwell (25%) — First line must hook in under 1 second.
+   - Strong opening observation or tension. Avoid soft openers like "오늘은요", "문득".
+   - Keep readable on mobile; short paragraphs / line breaks OK.
+3. Profile & Follow Incentive (15%) — Subtle signal why following this account is useful
+   (owner tips, FSD reality, LAFC fan, honest takes) without hard sell.
+4. Authenticity & Brand Fit (15%) — HARD FILTER
+   - NEVER invent specific personal events (no fake mountain drives, no "어제 ~했다" false stories).
+   - General patterns OK: "주차할 때 느끼는 점", "FSD 쓰다 보면".
+5. Media (5%) — every post needs concrete phone-shootable suggestedMedia in Korean.
 
-=== AUTHENTICITY HARD FILTER ===
-- NEVER invent specific personal experiences that did not happen.
-- No fake mountain drives, no "yesterday I..." false anecdotes.
-- Prefer practical tips, honest opinions, questions, general ownership observations.
-- Authenticity 9–10 required.
+=== LANGUAGE ===
+- Korean only in content. English only as proper nouns: FSD, Cybertruck, Tesla, Model 3/S/Y, Plaid, LAFC, Grok, Robotaxi, Dogecoin, X.
 
-=== SCREENSHOT / KEYWORD RULE ===
-- If images (screenshots) are provided: analyze them, extract themes/keywords/topics.
-- Compare with @Seung4680 account character (Tesla owner, FSD tester, LAFC STH, honest practical tone).
-- Merge user text keywords + screenshot-derived keywords.
-- Only use themes that fit the account; discard off-brand or fake-feeling angles.
-- Write posts from the merged keyword set in the account voice.
+=== QUALITY BAR ===
+- Only output posts you would score >= 8.0 weighted.
+- Reject bland generic Tesla news. Mix FSD tips, ownership observations, LAFC, light daily honest takes.
+- Prefer one sharp idea per post over laundry lists.
 
-High-Quality Criteria: Conversation 40%, Velocity 25%, Profile 15%, Authenticity 15%, Media 5%.
-Only posts >= 8.0. Mix topics. Concrete suggestedMedia (phone-shootable) in Korean.
+=== GOOD STRUCTURE EXAMPLE (pattern, not copy) ===
+Hook line → 1–2 concrete observations → question that invites reply.
 
-Respond in JSON only, no markdown:
+Respond JSON only, no markdown:
 {
   "posts": [
     {
-      "content": "한국어 포스트 본문만",
+      "content": "한국어 본문",
       "score": number,
+      "scores": {
+        "conversation": number,
+        "velocity": number,
+        "profile": number,
+        "authenticity": number,
+        "media": number
+      },
       "suggestedMedia": "한국어 사진/영상 설명",
       "dayOffset": 0,
       "slot": 1
     }
   ],
-  "extractedKeywords": ["스샷/키워드에서 뽑은 키워드"],
-  "keywordRequest": null or "한국어로 짧은 추가 요청"
+  "extractedKeywords": [],
+  "keywordRequest": null
 }`;
 
 export async function POST(req: NextRequest) {
@@ -51,7 +64,7 @@ export async function POST(req: NextRequest) {
       days = 3,
       countPerDay = 4,
       keywords,
-      images, // string[] of data URLs or https URLs
+      images,
     } = body;
 
     const xaiKey = process.env.XAI_API_KEY;
@@ -67,15 +80,19 @@ export async function POST(req: NextRequest) {
       ? images.filter((u: string) => typeof u === "string" && u.length > 0).slice(0, 4)
       : [];
 
-    const textPart = `한국어 트랙 전용. @Seung4680용 한국어 포스트 ${total}개를 약 ${days}일분으로 작성하세요. 시작일: ${startDate || "오늘"}.
-dayOffset 0,1,2... 와 slot을 나누세요.
-${keywords ? `사용자가 준 텍스트 키워드: ${keywords}` : "텍스트 키워드 없음."}
-${imageList.length > 0 ? `스크린샷/이미지 ${imageList.length}장이 첨부되어 있습니다. 이미지를 분석해 키워드·주제를 추출하고, 계정 성격과 맞는 것만 텍스트 키워드와 합쳐 포스트를 작성하세요.` : "첨부 이미지 없음."}
+    const textPart = `X 알고리즘 최적화 한국어 포스트 ${total}개 (@Seung4680). ~${days}일, 시작 ${startDate || "오늘"}.
+dayOffset / slot 배분.
+${keywords ? `키워드: ${keywords}` : ""}
+${imageList.length > 0 ? `첨부 이미지 ${imageList.length}장 분석 후 계정에 맞는 키워드만 병합.` : ""}
 
-필수: content 100% 한국어, 영어 문장 금지, 허위 에피소드 금지, 점수 8.0+, suggestedMedia 한국어.
-JSON만 출력.`;
+필수:
+- content 100% 한국어 + 답글 유도 질문
+- 첫 줄 훅
+- 허위 에피소드 금지
+- 가중 점수 8.0 미만 글은 출력하지 말 것
+- suggestedMedia 한국어
+JSON만.`;
 
-    // Build multimodal user message if images present
     const userContent: any[] = [{ type: "text", text: textPart }];
     for (const img of imageList) {
       userContent.push({
@@ -91,7 +108,7 @@ JSON만 출력.`;
         Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: "grok-3",
+        model: MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -99,7 +116,7 @@ JSON만 출력.`;
             content: imageList.length > 0 ? userContent : textPart,
           },
         ],
-        temperature: 0.45,
+        temperature: 0.65,
       }),
     });
 
@@ -107,7 +124,7 @@ JSON만 출력.`;
       const errText = await response.text();
       console.error("xAI generate error:", errText);
       return NextResponse.json(
-        { error: "Grok API failed", detail: errText.slice(0, 300) },
+        { error: "Grok API failed", detail: errText.slice(0, 400) },
         { status: 502 }
       );
     }
@@ -133,12 +150,14 @@ JSON만 출력.`;
       );
     }
 
-    const koreanPosts = parsed.posts.filter((p: any) => {
+    const qualityPosts = parsed.posts.filter((p: any) => {
       const t = (p.content || "").trim();
       if (!t) return false;
       const latinChars = (t.match(/[A-Za-z]/g) || []).length;
       const totalChars = t.replace(/\s/g, "").length || 1;
-      return latinChars / totalChars < 0.35;
+      if (latinChars / totalChars >= 0.35) return false;
+      const score = typeof p.score === "number" ? p.score : 0;
+      return score >= 8.0;
     });
 
     const supabase = await createClient();
@@ -151,7 +170,7 @@ JSON만 출력.`;
 
     const inserted = [];
 
-    for (const p of koreanPosts) {
+    for (const p of qualityPosts) {
       const dayOffset = typeof p.dayOffset === "number" ? p.dayOffset : 0;
 
       const { data: row, error } = await supabase
@@ -169,6 +188,7 @@ JSON만 출력.`;
         inserted.push({
           ...row,
           score: p.score,
+          scores: p.scores,
           suggestedMedia: p.suggestedMedia,
           dayOffset,
           slot: p.slot,
@@ -178,11 +198,12 @@ JSON만 출력.`;
 
     return NextResponse.json({
       success: true,
+      model: MODEL,
       count: inserted.length,
       posts: inserted,
       extractedKeywords: parsed.extractedKeywords || [],
       keywordRequest: parsed.keywordRequest || null,
-      droppedEnglish: parsed.posts.length - koreanPosts.length,
+      droppedLowQuality: parsed.posts.length - qualityPosts.length,
     });
   } catch (err: any) {
     console.error(err);

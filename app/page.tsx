@@ -34,7 +34,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.3.3
+              v1.4.0
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -72,8 +72,8 @@ export default async function HomePage() {
 
         <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
           <p className="mb-3 text-xs text-zinc-400">
-            한국어 일괄 스케줄: reviewed + 미디어만 · 17:00 LA 시작(지났으면
-            다음 정시) · 최소 3시간 · 특화 Grok 시간 배정
+            한국어 일괄 스케줄: reviewed + 미디어 · 17:00 LA · 최소 3시간 ·
+            grok-4.5 시간 배정
           </p>
           <BatchScheduleButton reviewedCount={reviewedReady} />
         </div>
