@@ -18,6 +18,7 @@ export default function PostActions({ post }: { post: Post }) {
   const [review, setReview] = useState<any>(null);
   const [loadingReview, setLoadingReview] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [removingIndex, setRemovingIndex] = useState<number | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -102,6 +103,32 @@ export default function PostActions({ post }: { post: Post }) {
       uploadFiles(e.target.files);
     }
     e.target.value = "";
+  }
+
+  async function handleRemoveMedia(index: number) {
+    if (post.status === "scheduled") {
+      setMessage("이미 스케줄된 포스트의 미디어는 삭제할 수 없습니다.");
+      return;
+    }
+    if (!post.media_urls || index < 0 || index >= post.media_urls.length) return;
+    if (!confirm("이 미디어를 삭제할까요?")) return;
+
+    setRemovingIndex(index);
+    setMessage(null);
+    try {
+      const next = post.media_urls.filter((_, i) => i !== index);
+      const { error } = await supabase
+        .from("SeungContent")
+        .update({ media_urls: next })
+        .eq("id", post.id);
+      if (error) throw error;
+      setMessage("미디어 삭제됨");
+      router.refresh();
+    } catch (err: any) {
+      setMessage(err.message || "미디어 삭제 실패");
+    } finally {
+      setRemovingIndex(null);
+    }
   }
 
   async function handleGenerateImage() {
@@ -208,6 +235,7 @@ export default function PostActions({ post }: { post: Post }) {
 
   const hasMedia = post.media_urls && post.media_urls.length > 0;
   const canSchedule = post.status === "reviewed";
+  const mediaLocked = post.status === "scheduled";
 
   return (
     <div className="space-y-4">
@@ -276,14 +304,42 @@ export default function PostActions({ post }: { post: Post }) {
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <h3 className="mb-3 text-sm font-medium">
-          미디어 업로드 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
+          미디어 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
         </h3>
+
+        {hasMedia && (
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            {post.media_urls!.map((url, i) => (
+              <div
+                key={`${url}-${i}`}
+                className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`media-${i}`}
+                  className="h-full w-full object-cover"
+                />
+                {!mediaLocked && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMedia(i)}
+                    disabled={removingIndex === i}
+                    className="absolute right-1.5 top-1.5 rounded-md bg-black/75 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {removingIndex === i ? "…" : "✕ 삭제"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => galleryRef.current?.click()}
-            disabled={uploading}
+            disabled={uploading || mediaLocked}
             className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
           >
             {uploading ? "업로드 중..." : "🖼 사진첩에서 선택"}
@@ -291,7 +347,7 @@ export default function PostActions({ post }: { post: Post }) {
           <button
             type="button"
             onClick={() => cameraRef.current?.click()}
-            disabled={uploading}
+            disabled={uploading || mediaLocked}
             className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
           >
             {uploading ? "업로드 중..." : "📷 카메라로 촬영"}
@@ -316,13 +372,14 @@ export default function PostActions({ post }: { post: Post }) {
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          일괄 스케줄에는 미디어가 필요합니다.
+          잘못 올린 이미지는 ✕ 삭제로 제거할 수 있습니다. 일괄 스케줄에는
+          미디어가 필요합니다.
         </p>
 
         <button
           type="button"
           onClick={handleGenerateImage}
-          disabled={generating}
+          disabled={generating || mediaLocked}
           className="mt-3 w-full rounded-lg border border-indigo-800/60 bg-indigo-950/40 py-2.5 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
         >
           {generating
