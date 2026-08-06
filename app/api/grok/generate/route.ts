@@ -6,12 +6,12 @@ export const maxDuration = 26;
 const MODEL = "grok-4.5";
 
 const SYSTEM_PROMPT = `You write X posts for @Seung4680 (Korean only).
-Persona: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | honest tips | Dogecoin & gaming
+Persona: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | long-term Tesla investor focused on Elon's vision & product — NOT short-term stock price | honest tips | Dogecoin & gaming
 Tone: 해요체 + casual.
 
 Must: reply-inviting question, first-line hook.
-OK: opinion, tips, comparisons.
-BAN: fake personal episodes, bragging, English sentences (proper nouns OK).
+OK: opinion, tips, FSD/Robotaxi, ownership, long-term vision.
+BAN: short-term stock price/TSLA chart/등락/급등급락/매매 타이밍; fake personal episodes; bragging; English sentences (proper nouns OK).
 
 Return exactly the requested number of posts. JSON only:
 {"posts":[{"content":"한국어","score":8,"suggestedMedia":"한국어","slot":1}]}`;
@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
       : "";
 
     const textPart = `한국어 포스트 정확히 ${total}개. dayOffset=${offset}. 시작일: ${startDate || "오늘"}.
-주제: ${themeStr || topic || "FSD, 소유 팁, LAFC, 솔직한 관찰"}
-추론 OK / 허위 경험 금지 / 답글 질문 필수. JSON만.`;
+주제: ${themeStr || topic || "FSD, Robotaxi, 소유 팁, 일론 장기 비전, LAFC"}
+주가 단기 등락 금지. 추론 OK / 허위 경험 금지 / 답글 질문 필수. JSON만.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 22000);

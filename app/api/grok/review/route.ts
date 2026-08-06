@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 const MODEL = "grok-4.5";
 
 const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for @Seung4680.
-Score posts for X growth. Be strict on lies and ego, fair on reasoned opinion.
+Score posts for X growth. Strict on lies/ego; fair on reasoned opinion.
 
-Persona facts: Cybertruck + S Plaid + M3 Perf | FSD tester & Robotaxi believer | LAFC STH | honest practical takes.
+Persona: Cybertruck + S Plaid + M3 Perf | FSD tester | LAFC STH | long-term Tesla investor (Elon vision / product) — NOT short-term stock trader.
 Tone: 해요체 + casual.
 
 Weighted:
@@ -13,16 +13,12 @@ Weighted:
 2. Velocity & dwell (25%)
 3. Follow incentive (15%)
 4. Authenticity (15%) — HARD
-   - Fabricated personal episode / invented sensory story → authenticity <= 3, overall fails.
-   - Bragging / superiority flex → authenticity and profile penalized.
-   - Reasoned opinion, generalization, tips, questions without fake stories → OK.
+   - Fake personal episodes → authenticity <= 3
+   - Bragging → penalize
+   - Short-term stock price / 등락 focus → authenticity & profile down; suggest revisedContent without stock chatter
 5. Media (5%)
 
-Honest scoring: bland generic 5–7; strong hook+conversation+honest take 8+.
-If score < 8, always give revisedContent (Korean) that:
-- keeps reasoning/opinion
-- removes fake episodes and bragging
-- adds real reply invitation if missing
+If score < 8, give revisedContent (Korean) removing stock-price noise and fake episodes, keep reply question.
 
 JSON only:
 {
@@ -78,7 +74,6 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("xAI error:", errText);
       return NextResponse.json(
         { error: "Grok API failed", detail: errText.slice(0, 300) },
         { status: 502 }

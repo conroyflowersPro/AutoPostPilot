@@ -5,24 +5,22 @@ export const maxDuration = 26;
 const MODEL = "grok-4.5";
 
 const SYSTEM = `You plan 3 days of Korean X posts for @Seung4680.
-Persona: Cybertruck + S Plaid + M3 Perf | FSD tester | LAFC STH | honest tips | Dogecoin & gaming
 
-Daily volume rules:
-- Total posts/day on X for this account target: 5–10
-- English track later uses max 2/day → plan Korean count in 3–6 per day (prefer 4–5)
-- Vary counts across days for natural cadence (not identical every day)
-- More posts on days with stronger conversation topics; fewer if thin themes
+Persona: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH | long-term Tesla investor who cares about Elon's vision and product progress — NOT short-term stock moves | honest tips | Dogecoin & gaming
 
-Themes: short Korean phrases from keywords or account niche. No fake personal events.
+HARD BAN themes: daily/short-term stock price, TSLA chart, 등락, 급등/급락, 매수/매도 타이밍, 시총 반응성 잡담.
+Prefer: FSD/Robotaxi progress, product ownership, Elon long-term vision, real tips, LAFC, honest observations.
+
+Daily volume: total X posts/day target 5–10; English later max 2 → plan Korean count 3–6/day (prefer 4–5). Vary across days.
 
 JSON only:
 {
   "days": [
-    { "dayOffset": 0, "count": 5, "themes": ["주제1", "주제2"] },
+    { "dayOffset": 0, "count": 5, "themes": ["주제1"] },
     { "dayOffset": 1, "count": 4, "themes": ["주제"] },
     { "dayOffset": 2, "count": 5, "themes": ["주제"] }
   ],
-  "rationale": "한 줄 한국어 이유"
+  "rationale": "한 줄 한국어"
 }`;
 
 export async function POST(req: NextRequest) {
@@ -42,9 +40,9 @@ export async function POST(req: NextRequest) {
       (typeof keywords === "string" && keywords.trim()) ||
       "";
 
-    const user = `Plan 3 days of Korean posts starting ${startDate || "today"}.
-Keywords/themes: ${topic || "(none — use FSD, ownership tips, LAFC, honest observations mix)"}
-Vary daily KR count 3–6. JSON only.`;
+    const user = `Plan 3 days Korean posts from ${startDate || "today"}.
+Keywords: ${topic || "(FSD, ownership, Elon vision, LAFC — no stock price)"}
+KR count 3–6/day. Ban short-term stock themes. JSON only.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
@@ -95,12 +93,11 @@ Vary daily KR count 3–6. JSON only.`;
       const m = raw.match(/\{[\s\S]*\}/);
       parsed = JSON.parse(m ? m[0] : raw);
     } catch {
-      // fallback balanced plan
       parsed = {
         days: [
-          { dayOffset: 0, count: 5, themes: topic ? [topic] : ["FSD"] },
+          { dayOffset: 0, count: 5, themes: ["FSD"] },
           { dayOffset: 1, count: 4, themes: ["소유 팁"] },
-          { dayOffset: 2, count: 5, themes: ["LAFC"] },
+          { dayOffset: 2, count: 5, themes: ["비전"] },
         ],
         rationale: "기본 균형 플랜",
       };
@@ -117,11 +114,7 @@ Vary daily KR count 3–6. JSON only.`;
       }));
 
     while (days.length < 3) {
-      days.push({
-        dayOffset: days.length,
-        count: 4,
-        themes: [],
-      });
+      days.push({ dayOffset: days.length, count: 4, themes: [] });
     }
 
     return NextResponse.json({

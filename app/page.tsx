@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import BatchScheduleButton from "./components/BatchScheduleButton";
+import PostList from "./components/PostList";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -18,15 +18,6 @@ export default async function HomePage() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const reviewedReady =
-    posts?.filter(
-      (p: any) =>
-        p.status === "reviewed" &&
-        p.pipeline_id === "42303" &&
-        p.media_urls &&
-        p.media_urls.length > 0
-    ).length || 0;
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
@@ -34,7 +25,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.4.8
+              v1.4.9
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -53,7 +44,7 @@ export default async function HomePage() {
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-medium">Posts</h2>
+          <h2 className="text-xl font-medium">현황</h2>
           <div className="flex gap-2">
             <Link
               href="/generate"
@@ -70,72 +61,8 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
-          <p className="mb-3 text-xs text-zinc-400">
-            Fedica는 <strong className="text-emerald-300">여기 일괄만</strong> ·
-            reviewed + 미디어 · 17:00 LA · 최소 3시간
-          </p>
-          <BatchScheduleButton reviewedCount={reviewedReady} />
-        </div>
-
-        {!posts || posts.length === 0 ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
-            <p>아직 포스트가 없습니다.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {posts.map((post: any) => (
-              <Link
-                key={post.id}
-                href={`/posts/${post.id}`}
-                className="block rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-zinc-700 hover:bg-zinc-900"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
-                    {post.content}
-                  </p>
-                  <StatusBadge status={post.status} />
-                </div>
-                <div className="mt-3 flex items-center gap-3 text-xs text-zinc-500">
-                  {post.scheduled_at && (
-                    <span>
-                      {new Date(post.scheduled_at).toLocaleString("ko-KR", {
-                        timeZone: "America/Los_Angeles",
-                      })}
-                    </span>
-                  )}
-                  {post.pipeline_id && (
-                    <span className="rounded bg-zinc-800 px-1.5 py-0.5">
-                      {post.pipeline_id === "42303" ? "KR" : "EN"}
-                    </span>
-                  )}
-                  {post.media_urls && post.media_urls.length > 0 && (
-                    <span>📷 {post.media_urls.length}</span>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        <PostList posts={posts || []} />
       </main>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    draft: "bg-zinc-700 text-zinc-300",
-    reviewed: "bg-blue-900/60 text-blue-300",
-    scheduled: "bg-amber-900/60 text-amber-300",
-    published: "bg-emerald-900/60 text-emerald-300",
-  };
-  return (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
-        colors[status] || colors.draft
-      }`}
-    >
-      {status}
-    </span>
   );
 }

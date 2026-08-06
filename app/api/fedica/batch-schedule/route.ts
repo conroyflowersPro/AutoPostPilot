@@ -6,15 +6,14 @@ import {
   assignSlotsWithGrok,
 } from "@/lib/schedule";
 
-/**
- * Batch schedule all reviewed Korean posts that have media.
- * One click from the client.
- */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const pipelineId = String(body.pipelineId || "42303");
-    const requireMedia = body.requireMedia !== false; // default true
+    const requireMedia = body.requireMedia !== false;
+    const postIds: string[] = Array.isArray(body.postIds)
+      ? body.postIds.map(String)
+      : [];
 
     const token = process.env.FEDICA_API_TOKEN;
     const xaiKey = process.env.XAI_API_KEY;
@@ -33,14 +32,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Only reviewed, not yet scheduled, KR pipeline
-    const { data: posts, error } = await supabase
+    let query = supabase
       .from("SeungContent")
       .select("*")
       .eq("status", "reviewed")
       .eq("pipeline_id", pipelineId)
       .order("created_at", { ascending: true });
 
+    if (postIds.length > 0) {
+      query = query.in("id", postIds);
+    }
+
+    const { data: posts, error } = await query;
     if (error) throw error;
 
     let eligible = posts || [];
@@ -54,9 +57,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         scheduled: [],
-        skipped: [],
+        failed: [],
         message:
-          "스케줄할 reviewed 포스트가 없습니다. (검수 완료 + 미디어 필요)",
+          "스케줄할 포스트 없음 (선택 + reviewed + 미디어 확인)",
       });
     }
 
@@ -87,9 +90,7 @@ export async function POST(req: NextRequest) {
         }
 
         const postBody: any = {
-          Accounts: [
-            { Platform: "Twitter", AccountId: "Seung4680" },
-          ],
+          Accounts: [{ Platform: "Twitter", AccountId: "Seung4680" }],
           Messages: [post.content],
         };
         if (mediaIds.length > 0) postBody.MediaId = mediaIds;
@@ -130,10 +131,7 @@ export async function POST(req: NextRequest) {
           mediaCount: mediaIds.length,
         });
       } catch (err: any) {
-        failures.push({
-          id: post.id,
-          error: err.message || "failed",
-        });
+        failures.push({ id: post.id, error: err.message || "failed" });
       }
     }
 
