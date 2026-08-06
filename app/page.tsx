@@ -25,7 +25,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v3.0.2
+              v3.0.3
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -42,23 +42,20 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-medium">현황</h2>
-          <div className="flex gap-2">
-            <Link
-              href="/generate"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
-            >
-              ✨ Grok 자동 생성
-            </Link>
-            <Link
-              href="/posts/new"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600"
-            >
-              + 직접 작성
-            </Link>
-          </div>
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <div className="flex gap-3">
+          <Link
+            href="/generate"
+            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium hover:bg-indigo-500"
+          >
+            특화 Grok 자동 생성
+          </Link>
+          <Link
+            href="/posts/new"
+            className="rounded-xl bg-zinc-800 px-4 py-2.5 text-sm hover:bg-zinc-700"
+          >
+            수동 작성
+          </Link>
         </div>
 
         <PostList posts={posts || []} />
