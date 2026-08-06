@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import BatchScheduleButton from "./components/BatchScheduleButton";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -17,6 +18,15 @@ export default async function HomePage() {
     .select("*")
     .order("created_at", { ascending: false });
 
+  const reviewedReady =
+    posts?.filter(
+      (p: any) =>
+        p.status === "reviewed" &&
+        p.pipeline_id === "42303" &&
+        p.media_urls &&
+        p.media_urls.length > 0
+    ).length || 0;
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
@@ -24,7 +34,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.2.0
+              v1.3.0
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -42,7 +52,7 @@ export default async function HomePage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Posts</h2>
           <div className="flex gap-2">
             <Link
@@ -58,6 +68,14 @@ export default async function HomePage() {
               + 직접 작성
             </Link>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <p className="mb-3 text-xs text-zinc-400">
+            한국어 일괄 스케줄: reviewed + 미디어만 · 17:00 LA 시작(지났으면
+            다음 정시) · 최소 3시간 · 특화 Grok 시간 배정
+          </p>
+          <BatchScheduleButton reviewedCount={reviewedReady} />
         </div>
 
         {!posts || posts.length === 0 ? (

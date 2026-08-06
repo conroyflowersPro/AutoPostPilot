@@ -22,7 +22,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Upload media to Fedica if provided
+    const supabase = await createClient();
+
+    // Enforce reviewed-only
+    const { data: existing } = await supabase
+      .from("SeungContent")
+      .select("status")
+      .eq("id", postId)
+      .single();
+
+    if (!existing || existing.status !== "reviewed") {
+      return NextResponse.json(
+        {
+          error:
+            "검수(reviewed) 완료된 포스트만 Fedica 스케줄링할 수 있습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
     let mediaIds: string[] = [];
     if (mediaUrls && Array.isArray(mediaUrls) && mediaUrls.length > 0) {
       try {
@@ -31,14 +49,13 @@ export async function POST(req: NextRequest) {
         console.error("Fedica media upload failed:", mediaErr);
         return NextResponse.json(
           {
-            error: `미디어 업로드 실패: ${mediaErr.message}. 텍스트만으로 재시도하거나 미디어를 확인해주세요.`,
+            error: `미디어 업로드 실패: ${mediaErr.message}`,
           },
           { status: 502 }
         );
       }
     }
 
-    // 2. Build post body
     const postBody: any = {
       Accounts: [
         {
@@ -58,7 +75,6 @@ export async function POST(req: NextRequest) {
       Posts: [postBody],
     };
 
-    // Optional specific DateTime (ISO 8601)
     if (scheduledAt) {
       body.DateTime = scheduledAt;
     }
@@ -81,8 +97,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Update post status in Supabase
-    const supabase = await createClient();
     const updatePayload: any = {
       status: "scheduled",
       fedica_post_id: String(data.Id),

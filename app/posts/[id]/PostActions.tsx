@@ -88,7 +88,7 @@ export default function PostActions({ post }: { post: Post }) {
         .update({ media_urls: urls })
         .eq("id", post.id);
 
-      setMessage("미디어 업로드 완료 — 이제 스케줄링 가능");
+      setMessage("미디어 업로드 완료");
       router.refresh();
     } catch (err: any) {
       setMessage(err.message || "업로드 실패");
@@ -126,7 +126,6 @@ export default function PostActions({ post }: { post: Post }) {
 
       setGenResult(data);
 
-      // If API returned a URL, attach it automatically
       if (data.imageUrl) {
         const urls = [...(post.media_urls || []), data.imageUrl];
         await supabase
@@ -138,7 +137,7 @@ export default function PostActions({ post }: { post: Post }) {
       } else {
         setMessage(
           data.message ||
-            "프롬프트가 준비되었습니다. 폰 촬영 또는 외부 생성 후 업로드하세요."
+            "프롬프트가 준비되었습니다. 폰 촬영 후 업로드하세요."
         );
       }
     } catch (err: any) {
@@ -149,6 +148,11 @@ export default function PostActions({ post }: { post: Post }) {
   }
 
   async function handleSchedule() {
+    if (post.status !== "reviewed") {
+      setMessage("검수(reviewed) 완료 후에만 스케줄할 수 있습니다.");
+      return;
+    }
+
     setScheduling(true);
     setMessage(null);
     try {
@@ -167,7 +171,7 @@ export default function PostActions({ post }: { post: Post }) {
 
       const mediaNote =
         data.mediaIds && data.mediaIds.length > 0
-          ? ` (미디어 ${data.mediaIds.length}개 첨부됨)`
+          ? ` (미디어 ${data.mediaIds.length}개)`
           : " (텍스트만)";
       setMessage(`스케줄 완료 (Fedica ID: ${data.fedicaId})${mediaNote}`);
       router.refresh();
@@ -181,7 +185,7 @@ export default function PostActions({ post }: { post: Post }) {
   async function handleDelete() {
     if (
       !confirm(
-        "이 포스트를 삭제할까요? (Fedica에 안 올린 draft만 삭제됩니다)"
+        "이 포스트를 삭제할까요? (Fedica에 안 올린 글만 삭제 권장)"
       )
     ) {
       return;
@@ -203,10 +207,10 @@ export default function PostActions({ post }: { post: Post }) {
   }
 
   const hasMedia = post.media_urls && post.media_urls.length > 0;
+  const canSchedule = post.status === "reviewed";
 
   return (
     <div className="space-y-4">
-      {/* Grok Review */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-medium">특화 Grok 검수 · 관리</h3>
@@ -270,7 +274,6 @@ export default function PostActions({ post }: { post: Post }) {
         )}
       </div>
 
-      {/* Media Upload — gallery + camera */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <h3 className="mb-3 text-sm font-medium">
           미디어 업로드 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
@@ -295,7 +298,6 @@ export default function PostActions({ post }: { post: Post }) {
           </button>
         </div>
 
-        {/* Gallery: no capture → photo library */}
         <input
           ref={galleryRef}
           type="file"
@@ -304,7 +306,6 @@ export default function PostActions({ post }: { post: Post }) {
           onChange={handleFileChange}
           className="hidden"
         />
-        {/* Camera */}
         <input
           ref={cameraRef}
           type="file"
@@ -315,11 +316,9 @@ export default function PostActions({ post }: { post: Post }) {
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          사진첩 또는 카메라 모두 가능합니다. 업로드 후 스케줄 시 Fedica에
-          첨부됩니다.
+          일괄 스케줄에는 미디어가 필요합니다.
         </p>
 
-        {/* Optional AI generate */}
         <button
           type="button"
           onClick={handleGenerateImage}
@@ -339,22 +338,24 @@ export default function PostActions({ post }: { post: Post }) {
         )}
       </div>
 
-      {/* Schedule */}
       <button
         onClick={handleSchedule}
-        disabled={scheduling || post.status === "scheduled"}
+        disabled={
+          scheduling || post.status === "scheduled" || !canSchedule
+        }
         className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
       >
         {scheduling
-          ? "스케줄링 중... (미디어 업로드 포함)"
+          ? "업로드 중… (Fedica)"
           : post.status === "scheduled"
           ? "이미 스케줄됨"
+          : !canSchedule
+          ? "검수 완료 후 스케줄 가능"
           : hasMedia
           ? "Fedica로 스케줄링 (미디어 포함)"
           : "Fedica로 스케줄링 (텍스트만)"}
       </button>
 
-      {/* Delete */}
       <button
         onClick={handleDelete}
         disabled={deleting || post.status === "scheduled"}
