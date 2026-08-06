@@ -1,27 +1,34 @@
-# AutoPostPilot v2.2.0
+# AutoPostPilot v3.0.3
 
 Specialized content management PWA for **@Seung4680**.
 
 특화 Grok이 콘텐츠를 편집·관리하는 주체입니다.
 
-## v2.2.0
+## v3.0.3
 
-- 사용자가 날짜를 선택하면 3일치 한국어 포스트를 특화 Grok이 생성
-- X 알고리즘 기반 점수 + 미디어 제안
-- 폰으로 촬영한 이미지/영상을 업로드하면 해당 포스트에 첨부
-- Fedica API로 최소 3.5시간 간격 자동 스케줄링
-- 날짜 현황으로 중복 방지
-- 특화 Grok = 콘텐츠 편집·관리 주체
+- Schedule-safe language (startDate is metadata only; block 방금/오늘 아침 etc.)
+- Korean speech default: mostly 해요체, not banmal-only
+- Planner fallback uses distinct creator-domain slots
+- Observation-only endings encouraged; reduce forced conclusions
+- Natural post length variation + more diverse openings
 
-## Features (current)
+## v3.0.0
+
+- 3일 슬롯 단위 콘텐츠 캘린더 계획 (하루 5~8개 한국어 포스트)
+- 날짜별 일괄 생성 (Grok 호출 ~4–5회로 감소)
+- x-grok-conv-id + reasoning_effort 적용
+- usedRecord로 3일 중복 방지
+- localStorage 진행 상태 복구
+- 수동 review 프롬프트 생성 철학과 정렬
+
+## Features
 
 - Login with Supabase Auth (email/password)
 - Post list with status & scheduled times
 - Create new posts (Korean / English track)
-- **Specialized Grok review** (X algorithm scoring + feedback + media suggestion)
-- Media upload from phone (camera supported) → Supabase Storage
-- **Fedica full media pipeline** (init → upload → finalize → MediaId)
-- Fedica scheduling (Pipeline 42303 / 20121)
+- Specialized Grok review (X algorithm scoring + feedback)
+- Media upload from phone → Supabase Storage
+- Fedica full media pipeline + scheduling (Pipeline 42303 / 20121)
 - Dark mobile-friendly UI + PWA ready
 
 ## Tech Stack
@@ -29,16 +36,16 @@ Specialized content management PWA for **@Seung4680**.
 - Next.js 15 (App Router) + TypeScript
 - Supabase (Auth + PostgreSQL + Storage + Edge Functions)
 - Tailwind CSS
-- xAI Grok API
+- xAI Grok API (grok-4.5)
 - Fedica Publishing API
-- Netlify hosting (UI only)
+- Netlify hosting
 
 ## Environment Variables
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-XAI_API_KEY=...   # Netlify env + Supabase secrets
+XAI_API_KEY=...
 FEDICA_API_TOKEN=...
 ```
 
@@ -47,20 +54,9 @@ FEDICA_API_TOKEN=...
 - id, content, scheduled_at, status (draft / reviewed / scheduled / published)
 - pipeline_id, fedica_post_id, media_urls, user_id, created_at, updated_at
 
-## v2.2.0 — Generation on Supabase Edge Function
-
-- Post generation runs on **Supabase Edge Function** (`generate-post`)
-- **1 post per API call** (stable with long system prompt)
-- Netlify hosts UI only — no more 26s generation timeout
-
-### Deploy the Edge Function
+## Deploy Edge Function
 
 ```bash
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
 supabase functions deploy generate-post
 supabase secrets set XAI_API_KEY=YOUR_REAL_KEY_HERE
 ```
-
-`SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically.
-Do not hardcode any API keys in the repo.
