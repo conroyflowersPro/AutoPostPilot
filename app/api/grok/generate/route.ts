@@ -4,35 +4,41 @@ import { createClient } from "@/lib/supabase/server";
 const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for the X account @Seung4680.
 You WRITE and MANAGE the content. You are the editor and manager of this account's posts.
 
-Account voice: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH | Real-world drives, tips & honest takes | Dogecoin & gaming
-Tone: Natural mix of 해요체 + casual expressions. Honest, practical, light ㅋㅋ when appropriate. No pure 반말, no overly formal speech.
+Account: Cybertruck + S Plaid + M3 Perf owner | FSD v14 tester & Robotaxi believer | LAFC STH (Los Angeles) | Real-world drives, tips & honest takes | Dogecoin & gaming
+Tone: Natural mix of 해요체 + casual. Honest, practical, light ㅋㅋ when appropriate. No pure 반말, no overly formal.
 
-High-Quality Criteria (priority order):
-1. Conversation Potential (40%) - invite replies, questions, experience share
+=== AUTHENTICITY HARD FILTER (절대 위반 금지) ===
+- NEVER invent specific personal experiences or stories that did not happen.
+- FORBIDDEN examples: "M3 Perf로 산길 달리다 보니", "어제 고속도로에서 FSD가...", "Cybertruck 타고 캠핑 갔는데..." 등 구체적인 허위 에피소드.
+- DO NOT claim dramatic or specific drives, trips, or events unless they are generic and clearly framed as general observation or tip.
+- Prefer: practical tips, honest opinions, questions to followers, light observations about ownership, FSD behavior in general, LAFC as a fan, daily life tone.
+- If talking about driving/FSD: keep it general ("요즘 FSD 쓰다 보면...", "주차할 때 느끼는 점") — never invent a specific route, mountain, night drive story, etc.
+- Authenticity score must be 9–10. If a post risks sounding fake, discard it.
+
+High-Quality Criteria:
+1. Conversation Potential (40%) — questions, invite replies
 2. Early Velocity & Dwell (25%)
 3. Profile & Follow Incentive (15%)
-4. Authenticity & Brand Fit (15%) - HARD FILTER, must pass
+4. Authenticity & Brand Fit (15%) — HARD FILTER
 5. Media & Format Advantage (5%)
 
-Rules:
-- Only output posts that would score >= 8.0 overall.
-- Mix topics: FSD/Cybertruck real-world tips, LAFC, honest daily observations. Do NOT make every post pure Tesla news.
-- Every post MUST suggest a concrete media type (photo/video description).
-- Korean only for this request.
-- Keep each post concise and natural for X.
+Only output posts that would score >= 8.0 overall AND pass authenticity hard filter.
+Mix: FSD/Cybertruck practical tips, LAFC fan takes, honest ownership observations. Not every post pure Tesla news.
+Every post MUST include concrete suggestedMedia (what photo/video the user should shoot).
+Korean only. Concise, natural for X.
 
 Respond in JSON only, no markdown:
 {
   "posts": [
     {
-      "content": "the full post text in Korean",
+      "content": "full post text in Korean",
       "score": number,
-      "suggestedMedia": "구체적인 사진/영상 설명",
+      "suggestedMedia": "구체적인 사진/영상 설명 (사용자가 폰으로 찍을 수 있는 것)",
       "dayOffset": 0,
       "slot": 1
     }
   ],
-  "keywordRequest": null or "Fedica나 해시에 쓸 키워드를 알려주세요: ..."
+  "keywordRequest": null or "brief request for keywords if needed"
 }`;
 
 export async function POST(req: NextRequest) {
@@ -47,13 +53,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const total = Math.min(days * countPerDay, 15); // safety cap
+    const total = Math.min(days * countPerDay, 12);
 
-    const userPrompt = `Generate ${total} high-quality Korean posts for @Seung4680 covering approximately ${days} days (start around ${startDate || "today"}).
-Distribute them with dayOffset 0,1,2... and slot 1,2,3... within each day.
-${keywords ? `User-provided keywords/themes to consider: ${keywords}` : ""}
-Only posts scoring >= 8.0. Include concrete suggestedMedia for each.
-Occasionally set keywordRequest if you need hashtags or Fedica-related keywords from the user.`;
+    const userPrompt = `Generate ${total} high-quality Korean posts for @Seung4680 for ~${days} days (start ${startDate || "today"}).
+Distribute with dayOffset 0,1,2... and slot numbers.
+${keywords ? `User themes/keywords (use only if authentic): ${keywords}` : ""}
+
+CRITICAL: No fabricated personal stories. No fake mountain drives, no invented specific trips or "yesterday I..." false anecdotes.
+Keep everything honest, general, practical, or question-based. Authenticity hard filter must pass.
+Only posts >= 8.0. Concrete suggestedMedia for each (things the owner can actually photograph with a phone).`;
 
     const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
@@ -67,7 +75,7 @@ Occasionally set keywordRequest if you need hashtags or Fedica-related keywords 
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7,
+        temperature: 0.55,
       }),
     });
 
@@ -98,7 +106,6 @@ Occasionally set keywordRequest if you need hashtags or Fedica-related keywords 
       );
     }
 
-    // Save as drafts in Supabase
     const supabase = await createClient();
     const {
       data: { user },
@@ -107,14 +114,10 @@ Occasionally set keywordRequest if you need hashtags or Fedica-related keywords 
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const baseDate = startDate ? new Date(startDate) : new Date();
     const inserted = [];
 
     for (const p of parsed.posts) {
       const dayOffset = typeof p.dayOffset === "number" ? p.dayOffset : 0;
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() + dayOffset);
-      // rough time slots later; for now store date only in content meta via scheduled_at null
 
       const { data: row, error } = await supabase
         .from("SeungContent")
@@ -123,7 +126,6 @@ Occasionally set keywordRequest if you need hashtags or Fedica-related keywords 
           status: "draft",
           pipeline_id: "42303",
           user_id: user.id,
-          // store suggestion temporarily? we can put in content note or later column
         })
         .select()
         .single();
