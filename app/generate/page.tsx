@@ -335,22 +335,43 @@ export default function GeneratePage() {
         }
 
         setPhase("3일 슬롯 캘린더 계획 중...");
-        const planRes = await fetch("/api/grok/plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            startDate,
-            keywords: keywords.trim() || undefined,
-            mergedKeywords: mergedKeywords || undefined,
+        try {
+          const planRes = await fetch("/api/grok/plan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              startDate,
+              keywords: keywords.trim() || undefined,
+              mergedKeywords: mergedKeywords || undefined,
+              generationDays: GENERATION_DAYS,
+            }),
+          });
+          const planData = await readJson(planRes);
+          plan = {
+            generationDays: planData.generationDays || GENERATION_DAYS,
+            days: planData.days || [],
+            rationale: planData.rationale || undefined,
+          };
+        } catch (planErr: any) {
+          const topics = ["FSD 관찰", "Cybertruck 일상", "Robotaxi 시각", "LAFC", "소유 팁"];
+          const angles = ["실사용 체감", "디테일 관찰", "장기 전망", "경기/분위기", "유용한 팁"];
+          plan = {
             generationDays: GENERATION_DAYS,
-          }),
-        });
-        const planData = await readJson(planRes);
-        plan = {
-          generationDays: planData.generationDays || GENERATION_DAYS,
-          days: planData.days || [],
-          rationale: planData.rationale || undefined,
-        };
+            days: [0, 1, 2].map((i) => ({
+              dayOffset: i,
+              posts: topics.map((t, n) => ({
+                slotId: `D${i + 1}P${n + 1}`,
+                primaryTopic: t,
+                angle: angles[n],
+                contentType: "observation",
+                allowedContext: [],
+                forbiddenTopics: ["주가", "등락", "매매"],
+                targetLength: "medium" as TargetLength,
+              })),
+            })),
+            rationale: `계획 실패 대체: ${String(planErr?.message || planErr).slice(0, 80)}`,
+          };
+        }
 
         const jobState: GenerationJobState = {
           jobId,
@@ -484,7 +505,7 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v3.0.0
+            v3.0.1
           </span>
         </div>
       </header>
