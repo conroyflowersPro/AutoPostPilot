@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -20,9 +20,13 @@ export default function PostActions({ post }: { post: Post }) {
   const [uploading, setUploading] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   async function handleReview() {
     setLoadingReview(true);
@@ -52,9 +56,9 @@ export default function PostActions({ post }: { post: Post }) {
     }
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  async function uploadFiles(files: FileList | File[]) {
+    const list = Array.from(files);
+    if (list.length === 0) return;
 
     setUploading(true);
     setMessage(null);
@@ -62,8 +66,8 @@ export default function PostActions({ post }: { post: Post }) {
     try {
       const urls: string[] = post.media_urls || [];
 
-      for (const file of Array.from(files)) {
-        const ext = file.name.split(".").pop();
+      for (const file of list) {
+        const ext = file.name.split(".").pop() || "jpg";
         const path = `${post.id}/${Date.now()}.${ext}`;
 
         const { error: uploadError } = await supabase.storage
@@ -90,6 +94,57 @@ export default function PostActions({ post }: { post: Post }) {
       setMessage(err.message || "업로드 실패");
     } finally {
       setUploading(false);
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      uploadFiles(e.target.files);
+    }
+    e.target.value = "";
+  }
+
+  async function handleGenerateImage() {
+    setGenerating(true);
+    setMessage(null);
+    setGenResult(null);
+    try {
+      const prompt =
+        review?.suggestedMedia ||
+        `Natural photo matching this post: ${post.content.slice(0, 200)}`;
+
+      const res = await fetch("/api/grok/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          postContent: post.content,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "생성 실패");
+
+      setGenResult(data);
+
+      // If API returned a URL, attach it automatically
+      if (data.imageUrl) {
+        const urls = [...(post.media_urls || []), data.imageUrl];
+        await supabase
+          .from("SeungContent")
+          .update({ media_urls: urls })
+          .eq("id", post.id);
+        setMessage("AI 이미지 생성 후 첨부 완료");
+        router.refresh();
+      } else {
+        setMessage(
+          data.message ||
+            "프롬프트가 준비되었습니다. 폰 촬영 또는 외부 생성 후 업로드하세요."
+        );
+      }
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -124,7 +179,11 @@ export default function PostActions({ post }: { post: Post }) {
   }
 
   async function handleDelete() {
-    if (!confirm("이 포스트를 삭제할까요? (Fedica에는 올라가지 않은 draft만 삭제됩니다)")) {
+    if (
+      !confirm(
+        "이 포스트를 삭제할까요? (Fedica에 안 올린 draft만 삭제됩니다)"
+      )
+    ) {
       return;
     }
     setDeleting(true);
@@ -211,28 +270,73 @@ export default function PostActions({ post }: { post: Post }) {
         )}
       </div>
 
-      {/* Media Upload */}
+      {/* Media Upload — gallery + camera */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <h3 className="mb-3 text-sm font-medium">
           미디어 업로드 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
         </h3>
-        <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-zinc-600 bg-zinc-800/50 px-4 py-6 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200">
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            capture="environment"
-            onChange={handleUpload}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
             disabled={uploading}
-            className="hidden"
-          />
-          {uploading
-            ? "업로드 중..."
-            : "📷 사진/영상 선택 (폰 카메라 가능)"}
-        </label>
+            className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
+          >
+            {uploading ? "업로드 중..." : "🖼 사진첩에서 선택"}
+          </button>
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            disabled={uploading}
+            className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
+          >
+            {uploading ? "업로드 중..." : "📷 카메라로 촬영"}
+          </button>
+        </div>
+
+        {/* Gallery: no capture → photo library */}
+        <input
+          ref={galleryRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        {/* Camera */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*,video/*"
+          capture="environment"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
         <p className="mt-2 text-[11px] text-zinc-500">
-          업로드 후 스케줄링하면 Fedica에 미디어가 함께 첨부됩니다.
+          사진첩 또는 카메라 모두 가능합니다. 업로드 후 스케줄 시 Fedica에
+          첨부됩니다.
         </p>
+
+        {/* Optional AI generate */}
+        <button
+          type="button"
+          onClick={handleGenerateImage}
+          disabled={generating}
+          className="mt-3 w-full rounded-lg border border-indigo-800/60 bg-indigo-950/40 py-2.5 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
+        >
+          {generating
+            ? "Grok 이미지 생성 중..."
+            : "✨ Grok으로 이미지 생성 (선택)"}
+        </button>
+
+        {genResult?.prompt && !genResult.imageUrl && (
+          <div className="mt-2 rounded-lg bg-zinc-800/80 p-2 text-[11px] text-zinc-400">
+            <p className="mb-1 text-zinc-500">생성 프롬프트:</p>
+            <p className="whitespace-pre-wrap">{genResult.prompt}</p>
+          </div>
+        )}
       </div>
 
       {/* Schedule */}
