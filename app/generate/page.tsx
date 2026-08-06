@@ -31,6 +31,26 @@ async function compressImage(file: File): Promise<Blob> {
   });
 }
 
+async function readJson(res: Response) {
+  const rawText = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(
+      `서버 응답 오류 (${res.status}): ${rawText.slice(0, 120) || "빈 응답/타임아웃"}`
+    );
+  }
+  if (!res.ok) {
+    throw new Error(
+      data.detail
+        ? `${data.error}: ${String(data.detail).slice(0, 200)}`
+        : data.error || `요청 실패 (${res.status})`
+    );
+  }
+  return data;
+}
+
 export default function GeneratePage() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -40,6 +60,7 @@ export default function GeneratePage() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -107,47 +128,56 @@ export default function GeneratePage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setPhase(null);
 
     try {
-      let imageUrls: string[] | undefined;
+      let imageUrls: string[] = [];
+      let mergedKeywords = keywords.trim();
+
+      // Step 1: upload + extract keywords (only if screenshots)
       if (files.length > 0) {
+        setPhase("스샷 업로드 중...");
         imageUrls = await uploadKeywordImages();
+
+        setPhase("키워드 추출 중...");
+        const extractRes = await fetch("/api/grok/extract-keywords", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            images: imageUrls,
+            keywords: keywords.trim() || undefined,
+          }),
+        });
+        const extractData = await readJson(extractRes);
+        mergedKeywords =
+          extractData.mergedKeywords ||
+          (extractData.keywords || []).join(", ") ||
+          keywords.trim();
       }
 
-      const res = await fetch("/api/grok/generate", {
+      // Step 2: text-only generation (no images in this request)
+      setPhase("포스트 작성 중...");
+      const genRes = await fetch("/api/grok/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startDate,
           days: 3,
-          countPerDay: 4,
+          countPerDay: 3,
           keywords: keywords.trim() || undefined,
-          images: imageUrls,
+          mergedKeywords: mergedKeywords || undefined,
         }),
       });
-
-      const rawText = await res.text();
-      let data: any;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        throw new Error(
-          `서버 응답 오류 (${res.status}): ${rawText.slice(0, 120) || "빈 응답/타임아웃"}`
-        );
-      }
-
-      if (!res.ok) {
-        throw new Error(
-          data.detail
-            ? `${data.error}: ${String(data.detail).slice(0, 200)}`
-            : data.error || `생성 실패 (${res.status})`
-        );
-      }
-      setResult(data);
+      const data = await readJson(genRes);
+      setResult({
+        ...data,
+        mergedKeywords: data.mergedKeywords || mergedKeywords,
+      });
     } catch (err: any) {
       setError(err.message || "알 수 없는 오류");
     } finally {
       setLoading(false);
+      setPhase(null);
     }
   }
 
@@ -160,14 +190,15 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.3
+            v1.4.4
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          스샷은 키워드만 추출한 뒤 본문을 작성합니다 (타임아웃 방지).
+          스샷 → 키워드 추출 → 본문 작성 (요청 분리로 타임아웃 방지). 한 번에
+          최대 약 9개.
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -258,9 +289,7 @@ export default function GeneratePage() {
             className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
           >
             {loading
-              ? files.length
-                ? "스샷 분석 후 작성 중..."
-                : "특화 Grok이 작성 중..."
+              ? phase || "처리 중..."
               : "3일치 한국어 포스트 자동 생성"}
           </button>
         </form>
@@ -274,11 +303,6 @@ export default function GeneratePage() {
               {result.mergedKeywords && (
                 <p className="mt-2 text-xs text-zinc-300">
                   사용 키워드: {result.mergedKeywords}
-                </p>
-              )}
-              {result.extractedKeywords?.length > 0 && (
-                <p className="mt-1 text-xs text-zinc-400">
-                  스샷 추출: {result.extractedKeywords.join(", ")}
                 </p>
               )}
               {result.droppedLowQuality > 0 && (

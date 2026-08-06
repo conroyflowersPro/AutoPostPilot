@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const maxDuration = 60;
+
 const MODEL = "grok-4.5";
 
 const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for @Seung4680.
@@ -42,106 +44,15 @@ JSON only:
   "keywordRequest": null
 }`;
 
-function isHttpUrl(s: string) {
-  try {
-    const u = new URL(s);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-async function callGrok(
-  xaiKey: string,
-  messages: any[],
-  temperature: number
-) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 55000);
-  try {
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${xaiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages,
-        temperature,
-      }),
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    if (!response.ok) {
-      throw new Error(`Grok ${response.status}: ${text.slice(0, 300)}`);
-    }
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(`Grok non-JSON: ${text.slice(0, 200)}`);
-    }
-    return data.choices?.[0]?.message?.content || "{}";
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function parseJsonObject(raw: string) {
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-}
-
-async function extractKeywordsFromImages(
-  xaiKey: string,
-  imageUrls: string[],
-  textKeywords?: string
-): Promise<string[]> {
-  const limited = imageUrls.slice(0, 2);
-  const userContent: any[] = [
-    {
-      type: "text",
-      text: `Extract 5–12 short Korean topic keywords from these screenshots for @Seung4680 (Tesla/FSD/Cybertruck/LAFC/honest tips). Discard off-brand topics.
-${textKeywords ? `Also merge text keywords: ${textKeywords}` : ""}
-JSON only: { "keywords": ["..."] }`,
-    },
-  ];
-  for (const url of limited) {
-    userContent.push({ type: "image_url", image_url: { url } });
-  }
-
-  const raw = await callGrok(
-    xaiKey,
-    [
-      {
-        role: "system",
-        content:
-          "Extract keywords only. JSON only. No posts. Korean short phrases.",
-      },
-      { role: "user", content: userContent },
-    ],
-    0.2
-  );
-
-  try {
-    const parsed = parseJsonObject(raw);
-    const kws = Array.isArray(parsed.keywords) ? parsed.keywords : [];
-    return kws.map((k: any) => String(k)).filter(Boolean).slice(0, 12);
-  } catch {
-    return textKeywords ? [textKeywords] : [];
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       startDate,
       days = 3,
-      countPerDay = 4,
+      countPerDay = 3,
       keywords,
-      images,
+      mergedKeywords,
     } = body;
 
     const xaiKey = process.env.XAI_API_KEY;
@@ -152,63 +63,70 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const total = Math.min(days * countPerDay, 12);
-    const imageList: string[] = Array.isArray(images)
-      ? images
-          .filter((u: unknown) => typeof u === "string" && isHttpUrl(u as string))
-          .slice(0, 2)
-      : [];
-
-    let mergedKeywords = typeof keywords === "string" ? keywords.trim() : "";
-    let extractedFromImages: string[] = [];
-
-    if (imageList.length > 0) {
-      try {
-        extractedFromImages = await extractKeywordsFromImages(
-          xaiKey,
-          imageList,
-          mergedKeywords || undefined
-        );
-        if (extractedFromImages.length) {
-          const set = new Set(
-            [
-              ...extractedFromImages,
-              ...(mergedKeywords ? mergedKeywords.split(/[,，]/) : []),
-            ]
-              .map((s) => s.trim())
-              .filter(Boolean)
-          );
-          mergedKeywords = Array.from(set).join(", ");
-        }
-      } catch (e) {
-        console.error("keyword extract failed", e);
-      }
-    }
+    // Cap volume to reduce latency / timeout risk
+    const total = Math.min(Number(days) * Number(countPerDay) || 9, 9);
+    const topic =
+      (typeof mergedKeywords === "string" && mergedKeywords.trim()) ||
+      (typeof keywords === "string" && keywords.trim()) ||
+      "";
 
     const textPart = `대신 작성. X용 한국어 포스트 ${total}개. ~${days}일, 시작 ${startDate || "오늘"}.
-키워드/주제: ${mergedKeywords || "(없음 — 계정 기본 주제 믹스)"}
+키워드/주제: ${topic || "(계정 기본 주제 믹스: FSD, 소유 팁, LAFC, 솔직한 관찰)"}
 
 추론·의견 OK. 허위 에피소드·잘난 척 금지. 형식 다양화.
 점수 8.0+만. JSON만.`;
 
-    const raw = await callGrok(
-      xaiKey,
-      [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: textPart },
-      ],
-      0.7
-    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 55000);
 
-    let parsed: any;
+    let response: Response;
     try {
-      parsed = parseJsonObject(raw);
+      response = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${xaiKey}`,
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: textPart },
+          ],
+          temperature: 0.7,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const rawText = await response.text();
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: "Grok API failed", detail: rawText.slice(0, 400) },
+        { status: 502 }
+      );
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(rawText);
     } catch {
       return NextResponse.json(
-        {
-          error: "Failed to parse Grok response",
-          raw: String(raw).slice(0, 500),
-        },
+        { error: "Grok non-JSON response", detail: rawText.slice(0, 200) },
+        { status: 502 }
+      );
+    }
+
+    const raw = data.choices?.[0]?.message?.content || "{}";
+    let parsed: any;
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    } catch {
+      return NextResponse.json(
+        { error: "Failed to parse Grok response", raw: String(raw).slice(0, 500) },
         { status: 502 }
       );
     }
@@ -269,20 +187,16 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       count: inserted.length,
       posts: inserted,
-      extractedKeywords:
-        extractedFromImages.length > 0
-          ? extractedFromImages
-          : parsed.extractedKeywords || [],
-      mergedKeywords,
+      extractedKeywords: parsed.extractedKeywords || [],
+      mergedKeywords: topic,
       keywordRequest: parsed.keywordRequest || null,
       droppedLowQuality: parsed.posts.length - qualityPosts.length,
-      imageCount: imageList.length,
     });
   } catch (err: any) {
     console.error(err);
     const msg =
       err?.name === "AbortError"
-        ? "Grok 요청 시간 초과. 스샷 수를 줄이거나 잠시 후 다시 시도하세요."
+        ? "포스트 생성 시간 초과. 잠시 후 다시 시도하세요."
         : err.message || "Internal error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
