@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-/** Resize/compress image file → JPEG blob under ~1.2MB */
 async function compressImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const maxSide = 1280;
+  const maxSide = 960;
   let { width, height } = bitmap;
   if (width > maxSide || height > maxSide) {
     const scale = maxSide / Math.max(width, height);
@@ -27,7 +26,7 @@ async function compressImage(file: File): Promise<Blob> {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("compress failed"))),
       "image/jpeg",
-      0.82
+      0.75
     );
   });
 }
@@ -49,7 +48,7 @@ export default function GeneratePage() {
 
   function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    const max = 4;
+    const max = 2;
     const room = max - files.length;
     if (room <= 0) return;
 
@@ -127,11 +126,14 @@ export default function GeneratePage() {
         }),
       });
 
+      const rawText = await res.text();
       let data: any;
       try {
-        data = await res.json();
+        data = JSON.parse(rawText);
       } catch {
-        throw new Error("서버 응답을 읽지 못했습니다");
+        throw new Error(
+          `서버 응답 오류 (${res.status}): ${rawText.slice(0, 120) || "빈 응답/타임아웃"}`
+        );
       }
 
       if (!res.ok) {
@@ -158,15 +160,14 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v1.4.1
+            v1.4.3
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          한국어 · grok-4.5 · X 알고리즘 기준. 스샷은 압축 후 업로드되어
-          Grok이 분석합니다.
+          스샷은 키워드만 추출한 뒤 본문을 작성합니다 (타임아웃 방지).
         </p>
 
         <form onSubmit={handleGenerate} className="space-y-4">
@@ -198,14 +199,14 @@ export default function GeneratePage() {
 
           <div>
             <label className="mb-1.5 block text-xs text-zinc-400">
-              키워드 스크린샷 (선택, 최대 4장)
+              키워드 스크린샷 (선택, 최대 2장)
             </label>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
               className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-600 bg-zinc-900/80 px-4 py-5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
             >
-              🖼 스샷 / 사진 추가 (갤러리·촬영)
+              🖼 스샷 / 사진 추가
             </button>
             <input
               ref={fileRef}
@@ -220,7 +221,7 @@ export default function GeneratePage() {
             />
 
             {previews.length > 0 && (
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {previews.map((src, i) => (
                   <div
                     key={i}
@@ -243,10 +244,6 @@ export default function GeneratePage() {
                 ))}
               </div>
             )}
-            <p className="mt-1.5 text-[11px] text-zinc-500">
-              생성 시 스샷을 서버에 올린 뒤 Grok이 URL로 분석합니다 (용량
-              오류 방지).
-            </p>
           </div>
 
           {error && (
@@ -262,7 +259,7 @@ export default function GeneratePage() {
           >
             {loading
               ? files.length
-                ? "스샷 업로드 후 작성 중..."
+                ? "스샷 분석 후 작성 중..."
                 : "특화 Grok이 작성 중..."
               : "3일치 한국어 포스트 자동 생성"}
           </button>
@@ -274,22 +271,19 @@ export default function GeneratePage() {
               <p className="font-medium text-emerald-300">
                 {result.count}개 포스트가 draft로 저장되었습니다.
               </p>
-              {result.model && (
-                <p className="mt-1 text-xs text-zinc-400">model: {result.model}</p>
+              {result.mergedKeywords && (
+                <p className="mt-2 text-xs text-zinc-300">
+                  사용 키워드: {result.mergedKeywords}
+                </p>
               )}
               {result.extractedKeywords?.length > 0 && (
-                <p className="mt-2 text-xs text-zinc-300">
-                  추출·병합 키워드: {result.extractedKeywords.join(", ")}
+                <p className="mt-1 text-xs text-zinc-400">
+                  스샷 추출: {result.extractedKeywords.join(", ")}
                 </p>
               )}
               {result.droppedLowQuality > 0 && (
                 <p className="mt-1 text-xs text-amber-300">
-                  8점 미만 {result.droppedLowQuality}개 제외됨
-                </p>
-              )}
-              {result.keywordRequest && (
-                <p className="mt-2 text-amber-300 text-xs">
-                  Grok 요청: {result.keywordRequest}
+                  8점 미만 {result.droppedLowQuality}개 제외
                 </p>
               )}
               <button
@@ -315,11 +309,6 @@ export default function GeneratePage() {
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">
                     {p.content}
                   </p>
-                  {p.suggestedMedia && (
-                    <p className="mt-2 text-xs text-amber-300">
-                      📷 추천: {p.suggestedMedia}
-                    </p>
-                  )}
                 </div>
               ))}
             </div>

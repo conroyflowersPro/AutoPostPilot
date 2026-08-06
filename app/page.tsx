@@ -34,7 +34,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.4.2
+              v1.4.3
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -72,8 +72,7 @@ export default async function HomePage() {
 
         <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
           <p className="mb-3 text-xs text-zinc-400">
-            한국어 일괄 스케줄: reviewed + 미디어 · 17:00 LA · 최소 3시간 ·
-            grok-4.5
+            한국어 일괄 스케줄: reviewed + 미디어 · 17:00 LA · 최소 3시간
           </p>
           <BatchScheduleButton reviewedCount={reviewedReady} />
         </div>
@@ -81,9 +80,6 @@ export default async function HomePage() {
         {!posts || posts.length === 0 ? (
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
             <p>아직 포스트가 없습니다.</p>
-            <p className="mt-2 text-sm">
-              「Grok 자동 생성」으로 3일치 초안을 만들어보세요.
-            </p>
           </div>
         ) : (
           <div className="space-y-3">

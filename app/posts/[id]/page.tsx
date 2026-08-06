@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import PostActions from "./PostActions";
+import PostContentEditor from "./PostContentEditor";
 
 export default async function PostDetailPage({
   params,
@@ -36,7 +37,6 @@ export default async function PostDetailPage({
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        {/* Status & Meta */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full bg-zinc-800 px-2.5 py-1 uppercase">
             {post.status}
@@ -53,33 +53,12 @@ export default async function PostDetailPage({
           )}
         </div>
 
-        {/* Content */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {post.content}
-          </p>
-        </div>
+        <PostContentEditor
+          postId={post.id}
+          content={post.content}
+          status={post.status}
+        />
 
-        {/* Media preview */}
-        {post.media_urls && post.media_urls.length > 0 && (
-          <div className="grid grid-cols-2 gap-2">
-            {post.media_urls.map((url: string, i: number) => (
-              <div
-                key={i}
-                className="aspect-square overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={url}
-                  alt={`media-${i}`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Actions (client component) */}
         <PostActions post={post} />
       </main>
     </div>
