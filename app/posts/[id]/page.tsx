@@ -25,7 +25,6 @@ export default async function PostDetailPage({
 
   if (!post) notFound();
 
-  // Same order as home list for prev/next
   const { data: allIds } = await supabase
     .from("SeungContent")
     .select("id")
@@ -33,8 +32,9 @@ export default async function PostDetailPage({
 
   const ids = (allIds || []).map((r: { id: string }) => r.id);
   const idx = ids.indexOf(id);
-  const newerId = idx > 0 ? ids[idx - 1] : null;
-  const olderId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+  // list is newest-first: "next" in workflow = older draft (idx+1)
+  const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+  const prevId = idx > 0 ? ids[idx - 1] : null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -51,33 +51,6 @@ export default async function PostDetailPage({
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <div className="flex gap-2">
-          {olderId ? (
-            <Link
-              href={`/posts/${olderId}`}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/60 py-2.5 text-center text-sm hover:border-zinc-500"
-            >
-              ← 이전
-            </Link>
-          ) : (
-            <span className="flex-1 rounded-lg border border-zinc-800 py-2.5 text-center text-sm text-zinc-600">
-              ← 이전
-            </span>
-          )}
-          {newerId ? (
-            <Link
-              href={`/posts/${newerId}`}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/60 py-2.5 text-center text-sm hover:border-zinc-500"
-            >
-              다음 →
-            </Link>
-          ) : (
-            <span className="flex-1 rounded-lg border border-zinc-800 py-2.5 text-center text-sm text-zinc-600">
-              다음 →
-            </span>
-          )}
-        </div>
-
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full bg-zinc-800 px-2.5 py-1 uppercase">
             {post.status}
@@ -100,37 +73,7 @@ export default async function PostDetailPage({
           status={post.status}
         />
 
-        <PostActions post={post} />
-
-        <div className="flex gap-2 pb-8">
-          {olderId ? (
-            <Link
-              href={`/posts/${olderId}`}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/60 py-2.5 text-center text-sm hover:border-zinc-500"
-            >
-              ← 이전
-            </Link>
-          ) : (
-            <span className="flex-1 rounded-lg border border-zinc-800 py-2.5 text-center text-sm text-zinc-600">
-              ← 이전
-            </span>
-          )}
-          {newerId ? (
-            <Link
-              href={`/posts/${newerId}`}
-              className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-center text-sm font-medium hover:bg-indigo-500"
-            >
-              다음 →
-            </Link>
-          ) : (
-            <Link
-              href="/"
-              className="flex-1 rounded-lg bg-emerald-700 py-2.5 text-center text-sm font-medium hover:bg-emerald-600"
-            >
-              목록으로 (일괄 스케줄)
-            </Link>
-          )}
-        </div>
+        <PostActions post={post} nextId={nextId} prevId={prevId} />
       </main>
     </div>
   );

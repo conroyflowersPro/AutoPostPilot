@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const STYLE =
-  "Photorealistic smartphone photo, natural lighting, candid owner feel, not CGI, not illustration, not overly perfect.";
+export const maxDuration = 26;
 
-/** Official xAI Imagine models */
-const MODELS = ["grok-imagine-image-quality", "grok-imagine-image"] as const;
+const STYLE =
+  "Photorealistic smartphone photo, natural lighting, candid owner feel, not CGI.";
+
+const MODELS = ["grok-imagine-image", "grok-imagine-image-quality"] as const;
 
 function extractUrls(data: any): string[] {
   const list = data?.data || data?.images || [];
@@ -13,8 +14,10 @@ function extractUrls(data: any): string[] {
     return single ? [single] : [];
   }
   return list
-    .map((item: any) => item?.url || item?.b64_json || null)
-    .filter((u: string | null) => !!u && typeof u === "string" && u.startsWith("http"));
+    .map((item: any) => item?.url || null)
+    .filter(
+      (u: string | null) => !!u && typeof u === "string" && u.startsWith("http")
+    );
 }
 
 async function generateBatch(
@@ -25,6 +28,8 @@ async function generateBatch(
   let lastError = "";
 
   for (const model of MODELS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch("https://api.x.ai/v1/images/generations", {
         method: "POST",
@@ -39,6 +44,7 @@ async function generateBatch(
           aspect_ratio: "1:1",
           response_format: "url",
         }),
+        signal: controller.signal,
       });
 
       const text = await res.text();
@@ -46,7 +52,7 @@ async function generateBatch(
       try {
         data = JSON.parse(text);
       } catch {
-        lastError = `Invalid JSON (${res.status}): ${text.slice(0, 200)}`;
+        lastError = `Invalid JSON (${res.status})`;
         continue;
       }
 
@@ -55,17 +61,18 @@ async function generateBatch(
           data.error?.message ||
           data.message ||
           data.error ||
-          `HTTP ${res.status}: ${text.slice(0, 200)}`;
+          `HTTP ${res.status}`;
         continue;
       }
 
       const urls = extractUrls(data);
-      if (urls.length > 0) {
-        return { urls, model };
-      }
-      lastError = `No image URLs in response from ${model}`;
+      if (urls.length > 0) return { urls, model };
+      lastError = `No URLs from ${model}`;
     } catch (e: any) {
-      lastError = e.message || String(e);
+      lastError =
+        e?.name === "AbortError" ? "이미지 생성 시간 초과" : e.message || String(e);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -91,11 +98,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const base = (prompt || postContent || "").toString().slice(0, 800);
+    const base = (prompt || postContent || "").toString().slice(0, 500);
     const fullPrompt = `${base}\n\nStyle: ${STYLE}`;
 
-    // One API call → up to 4 samples
-    const { urls, error, model } = await generateBatch(xaiKey, fullPrompt, 4);
+    // Only 2 samples to stay under Netlify timeout
+    const { urls, error, model } = await generateBatch(xaiKey, fullPrompt, 2);
 
     if (urls.length > 0) {
       return NextResponse.json({
@@ -113,7 +120,7 @@ export async function POST(req: NextRequest) {
       imageUrl: null,
       prompt: fullPrompt,
       error: error || "unknown",
-      message: `이미지 생성 실패: ${error || "응답 없음"}. 폰으로 촬영해 업로드해주세요.`,
+      message: `이미지 생성 실패/시간초과. 폰 사진첩에서 직접 올려주세요. (${error || ""})`,
     });
   } catch (err: any) {
     console.error(err);

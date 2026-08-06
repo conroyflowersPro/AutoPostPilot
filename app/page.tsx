@@ -34,7 +34,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v1.4.7
+              v1.4.8
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ export default async function HomePage() {
 
         <div className="mb-6 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
           <p className="mb-3 text-xs text-zinc-400">
-            Fedica는 <strong className="text-emerald-300">일괄 스케줄만</strong> ·
+            Fedica는 <strong className="text-emerald-300">여기 일괄만</strong> ·
             reviewed + 미디어 · 17:00 LA · 최소 3시간
           </p>
           <BatchScheduleButton reviewedCount={reviewedReady} />

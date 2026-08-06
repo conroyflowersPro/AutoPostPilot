@@ -15,7 +15,45 @@ type Post = {
   fedica_post_id: string | null;
 };
 
-export default function PostActions({ post }: { post: Post }) {
+async function compressImage(file: File): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1600;
+    let { width, height } = bitmap;
+    if (width > maxSide || height > maxSide) {
+      const scale = maxSide / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (b) => resolve(b || file),
+        "image/jpeg",
+        0.78
+      );
+    });
+  } catch {
+    return file;
+  }
+}
+
+export default function PostActions({
+  post,
+  nextId,
+  prevId,
+}: {
+  post: Post;
+  nextId?: string | null;
+  prevId?: string | null;
+}) {
   const [review, setReview] = useState<any>(null);
   const [loadingReview, setLoadingReview] = useState(false);
   const [applyingRevision, setApplyingRevision] = useState(false);
@@ -28,6 +66,7 @@ export default function PostActions({ post }: { post: Post }) {
     null
   );
   const [message, setMessage] = useState<string | null>(null);
+  const [justUploaded, setJustUploaded] = useState(false);
   const router = useRouter();
   const supabase = createClient();
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -91,17 +130,22 @@ export default function PostActions({ post }: { post: Post }) {
 
     setUploading(true);
     setMessage(null);
+    setJustUploaded(false);
 
     try {
-      const urls: string[] = post.media_urls || [];
+      const urls: string[] = [...(post.media_urls || [])];
 
       for (const file of list) {
-        const ext = file.name.split(".").pop() || "jpg";
-        const path = `${post.id}/${Date.now()}.${ext}`;
+        setMessage(`압축·업로드 중… (${file.name.slice(0, 20)})`);
+        const blob = await compressImage(file);
+        const path = `${post.id}/${Date.now()}.jpg`;
 
         const { error: uploadError } = await supabase.storage
           .from("media")
-          .upload(path, file, { upsert: true });
+          .upload(path, blob, {
+            contentType: "image/jpeg",
+            upsert: true,
+          });
 
         if (uploadError) throw uploadError;
 
@@ -112,15 +156,17 @@ export default function PostActions({ post }: { post: Post }) {
         urls.push(publicUrl);
       }
 
-      await supabase
+      const { error } = await supabase
         .from("SeungContent")
         .update({ media_urls: urls })
         .eq("id", post.id);
+      if (error) throw error;
 
       setMessage("미디어 업로드 완료");
+      setJustUploaded(true);
       router.refresh();
     } catch (err: any) {
-      setMessage(err.message || "업로드 실패");
+      setMessage(err.message || "업로드 실패 — 사진 용량을 줄여 다시 시도");
     } finally {
       setUploading(false);
     }
@@ -182,19 +228,17 @@ export default function PostActions({ post }: { post: Post }) {
       setGenResult(data);
 
       if (data.candidates?.length) {
-        setMessage(
-          `샘플 ${data.candidates.length}장 준비됨 — 원하는 이미지를 선택하세요.`
-        );
-      } else if (data.imageUrl) {
-        setMessage("이미지 1장 생성됨 — 아래에서 선택하세요.");
+        setMessage(`샘플 ${data.candidates.length}장 — 탭해서 첨부`);
       } else {
         setMessage(
           data.message ||
-            "생성 제한. 폰으로 촬영해 업로드하거나 프롬프트를 사용하세요."
+            "생성 시간초과/실패. 폰 사진첩에서 직접 올려주세요."
         );
       }
     } catch (err: any) {
-      setMessage(err.message);
+      setMessage(
+        err.message || "이미지 생성 실패 — 폰에서 직접 업로드하세요"
+      );
     } finally {
       setGenerating(false);
     }
@@ -212,6 +256,7 @@ export default function PostActions({ post }: { post: Post }) {
         .eq("id", post.id);
       if (error) throw error;
       setMessage("선택한 이미지가 첨부되었습니다.");
+      setJustUploaded(true);
       router.refresh();
     } catch (err: any) {
       setMessage(err.message || "첨부 실패");
@@ -254,7 +299,7 @@ export default function PostActions({ post }: { post: Post }) {
       : [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-medium">특화 Grok 검수 · 관리</h3>
@@ -284,16 +329,6 @@ export default function PostActions({ post }: { post: Post }) {
               </span>
             </div>
 
-            {review.scores && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>Conversation: {review.scores.conversation}</div>
-                <div>Velocity: {review.scores.velocity}</div>
-                <div>Profile: {review.scores.profile}</div>
-                <div>Authenticity: {review.scores.authenticity}</div>
-                <div>Media: {review.scores.media}</div>
-              </div>
-            )}
-
             {review.feedback && (
               <p className="rounded-lg bg-zinc-800/80 p-3 text-xs leading-relaxed text-zinc-300">
                 {review.feedback}
@@ -320,7 +355,7 @@ export default function PostActions({ post }: { post: Post }) {
                 >
                   {applyingRevision
                     ? "적용 중..."
-                    : "✓ 수정 제안 적용 (본문 교체)"}
+                    : "✓ 수정 제안 적용"}
                 </button>
               </div>
             )}
@@ -353,7 +388,7 @@ export default function PostActions({ post }: { post: Post }) {
                     disabled={removingIndex === i}
                     className="absolute right-1.5 top-1.5 rounded-md bg-black/75 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
                   >
-                    {removingIndex === i ? "…" : "✕ 삭제"}
+                    {removingIndex === i ? "…" : "✕"}
                   </button>
                 )}
               </div>
@@ -368,7 +403,7 @@ export default function PostActions({ post }: { post: Post }) {
             disabled={uploading || mediaLocked}
             className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
           >
-            {uploading ? "업로드 중..." : "🖼 사진첩에서 선택"}
+            {uploading ? "압축·업로드 중..." : "🖼 사진첩"}
           </button>
           <button
             type="button"
@@ -376,7 +411,7 @@ export default function PostActions({ post }: { post: Post }) {
             disabled={uploading || mediaLocked}
             className="rounded-lg border border-zinc-600 bg-zinc-800/50 px-3 py-4 text-sm text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50"
           >
-            {uploading ? "업로드 중..." : "📷 카메라로 촬영"}
+            {uploading ? "압축·업로드 중..." : "📷 촬영"}
           </button>
         </div>
 
@@ -398,7 +433,7 @@ export default function PostActions({ post }: { post: Post }) {
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          일괄 스케줄에는 미디어 + 검수(reviewed) 필요.
+          업로드 전 자동 압축합니다. 일괄 스케줄 = 홈에서만.
         </p>
 
         <button
@@ -408,52 +443,47 @@ export default function PostActions({ post }: { post: Post }) {
           className="mt-3 w-full rounded-lg border border-indigo-800/60 bg-indigo-950/40 py-2.5 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
         >
           {generating
-            ? "Grok 샘플 생성 중 (최대 4장)..."
-            : "✨ Grok 이미지 샘플 생성"}
+            ? "샘플 생성 중 (최대 2장)..."
+            : "✨ Grok 이미지 샘플 (선택)"}
         </button>
 
         {candidates.length > 0 && (
-          <div className="mt-3 space-y-2">
-            <p className="text-xs text-zinc-400">
-              샘플 중 원하는 이미지를 탭해서 첨부 ({candidates.length}장)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {candidates.map((url, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSelectCandidate(url, i)}
-                  disabled={selectingCandidate !== null || mediaLocked}
-                  className="relative aspect-square overflow-hidden rounded-lg border border-indigo-700/50 bg-zinc-900 ring-offset-2 ring-offset-zinc-950 hover:ring-2 hover:ring-indigo-500 disabled:opacity-50"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`candidate-${i}`}
-                    className="h-full w-full object-cover"
-                  />
-                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-                    {selectingCandidate === i ? "첨부 중…" : `선택 ${i + 1}`}
-                  </span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {candidates.map((url, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleSelectCandidate(url, i)}
+                disabled={selectingCandidate !== null || mediaLocked}
+                className="relative aspect-square overflow-hidden rounded-lg border border-indigo-700/50 bg-zinc-900"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`c-${i}`}
+                  className="h-full w-full object-cover"
+                />
+                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 text-[10px] text-white">
+                  {selectingCandidate === i ? "…" : `선택 ${i + 1}`}
+                </span>
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-center">
-        <p className="text-xs text-emerald-200/90">
-          Fedica 스케줄은 <strong>홈 화면 일괄 스케줄</strong>만 사용합니다.
-          (단건 스케줄 제거됨)
-        </p>
+      {justUploaded && nextId && (
         <Link
-          href="/"
-          className="mt-2 inline-block rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium hover:bg-emerald-600"
+          href={`/posts/${nextId}`}
+          className="block w-full rounded-xl bg-indigo-600 py-4 text-center text-sm font-semibold hover:bg-indigo-500"
         >
-          홈에서 일괄 스케줄 →
+          다음 포스트로 →
         </Link>
-      </div>
+      )}
+
+      <p className="text-center text-[11px] text-zinc-500">
+        Fedica 스케줄은 홈 <strong className="text-emerald-400">일괄만</strong>
+      </p>
 
       <button
         onClick={handleDelete}
@@ -468,6 +498,39 @@ export default function PostActions({ post }: { post: Post }) {
           {message}
         </p>
       )}
+
+      {/* Sticky bottom nav */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl gap-2 px-4 py-3">
+          {prevId ? (
+            <Link
+              href={`/posts/${prevId}`}
+              className="flex-1 rounded-lg border border-zinc-700 py-3 text-center text-sm"
+            >
+              ← 이전
+            </Link>
+          ) : (
+            <span className="flex-1 rounded-lg border border-zinc-800 py-3 text-center text-sm text-zinc-600">
+              ← 이전
+            </span>
+          )}
+          {nextId ? (
+            <Link
+              href={`/posts/${nextId}`}
+              className="flex-[1.4] rounded-lg bg-indigo-600 py-3 text-center text-sm font-semibold hover:bg-indigo-500"
+            >
+              다음 포스트 →
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="flex-[1.4] rounded-lg bg-emerald-700 py-3 text-center text-sm font-semibold hover:bg-emerald-600"
+            >
+              홈 · 일괄 스케줄
+            </Link>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
