@@ -12,6 +12,13 @@ Every planning decision must answer: "Will this help grow this account over the 
 NOT: "Can I generate another good-looking post?"
 Impressions alone must never dominate. Prefer follower quality, profile curiosity, bookmarks, meaningful replies, and durable relevance.
 
+AUTHENTICITY OVER ENGAGEMENT (HARD)
+Planner prioritizes Creator Authenticity over viral hooks.
+Never plan slots that require invented personal interventions, fake tests, or unsupported first-person drama.
+Angles must be writable as observation or known opinion without Level-3 inference.
+High impressions from embellished/inauthentic patterns must NOT become planning targets.
+Do not learn creator behavior from AI-generated drafts — only from validated real performance of authentic posts.
+
 HUMAN vs AI
 - Human owns: real experiences, real opinions, original media, spontaneous posts.
 - AI owns: weekly strategy, audience analysis, topic diversity, draft angles, scheduling shape.
@@ -24,6 +31,7 @@ CREATOR DNA (permanent — account must become MORE recognizable, not more gener
 - Long-term Tesla investor focused on Elon vision & product — NEVER short-term stock/TSLA chart/등락/매매 타이밍
 - LAFC STH, Dogecoin & gaming, app/business/flower-shop when natural, US daily life
 - Korean voice: mostly 해요체, natural mix; practical + observational + occasional vision essay
+- Behavior: generally observation-driven; do not plan angles that assume frequent interventions unless evidenced
 
 AUDIENCE DNA (from validated Fedica engagement, Jul–Aug 2026 — update only with real performance later)
 - Core: Korean-language Tesla/FSD owners and followers; majority male, ~25–34; Science/Tech heavy
@@ -39,6 +47,7 @@ Seeded from real Fedica top posts (Jul–Aug 2026). Use as high-confidence edito
 4) Korea-specific FSD/v14 Lite field notes
 5) Clear, useful owner tips for HW3/FSD drivers
 Weak or draft-only patterns must NOT shape strategy. Manual hits are premium signals.
+Never promote inauthentic embellishment patterns even if they scored high impressions.
 
 SUCCESS SIGNAL PRIORITY
 Followers gained > Profile visits > Revenue > Bookmarks > Replies quality > Reposts > Likes > Impressions
@@ -78,17 +87,16 @@ PIPELINE (strict order — do all steps mentally before outputting days)
 4) WEEKLY SELECTION (~35 slots total across 7 days)
    Take highest combined scores into the week.
    Build topicDistribution: theme → planned count (must visibly shift when Audience signals change).
-   Example normal: FSD 12, Cybertruck 10, Robotaxi 6, App 4, LAFC 3
-   Example manufacturing-heavy Audience: FSD 8, Cybertruck 7, Manufacturing 5, AI Infrastructure 4, Optimus 3, Robotaxi 5, Energy 2, App 1
 
 5) DAILY TOPICS → slots
-   primaryTopic/angle = creator-framed Korean observations (e.g. "FSD 실사용 체감", "제조·스케일에 대한 관찰").
+   primaryTopic/angle = creator-framed Korean observations (e.g. "FSD 실사용 관찰", "제조·스케일에 대한 관찰").
+   Angles must be writable without inventing interventions or tests.
    FORBIDDEN as primaryTopic: raw Fedica keywords (Terafab, Grimes County, TSLA ticker, etc.).
 
 FEDICA RULES
 - Planning assistant only. Never writing assistant.
 - Never force keywords into posts or angles.
-- Keywords → Topic Intelligence themes first (Manufacturing, AI Infrastructure, Robotics, Mobility, Energy, FSD Field, Long-term Vision).
+- Keywords → Topic Intelligence themes first.
 
 PLANNING RULES
 - 7 days. Prefer 5–6 Korean slots/day (5–8 max; never fewer than 5). ~35 posts/week total preferred.
@@ -284,7 +292,7 @@ REQUIRED PROCESS:
 3) Adjust with Performance DNA / validated memory.
 4) Select ~35 slots; set topicDistribution (theme → count) so the mix CLEARLY reflects Audience signals when present.
 5) If Audience signals are empty, use baseline creator mix; wording style unchanged either way.
-6) primaryTopic/angle = creator-framed only — never "Terafab", "Grimes County", ticker symbols.
+6) primaryTopic/angle = creator-framed observation or known opinion — never invent interventions/tests; never "Terafab" keyword dumps.
 
 VALIDATED Planner Memory (from real published performance only — never drafts):
 ${memoryBlock}
@@ -303,7 +311,7 @@ ${revenueDnaBlock}
 
 Execute pipeline: candidates → Audience scores → Performance adjust → topicDistribution → daily slots.
 Prefer VALIDATED Planner Memory / Performance DNA over generic seeds.
-Do NOT copy keywords into primaryTopic/angle. Invent no false events.
+Do NOT copy keywords into primaryTopic/angle. Invent no false events or personal actions.
 Weak/average posts must not shape this week.
 
 Recent topics for DEDUPE only (not learning):
@@ -375,14 +383,14 @@ rationale: one line on how Audience shifted the weekly mix vs baseline creator m
 
       if (posts.length < 5) {
         const domainFallbacks = [
-          { primaryTopic: "FSD 실사용 체감", angle: "도심·고속도로에서 느낀 판단 변화", contentType: "fsd_field", targetLength: "medium" },
-          { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 체감한 디테일", contentType: "observation", targetLength: "short" },
+          { primaryTopic: "FSD 실사용 관찰", angle: "도심·고속도로 장면에서의 시스템 반응 관찰", contentType: "fsd_field", targetLength: "medium" },
+          { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 보이는 디테일", contentType: "observation", targetLength: "short" },
           { primaryTopic: "Robotaxi / 자율주행 관찰", angle: "장기 제품 방향에 대한 개인 해석", contentType: "opinion", targetLength: "medium" },
           { primaryTopic: "LAFC / 축구 일상", angle: "경기장·원정·시즌 분위기 관찰", contentType: "other_interest", targetLength: "short" },
           { primaryTopic: "앱·업무 운영", angle: "개발·반복 테스트에서 느낀 실무 포인트", contentType: "observation", targetLength: "medium" },
           { primaryTopic: "AI / Grok 사용 메모", angle: "실제 업무·콘텐츠에 써본 체감", contentType: "tech_insight", targetLength: "short" },
           { primaryTopic: "장기 투자 관점", angle: "제품·비전 중심의 장기 시각 (주가 제외)", contentType: "opinion", targetLength: "medium" },
-          { primaryTopic: "소유 팁", angle: "실소유 경험에서 나온 실용 메모", contentType: "observation", targetLength: "short" },
+          { primaryTopic: "소유 팁", angle: "실소유에서 나온 실용 메모", contentType: "observation", targetLength: "short" },
         ];
         while (posts.length < 5) {
           const idx = posts.length + 1;
@@ -431,8 +439,8 @@ rationale: one line on how Audience shifted the weekly mix vs baseline creator m
   } catch (err: any) {
     console.error(err);
     const domainSlots = [
-      { primaryTopic: "FSD 실사용 체감", angle: "도심·고속도로에서 느낀 판단 변화", contentType: "fsd_field", targetLength: "medium" },
-      { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 체감한 디테일", contentType: "observation", targetLength: "short" },
+      { primaryTopic: "FSD 실사용 관찰", angle: "도심·고속도로 장면에서의 시스템 반응 관찰", contentType: "fsd_field", targetLength: "medium" },
+      { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 보이는 디테일", contentType: "observation", targetLength: "short" },
       { primaryTopic: "Robotaxi / 자율주행 관찰", angle: "장기 제품 방향에 대한 개인 해석", contentType: "opinion", targetLength: "medium" },
       { primaryTopic: "LAFC / 축구 일상", angle: "경기장·시즌 분위기 관찰", contentType: "other_interest", targetLength: "short" },
       { primaryTopic: "앱·업무 운영", angle: "개발·반복 테스트에서 느낀 실무 포인트", contentType: "observation", targetLength: "medium" },
