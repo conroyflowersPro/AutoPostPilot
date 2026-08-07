@@ -19,8 +19,13 @@ const FILTERS = [
   { key: "all", label: "전체" },
   { key: "draft", label: "draft" },
   { key: "reviewed", label: "reviewed" },
+  { key: "scheduling", label: "scheduling" },
+  { key: "schedule_failed", label: "failed" },
   { key: "scheduled", label: "scheduled" },
 ] as const;
+
+/** Must match lib/config/scheduling.ts batchSize */
+const SCHEDULE_BATCH_SIZE = 3;
 
 function formatLA(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -62,7 +67,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
 
   const selectable = visible.filter(
     (p) =>
-      p.status === "reviewed" &&
+      (p.status === "reviewed" || p.status === "schedule_failed") &&
       p.pipeline_id === "42303" &&
       p.media_urls &&
       p.media_urls.length > 0
@@ -108,7 +113,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 draft ${ids.length}개를 reviewed로 표시할까요?\n(미디어 없는 항목도 포함됩니다. 스케줄은 미디어 있는 reviewed만 가능)`
+        `선택한 draft ${ids.length}개를 reviewed로 표시할까요?\n(미디어 없는 항목도 포함됩니다)`
       )
     )
       return;
@@ -165,27 +170,11 @@ export default function PostList({ posts }: { posts: Post[] }) {
       setMsg("삭제할 포스트를 선택하세요.");
       return;
     }
-    const scheduledCount = posts.filter(
-      (p) => ids.includes(p.id) && p.status === "scheduled"
-    ).length;
-    const warn =
-      scheduledCount > 0
-        ? `\n(그중 스케줄됨 ${scheduledCount}개 — 앱 DB에서만 삭제, Fedica는 수동 확인)`
-        : "";
-    if (
-      !confirm(
-        `선택한 ${ids.length}개 포스트를 삭제할까요?${warn}\n이 작업은 되돌릴 수 없습니다.`
-      )
-    )
-      return;
-
+    if (!confirm(`선택한 ${ids.length}개 포스트를 삭제할까요?`)) return;
     setBusy(true);
     setMsg("삭제 중…");
     try {
-      const { error } = await supabase
-        .from("SeungContent")
-        .delete()
-        .in("id", ids);
+      const { error } = await supabase.from("SeungContent").delete().in("id", ids);
       if (error) throw error;
       setSelected(new Set());
       setMsg(`${ids.length}개 삭제 완료`);
@@ -202,35 +191,70 @@ export default function PostList({ posts }: { posts: Post[] }) {
       selectable.some((p) => p.id === id)
     );
     if (ids.length === 0) {
-      setMsg("reviewed + 미디어 있는 포스트를 선택하세요.");
+      setMsg("reviewed(또는 재시도 failed) + 미디어 있는 포스트를 선택하세요.");
       return;
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 일괄 스케줄할까요?\n시작일: ${startDate} (LA)\n하루 최대 ${maxPerDay}개 · 최소 3시간 간격`
+        `선택한 ${ids.length}개를 Fedica 일괄 스케줄할까요?\n시작일: ${startDate} (LA)\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩 자동 연속`
       )
     )
       return;
 
     setBusy(true);
-    setMsg("업로드 중…");
     setScheduleResult(null);
+
+    const allScheduled: any[] = [];
+    const allFailed: any[] = [];
+    const allSkipped: any[] = [];
+    const total = ids.length;
+
     try {
-      const res = await fetch("/api/fedica/batch-schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pipelineId: "42303",
-          requireMedia: true,
-          postIds: ids,
-          startDate,
-          maxPerDay,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "일괄 스케줄 실패");
-      setScheduleResult(data);
-      setMsg(data.message || "완료");
+      for (let offset = 0; offset < ids.length; offset += SCHEDULE_BATCH_SIZE) {
+        const chunk = ids.slice(offset, offset + SCHEDULE_BATCH_SIZE);
+        const done = Math.min(offset + chunk.length, total);
+        setMsg(
+          `Scheduling ${total} posts… ${done} / ${total} (성공 ${allScheduled.length} · 실패 ${allFailed.length})`
+        );
+
+        const res = await fetch("/api/fedica/batch-schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pipelineId: "42303",
+            requireMedia: true,
+            postIds: chunk,
+            startDate,
+            maxPerDay,
+            slotOffset: offset,
+            totalPlanned: total,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          for (const id of chunk) {
+            allFailed.push({
+              id,
+              error: data.error || "배치 요청 실패",
+              stage: "publish_post",
+            });
+          }
+          continue;
+        }
+        if (Array.isArray(data.scheduled)) allScheduled.push(...data.scheduled);
+        if (Array.isArray(data.failed)) allFailed.push(...data.failed);
+        if (Array.isArray(data.skipped)) allSkipped.push(...data.skipped);
+      }
+
+      const summary = {
+        scheduled: allScheduled,
+        failed: allFailed,
+        skipped: allSkipped,
+        total,
+        message: `완료: ${allScheduled.length} Scheduled · ${allFailed.length} Failed · ${allSkipped.length} Skipped`,
+      };
+      setScheduleResult(summary);
+      setMsg(summary.message);
       setSelected(new Set());
       router.refresh();
     } catch (e: any) {
@@ -262,7 +286,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
       <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-3">
         <p className="text-xs text-zinc-400">
           Fedica는 <strong className="text-emerald-300">선택한 포스트만</strong>{" "}
-          · 시작일 기준으로 일자 분산
+          · {SCHEDULE_BATCH_SIZE}개씩 자동 배치
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -350,16 +374,35 @@ export default function PostList({ posts }: { posts: Post[] }) {
           </button>
         </div>
 
-        {msg && <p className="text-xs text-zinc-400">{msg}</p>}
-        {scheduleResult?.scheduled?.length > 0 && (
-          <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-zinc-300">
-            {scheduleResult.scheduled.map((s: any) => (
-              <li key={s.id}>
-                예정 {formatLA(s.scheduledAt)} LA
-                {s.mediaCount ? ` · 미디어 ${s.mediaCount}` : ""}
-              </li>
-            ))}
-          </ul>
+        {msg && <p className="text-xs text-zinc-300">{msg}</p>}
+        {scheduleResult && (
+          <div className="space-y-2 text-xs">
+            {scheduleResult.scheduled?.length > 0 && (
+              <ul className="max-h-28 space-y-1 overflow-y-auto text-emerald-300/90">
+                {scheduleResult.scheduled.map((s: any) => (
+                  <li key={s.id}>
+                    ✓ 예정 {s.scheduledAt ? formatLA(s.scheduledAt) : "—"} LA
+                    {s.mediaCount ? ` · 미디어 ${s.mediaCount}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {scheduleResult.failed?.length > 0 && (
+              <ul className="max-h-28 space-y-1 overflow-y-auto text-red-300/90">
+                {scheduleResult.failed.map((f: any) => (
+                  <li key={f.id}>
+                    ✗ {f.stage ? `[${f.stage}] ` : ""}
+                    {f.error || "실패"}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {scheduleResult.skipped?.length > 0 && (
+              <p className="text-zinc-500">
+                건너힤 {scheduleResult.skipped.length}개 (이미 예약됨 등)
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -371,7 +414,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
         <div className="space-y-3">
           {visible.map((post) => {
             const canSchedule =
-              post.status === "reviewed" &&
+              (post.status === "reviewed" || post.status === "schedule_failed") &&
               post.pipeline_id === "42303" &&
               !!post.media_urls?.length;
             const checked = selected.has(post.id);
@@ -453,6 +496,8 @@ function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     draft: "bg-zinc-700 text-zinc-300",
     reviewed: "bg-blue-900/60 text-blue-300",
+    scheduling: "bg-purple-900/60 text-purple-300",
+    schedule_failed: "bg-red-900/60 text-red-300",
     scheduled: "bg-amber-900/60 text-amber-300",
     published: "bg-emerald-900/60 text-emerald-300",
   };
