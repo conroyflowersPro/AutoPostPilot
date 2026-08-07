@@ -1,0 +1,113 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { parseMetricsCsv } from "@/lib/learning/parse-csv";
+import type { MetricOrigin } from "@/lib/learning/types";
+
+export const maxDuration = 26;
+
+/**
+ * POST /api/learning/import
+ * Body: { csvText: string, origin?: 'ai'|'manual'|'unknown', notes?: string }
+ * Imports analytics CSV → learning_runs + post_metrics (status=imported).
+ * Does NOT update Planner Memory (analyze step does that).
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const csvText = typeof body.csvText === "string" ? body.csvText : "";
+    if (!csvText.trim()) {
+      return NextResponse.json({ error: "csvText required" }, { status: 400 });
+    }
+
+    const origin = (["ai", "manual", "unknown"].includes(body.origin)
+      ? body.origin
+      : "unknown") as MetricOrigin;
+    const notes = typeof body.notes === "string" ? body.notes.slice(0, 500) : null;
+
+    let rows;
+    try {
+      rows = parseMetricsCsv(csvText, origin);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: "CSV parse failed", detail: String(e?.message || e) },
+        { status: 400 }
+      );
+    }
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { error: "No metric rows found in CSV" },
+        { status: 400 }
+      );
+    }
+
+    const { data: run, error: runErr } = await supabase
+      .from("learning_runs")
+      .insert({
+        source: "csv",
+        status: "imported",
+        notes,
+        raw_meta: { rowCount: rows.length, origin },
+      })
+      .select("id")
+      .single();
+
+    if (runErr || !run) {
+      return NextResponse.json(
+        {
+          error: "learning_runs insert failed — run migration?",
+          detail: runErr?.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    const metricRows = rows.map((r) => ({
+      learning_run_id: run.id,
+      content_snippet: r.contentSnippet,
+      published_at: r.publishedAt,
+      followers_gained: r.followersGained,
+      profile_visits: r.profileVisits,
+      bookmarks: r.bookmarks,
+      replies: r.replies,
+      reposts: r.reposts,
+      likes: r.likes,
+      impressions: r.impressions,
+      quotes: r.quotes,
+      engagement_rate: r.engagementRate,
+      origin: r.origin,
+      raw: r.raw ?? null,
+      is_success: false,
+    }));
+
+    const { error: mErr } = await supabase.from("post_metrics").insert(metricRows);
+    if (mErr) {
+      return NextResponse.json(
+        { error: "post_metrics insert failed", detail: mErr.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      learningRunId: run.id,
+      imported: rows.length,
+      status: "imported",
+      next: "POST /api/learning/analyze with learningRunId",
+    });
+  } catch (err: any) {
+    console.error(err);
+    return NextResponse.json(
+      { error: String(err?.message || err) },
+      { status: 500 }
+    );
+  }
+}
