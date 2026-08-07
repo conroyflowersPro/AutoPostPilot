@@ -249,45 +249,34 @@ export async function scheduleOnePost(opts: {
       };
     }
 
-    let updErr: any = null;
+    // Duplicate Risk Mitigation: persist provider id ASAP after success
+    const minimalSuccess = {
+      status: "scheduled" as const,
+      scheduled_at: scheduledAtISO,
+      fedica_post_id: providerPostId || null,
+    };
     {
-      const full = await supabase
+      const first = await supabase
         .from("SeungContent")
-        .update({
-          status: "scheduled",
-          scheduled_at: scheduledAtISO,
-          fedica_post_id: providerPostId || null,
-          last_error: null,
-          error_stage: null,
-          schedule_provider: provider.name,
-          last_attempt_at: new Date().toISOString(),
-          attempt_count: attemptCount,
-        })
+        .update(minimalSuccess)
         .eq("id", post.id);
-      updErr = full.error;
-      if (updErr && /column|schema/i.test(updErr.message || "")) {
-        const basic = await supabase
+      if (first.error) {
+        await supabase
           .from("SeungContent")
-          .update({
-            status: "scheduled",
-            scheduled_at: scheduledAtISO,
-            fedica_post_id: providerPostId || null,
-          })
+          .update(minimalSuccess)
           .eq("id", post.id);
-        updErr = basic.error;
       }
     }
-
-    if (updErr) {
-      await supabase
-        .from("SeungContent")
-        .update({
-          status: "scheduled",
-          scheduled_at: scheduledAtISO,
-          fedica_post_id: providerPostId || null,
-        })
-        .eq("id", post.id);
-    }
+    await supabase
+      .from("SeungContent")
+      .update({
+        last_error: null,
+        error_stage: null,
+        schedule_provider: provider.name,
+        last_attempt_at: new Date().toISOString(),
+        attempt_count: attemptCount,
+      })
+      .eq("id", post.id);
 
     return {
       ok: true,
