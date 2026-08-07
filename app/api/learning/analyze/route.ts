@@ -5,17 +5,14 @@ import {
   buildPlannerMemory,
   buildCreatorDnaHint,
   buildAudienceDnaHint,
+  buildPerformanceDna,
+  buildRevenueDna,
 } from "@/lib/learning/score";
+import { extractFeatures } from "@/lib/learning/features";
 import type { NormalizedPostMetrics, MetricOrigin } from "@/lib/learning/types";
 
 export const maxDuration = 26;
 
-/**
- * POST /api/learning/analyze
- * Body: { learningRunId: string }
- * Scores metrics → updates post_metrics.is_success → writes planner_memory,
- * creator_dna, audience_dna. Only validated performance updates Memory.
- */
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -54,21 +51,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const normalized: NormalizedPostMetrics[] = metrics.map((row: any) => ({
-      contentSnippet: String(row.content_snippet || ""),
-      publishedAt: row.published_at ? String(row.published_at) : null,
-      followersGained: Number(row.followers_gained) || 0,
-      profileVisits: Number(row.profile_visits) || 0,
-      bookmarks: Number(row.bookmarks) || 0,
-      replies: Number(row.replies) || 0,
-      reposts: Number(row.reposts) || 0,
-      likes: Number(row.likes) || 0,
-      impressions: Number(row.impressions) || 0,
-      quotes: Number(row.quotes) || 0,
-      engagementRate:
-        row.engagement_rate != null ? Number(row.engagement_rate) : null,
-      origin: (row.origin || "unknown") as MetricOrigin,
-    }));
+    const normalized: NormalizedPostMetrics[] = metrics.map((row: any) => {
+      const snippet = String(row.content_snippet || "");
+      const features =
+        row.features && typeof row.features === "object"
+          ? row.features
+          : extractFeatures(snippet);
+      return {
+        postId: row.post_id ? String(row.post_id) : null,
+        contentSnippet: snippet,
+        publishedAt: row.published_at ? String(row.published_at) : null,
+        followersGained: Number(row.followers_gained) || 0,
+        profileVisits: Number(row.profile_visits) || 0,
+        bookmarks: Number(row.bookmarks) || 0,
+        replies: Number(row.replies) || 0,
+        reposts: Number(row.reposts) || 0,
+        likes: Number(row.likes) || 0,
+        impressions: Number(row.impressions) || 0,
+        quotes: Number(row.quotes) || 0,
+        shares: Number(row.shares) || 0,
+        detailExpands: Number(row.detail_expands) || 0,
+        urlClicks: Number(row.url_clicks) || 0,
+        hashtagClicks: Number(row.hashtag_clicks) || 0,
+        permalinkClicks: Number(row.permalink_clicks) || 0,
+        engagements: Number(row.engagements) || 0,
+        revenue: Number(row.revenue) || 0,
+        engagementRate:
+          row.engagement_rate != null ? Number(row.engagement_rate) : null,
+        origin: (row.origin || "unknown") as MetricOrigin,
+        features,
+      };
+    });
 
     const scored = scoreAll(normalized);
     const bySnippet = new Map(
@@ -84,6 +97,7 @@ export async function POST(req: NextRequest) {
         .update({
           weighted_score: s.weightedScore,
           is_success: s.isSuccess,
+          features: s.features ?? null,
         })
         .eq("id", row.id);
     }
@@ -91,6 +105,8 @@ export async function POST(req: NextRequest) {
     const memory = buildPlannerMemory(scored);
     const creatorDna = buildCreatorDnaHint(scored);
     const audienceDna = buildAudienceDnaHint(scored);
+    const performanceDna = buildPerformanceDna(scored);
+    const revenueDna = buildRevenueDna(scored);
 
     const { count: memCount } = await supabase
       .from("planner_memory")
@@ -124,6 +140,27 @@ export async function POST(req: NextRequest) {
       learning_run_id: learningRunId,
     });
 
+    try {
+      await supabase.from("performance_dna").insert({
+        version: nextVer,
+        data: performanceDna,
+        summary_ko: performanceDna.summaryKo,
+        learning_run_id: learningRunId,
+      });
+    } catch {
+      /* optional */
+    }
+    try {
+      await supabase.from("revenue_dna").insert({
+        version: nextVer,
+        data: revenueDna,
+        summary_ko: revenueDna.summaryKo,
+        learning_run_id: learningRunId,
+      });
+    } catch {
+      /* optional */
+    }
+
     await supabase
       .from("learning_runs")
       .update({
@@ -132,6 +169,8 @@ export async function POST(req: NextRequest) {
         raw_meta: {
           successCount: memory.successCount,
           analyzedCount: memory.analyzedCount,
+          performanceSummary: performanceDna.summaryKo,
+          revenueSummary: revenueDna.summaryKo,
         },
       })
       .eq("id", learningRunId);
@@ -143,6 +182,13 @@ export async function POST(req: NextRequest) {
       memory,
       creatorDna: { summaryKo: creatorDna.summaryKo },
       audienceDna: { summaryKo: audienceDna.summaryKo },
+      performanceDna: {
+        summaryKo: performanceDna.summaryKo,
+        topicWins: performanceDna.topicWins,
+        lengthWins: performanceDna.lengthWins,
+        whyPatterns: performanceDna.whyPatterns.slice(0, 5),
+      },
+      revenueDna: { summaryKo: revenueDna.summaryKo },
       status: "analyzed",
     });
   } catch (err: any) {

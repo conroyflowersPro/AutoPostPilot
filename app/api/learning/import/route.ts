@@ -5,12 +5,6 @@ import type { MetricOrigin } from "@/lib/learning/types";
 
 export const maxDuration = 26;
 
-/**
- * POST /api/learning/import
- * Body: { csvText: string, origin?: 'ai'|'manual'|'unknown', notes?: string }
- * Imports analytics CSV → learning_runs + post_metrics (status=imported).
- * Does NOT update Planner Memory (analyze step does that).
- */
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -52,7 +46,7 @@ export async function POST(req: NextRequest) {
     const { data: run, error: runErr } = await supabase
       .from("learning_runs")
       .insert({
-        source: "csv",
+        source: "x_analytics_csv",
         status: "imported",
         notes,
         raw_meta: { rowCount: rows.length, origin },
@@ -86,9 +80,41 @@ export async function POST(req: NextRequest) {
       origin: r.origin,
       raw: r.raw ?? null,
       is_success: false,
+      post_id: r.postId,
+      shares: r.shares,
+      detail_expands: r.detailExpands,
+      url_clicks: r.urlClicks,
+      hashtag_clicks: r.hashtagClicks,
+      permalink_clicks: r.permalinkClicks,
+      engagements: r.engagements,
+      revenue: r.revenue,
+      features: r.features ?? null,
     }));
 
-    const { error: mErr } = await supabase.from("post_metrics").insert(metricRows);
+    let { error: mErr } = await supabase.from("post_metrics").insert(metricRows);
+
+    if (mErr && /column|schema/i.test(mErr.message || "")) {
+      const basic = metricRows.map((r) => ({
+        learning_run_id: r.learning_run_id,
+        content_snippet: r.content_snippet,
+        published_at: r.published_at,
+        followers_gained: r.followers_gained,
+        profile_visits: r.profile_visits,
+        bookmarks: r.bookmarks,
+        replies: r.replies,
+        reposts: r.reposts,
+        likes: r.likes,
+        impressions: r.impressions,
+        quotes: r.quotes,
+        engagement_rate: r.engagement_rate,
+        origin: r.origin,
+        raw: r.raw,
+        is_success: false,
+      }));
+      const retry = await supabase.from("post_metrics").insert(basic);
+      mErr = retry.error;
+    }
+
     if (mErr) {
       return NextResponse.json(
         { error: "post_metrics insert failed", detail: mErr.message },
