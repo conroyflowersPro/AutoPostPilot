@@ -81,6 +81,10 @@ export default function PostList({ posts }: { posts: Post[] }) {
     setSelected(new Set(selectable.map((p) => p.id)));
   }
 
+  function selectAllVisible() {
+    setSelected(new Set(visible.map((p) => p.id)));
+  }
+
   function clearSel() {
     setSelected(new Set());
   }
@@ -109,6 +113,44 @@ export default function PostList({ posts }: { posts: Post[] }) {
       router.refresh();
     } catch (e: any) {
       setMsg(e.message || "삭제 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleBatchDelete() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) {
+      setMsg("삭제할 포스트를 선택하세요.");
+      return;
+    }
+    const scheduledCount = posts.filter(
+      (p) => ids.includes(p.id) && p.status === "scheduled"
+    ).length;
+    const warn =
+      scheduledCount > 0
+        ? `\n(그중 스케줄됨 ${scheduledCount}개 — 앱 DB에서만 삭제, Fedica는 수동 확인)`
+        : "";
+    if (
+      !confirm(
+        `선택한 ${ids.length}개 포스트를 삭제할까요?${warn}\n이 작업은 되돌릴 수 없습니다.`
+      )
+    )
+      return;
+
+    setBusy(true);
+    setMsg("삭제 중…");
+    try {
+      const { error } = await supabase
+        .from("SeungContent")
+        .delete()
+        .in("id", ids);
+      if (error) throw error;
+      setSelected(new Set());
+      setMsg(`${ids.length}개 삭제 완료`);
+      router.refresh();
+    } catch (e: any) {
+      setMsg(e.message || "일괄 삭제 실패");
     } finally {
       setBusy(false);
     }
@@ -219,6 +261,13 @@ export default function PostList({ posts }: { posts: Post[] }) {
           </button>
           <button
             type="button"
+            onClick={selectAllVisible}
+            className="rounded-lg bg-zinc-800 px-3 py-1.5 hover:bg-zinc-700"
+          >
+            화면 전체 선택 ({visible.length})
+          </button>
+          <button
+            type="button"
             onClick={clearSel}
             className="rounded-lg bg-zinc-800 px-3 py-1.5 hover:bg-zinc-700"
           >
@@ -227,16 +276,26 @@ export default function PostList({ posts }: { posts: Post[] }) {
           <span className="self-center text-zinc-500">선택 {selected.size}개</span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleBatchSchedule}
-          disabled={busy || selected.size === 0}
-          className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 sm:w-auto sm:px-5"
-        >
-          {busy
-            ? "처리 중…"
-            : `선택 ${selected.size}개 · ${startDate}부터 일괄 스케줄`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleBatchSchedule}
+            disabled={busy || selected.size === 0}
+            className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50 sm:w-auto sm:px-5"
+          >
+            {busy
+              ? "처리 중…"
+              : `선택 ${selected.size}개 · ${startDate}부터 일괄 스케줄`}
+          </button>
+          <button
+            type="button"
+            onClick={handleBatchDelete}
+            disabled={busy || selected.size === 0}
+            className="w-full rounded-xl border border-red-800/60 bg-red-950/40 py-3 text-sm font-medium text-red-200 hover:bg-red-900/50 disabled:opacity-50 sm:w-auto sm:px-5"
+          >
+            선택 {selected.size}개 일괄 삭제
+          </button>
+        </div>
 
         {msg && <p className="text-xs text-zinc-400">{msg}</p>}
         {scheduleResult?.scheduled?.length > 0 && (
@@ -258,7 +317,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
       ) : (
         <div className="space-y-3">
           {visible.map((post) => {
-            const canSelect =
+            const canSchedule =
               post.status === "reviewed" &&
               post.pipeline_id === "42303" &&
               !!post.media_urls?.length;
@@ -268,18 +327,20 @@ export default function PostList({ posts }: { posts: Post[] }) {
               <div
                 key={post.id}
                 className={`rounded-xl border bg-zinc-900/60 p-4 ${
-                  checked ? "border-emerald-600" : "border-zinc-800"
+                  checked
+                    ? canSchedule
+                      ? "border-emerald-600"
+                      : "border-red-800/50"
+                    : "border-zinc-800"
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {canSelect && (
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(post.id)}
-                      className="mt-1 h-4 w-4 accent-emerald-500"
-                    />
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(post.id)}
+                    className="mt-1 h-4 w-4 accent-emerald-500"
+                  />
                   <Link href={`/posts/${post.id}`} className="min-w-0 flex-1">
                     <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
                       {post.content}
