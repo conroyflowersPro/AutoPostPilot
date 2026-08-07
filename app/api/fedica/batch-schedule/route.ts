@@ -1,35 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { uploadMultipleMedia } from "@/lib/fedica";
 import {
   computeKRBatchStartISO,
   computeStartISOForDate,
-  assignSlotsWithGrok,
   buildDaySpreadSlots,
 } from "@/lib/schedule";
+import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
+import { scheduleOnePost } from "@/lib/services/schedule-service";
+import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
+export const maxDuration = 26;
+
+/** Thin API: UI sends chunks of SCHEDULING_CONFIG.batchSize */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const pipelineId = String(body.pipelineId || "42303");
+    const pipelineId = String(
+      body.pipelineId || SCHEDULING_CONFIG.defaultPipelineId
+    );
     const requireMedia = body.requireMedia !== false;
     const postIds: string[] = Array.isArray(body.postIds)
-      ? body.postIds.map(String)
+      ? body.postIds.map(String).slice(0, SCHEDULING_CONFIG.batchSize)
       : [];
     const startDate =
       typeof body.startDate === "string" ? body.startDate.trim() : "";
-    const maxPerDay = Math.min(
-      8,
-      Math.max(3, Number(body.maxPerDay) || 5)
+    const maxPerDay = Math.min(8, Math.max(3, Number(body.maxPerDay) || 5));
+    const slotOffset = Math.max(0, Number(body.slotOffset) || 0);
+    const totalPlanned = Math.max(
+      postIds.length,
+      Number(body.totalPlanned) || postIds.length
     );
 
-    const token = process.env.FEDICA_API_TOKEN;
-    const xaiKey = process.env.XAI_API_KEY;
-    if (!token) {
+    if (!process.env.FEDICA_API_TOKEN) {
       return NextResponse.json(
         { error: "FEDICA_API_TOKEN not configured" },
         { status: 500 }
       );
+    }
+
+    if (postIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        scheduled: [],
+        failed: [],
+        skipped: [],
+        message: "No post IDs",
+        batchSize: SCHEDULING_CONFIG.batchSize,
+      });
     }
 
     const supabase = await createClient();
@@ -40,106 +57,73 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    let query = supabase
+    const { data: posts, error } = await supabase
       .from("SeungContent")
       .select("*")
-      .eq("status", "reviewed")
-      .eq("pipeline_id", pipelineId)
-      .order("created_at", { ascending: true });
-
-    if (postIds.length > 0) {
-      query = query.in("id", postIds);
-    }
-
-    const { data: posts, error } = await query;
+      .in("id", postIds);
     if (error) throw error;
 
-    let eligible = posts || [];
-    if (requireMedia) {
-      eligible = eligible.filter(
-        (p) => p.media_urls && p.media_urls.length > 0
-      );
-    }
-
-    if (eligible.length === 0) {
-      return NextResponse.json({
-        success: true,
-        scheduled: [],
-        failed: [],
-        message:
-          "스케줄할 포스트 없음 (선택 + reviewed + 미디어 확인)",
-      });
-    }
+    const byId = new Map((posts || []).map((p: any) => [p.id, p]));
+    const ordered = postIds.map((id) => byId.get(id)).filter(Boolean) as any[];
 
     const startISO = startDate
       ? computeStartISOForDate(startDate)
       : computeKRBatchStartISO();
 
-    const slots = xaiKey
-      ? await assignSlotsWithGrok(
-          eligible.map((p) => ({ id: p.id, content: p.content })),
-          startISO,
-          xaiKey,
-          maxPerDay
-        )
-      : buildDaySpreadSlots(startISO, eligible.length, maxPerDay);
+    const allSlots = buildDaySpreadSlots(
+      startISO,
+      Math.max(totalPlanned, slotOffset + ordered.length),
+      maxPerDay
+    );
 
-    const results: any[] = [];
-    const failures: any[] = [];
+    const provider = createDefaultPublisher();
+    const scheduled: any[] = [];
+    const failed: any[] = [];
+    const skipped: any[] = [];
 
-    for (let i = 0; i < eligible.length; i++) {
-      const post = eligible[i];
-      const scheduledAt = slots[i];
+    for (let i = 0; i < ordered.length; i++) {
+      const post = ordered[i];
+      const scheduledAt =
+        allSlots[slotOffset + i] || allSlots[allSlots.length - 1];
+      const result = await scheduleOnePost({
+        supabase,
+        provider,
+        post,
+        scheduledAtISO: scheduledAt,
+        pipelineId,
+        requireMedia,
+      });
 
-      try {
-        let mediaIds: string[] = [];
-        if (post.media_urls && post.media_urls.length > 0) {
-          mediaIds = await uploadMultipleMedia(post.media_urls);
+      if (result.ok) {
+        if (result.skipped || result.status === "already_scheduled") {
+          skipped.push({
+            id: result.id,
+            reason: "already_scheduled",
+            scheduledAt: result.scheduledAt,
+            providerPostId: result.providerPostId,
+          });
+        } else {
+          scheduled.push({
+            id: result.id,
+            fedicaId: result.providerPostId,
+            scheduledAt: result.scheduledAt,
+            mediaCount: result.mediaCount || 0,
+          });
         }
-
-        const postBody: any = {
-          Accounts: [{ Platform: "Twitter", AccountId: "Seung4680" }],
-          Messages: [post.content],
-        };
-        if (mediaIds.length > 0) postBody.MediaId = mediaIds;
-
-        const fedicaBody = {
-          PipelineId: Number(pipelineId) || 42303,
-          DateTime: scheduledAt,
-          Posts: [postBody],
-        };
-
-        const res = await fetch("https://fedica.com/api/publish/post", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(fedicaBody),
+      } else if (result.status === "skipped") {
+        skipped.push({
+          id: result.id,
+          reason: result.errorUser,
+          stage: result.errorStage,
         });
-
-        const data = await res.json();
-        if (!res.ok || !data.Success) {
-          throw new Error(data.Error || "Fedica API failed");
-        }
-
-        await supabase
-          .from("SeungContent")
-          .update({
-            status: "scheduled",
-            fedica_post_id: String(data.Id),
-            scheduled_at: scheduledAt,
-          })
-          .eq("id", post.id);
-
-        results.push({
-          id: post.id,
-          fedicaId: data.Id,
-          scheduledAt,
-          mediaCount: mediaIds.length,
+      } else {
+        failed.push({
+          id: result.id,
+          error: result.errorUser,
+          errorInternal: result.errorInternal,
+          stage: result.errorStage,
+          retryable: result.retryable,
         });
-      } catch (err: any) {
-        failures.push({ id: post.id, error: err.message || "failed" });
       }
     }
 
@@ -148,10 +132,13 @@ export async function POST(req: NextRequest) {
       startISO,
       startDate: startDate || null,
       maxPerDay,
-      scheduled: results,
-      failed: failures,
-      total: eligible.length,
-      message: `${results.length}/${eligible.length}개 스케줄 (시작 ${startDate || "오늘"}, 하루 최대 ${maxPerDay})`,
+      batchSize: SCHEDULING_CONFIG.batchSize,
+      slotOffset,
+      scheduled,
+      failed,
+      skipped,
+      total: ordered.length,
+      message: `batch done: ok ${scheduled.length} / fail ${failed.length} / skip ${skipped.length}`,
     });
   } catch (err: any) {
     console.error(err);
