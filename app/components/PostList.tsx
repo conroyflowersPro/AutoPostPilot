@@ -89,6 +89,47 @@ export default function PostList({ posts }: { posts: Post[] }) {
     setSelected(new Set());
   }
 
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((p) => selected.has(p.id));
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) clearSel();
+    else selectAllVisible();
+  }
+
+  async function handleBatchMarkReviewed() {
+    const ids = Array.from(selected).filter((id) => {
+      const p = posts.find((x) => x.id === id);
+      return p && p.status === "draft";
+    });
+    if (ids.length === 0) {
+      setMsg("reviewed로 바꿀 draft를 선택하세요.");
+      return;
+    }
+    if (
+      !confirm(
+        `선택한 draft ${ids.length}개를 reviewed로 표시할까요?\n(미디어 없는 항목도 포함됩니다. 스케줄은 미디어 있는 reviewed만 가능)`
+      )
+    )
+      return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { error } = await supabase
+        .from("SeungContent")
+        .update({ status: "reviewed" })
+        .in("id", ids);
+      if (error) throw error;
+      setSelected(new Set());
+      setMsg(`${ids.length}개 draft → reviewed 완료`);
+      router.refresh();
+    } catch (e: any) {
+      setMsg(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDelete(id: string, status: string) {
     if (status === "scheduled") {
       if (
@@ -251,20 +292,24 @@ export default function PostList({ posts }: { posts: Post[] }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-indigo-800/50 bg-indigo-950/50 px-3 py-1.5 hover:bg-indigo-900/40">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAllVisible}
+              className="h-4 w-4 accent-emerald-500"
+            />
+            <span className="font-medium text-indigo-200">
+              화면 전체 선택 ({visible.length})
+            </span>
+          </label>
           <button
             type="button"
             onClick={selectAllReady}
             className="rounded-lg bg-zinc-800 px-3 py-1.5 hover:bg-zinc-700"
           >
-            스케줄 가능 전체 선택 ({selectable.length})
-          </button>
-          <button
-            type="button"
-            onClick={selectAllVisible}
-            className="rounded-lg bg-zinc-800 px-3 py-1.5 hover:bg-zinc-700"
-          >
-            화면 전체 선택 ({visible.length})
+            스케줄 가능만 ({selectable.length})
           </button>
           <button
             type="button"
@@ -286,6 +331,14 @@ export default function PostList({ posts }: { posts: Post[] }) {
             {busy
               ? "처리 중…"
               : `선택 ${selected.size}개 · ${startDate}부터 일괄 스케줄`}
+          </button>
+          <button
+            type="button"
+            onClick={handleBatchMarkReviewed}
+            disabled={busy || selected.size === 0}
+            className="w-full rounded-xl border border-blue-800/60 bg-blue-950/40 py-3 text-sm font-medium text-blue-200 hover:bg-blue-900/50 disabled:opacity-50 sm:w-auto sm:px-5"
+          >
+            선택 draft → reviewed
           </button>
           <button
             type="button"
@@ -326,12 +379,21 @@ export default function PostList({ posts }: { posts: Post[] }) {
             return (
               <div
                 key={post.id}
-                className={`rounded-xl border bg-zinc-900/60 p-4 ${
+                role="button"
+                tabIndex={0}
+                onClick={() => toggle(post.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle(post.id);
+                  }
+                }}
+                className={`cursor-pointer rounded-xl border bg-zinc-900/60 p-4 transition-colors ${
                   checked
                     ? canSchedule
-                      ? "border-emerald-600"
-                      : "border-red-800/50"
-                    : "border-zinc-800"
+                      ? "border-emerald-600 bg-emerald-950/20"
+                      : "border-indigo-600/60 bg-indigo-950/15"
+                    : "border-zinc-800 hover:border-zinc-600"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -339,9 +401,10 @@ export default function PostList({ posts }: { posts: Post[] }) {
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggle(post.id)}
-                    className="mt-1 h-4 w-4 accent-emerald-500"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-1 h-5 w-5 accent-emerald-500"
                   />
-                  <Link href={`/posts/${post.id}`} className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
                       {post.content}
                     </p>
@@ -356,12 +419,22 @@ export default function PostList({ posts }: { posts: Post[] }) {
                           예정 {formatLA(post.scheduled_at)} LA
                         </span>
                       )}
+                      <Link
+                        href={`/posts/${post.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-indigo-400 hover:text-indigo-300"
+                      >
+                        상세 →
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => handleDelete(post.id, post.status)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(post.id, post.status);
+                    }}
                     className="shrink-0 rounded-lg border border-red-900/50 px-2 py-1 text-[11px] text-red-300 hover:bg-red-950/50 disabled:opacity-40"
                   >
                     삭제
