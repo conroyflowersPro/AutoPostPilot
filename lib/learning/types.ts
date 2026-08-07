@@ -1,8 +1,23 @@
-/** Weekly Learning Engine v3 — normalized models */
+/** Growth Intelligence Engine v4 — normalized models */
 
 export type MetricOrigin = "ai" | "manual" | "unknown";
 
+export type ContentFeatures = {
+  lengthBucket: "short" | "medium" | "long";
+  charCount: number;
+  hasQuestion: boolean;
+  hasMediaLink: boolean;
+  isReply: boolean;
+  isEnglish: boolean;
+  isKorean: boolean;
+  hasNumbers: boolean;
+  hasEmoji: boolean;
+  hasCta: boolean;
+  topicGuess: string;
+};
+
 export type NormalizedPostMetrics = {
+  postId: string | null;
   contentSnippet: string;
   publishedAt: string | null;
   followersGained: number;
@@ -13,8 +28,16 @@ export type NormalizedPostMetrics = {
   likes: number;
   impressions: number;
   quotes: number;
+  shares: number;
+  detailExpands: number;
+  urlClicks: number;
+  hashtagClicks: number;
+  permalinkClicks: number;
+  engagements: number;
+  revenue: number;
   engagementRate: number | null;
   origin: MetricOrigin;
+  features?: ContentFeatures;
   raw?: Record<string, unknown>;
 };
 
@@ -50,14 +73,34 @@ export type AudienceDnaPayload = {
   summaryKo: string;
 };
 
-/** Success signal weights — impressions never dominate */
+export type PerformanceDnaPayload = {
+  whyPatterns: string[];
+  topStructures: string[];
+  lengthWins: string[];
+  topicWins: string[];
+  summaryKo: string;
+};
+
+export type RevenueDnaPayload = {
+  revenueByTopic: string[];
+  notes: string[];
+  summaryKo: string;
+};
+
+/**
+ * Success signal priority (v4):
+ * Followers > Profile > Revenue > Bookmarks > Replies > Reposts > Quotes > Likes > Impressions
+ */
 export const METRIC_WEIGHTS = {
   followersGained: 40,
-  profileVisits: 20,
-  bookmarks: 15,
-  replies: 10,
-  reposts: 7,
-  likes: 5,
-  impressions: 2,
-  quotes: 1,
+  profileVisits: 18,
+  revenue: 15,
+  bookmarks: 10,
+  replies: 7,
+  reposts: 5,
+  quotes: 2,
+  likes: 2,
+  impressions: 1,
+  detailExpands: 3,
+  shares: 2,
 } as const;
