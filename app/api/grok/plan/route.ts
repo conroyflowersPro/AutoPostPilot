@@ -50,54 +50,68 @@ Audience should feel: "this creator somehow keeps talking about exactly what I'm
 They should NEVER notice Fedica keywords themselves.
 
 INTELLIGENCE MODEL ROLES (hard separation)
-- Audience DNA (Fedica): PLANNING only — weekly topic selection, topic distribution counts, priority, emerging themes, editorial direction.
-- Creator DNA: WRITING identity — tone, hooks, rhythm, how topics are framed. Always higher priority than Audience DNA for wording.
-- Performance DNA: LEARNING from validated results only.
-- Revenue DNA: OPTIMIZATION signals when available.
-If Audience DNA disappears, wording/style must stay similar; only the weekly topic allocation should change.
+- Creator DNA = Writer identity (HOW posts are written). Fixed. Never overridden by Audience.
+- Audience DNA = Weekly Editor (WHICH topics get slots this week). Scores candidates; does not write sentences.
+- Performance DNA = Analyst. Adjusts priority after Audience scoring using validated patterns only.
+- Revenue DNA = Business signals when available.
+If Audience DNA changes, topic mix MUST change. Writing style must stay the same.
 
-FEDICA = PLANNING ASSISTANT (not writing assistant)
-- NEVER inject keywords into posts, primaryTopic labels, or angles.
-- NEVER generate a post simply because a keyword exists.
-- BAD primaryTopic: "Terafab", "Grimes County", "TSLA"
-- GOOD primaryTopic (creator frame): "공장·제조 스케일 관찰", "FSD 실사용 체감", "로봇·자동화에 대한 개인 해석"
-- Keyword → Topic Intelligence first:
-  Terafab / Grimes County → Manufacturing / AI Infrastructure (allocation signal)
-  Optimus → Robotics / automation (allocation signal)
-  TSLA → Long-term Vision only (never stock price)
-  Robotaxi → Mobility
-  Megapack → Energy
-- Audience answers: "What are followers becoming interested in this week?"
-- Audience does NOT answer: "What keywords should I mention?"
+PIPELINE (strict order — do all steps mentally before outputting days)
+1) CANDIDATE TOPIC GENERATION (Creator DNA only)
+   Produce a large internal pool of ~80–100 natural discussion topics this creator could talk about.
+   Cover: FSD field, Cybertruck ownership, Robotaxi/mobility, manufacturing/scale, AI infrastructure, Optimus/robotics, energy, owner tips, app/work, LAFC, long-term vision, honest failures, Korea-specific notes, US daily life.
+   No filtering yet. No Fedica keywords as candidate labels.
 
-TOPIC DISTRIBUTION (required planning step)
-1) Start from baseline creator mix (FSD, Cybertruck, Robotaxi, App, LAFC, owner tips, occasional vision).
-2) Re-weight slot counts using Audience DNA topic categories (boost emerging themes; reduce low-interest areas).
-3) Maximize diversity — avoid many posts that rephrase the same idea.
-4) Output topicDistribution in audienceRead (category → planned slot count for the week).
-Example shift: baseline FSD-heavy → after Audience: fewer FSD slots, more Manufacturing / AI Infrastructure / Robotics — still written in creator voice.
+2) AUDIENCE DNA SELECTION (score candidates — do NOT write posts)
+   Score each candidate for this week:
+   - rising relevance to follower interests
+   - emerging discussion fit
+   - topic diversity value
+   - brand fit (still on-creator)
+   Output: Audience Score per selected theme. Never "I must mention Terafab" — instead "manufacturing expansion / AI infrastructure is rising".
 
-PLANNER SEQUENCE
-1) Creator DNA (HOW we talk — fixed)
-2) Audience DNA → Topic Intelligence → weekly TOPIC DISTRIBUTION (WHAT we talk about how many times)
-3) Performance DNA / Memory (validated only)
-4) Revenue DNA if available
-5) X context
-6) Recent topics (dedupe only)
-7) Assign daily slots that realize the distribution
-8) primaryTopic/angle must be creator-framed observations, never keyword strings
+3) PERFORMANCE DNA PRIORITY ADJUSTMENT
+   Raise themes that historically gained followers/profile visits/bookmarks.
+   Lower themes that repeatedly underperformed.
+   Refine selection; do not replace Audience ranking entirely.
+
+4) WEEKLY SELECTION (~35 slots total across 7 days)
+   Take highest combined scores into the week.
+   Build topicDistribution: theme → planned count (must visibly shift when Audience signals change).
+   Example normal: FSD 12, Cybertruck 10, Robotaxi 6, App 4, LAFC 3
+   Example manufacturing-heavy Audience: FSD 8, Cybertruck 7, Manufacturing 5, AI Infrastructure 4, Optimus 3, Robotaxi 5, Energy 2, App 1
+
+5) DAILY TOPICS → slots
+   primaryTopic/angle = creator-framed Korean observations (e.g. "FSD 실사용 체감", "제조·스케일에 대한 관찰").
+   FORBIDDEN as primaryTopic: raw Fedica keywords (Terafab, Grimes County, TSLA ticker, etc.).
+
+FEDICA RULES
+- Planning assistant only. Never writing assistant.
+- Never force keywords into posts or angles.
+- Keywords → Topic Intelligence themes first (Manufacturing, AI Infrastructure, Robotics, Mobility, Energy, FSD Field, Long-term Vision).
 
 PLANNING RULES
-- Operate one full week (7 days). Prefer 5–6 Korean slots/day (5–8 max; never fewer than 5).
-- One primaryTopic per slot; at most one supporting allowedContext.
-- Vary contentType and targetLength. Mix field note, honest observation, practical tip, occasional vision essay.
-- Same detailed topic/example/opening/conclusion must not repeat across the week.
-- startDate is scheduling metadata only — no 오늘/방금/아까 angles.
-- Media is attached later by the human.
+- 7 days. Prefer 5–6 Korean slots/day (5–8 max; never fewer than 5). ~35 posts/week total preferred.
+- One primaryTopic per slot; at most one allowedContext.
+- Vary contentType and targetLength. Mix field note, observation, tip, occasional vision essay.
+- No repeated detailed topic/example/opening/conclusion across the week.
+- startDate is metadata only — no 오늘/방금/아까.
+- Media attached later by human.
 - Forbidden: 주가, 등락, 매매 타이밍, TSLA chart talk.
-- Creator identity must never be sacrificed to chase trending topics.
+- Never sacrifice creator identity to chase trends.
 
-Output JSON only with generationDays, audienceRead (must include topicDistribution: theme→count, plus interestGraph, sentiment, coverageNote, performanceLean), days[], rationale.
+Output JSON only:
+- generationDays
+- audienceRead: {
+    interestGraph,
+    sentiment,
+    coverageNote,
+    performanceLean,
+    topicDistribution: { "theme": count, ... },
+    candidateHighlights?: ["top themes considered"]
+  }
+- days[] with slots
+- rationale (one short sentence: how Audience shifted the mix vs baseline)
 slotId format: D{day+1}P{index}
 `;
 
@@ -251,25 +265,26 @@ export async function POST(req: NextRequest) {
 
 Scheduling startDate (metadata only — NOT experience evidence): ${startDate || "(not provided)"}.
 
-Audience DNA for PLANNING ONLY (re-weight weekly topic distribution — do NOT change writing style):
+Audience DNA = Weekly Editor (score & select topics — NEVER rewrite creator voice):
 
-Topic categories (use to set slot COUNTS / priority, not wording):
+Topic categories (allocation / scoring signals):
 ${categoryBlock}
 
-Audience interest themes (allocation signals):
+Audience interest themes:
 ${interestBlock}
 
-Raw Fedica keywords (internal only — FORBIDDEN in primaryTopic, angle, or any post wording):
+Raw Fedica keywords (INTERNAL ONLY — forbidden in primaryTopic, angle, content guidance):
 ${topic || "(none)"}
 
 Audience sentiment: ${sentimentLabel}
-(affects which themes get more slots; does not change Creator DNA tone)
 
-REQUIRED:
-1) Decide topicDistribution for the full week first (category → count).
-2) Assign daily slots to realize that distribution.
-3) primaryTopic/angle = creator-framed (e.g. "FSD 실사용에서 느낀 판단", "제조·스케일에 대한 관찰") — NEVER keyword dumps like "Terafab" or "Grimes County".
-4) If these Audience signals were empty, keep similar wording style; only the mix of topics would differ.
+REQUIRED PROCESS:
+1) Build ~80–100 creator-native candidate topics (internal; need not list all in JSON).
+2) Score candidates with Audience DNA (rising interest, emerging themes, diversity).
+3) Adjust with Performance DNA / validated memory.
+4) Select ~35 slots; set topicDistribution (theme → count) so the mix CLEARLY reflects Audience signals when present.
+5) If Audience signals are empty, use baseline creator mix; wording style unchanged either way.
+6) primaryTopic/angle = creator-framed only — never "Terafab", "Grimes County", ticker symbols.
 
 VALIDATED Planner Memory (from real published performance only — never drafts):
 ${memoryBlock}
@@ -286,7 +301,7 @@ ${performanceDnaBlock}
 Revenue DNA:
 ${revenueDnaBlock}
 
-First lock topicDistribution from Audience DNA (planning), then fill slots.
+Execute pipeline: candidates → Audience scores → Performance adjust → topicDistribution → daily slots.
 Prefer VALIDATED Planner Memory / Performance DNA over generic seeds.
 Do NOT copy keywords into primaryTopic/angle. Invent no false events.
 Weak/average posts must not shape this week.
@@ -294,8 +309,9 @@ Weak/average posts must not shape this week.
 Recent topics for DEDUPE only (not learning):
 ${recentBlock}
 
-Each day 5–8 slots (prefer 5–6). Mix short/medium/long.
-JSON only. audienceRead MUST include: interestGraph, sentiment, coverageNote, performanceLean, topicDistribution (object: theme → planned count for the week).`;
+Each day 5–8 slots (prefer 5–6). ~35 total for the week. Mix short/medium/long.
+JSON only. audienceRead MUST include topicDistribution (theme→count) plus interestGraph, sentiment, coverageNote, performanceLean, optional candidateHighlights.
+rationale: one line on how Audience shifted the weekly mix vs baseline creator mix.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
