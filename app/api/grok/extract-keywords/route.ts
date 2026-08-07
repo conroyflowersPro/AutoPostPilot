@@ -13,6 +13,15 @@ function isHttpUrl(s: string) {
   }
 }
 
+function normalizeSentiment(raw: unknown): "positive" | "neutral" | "negative" | null {
+  const s = String(raw || "").toLowerCase().trim();
+  if (!s) return null;
+  if (s.includes("pos") || s.includes("긍정") || s.includes("호조")) return "positive";
+  if (s.includes("neg") || s.includes("부정") || s.includes("비판")) return "negative";
+  if (s.includes("neu") || s.includes("중립") || s.includes("보통")) return "neutral";
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -41,15 +50,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         keywords: kws,
         mergedKeywords: textKw,
+        interests: kws.slice(0, 8),
+        sentiment: null,
       });
     }
 
     const userContent: any[] = [
       {
         type: "text",
-        text: `Extract 5–8 short Korean topic keywords for @Seung4680 (Tesla/FSD/Cybertruck/LAFC). Discard off-brand.
-${textKw ? `Merge text: ${textKw}` : ""}
-JSON only: { "keywords": ["..."] }`,
+        text: `You analyze a Fedica follower-keyword screenshot for @Seung4680 (Tesla owner / FSD / Cybertruck / LAFC).
+
+Return JSON only:
+{
+  "keywords": ["5-8 short topic keywords from the image"],
+  "interests": ["3-8 broader audience interest themes inferred from keywords — not raw keyword copies"],
+  "sentiment": "positive|neutral|negative|null"
+}
+
+Rules:
+- keywords = surface signals from the screenshot
+- interests = what the audience seems to care about (e.g. Terafab → AI infrastructure / compute)
+- sentiment = overall mood of the follower interest list if visible; otherwise null
+- Discard off-brand noise
+${textKw ? `Also merge text keywords: ${textKw}` : ""}`,
       },
       { type: "image_url", image_url: { url: imageList[0] } },
     ];
@@ -70,7 +93,8 @@ JSON only: { "keywords": ["..."] }`,
           messages: [
             {
               role: "system",
-              content: "Extract keywords only. JSON only.",
+              content:
+                "Audience intelligence extraction for X creator. JSON only. No prose.",
             },
             { role: "user", content: userContent },
           ],
@@ -84,12 +108,13 @@ JSON only: { "keywords": ["..."] }`,
 
     const text = await response.text();
     if (!response.ok) {
-      // Fail soft — return text keywords
       return NextResponse.json({
         keywords: textKw
           ? textKw.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean)
           : [],
         mergedKeywords: textKw,
+        interests: [],
+        sentiment: null,
         warning: `vision extract failed: ${text.slice(0, 120)}`,
       });
     }
@@ -101,6 +126,8 @@ JSON only: { "keywords": ["..."] }`,
       return NextResponse.json({
         keywords: textKw ? [textKw] : [],
         mergedKeywords: textKw,
+        interests: [],
+        sentiment: null,
         warning: "vision non-JSON",
       });
     }
@@ -122,22 +149,25 @@ JSON only: { "keywords": ["..."] }`,
       : [];
     const merged = Array.from(new Set([...fromImages, ...fromText])).slice(0, 10);
 
+    const interests = Array.isArray(parsed.interests)
+      ? parsed.interests.map((k: any) => String(k).trim()).filter(Boolean).slice(0, 10)
+      : merged.slice(0, 6);
+
     return NextResponse.json({
       success: true,
       keywords: merged,
       mergedKeywords: merged.join(", "),
+      interests,
+      sentiment: normalizeSentiment(parsed.sentiment),
       imageCount: imageList.length,
     });
   } catch (err: any) {
     console.error(err);
-    // Always fail soft so generate can continue
-    const textKw =
-      typeof (await req.clone().json().catch(() => ({}))).keywords === "string"
-        ? (await req.clone().json().catch(() => ({}))).keywords
-        : "";
     return NextResponse.json({
       keywords: [],
       mergedKeywords: "",
+      interests: [],
+      sentiment: null,
       warning: err?.name === "AbortError" ? "extract timeout" : err.message,
     });
   }
