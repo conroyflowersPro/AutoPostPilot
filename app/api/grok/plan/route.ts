@@ -33,70 +33,32 @@ AUDIENCE DNA (from validated Fedica engagement, Jul–Aug 2026 — update only w
 
 PERFORMANCE MEMORY (validated high performers ONLY — never learn from raw AI drafts)
 Seeded from real Fedica top posts (Jul–Aug 2026). Use as high-confidence editorial patterns, not templates to copy:
-1) Practical HW3/FSD troubleshooting with concrete symptoms, numbers, and owner actions (high impressions + useful engagement)
-2) Honest personal failure / cost confession (e.g. FSD parking mishap, real repair cost) — vulnerability + lesson without bait
-3) Long-form ecosystem opinion connecting FSD, AI hardware limits, content/time, Grok, Optimus, manufacturing/compute — thoughtful, not hype
-4) Korea-specific FSD/v14 Lite field notes and community cross-reference
-5) Clear, useful owner tips that other HW3/FSD drivers can act on
-Weak or purely draft-generated patterns must NOT shape strategy.
-Manual spontaneous hits from the creator are higher-confidence than AI draft success when both exist.
+1) Practical HW3/FSD troubleshooting with concrete symptoms, numbers, and owner actions
+2) Honest personal failure / cost confession — vulnerability + lesson without bait
+3) Long-form ecosystem opinion connecting FSD, AI hardware, Grok, Optimus, compute
+4) Korea-specific FSD/v14 Lite field notes
+5) Clear, useful owner tips for HW3/FSD drivers
+Weak or draft-only patterns must NOT shape strategy. Manual hits are premium signals.
 
-SUCCESS SIGNAL PRIORITY (when judging what to amplify)
-Followers gained > Profile visits > Bookmarks > Replies quality > Reposts > Likes > Impressions
+SUCCESS SIGNAL PRIORITY
+Followers gained > Profile visits > Revenue > Bookmarks > Replies quality > Reposts > Likes > Impressions
 Never optimize the week only for impressions.
 
 CONTENT DNA INTERSECTION
-Weekly strategy emerges from Creator DNA ∩ Audience DNA.
-Audience should feel: "this creator naturally talks about things I care about."
-Never chase keywords. Never force trending words. Never invent experiences.
+Weekly strategy emerges from Creator DNA ∩ Audience DNA ∩ Performance DNA.
+Never chase keywords. Never invent experiences.
 
 PLANNER SEQUENCE
-1) Creator DNA
-2) Audience DNA + Fedica Audience Intelligence (keywords/interests/sentiment if provided)
-3) Interest Graph (internal only; posts need not contain raw keywords)
-4) Performance Memory (validated patterns only)
-5) Current X context (why topics matter now — do not copy viral posts)
-6) Recent topics (dedupe only — NOT learning signal)
-7) Weekly Interest Coverage (avoid accidental single-topic domination; equal quotas NOT required)
-8) 7-day editorial strategy → daily slots
+1) Creator DNA 2) Audience DNA + Fedica 3) Interest Graph 4) Performance DNA / Memory 5) Revenue DNA if available 6) X context 7) Recent topics (dedupe) 8) Weekly Interest Coverage 9) 7-day strategy
 
 PLANNING RULES
-- Operate one full week (7 days). Prefer 5–6 Korean slots/day (5–8 max; never fewer than 5).
-- One primaryTopic per slot; at most one supporting allowedContext.
-- Vary contentType and targetLength (short/medium/long). Include mixture: field note, honest observation, practical tip, occasional vision essay.
-- Same detailed topic/example/opening/conclusion must not repeat across the week.
-- startDate is scheduling metadata only — no 오늘/방금/아까 angles.
-- Media is attached later by the human.
-- Forbidden across the board unless explicitly allowed by persona: 주가, 등락, 매매 타이밍, TSLA chart talk.
+- 7 days. Prefer 5–6 Korean slots/day (5–8 max).
+- One primaryTopic per slot. Vary length/type.
+- startDate is metadata only — no 오늘/방금 angles.
+- Media attached later by human.
+- Forbidden: 주가, 등락, 매매 타이밍, TSLA chart talk.
 
-Output JSON only:
-{
-  "generationDays": 7,
-  "audienceRead": {
-    "interestGraph": ["theme chains as short strings"],
-    "sentiment": "positive|neutral|negative|unknown",
-    "coverageNote": "one Korean line on weekly balance",
-    "performanceLean": "one Korean line — which validated patterns this week leans on"
-  },
-  "days": [
-    {
-      "dayOffset": 0,
-      "posts": [
-        {
-          "slotId": "D1P1",
-          "primaryTopic": "…",
-          "angle": "…",
-          "contentType": "personal_experience|observation|fsd_field|news_interpretation|tech_insight|humor|memory|opinion|other_interest|media_led",
-          "allowedContext": ["…"],
-          "forbiddenTopics": ["…"],
-          "targetLength": "short|medium|long"
-        }
-      ]
-    }
-  ],
-  "rationale": "한 줄 한국어 — 주간 성장 전략 관점"
-}
-
+Output JSON only with generationDays, audienceRead (interestGraph, sentiment, coverageNote, performanceLean), days[], rationale.
 slotId format: D{day+1}P{index}
 `;
 
@@ -113,10 +75,11 @@ export async function POST(req: NextRequest) {
       sentiment,
     } = body || {};
 
-    // Weekly Learning Engine: load validated memory only (never from drafts)
     let memoryBlock = "(no validated Planner Memory yet — use seeded PERFORMANCE MEMORY)";
     let creatorDnaBlock = "(use SYSTEM Creator DNA)";
     let audienceDnaBlock = "(use SYSTEM Audience DNA + Fedica signals)";
+    let performanceDnaBlock = "(no Performance DNA yet — use seeded patterns)";
+    let revenueDnaBlock = "(no Revenue DNA yet)";
     try {
       const { createClient } = await import("@/lib/supabase/server");
       const supabase = await createClient();
@@ -159,8 +122,38 @@ export async function POST(req: NextRequest) {
       if (adna?.summary_ko) {
         audienceDnaBlock = `v${adna.version}: ${adna.summary_ko}`;
       }
+      const { data: pdna } = await supabase
+        .from("performance_dna")
+        .select("version, data, summary_ko")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pdna?.summary_ko) {
+        performanceDnaBlock = `v${pdna.version}: ${pdna.summary_ko}`;
+        if (pdna.data && typeof pdna.data === "object") {
+          const d = pdna.data as any;
+          if (Array.isArray(d.topicWins) && d.topicWins.length)
+            performanceDnaBlock += " | topics: " + d.topicWins.slice(0, 5).join(", ");
+          if (Array.isArray(d.whyPatterns) && d.whyPatterns.length)
+            performanceDnaBlock +=
+              "\nWhy: " +
+              d.whyPatterns
+                .slice(0, 5)
+                .map((p: string, i: number) => `${i + 1}. ${String(p).slice(0, 120)}`)
+                .join("\n");
+        }
+      }
+      const { data: rdna } = await supabase
+        .from("revenue_dna")
+        .select("version, data, summary_ko")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (rdna?.summary_ko) {
+        revenueDnaBlock = `v${rdna.version}: ${rdna.summary_ko}`;
+      }
     } catch {
-      /* tables may not exist yet — fall back to seeded SYSTEM */
+      /* tables may not exist yet */
     }
 
     const xaiKey = process.env.XAI_API_KEY;
@@ -214,7 +207,6 @@ Inferred audience interests:
 ${interestBlock}
 
 Audience sentiment: ${sentimentLabel}
-(positive → slight vision/energy when authentic; neutral → analysis/observation; negative → clarity/facts, no hype; unknown → balanced)
 
 VALIDATED Planner Memory (from real published performance only — never drafts):
 ${memoryBlock}
@@ -225,7 +217,13 @@ ${creatorDnaBlock}
 Evolving Audience DNA hint:
 ${audienceDnaBlock}
 
-Build Interest Graph from keywords/interests. Prefer VALIDATED Planner Memory patterns over generic seeds. Do NOT copy patterns verbatim; invent no false events. Weak/average posts must not shape this week.
+Performance DNA (why successful posts worked — validated only):
+${performanceDnaBlock}
+
+Revenue DNA:
+${revenueDnaBlock}
+
+Build Interest Graph from keywords/interests. Prefer VALIDATED Planner Memory and Performance DNA over generic seeds. Do NOT copy patterns verbatim; invent no false events. Weak/average posts must not shape this week.
 
 Recent topics for DEDUPE only (not learning):
 ${recentBlock}
