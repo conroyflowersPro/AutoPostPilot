@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-const GENERATION_DAYS = 3;
+const GENERATION_DAYS = 7;
 const LS_PREFIX = "autopostpilot_generation_job_";
 
 type TargetLength = "short" | "medium" | "long";
@@ -334,8 +334,28 @@ export default function GeneratePage() {
           }
         }
 
-        setPhase("3일 슬롯 캘린더 계획 중...");
+        setPhase("7일 주간 슬롯 캘린더 계획 중...");
         try {
+          let recentTopics: string[] = [];
+          try {
+            const { data: recentRows } = await supabase
+              .from("SeungContent")
+              .select("content, status")
+              .in("status", ["draft", "reviewed", "scheduled"])
+              .order("created_at", { ascending: false })
+              .limit(20);
+            recentTopics = (recentRows || [])
+              .map((r: { content?: string }) =>
+                String(r.content || "")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .slice(0, 80)
+              )
+              .filter(Boolean);
+          } catch {
+            /* non-fatal */
+          }
+
           const planRes = await fetch("/api/grok/plan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -344,6 +364,8 @@ export default function GeneratePage() {
               keywords: keywords.trim() || undefined,
               mergedKeywords: mergedKeywords || undefined,
               generationDays: GENERATION_DAYS,
+              recentTopics:
+                recentTopics.length > 0 ? recentTopics : undefined,
             }),
           });
           const planData = await readJson(planRes);
@@ -353,20 +375,50 @@ export default function GeneratePage() {
             rationale: planData.rationale || undefined,
           };
         } catch (planErr: any) {
-          const topics = ["FSD 관찰", "Cybertruck 일상", "Robotaxi 시각", "LAFC", "소유 팁"];
-          const angles = ["실사용 체감", "디테일 관찰", "장기 전망", "경기/분위기", "유용한 팁"];
+          const domainSlots = [
+            {
+              primaryTopic: "FSD 실사용 체감",
+              angle: "도심·고속도로에서 느낀 판단 변화",
+              contentType: "fsd_field",
+              targetLength: "medium" as TargetLength,
+            },
+            {
+              primaryTopic: "Cybertruck 일상 활용",
+              angle: "적재·주차·실사용에서 체감한 디테일",
+              contentType: "observation",
+              targetLength: "short" as TargetLength,
+            },
+            {
+              primaryTopic: "Robotaxi / 자율주행 관찰",
+              angle: "장기 제품 방향에 대한 개인 해석",
+              contentType: "opinion",
+              targetLength: "medium" as TargetLength,
+            },
+            {
+              primaryTopic: "LAFC / 축구 일상",
+              angle: "경기장·시즌 분위기 관찰",
+              contentType: "other_interest",
+              targetLength: "short" as TargetLength,
+            },
+            {
+              primaryTopic: "앱·업무 운영",
+              angle: "개발·반복 테스트에서 느낀 실무 포인트",
+              contentType: "observation",
+              targetLength: "medium" as TargetLength,
+            },
+          ];
           plan = {
             generationDays: GENERATION_DAYS,
-            days: [0, 1, 2].map((i) => ({
+            days: Array.from({ length: GENERATION_DAYS }, (_, i) => ({
               dayOffset: i,
-              posts: topics.map((t, n) => ({
+              posts: domainSlots.map((s, n) => ({
                 slotId: `D${i + 1}P${n + 1}`,
-                primaryTopic: t,
-                angle: angles[n],
-                contentType: "observation",
+                primaryTopic: s.primaryTopic,
+                angle: s.angle,
+                contentType: s.contentType,
                 allowedContext: [],
                 forbiddenTopics: ["주가", "등락", "매매"],
-                targetLength: "medium" as TargetLength,
+                targetLength: s.targetLength,
               })),
             })),
             rationale: `계획 실패 대체: ${String(planErr?.message || planErr).slice(0, 80)}`,
@@ -505,14 +557,14 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">특화 Grok 자동 생성</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v3.0.2
+            v4.1.0
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <p className="text-sm text-zinc-400">
-          Grok이 3일 슬롯 캘린더를 짠 뒤 날짜별 일괄 생성합니다 (호출 4~5회).
+          Grok이 7일 주간 운영 캘린더를 짠 뒤 날짜별 일괄 생성합니다 (플랜 1회 + 일 배치 약 7회).
         </p>
 
         {resumeJob && !loading && !result && (
@@ -635,7 +687,7 @@ export default function GeneratePage() {
           >
             {loading
               ? phase || "처리 중..."
-              : "3일치 한국어 포스트 자동 생성"}
+              : "7일 한국어 주간 운영 자동 생성"}
           </button>
         </form>
 
