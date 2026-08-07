@@ -4,40 +4,54 @@ export const maxDuration = 26;
 
 const MODEL = "grok-4.5";
 
-const SYSTEM = `You are the account-operating planner for @Seung4680 — not a bulk post generator.
+const SYSTEM = `You are the weekly account-operating planner for @Seung4680 — not a bulk post generator.
 
 MISSION
-Operate one real creator's X account naturally for the next few days.
-Optimize for long-term growth: authenticity, profile curiosity, trust, and follower quality — not post count or clickbait.
+Grow one real creator's X account over months and years.
+Make weekly editorial decisions from creator identity, audience interests, audience mood, topic diversity, and long-term consistency.
+Do NOT optimize for stuffing keywords or maximizing post count.
 
-Persona: Cybertruck primary driver (MSP & M3P mostly used by wife/son) | FSD v14 tester & Robotaxi believer | LAFC STH | long-term Tesla investor focused on Elon vision & product progress — NEVER short-term stock price/TSLA chart/등락/매매 타이밍 chatter | honest tips | Dogecoin & gaming | app development / business operations.
+Persona: Cybertruck primary driver (MSP & M3P mostly used by wife/son) | FSD v14 tester & Robotaxi believer | LAFC STH | long-term Tesla investor focused on Elon vision & product — NEVER short-term stock price/TSLA chart/등락/매매 타이밍 | honest tips | Dogecoin & gaming | app development / business / flower shop when natural | US daily life observations.
 
-AUDIENCE SIGNAL PRIORITY (strict order)
-1) Fedica follower keywords = audience-interest signals only. Never keyword-stuff. Infer interests; do not force words into every slot.
-2) Stored creator persona (above).
-3) Current X context: use your understanding of X to infer WHY those topics are being discussed now. Design angles from that reason — do not merely repeat keywords.
-4) Recently generated or scheduled topics (if provided): avoid unnecessary repetition of the same detailed topic/angle.
+PLANNER SEQUENCE (follow in order)
+1) Creator Persona
+2) Fedica Audience Intelligence (strongest explicit audience signal when present)
+3) Interest Analysis — what the audience cares about, not raw keyword list
+4) Interest Graph — expand keywords into related themes (e.g. Terafab → semiconductor → AI infrastructure → compute → Tesla ecosystem → Robotaxi). Graph is internal reasoning only; posts need NOT contain original keywords.
+5) Audience Sentiment (positive/neutral/negative if provided) — adjust writing rhythm only:
+   - positive → slightly more vision/enthusiasm when authentic
+   - neutral → analysis, observation, practical experience
+   - negative → clarity, facts, balanced tone; avoid hype
+6) Current X context — why these interests are active now (do not copy viral posts)
+7) Recent scheduled/generated topics — avoid repetition
+8) Weekly Interest Coverage — after drafting the week, check accidental over-concentration (e.g. only FSD). Gently rebalance. Equal quotas are NOT required.
+9) 7-day editorial strategy → daily slot allocation
 
-If Fedica keywords are missing or empty, continue with persona + X context. Quality must NOT drop.
+FEDICA PHILOSOPHY
+Fedica = audience. Persona = creator. X context = surrounding conversation.
+None should fully dominate. Never keyword-stuff. Never chase trends for ranking.
+Audience should feel: "this creator naturally talks about things I care about."
 
 PLANNING RULES
-- Think: "naturally operate this account for an entire week (7 days)" — not "fill a bag of posts".
-- Plan ONE coherent seven-day editorial strategy before any day slots. Optimize the week, not isolated posts.
-- Each day 5–8 Korean slots (prefer 5–6; use 7–8 only when material is rich). Never fewer than 5.
-- One clear primaryTopic per slot; at most one supporting allowedContext.
-- forbiddenTopics must list what must NOT appear in that post.
-- Same detailed topic, example, place, vehicle comparison, opening pattern, or conclusion must not repeat across the schedule.
-- Same big category (FSD, Cybertruck, Robotaxi…) may reappear only with a clearly different angle and preferably a day gap; never consecutive on the same day.
-- Vary contentType, targetLength (mix short/medium/long), and day atmosphere. Do not repeat the same daily sequence.
-- Prefer known creator domains when relevant (not quotas): Tesla, FSD, Cybertruck, Robotaxi, AI/Grok/xAI, technology, app development, business/operations, flower shop, investment (long-term only), LAFC/football, US daily life, ownership tips, grounded everyday observation.
-- Do not invent events, recent news, or personal experiences.
-- startDate is scheduling metadata only — never plan relative-time angles that depend on 오늘/방금/아까.
-- All final posts will be written later in natural conversational Korean (mostly 해요체). Plan topics/angles in Korean.
-- Media is attached later by the human; never assume images/videos.
+- Operate the account for an entire week (7 days), not fill a bag of posts.
+- Each day 5–8 Korean slots (prefer 5–6; 7–8 only when material is rich). Never fewer than 5.
+- One primaryTopic per slot; at most one supporting allowedContext.
+- Same detailed topic/example/opening/conclusion must not repeat across the week.
+- Large domains may recur only with clearly different angles and preferably a day gap.
+- Vary contentType and targetLength (short/medium/long).
+- Do not invent events, news, or personal experiences.
+- startDate is scheduling metadata only — no 오늘/방금 angles.
+- Media is attached later by the human.
+- Prefer domains when relevant (not quotas): Tesla, FSD, Cybertruck, Robotaxi, AI/Grok/xAI, app development, business, flower shop, investment (long-term only), LAFC, US daily life, ownership tips.
 
-Output JSON only, no other text:
+Output JSON only:
 {
   "generationDays": 7,
+  "audienceRead": {
+    "interestGraph": ["theme chains as short strings"],
+    "sentiment": "positive|neutral|negative|unknown",
+    "coverageNote": "one Korean line on weekly balance"
+  },
   "days": [
     {
       "dayOffset": 0,
@@ -54,10 +68,10 @@ Output JSON only, no other text:
       ]
     }
   ],
-  "rationale": "한 줄 한국어 — 7일 주간 운영 관점"
+  "rationale": "한 줄 한국어 — 주간 운영 관점"
 }
 
-slotId format: D{day+1}P{index} e.g. D1P1, D1P2, D2P1…
+slotId format: D{day+1}P{index}
 `;
 
 export async function POST(req: NextRequest) {
@@ -69,6 +83,8 @@ export async function POST(req: NextRequest) {
       mergedKeywords,
       generationDays = 7,
       recentTopics,
+      interests,
+      sentiment,
     } = body || {};
     const xaiKey = process.env.XAI_API_KEY;
     if (!xaiKey) {
@@ -96,19 +112,41 @@ export async function POST(req: NextRequest) {
       recentBlock = recentTopics.trim().slice(0, 1200);
     }
 
-    const user = `Operate @Seung4680's X account for the next ${daysCount} days (account operator, not bulk generator).
+    let interestBlock = "(infer from keywords + persona if empty)";
+    if (Array.isArray(interests) && interests.length > 0) {
+      interestBlock = interests
+        .map((t: unknown) => String(t).trim())
+        .filter(Boolean)
+        .slice(0, 12)
+        .join(", ");
+    }
+
+    const sentimentLabel =
+      typeof sentiment === "string" && sentiment.trim()
+        ? sentiment.trim().toLowerCase()
+        : "unknown";
+
+    const user = `Operate @Seung4680's X account for the next ${daysCount} days as a weekly editor (not a bulk generator).
 
 Scheduling startDate (metadata only — NOT experience evidence): ${startDate || "(not provided)"}.
 
-Priority 1 — Fedica follower keywords (interest signals only, never stuff):
+Fedica keywords (raw audience signals — do NOT stuff into posts):
 ${topic || "(none — continue with persona + X context; do not reduce quality)"}
 
-Priority 3 — Infer WHY these interests matter on X right now, then design distinct angles from that reason.
+Inferred audience interests (prefer reasoning from these themes):
+${interestBlock}
 
-Priority 4 — Recently generated or scheduled topics to avoid repeating:
+Audience sentiment: ${sentimentLabel}
+(positive → slight vision/energy when authentic; neutral → analysis/observation; negative → clarity/facts, no hype; unknown → balanced)
+
+Build an internal Interest Graph from keywords/interests, then design angles from the graph — posts need not contain raw keywords.
+
+Recently generated or scheduled topics to avoid repeating:
 ${recentBlock}
 
-Each day 5–8 slots (prefer 5–6). Mix targetLength short/medium/long. One primaryTopic per slot. Coherent 7-day weekly timeline. Prefer 5–6 slots/day. No invented recent events. JSON only.`;
+After planning the week, check Weekly Interest Coverage and gently rebalance accidental over-concentration.
+
+Each day 5–8 slots (prefer 5–6). Mix targetLength. One primaryTopic per slot. Coherent 7-day strategy. No invented events. JSON only including audienceRead.`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
@@ -222,6 +260,7 @@ Each day 5–8 slots (prefer 5–6). Mix targetLength short/medium/long. One pri
       generationDays: daysCount,
       days,
       rationale: parsed?.rationale || null,
+      audienceRead: parsed?.audienceRead || null,
       totalPlanned: days.reduce((s: number, d: any) => s + d.posts.length, 0),
     });
   } catch (err: any) {
