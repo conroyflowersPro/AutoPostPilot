@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import PostList from "./components/PostList";
+import CalendarControlCenter from "@/app/components/CalendarControlCenter";
 
-export default async function HomePage() {
+export default async function CalendarPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,18 +13,15 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  const { data: posts } = await supabase
-    .from("SeungContent")
-    .select("*")
-    .order("created_at", { ascending: false });
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+            <Link href="/" className="text-lg font-semibold tracking-tight hover:text-zinc-300">
+              AutoPostPilot
+            </Link>
+            <span className="rounded bg-indigo-900/60 px-1.5 py-0.5 text-[10px] text-indigo-300">
               v5.0.0
             </span>
           </div>
@@ -44,36 +41,24 @@ export default async function HomePage() {
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-medium">현황</h2>
-          <div className="flex flex-wrap gap-2">
+          <h1 className="text-xl font-medium">Activity Calendar</h1>
+          <div className="flex gap-2">
             <Link
-              href="/calendar"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600"
+              href="/"
+              className="rounded-lg bg-zinc-700 px-3 py-2 text-sm font-medium hover:bg-zinc-600"
             >
-              📅 Calendar
+              현황
             </Link>
             <Link
               href="/generate"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
             >
-              ✨ Grok 자동 생성
-            </Link>
-            <Link
-              href="/posts/new"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600"
-            >
-              + 직접 작성
-            </Link>
-            <Link
-              href="/learning"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600"
-            >
-              주간 학습
+              Grok 생성
             </Link>
           </div>
         </div>
 
-        <PostList posts={posts || []} />
+        <CalendarControlCenter />
       </main>
     </div>
   );
