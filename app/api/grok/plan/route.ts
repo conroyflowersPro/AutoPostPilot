@@ -112,6 +112,57 @@ export async function POST(req: NextRequest) {
       interests,
       sentiment,
     } = body || {};
+
+    // Weekly Learning Engine: load validated memory only (never from drafts)
+    let memoryBlock = "(no validated Planner Memory yet — use seeded PERFORMANCE MEMORY)";
+    let creatorDnaBlock = "(use SYSTEM Creator DNA)";
+    let audienceDnaBlock = "(use SYSTEM Audience DNA + Fedica signals)";
+    try {
+      const { createClient } = await import("@/lib/supabase/server");
+      const supabase = await createClient();
+      const { data: mem } = await supabase
+        .from("planner_memory")
+        .select("version, patterns, summary_ko")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (mem?.patterns && Array.isArray(mem.patterns) && mem.patterns.length) {
+        memoryBlock =
+          `v${mem.version}: ${mem.summary_ko || ""}\n` +
+          mem.patterns
+            .slice(0, 10)
+            .map((p: string, i: number) => `${i + 1}. ${String(p).slice(0, 160)}`)
+            .join("\n");
+      }
+      const { data: cdna } = await supabase
+        .from("creator_dna")
+        .select("version, data, summary_ko")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cdna?.summary_ko) {
+        creatorDnaBlock = `v${cdna.version}: ${cdna.summary_ko}`;
+        if (cdna.data && typeof cdna.data === "object") {
+          const d = cdna.data as any;
+          if (Array.isArray(d.successfulStructures) && d.successfulStructures.length) {
+            creatorDnaBlock +=
+              " | structures: " + d.successfulStructures.slice(0, 5).join(", ");
+          }
+        }
+      }
+      const { data: adna } = await supabase
+        .from("audience_dna")
+        .select("version, data, summary_ko")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (adna?.summary_ko) {
+        audienceDnaBlock = `v${adna.version}: ${adna.summary_ko}`;
+      }
+    } catch {
+      /* tables may not exist yet — fall back to seeded SYSTEM */
+    }
+
     const xaiKey = process.env.XAI_API_KEY;
     if (!xaiKey) {
       return NextResponse.json(
@@ -165,7 +216,16 @@ ${interestBlock}
 Audience sentiment: ${sentimentLabel}
 (positive → slight vision/energy when authentic; neutral → analysis/observation; negative → clarity/facts, no hype; unknown → balanced)
 
-Build Interest Graph from keywords/interests. Lean on PERFORMANCE MEMORY validated patterns (practical FSD field notes, honest failure confessions, Korea FSD notes, ecosystem vision essays) — do NOT copy them; invent no false events.
+VALIDATED Planner Memory (from real published performance only — never drafts):
+${memoryBlock}
+
+Evolving Creator DNA hint:
+${creatorDnaBlock}
+
+Evolving Audience DNA hint:
+${audienceDnaBlock}
+
+Build Interest Graph from keywords/interests. Prefer VALIDATED Planner Memory patterns over generic seeds. Do NOT copy patterns verbatim; invent no false events. Weak/average posts must not shape this week.
 
 Recent topics for DEDUPE only (not learning):
 ${recentBlock}
