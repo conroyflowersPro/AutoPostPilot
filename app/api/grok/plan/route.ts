@@ -46,10 +46,34 @@ Never optimize the week only for impressions.
 
 CONTENT DNA INTERSECTION
 Weekly strategy emerges from Creator DNA ∩ Audience DNA ∩ Performance DNA.
-Never chase keywords. Never invent experiences.
+Audience should feel: "this creator somehow keeps talking about exactly what I'm already interested in."
+They should NEVER notice Fedica keywords themselves.
+
+FEDICA KEYWORD RULES (hard)
+- Fedica keywords are Audience Intelligence signals only.
+- They are NOT writing prompts, NOT hashtags, NOT phrases to insert into posts.
+- NEVER generate a post simply because a keyword exists.
+- BAD: "Tesla announced Terafab in Grimes County." (keyword dump)
+- GOOD: talk about manufacturing scale / bringing the stack in-house / long-term AI capacity — in creator voice, without naming the keyword dump.
+- Transform keywords into themes first:
+  Grimes County / Terafab → Manufacturing, AI Infrastructure
+  Optimus → Robotics, automation, future of labor
+  TSLA → long-term product/vision (NEVER stock price)
+  Robotaxi / Cybercab → Mobility
+  Megapack → Energy
+- Fedica may influence: weekly topic selection, priority, diversity, emerging themes, editorial direction.
+- Fedica must NOT determine: sentence wording, hooks, tone, rhythm — those belong only to Creator DNA.
 
 PLANNER SEQUENCE
-1) Creator DNA 2) Audience DNA + Fedica 3) Interest Graph 4) Performance DNA / Memory 5) Revenue DNA if available 6) X context 7) Recent topics (dedupe) 8) Weekly Interest Coverage 9) 7-day strategy
+1) Creator DNA (how we talk)
+2) Audience DNA + Fedica → Keyword Intelligence → Interests → Topic Categories (what to talk about)
+3) Interest Graph / Topic Intelligence (internal only; posts must not contain raw keywords)
+4) Performance Memory / Performance DNA (validated patterns only)
+5) Revenue DNA if available
+6) X context
+7) Recent topics (dedupe only)
+8) Weekly Interest Coverage
+9) 7-day strategy
 
 PLANNING RULES
 - 7 days. Prefer 5–6 Korean slots/day (5–8 max).
@@ -182,13 +206,25 @@ export async function POST(req: NextRequest) {
       recentBlock = recentTopics.trim().slice(0, 1200);
     }
 
-    let interestBlock = "(infer from keywords + persona if empty)";
+    let interestBlock = "(infer from categories + persona if empty)";
     if (Array.isArray(interests) && interests.length > 0) {
       interestBlock = interests
         .map((t: unknown) => String(t).trim())
         .filter(Boolean)
         .slice(0, 12)
         .join(", ");
+    }
+
+    let categoryBlock = "(none provided — derive themes from interests / persona)";
+    const topicCategories = (body || {}).topicCategories;
+    if (Array.isArray(topicCategories) && topicCategories.length > 0) {
+      categoryBlock = topicCategories
+        .map((t: unknown) => String(t).trim())
+        .filter(Boolean)
+        .slice(0, 10)
+        .join(", ");
+    } else if (interestBlock && !interestBlock.startsWith("(")) {
+      categoryBlock = interestBlock;
     }
 
     const sentimentLabel =
@@ -200,13 +236,21 @@ export async function POST(req: NextRequest) {
 
 Scheduling startDate (metadata only — NOT experience evidence): ${startDate || "(not provided)"}.
 
-Fedica keywords (raw audience signals — do NOT stuff into posts):
-${topic || "(none — continue with Creator DNA + Audience DNA; do not reduce quality)"}
+Audience Intelligence (from Fedica — already interpreted; do NOT paste raw keywords into posts):
 
-Inferred audience interests:
+Topic categories (prefer these for weekly topic selection):
+${categoryBlock}
+
+Audience interest themes:
 ${interestBlock}
 
+Raw Fedica keywords (for your internal context ONLY — never copy into angles or primaryTopic wording):
+${topic || "(none)"}
+
 Audience sentiment: ${sentimentLabel}
+(positive → slight vision/energy when authentic; neutral → analysis/observation; negative → clarity/facts, no hype; unknown → balanced)
+
+Reminder: primaryTopic and angle must sound like the creator's natural concerns, not keyword labels.
 
 VALIDATED Planner Memory (from real published performance only — never drafts):
 ${memoryBlock}
@@ -223,7 +267,7 @@ ${performanceDnaBlock}
 Revenue DNA:
 ${revenueDnaBlock}
 
-Build Interest Graph from keywords/interests. Prefer VALIDATED Planner Memory and Performance DNA over generic seeds. Do NOT copy patterns verbatim; invent no false events. Weak/average posts must not shape this week.
+Build Topic Intelligence from topic categories + interest themes (not raw keyword strings). Prefer VALIDATED Planner Memory / Performance DNA over generic seeds. Do NOT copy keywords or patterns verbatim; invent no false events. Weak/average posts must not shape this week.
 
 Recent topics for DEDUPE only (not learning):
 ${recentBlock}
