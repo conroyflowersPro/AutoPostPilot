@@ -98,18 +98,18 @@ export default function LearningPage() {
           </Link>
           <h1 className="text-lg font-semibold">주간 학습 (Learning)</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v4.4.0
+            v4.5.0
           </span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-300">
-          <p className="font-medium text-zinc-100">Weekly Learning Engine v3</p>
+          <p className="font-medium text-zinc-100">Growth Intelligence Engine v4</p>
           <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-            draft·생성 직후·발행 직후에는 Memory를 갱신하지 않습니다. Fedica 등에서
-            내보낸 CSV를 가져온 뒤, 검증된 고성과만 Planner Memory / Creator DNA /
-            Audience DNA에 반영합니다. 노출(impressions)만으로 학습하지 않습니다.
+            X Analytics Content CSV 우선. 생성·발행 직후 Memory 갱신 안 함.
+            검증된 고성과만 Planner Memory / Creator·Audience·Performance·Revenue DNA에 반영.
+            권장 학습 주기: 약 14일. 노출만으로 학습하지 않습니다.
           </p>
         </div>
 
@@ -135,7 +135,7 @@ export default function LearningPage() {
         <form onSubmit={runCycle} className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs text-zinc-400">
-              Analytics CSV (우선)
+              X Analytics Content CSV (우선) / Fedica CSV
             </label>
             <input
               type="file"
@@ -147,7 +147,7 @@ export default function LearningPage() {
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={8}
-              placeholder="content,likes,replies,reposts,impressions,bookmarks,profile_visits,followers_gained"
+              placeholder="Post text,Impressions,Likes,New follows,Profile visits,Bookmarks,..."
               className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs outline-none focus:border-emerald-500"
             />
           </div>
@@ -170,7 +170,7 @@ export default function LearningPage() {
               <input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="예: 2026-08 Fedica export"
+                placeholder="예: 2026-07-25~08-07 X Analytics export"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
               />
             </div>
@@ -205,9 +205,16 @@ export default function LearningPage() {
                 {result.analyze.memory.summaryKo}
               </p>
             )}
+            {result.analyze.performanceDna?.summaryKo && (
+              <p className="mt-1 text-xs text-emerald-400/80">
+                {result.analyze.performanceDna.summaryKo}
+                {result.analyze.performanceDna.topicWins?.length
+                  ? ` · ${result.analyze.performanceDna.topicWins.join(", ")}`
+                  : ""}
+              </p>
+            )}
             <p className="mt-3 text-xs text-zinc-500">
-              다음 주 생성 시 plan이 이 Memory를 읽습니다. 생성·발행만으로는
-              Memory가 바뀌지 않습니다.
+              다음 주 생성 시 plan이 이 Memory·DNA를 읽습니다.
             </p>
           </div>
         )}
