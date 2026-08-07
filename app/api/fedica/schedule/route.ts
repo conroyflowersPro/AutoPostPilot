@@ -1,21 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { uploadMultipleMedia } from "@/lib/fedica";
+import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
+import { scheduleOnePost } from "@/lib/services/schedule-service";
+import { computeKRBatchStartISO } from "@/lib/schedule";
+import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
+export const maxDuration = 26;
+
+/** Single-post schedule — same core as batch-schedule. */
 export async function POST(req: NextRequest) {
   try {
-    const { postId, content, pipelineId, mediaUrls, scheduledAt } =
-      await req.json();
+    const body = await req.json().catch(() => ({}));
+    const postId = body.postId ? String(body.postId) : "";
+    const pipelineId = String(
+      body.pipelineId || SCHEDULING_CONFIG.defaultPipelineId
+    );
+    const requireMedia = body.requireMedia !== false;
+    const scheduledAt =
+      typeof body.scheduledAt === "string" && body.scheduledAt.trim()
+        ? body.scheduledAt.trim()
+        : computeKRBatchStartISO();
 
-    if (!postId || !content) {
-      return NextResponse.json(
-        { error: "postId and content required" },
-        { status: 400 }
-      );
+    if (!postId) {
+      return NextResponse.json({ error: "postId required" }, { status: 400 });
     }
-
-    const token = process.env.FEDICA_API_TOKEN;
-    if (!token) {
+    if (!process.env.FEDICA_API_TOKEN) {
       return NextResponse.json(
         { error: "FEDICA_API_TOKEN not configured" },
         { status: 500 }
@@ -23,95 +32,68 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
-    // Enforce reviewed-only
-    const { data: existing } = await supabase
+    const { data: post, error } = await supabase
       .from("SeungContent")
-      .select("status")
+      .select(
+        "id, content, status, pipeline_id, media_urls, scheduled_at, fedica_post_id, attempt_count"
+      )
       .eq("id", postId)
-      .single();
+      .maybeSingle();
 
-    if (!existing || existing.status !== "reviewed") {
-      return NextResponse.json(
-        {
-          error:
-            "검수(reviewed) 완료된 포스트만 Fedica 스케줄링할 수 있습니다.",
-        },
-        { status: 400 }
-      );
+    if (error) throw error;
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    let mediaIds: string[] = [];
-    if (mediaUrls && Array.isArray(mediaUrls) && mediaUrls.length > 0) {
-      try {
-        mediaIds = await uploadMultipleMedia(mediaUrls);
-      } catch (mediaErr: any) {
-        console.error("Fedica media upload failed:", mediaErr);
-        return NextResponse.json(
-          {
-            error: `미디어 업로드 실패: ${mediaErr.message}`,
-          },
-          { status: 502 }
-        );
-      }
+    const provider = createDefaultPublisher();
+    const result = await scheduleOnePost({
+      supabase,
+      provider,
+      post,
+      scheduledAtISO: scheduledAt,
+      pipelineId,
+      requireMedia,
+    });
+
+    if (result.ok) {
+      return NextResponse.json({
+        success: true,
+        id: result.id,
+        status: result.status,
+        fedicaId: result.providerPostId,
+        scheduledAt: result.scheduledAt,
+        skipped: !!result.skipped,
+        mediaCount: result.mediaCount || 0,
+      });
     }
 
-    const postBody: any = {
-      Accounts: [
-        {
-          Platform: "Twitter",
-          AccountId: "Seung4680",
-        },
-      ],
-      Messages: [content],
-    };
+    const status =
+      result.status === "skipped"
+        ? 409
+        : result.errorStage === "validate_post" ||
+            result.errorStage === "validate_media"
+          ? 400
+          : 502;
 
-    if (mediaIds.length > 0) {
-      postBody.MediaId = mediaIds;
-    }
-
-    const body: any = {
-      PipelineId: Number(pipelineId) || 42303,
-      Posts: [postBody],
-    };
-
-    if (scheduledAt) {
-      body.DateTime = scheduledAt;
-    }
-
-    const res = await fetch("https://fedica.com/api/publish/post", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    return NextResponse.json(
+      {
+        success: false,
+        id: result.id,
+        status: result.status,
+        error: result.errorUser,
+        errorInternal: result.errorInternal,
+        stage: result.errorStage,
+        retryable: result.retryable,
       },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || !data.Success) {
-      return NextResponse.json(
-        { error: data.Error || "Fedica API failed" },
-        { status: 502 }
-      );
-    }
-
-    const updatePayload: any = {
-      status: "scheduled",
-      fedica_post_id: String(data.Id),
-    };
-    if (scheduledAt) {
-      updatePayload.scheduled_at = scheduledAt;
-    }
-
-    await supabase.from("SeungContent").update(updatePayload).eq("id", postId);
-
-    return NextResponse.json({
-      success: true,
-      fedicaId: data.Id,
-      mediaIds,
-    });
+      { status }
+    );
   } catch (err: any) {
     console.error(err);
     return NextResponse.json(
