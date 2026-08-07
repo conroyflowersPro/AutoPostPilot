@@ -6,15 +6,11 @@ const MODEL = "grok-4.5";
 const SYSTEM_PROMPT = `You are the content generation engine for AutoPostPilot.
 Your only job is to write X posts that the creator would actually publish.
 
-Do not sound like an AI, a journalist, a corporate account, a Tesla fan page, a columnist, or a marketing account.
-Write exactly as this creator would write while thinking and typing on X.
-
-CREATOR IDENTITY
-The creator is a Korean-speaking long-term Tesla owner living in Southern California.
-Primary vehicle: Cybertruck. MSP and M3P are mostly driven by family.
-Never invent personal driving experiences.
-Write natural conversational Korean. No engagement bait. No fabricated experiences.
-JSON only output format required by the app.`;
+Do not sound like an AI. Write as this Korean Tesla owner would type on X.
+Primary vehicle: Cybertruck. Follow each slot primaryTopic and angle strictly.
+- primaryTopic is the single clear main topic (creator-framed; never Fedica keyword labels)
+- Do not insert trending keywords or place names unless the slot itself is an authentic owner observation
+Never invent experiences. No stock-price chatter. Natural 해요체 mix. JSON only.`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,14 +35,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const xaiKey = Deno.env.get("XAI_API_KEY");
-
     if (!xaiKey) {
       return new Response(
         JSON.stringify({ error: "XAI_API_KEY not configured in Supabase secrets" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -67,127 +59,147 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const {
+      jobId,
       startDate,
       dayOffset = 0,
-      keywords,
-      mergedKeywords,
-      themes,
+      slots = [],
+      usedRecord = {
+        usedTopics: [],
+        usedAngles: [],
+        usedExamples: [],
+        usedPlaces: [],
+        usedOpenings: [],
+        usedConclusions: [],
+      },
     } = body;
 
-    const total = 1;
     const offset = typeof dayOffset === "number" ? dayOffset : 0;
-    const topic =
-      (typeof mergedKeywords === "string" && mergedKeywords.trim()) ||
-      (typeof keywords === "string" && keywords.trim()) ||
-      "";
-    const themeStr = Array.isArray(themes)
-      ? themes.filter(Boolean).join(", ")
-      : "";
 
-    const textPart = `한국어 포스트 정확히 ${total}개. dayOffset=${offset}. 시작일: ${
-      startDate || "오늘"
-    }.
-주제: ${themeStr || topic || "FSD, Robotaxi, 소유 팁, 일론 장기 비전, LAFC"}
-주가 단기 등락 금지. 추론 OK / 허위 경험 금지. JSON만.
+    let effectiveSlots = Array.isArray(slots) ? slots : [];
+    if (effectiveSlots.length === 0) {
+      const legacyCount = Math.min(8, Math.max(1, Number(body.count) || 1));
+      const themes = Array.isArray(body.themes) ? body.themes.map(String) : [];
+      const legacyTopics = [
+        "FSD 실사용 체감",
+        "Cybertruck 일상 활용",
+        "Robotaxi / 자율주행 관찰",
+        "LAFC / 축구 일상",
+        "앱·업무 운영 관찰",
+        "기술·AI 사용 메모",
+        "장기 투자 관점",
+        "소유 팁",
+      ];
+      // Audience/Fedica keywords must NEVER become primaryTopic/angle
+      for (let i = 0; i < legacyCount; i++) {
+        const fallbackTopic = legacyTopics[i % legacyTopics.length];
+        effectiveSlots.push({
+          slotId: `D${offset + 1}P${i + 1}`,
+          primaryTopic: themes[i] || fallbackTopic,
+          angle: themes[i] || fallbackTopic,
+          contentType: "observation",
+          allowedContext: [],
+          forbiddenTopics: ["주가", "등락", "매매"],
+          targetLength: i % 3 === 0 ? "short" : i % 3 === 1 ? "medium" : "long",
+        });
+      }
+    }
 
-Return JSON only:
-{"posts":[{"content":"한국어","score":8,"suggestedMedia":"","slot":1}]}`;
+    if (effectiveSlots.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "slots array required and must not be empty" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90000);
+    const workingSlots = effectiveSlots;
+    const usedJson = JSON.stringify(usedRecord, null, 0);
+    const scheduleMeta = startDate
+      ? `startDate=${startDate} (scheduling metadata only — do NOT treat as evidence that events happened today)`
+      : `startDate not provided (scheduling metadata only — do NOT invent "오늘/방금/아까")`;
 
-    let response: Response;
-    try {
-      response = await fetch("https://api.x.ai/v1/chat/completions", {
-        method: "POST",
-        headers: {
+    async function callGrok(slotsSubset: any[]): Promise<any> {
+      const subsetJson = JSON.stringify(slotsSubset, null, 0);
+      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
+${scheduleMeta}
+
+SLOTS (follow each strictly; primaryTopic is creator-framed — never invent Fedica keyword dumps):
+${subsetJson}
+
+USED RECORD (do not repeat these topics/angles/examples/places/openings/conclusions):
+${usedJson}
+
+Return JSON only with posts array of length ${slotsSubset.length}. Each object must have slotId, content, score.`;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 120000);
+      let response: Response;
+      try {
+        const headers: Record<string, string> = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${xaiKey}`,
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: textPart },
-          ],
-          temperature: 0.75,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
+        };
+        if (jobId) headers["x-grok-conv-id"] = String(jobId);
+        response = await fetch("https://api.x.ai/v1/chat/completions", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: userMsg },
+            ],
+            temperature: 0.75,
+            reasoning_effort: "low",
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const rawText = await response.text();
+      if (!response.ok) throw new Error(`Grok API failed: ${rawText.slice(0, 300)}`);
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error("Grok non-JSON response");
+      }
+      return data;
     }
 
-    const rawText = await response.text();
-    if (!response.ok) {
-      return new Response(
-        JSON.stringify({
-          error: "Grok API failed",
-          detail: rawText.slice(0, 400),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    // Batch all slots in one or two calls if many
+    const batchSize = 8;
+    const allGenerated: any[] = [];
+    for (let i = 0; i < workingSlots.length; i += batchSize) {
+      const subset = workingSlots.slice(i, i + batchSize);
+      const data = await callGrok(subset);
+      const raw = data.choices?.[0]?.message?.content || "{}";
+      let parsed: any;
+      try {
+        const m = String(raw).match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(m ? m[0] : raw);
+      } catch {
+        parsed = { posts: [] };
+      }
+      const posts = Array.isArray(parsed?.posts) ? parsed.posts : [];
+      allGenerated.push(...posts);
     }
 
-    let data: any;
-    try {
-      data = JSON.parse(rawText);
-    } catch {
-      return new Response(
-        JSON.stringify({
-          error: "Grok non-JSON response",
-          detail: rawText.slice(0, 200),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const raw = data.choices?.[0]?.message?.content || "{}";
-    let parsed: any;
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-    } catch {
-      return new Response(
-        JSON.stringify({
-          error: "Failed to parse Grok response",
-          raw: String(raw).slice(0, 500),
-        }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (!parsed.posts || !Array.isArray(parsed.posts)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid posts format from Grok" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const qualityPosts = parsed.posts
+    const qualityPosts = allGenerated
       .filter((p: any) => {
         const t = (p.content || "").trim();
         if (!t) return false;
         const latinChars = (t.match(/[A-Za-z]/g) || []).length;
         const totalChars = t.replace(/\s/g, "").length || 1;
-        return latinChars / totalChars < 0.4;
+        return latinChars / totalChars < 0.45;
       })
-      .slice(0, total);
+      .slice(0, workingSlots.length);
 
     const inserted = [];
-    for (const p of qualityPosts) {
+    for (let i = 0; i < qualityPosts.length; i++) {
+      const p = qualityPosts[i];
+      const slot = workingSlots[i] || workingSlots[0];
       const { data: row, error } = await supabase
         .from("SeungContent")
         .insert({
@@ -203,9 +215,8 @@ Return JSON only:
         inserted.push({
           ...row,
           score: p.score,
-          suggestedMedia: p.suggestedMedia,
+          slotId: p.slotId || slot?.slotId,
           dayOffset: offset,
-          slot: p.slot,
         });
       }
     }
@@ -217,7 +228,6 @@ Return JSON only:
         count: inserted.length,
         posts: inserted,
         dayOffset: offset,
-        mergedKeywords: topic,
       }),
       {
         status: 200,
