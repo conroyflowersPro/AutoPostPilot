@@ -4,7 +4,13 @@
  * Demo fixtures only when explicitly enabled.
  */
 
-import { CalendarActivity, AccountSyncState, HomeDashboardData, ControlCenterSummary } from "./types";
+import { createClient } from "@/lib/supabase/server";
+import {
+  CalendarActivity,
+  AccountSyncState,
+  HomeDashboardData,
+  ControlCenterSummary,
+} from "./types";
 import { getDemoActivities } from "./demo-data";
 
 function demoEnabled(): boolean {
@@ -14,11 +20,16 @@ function demoEnabled(): boolean {
   );
 }
 
-export async function getOperationalActivities(_viewMonth: Date): Promise<CalendarActivity[]> {
+/** Real operational fetch — currently empty until activities are synced. */
+export async function getOperationalActivities(
+  _viewMonth: Date
+): Promise<CalendarActivity[]> {
   return [];
 }
 
-export async function getCalendarActivities(viewMonth: Date): Promise<CalendarActivity[]> {
+export async function getCalendarActivities(
+  viewMonth: Date
+): Promise<CalendarActivity[]> {
   if (demoEnabled()) {
     return getDemoActivities(viewMonth);
   }
@@ -26,17 +37,77 @@ export async function getCalendarActivities(viewMonth: Date): Promise<CalendarAc
 }
 
 export async function getAccountSyncState(): Promise<AccountSyncState> {
-  return {
-    status: "not_connected",
-    handle: null,
-    displayName: null,
-    followersCount: null,
-    followingCount: null,
-    lastSuccessfulSyncAt: null,
-    lastSyncAttemptAt: null,
-    lastError: null,
-    timezone: null,
-  };
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        status: "not_connected",
+        handle: null,
+        displayName: null,
+        followersCount: null,
+        followingCount: null,
+        lastSuccessfulSyncAt: null,
+        lastSyncAttemptAt: null,
+        lastError: null,
+        timezone: null,
+      };
+    }
+
+    const { data } = await supabase
+      .from("account_connections")
+      .select(
+        "handle, display_name, followers_count, following_count, last_successful_sync_at, last_sync_attempt_at, last_sync_status, last_sync_error, timezone, access_token"
+      )
+      .eq("user_id", user.id)
+      .eq("platform", "x")
+      .maybeSingle();
+
+    if (!data?.access_token) {
+      return {
+        status: "not_connected",
+        handle: data?.handle || null,
+        displayName: data?.display_name || null,
+        followersCount: data?.followers_count ?? null,
+        followingCount: data?.following_count ?? null,
+        lastSuccessfulSyncAt: data?.last_successful_sync_at || null,
+        lastSyncAttemptAt: data?.last_sync_attempt_at || null,
+        lastError: data?.last_sync_error || null,
+        timezone: data?.timezone || null,
+      };
+    }
+
+    let status: AccountSyncState["status"] = "never_synced";
+    if (data.last_successful_sync_at) status = "ok";
+    else if (data.last_sync_status === "failed") status = "failed";
+    else if (data.last_sync_status === "connected") status = "never_synced";
+
+    return {
+      status,
+      handle: data.handle,
+      displayName: data.display_name,
+      followersCount: data.followers_count,
+      followingCount: data.following_count,
+      lastSuccessfulSyncAt: data.last_successful_sync_at,
+      lastSyncAttemptAt: data.last_sync_attempt_at,
+      lastError: data.last_sync_error,
+      timezone: data.timezone,
+    };
+  } catch {
+    return {
+      status: "not_connected",
+      handle: null,
+      displayName: null,
+      followersCount: null,
+      followingCount: null,
+      lastSuccessfulSyncAt: null,
+      lastSyncAttemptAt: null,
+      lastError: null,
+      timezone: null,
+    };
+  }
 }
 
 function emptyToday(): ControlCenterSummary {
