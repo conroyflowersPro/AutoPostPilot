@@ -42,7 +42,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v5.3.0
+              v5.3.1
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -70,11 +70,15 @@ export default async function HomePage() {
               <div className="mt-1 text-xs text-zinc-400">
                 Status: <span className="text-zinc-200">{syncLabel(account.status)}</span>
               </div>
-              {!account.lastSuccessfulSyncAt && (
+              {account.lastSuccessfulSyncAt ? (
+                <div className="mt-0.5 text-xs text-zinc-500">
+                  Last sync: {account.lastSuccessfulSyncAt}
+                </div>
+              ) : (
                 <div className="mt-0.5 text-xs text-zinc-500">
                   {account.status === "not_connected"
                     ? "Connect X to enable profile + Daily Sync."
-                    : "Connected — run Daily Sync to load timeline."}
+                    : "Connected — press Sync Now to load timeline."}
                 </div>
               )}
             </div>
@@ -87,7 +91,7 @@ export default async function HomePage() {
               <div className="font-semibold">
                 {account.followingCount != null ? account.followingCount : "—"}
               </div>
-              <div className="mt-3 flex flex-col items-end gap-2">
+              <div className="mt-3 flex flex-col items-end gap-1.5">
                 {account.status === "not_connected" ? (
                   <a
                     href="/api/x/oauth/start"
@@ -96,14 +100,22 @@ export default async function HomePage() {
                     Connect X
                   </a>
                 ) : (
-                  <form action="/api/x/oauth/disconnect" method="post">
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
+                  <>
+                    <a
+                      href="/api/x/sync"
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500"
                     >
-                      Disconnect X
-                    </button>
-                  </form>
+                      Sync Now
+                    </a>
+                    <form action="/api/x/oauth/disconnect" method="post">
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
+                      >
+                        Disconnect X
+                      </button>
+                    </form>
+                  </>
                 )}
               </div>
             </div>
@@ -147,7 +159,7 @@ export default async function HomePage() {
           </div>
           {recentActual.length === 0 ? (
             <p className="text-sm text-zinc-500">
-              No actual X activity loaded. Connect X and run Daily Sync to populate.
+              No actual X activity loaded. Connect X and run Sync Now.
             </p>
           ) : (
             <ul className="space-y-2 text-sm">
