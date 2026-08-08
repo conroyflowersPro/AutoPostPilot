@@ -2,6 +2,7 @@
  * GET /api/learning/performance-coverage
  * Read-only Performance Evidence Coverage diagnostic.
  * No INSERT/UPDATE/DELETE. No DNA updates. No learning writes.
+ * v5.6.2: sync_runs uses completed_at (not finished_at); checkpoint_meta; reconciliation notes.
  */
 
 import { NextResponse } from "next/server";
@@ -43,7 +44,6 @@ export async function GET() {
 
     const accountId = conn.id;
 
-    // --- DB inventory (no date filter; maximum available period) ---
     const { count: activitiesCount, error: cntErr } = await supabase
       .from("account_activities")
       .select("id", { count: "exact", head: true })
@@ -100,14 +100,19 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
-    const { data: syncRuns } = await supabase
+    // completed_at (schema) — NOT finished_at (was breaking the whole select)
+    const { data: syncRuns, error: syncErr } = await supabase
       .from("x_sync_runs")
       .select(
-        "id, source, run_status, phase, pages_fetched, posts_discovered, posts_new, posts_updated, mentions_discovered, earliest_post_at, latest_post_at, end_reason, started_at, finished_at"
+        "id, account_id, source, status, run_status, phase, pages_fetched, posts_discovered, posts_new, posts_updated, mentions_discovered, metric_snapshots_written, earliest_post_at, latest_post_at, end_reason, started_at, completed_at, checkpoint_meta"
       )
       .eq("account_id", accountId)
       .order("started_at", { ascending: false })
-      .limit(5);
+      .limit(8);
+
+    const phase1aRuns = (syncRuns || []).filter(
+      (r) => r.source === "phase1a_max_collect"
+    );
 
     const dbInventory = {
       accountId,
@@ -121,7 +126,16 @@ export async function GET() {
       snapshotAtMin: snapEarliest?.snapshot_at ?? null,
       snapshotAtMax: snapLatest?.snapshot_at ?? null,
       recentSyncRuns: syncRuns ?? [],
-      note: "No date filter applied. Counts are maximum rows present for this account_id.",
+      phase1aRuns,
+      syncRunsError: syncErr?.message ?? null,
+      reconciliation: {
+        note: "posts_discovered (run) may exceed unique X_ACTUAL rows when the same x_post_id appears on multiple pages or persist fails",
+        originXActual: xActualCount ?? null,
+        originXMention: xMentionCount ?? null,
+        activitiesSum: (xActualCount ?? 0) + (xMentionCount ?? 0),
+        activitiesExact: activitiesCount ?? null,
+      },
+      note: "No date filter. Counts are maximum rows for this account_id. Schema uses completed_at.",
     };
 
     const adapter = new SupabaseEvidenceAdapter(supabase, accountId);
@@ -131,7 +145,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      version: "performance-evidence-v1.1",
+      version: "performance-evidence-v1.2",
       handle: conn.handle,
       dbInventory,
       report,
