@@ -1,5 +1,5 @@
 /**
- * Weekly Planner + Post Strategy types (v5.4)
+ * Weekly Planner + Post Strategy types (v5.4.2)
  * Strategy is a HYPOTHESIS until validated by published X outcomes.
  */
 
@@ -25,6 +25,16 @@ export type WritingApproach =
 
 export type Intensity = "none" | "low" | "medium" | "high";
 
+/** Evidence quality behind any X distribution / algorithm assumption */
+export type StrategyEvidenceClass =
+  | "verified"
+  | "observed"
+  | "hypothesis"
+  | "account_validated";
+
+/** Progressive learning confidence for strategy patterns */
+export type StrategyConfidence = "observed" | "emerging" | "validated";
+
 /** Per-slot strategic hypothesis — not a writing formula */
 export type PostStrategy = {
   strategicAngle: string;
@@ -42,6 +52,8 @@ export type PostStrategy = {
   mediaUsefulness: "optional" | "helpful" | "essential";
   /** Why this strategy might work — hypothesis only */
   hypothesisNote: string;
+  /** Optional evidence class for any algorithm/distribution claim used */
+  evidenceClass?: StrategyEvidenceClass;
 };
 
 export type ContentSlot = {
@@ -60,13 +72,20 @@ export type ContentSlot = {
   creatorIntentAligned?: boolean;
 };
 
+/**
+ * Product-facing weekly portfolio (not Creator identity).
+ * Prefer weeklyStrategy over legacy identityStatement in UI.
+ */
 export type PortfolioRead = {
-  /** If someone follows all week, what identity emerges? */
-  identityStatement: string;
+  /** @deprecated prefer weeklyStrategy — avoid framing as Creator identity */
+  identityStatement?: string;
+  /** Product label: This Week's Strategy / Weekly Portfolio */
+  weeklyStrategy: string;
   expansionMoves: string[];
   diversityNotes: string;
   riskOfNarrowing: string;
   creatorIntentReflection: string;
+  portfolioAdjustment?: string;
 };
 
 export type AudienceRead = {
@@ -78,6 +97,8 @@ export type AudienceRead = {
   candidateHighlights?: string[];
   portfolio?: PortfolioRead;
   creatorIntent?: string;
+  intentStrength?: string;
+  diversityGuardApplied?: boolean;
 };
 
 export function defaultPostStrategy(partial?: Partial<PostStrategy>): PostStrategy {
@@ -98,6 +119,7 @@ export function defaultPostStrategy(partial?: Partial<PostStrategy>): PostStrate
     hypothesisNote:
       partial?.hypothesisNote ||
       "Hypothesis only — validate after publish with real X metrics.",
+    evidenceClass: partial?.evidenceClass || "hypothesis",
   };
 }
 
