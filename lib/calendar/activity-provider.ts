@@ -1,6 +1,6 @@
 /**
  * Operational activity provider.
- * Production: empty / DB-backed — NEVER silent demo fallback.
+ * X_ACTUAL from account_activities; planned from SeungContent.
  * Demo fixtures only when explicitly enabled.
  */
 
@@ -10,8 +10,12 @@ import {
   AccountSyncState,
   HomeDashboardData,
   ControlCenterSummary,
+  ActivityOrigin,
+  ActivityAction,
+  ActivityStatus,
 } from "./types";
 import { getDemoActivities } from "./demo-data";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 function demoEnabled(): boolean {
   return (
@@ -20,11 +24,124 @@ function demoEnabled(): boolean {
   );
 }
 
-/** Real operational fetch — currently empty until activities are synced. */
+function mapXActivity(row: {
+  id: string;
+  activity_date: string;
+  origin: string;
+  action_type: string;
+  status: string;
+  x_post_id?: string | null;
+  text_body?: string | null;
+  source_post_url?: string | null;
+  published_at?: string | null;
+  scheduled_at?: string | null;
+  topic?: string | null;
+  duplicate_warning?: string | null;
+}): CalendarActivity {
+  return {
+    activity_id: row.id,
+    date: row.activity_date,
+    scheduled_at: row.scheduled_at,
+    published_at: row.published_at,
+    origin: (row.origin as ActivityOrigin) || "X_ACTUAL",
+    action_type: (row.action_type as ActivityAction) || "ORIGINAL",
+    status: (row.status as ActivityStatus) || "PUBLISHED",
+    x_post_id: row.x_post_id,
+    final_text: row.text_body,
+    source_post_url: row.source_post_url,
+    topic: row.topic,
+    duplicate_warning: row.duplicate_warning,
+  };
+}
+
+function mapPlanned(row: {
+  id: string;
+  content: string | null;
+  scheduled_at: string | null;
+  status: string | null;
+  pipeline_id: string | null;
+  fedica_post_id: string | null;
+}): CalendarActivity | null {
+  if (!row.scheduled_at) return null;
+  const date = row.scheduled_at.slice(0, 10);
+  let origin: ActivityOrigin = "WEEKLY_PLANNER";
+  const pid = String(row.pipeline_id || "");
+  if (pid === "42338") origin = "WILD_GROWTH";
+
+  let status: ActivityStatus = "DRAFT";
+  const s = (row.status || "").toLowerCase();
+  if (s === "scheduled" || s === "scheduling") status = "SCHEDULED";
+  else if (s === "reviewed") status = "APPROVED";
+  else if (s === "published") status = "PUBLISHED";
+  else if (s === "draft") status = "DRAFT";
+
+  return {
+    activity_id: `plan-${row.id}`,
+    date,
+    scheduled_at: row.scheduled_at,
+    published_at: status === "PUBLISHED" ? row.scheduled_at : null,
+    origin,
+    action_type: "ORIGINAL",
+    status,
+    final_text: row.content,
+    generated_text: row.content,
+    fedica_pipeline_id: row.pipeline_id,
+  };
+}
+
 export async function getOperationalActivities(
-  _viewMonth: Date
+  viewMonth: Date
 ): Promise<CalendarActivity[]> {
-  return [];
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const from = format(startOfMonth(viewMonth), "yyyy-MM-dd");
+    const to = format(endOfMonth(viewMonth), "yyyy-MM-dd");
+    const out: CalendarActivity[] = [];
+
+    const { data: conn } = await supabase
+      .from("account_connections")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", "x")
+      .maybeSingle();
+
+    if (conn?.id) {
+      const { data: actual } = await supabase
+        .from("account_activities")
+        .select(
+          "id, activity_date, origin, action_type, status, x_post_id, text_body, source_post_url, published_at, scheduled_at, topic, duplicate_warning"
+        )
+        .eq("account_id", conn.id)
+        .gte("activity_date", from)
+        .lte("activity_date", to)
+        .order("published_at", { ascending: false });
+
+      for (const row of actual || []) {
+        out.push(mapXActivity(row));
+      }
+    }
+
+    const { data: planned } = await supabase
+      .from("SeungContent")
+      .select("id, content, scheduled_at, status, pipeline_id, fedica_post_id")
+      .not("scheduled_at", "is", null)
+      .gte("scheduled_at", `${from}T00:00:00`)
+      .lte("scheduled_at", `${to}T23:59:59`);
+
+    for (const row of planned || []) {
+      const m = mapPlanned(row);
+      if (m) out.push(m);
+    }
+
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 export async function getCalendarActivities(
@@ -36,25 +153,27 @@ export async function getCalendarActivities(
   return getOperationalActivities(viewMonth);
 }
 
+function emptyAccount(): AccountSyncState {
+  return {
+    status: "not_connected",
+    handle: null,
+    displayName: null,
+    followersCount: null,
+    followingCount: null,
+    lastSuccessfulSyncAt: null,
+    lastSyncAttemptAt: null,
+    lastError: null,
+    timezone: null,
+  };
+}
+
 export async function getAccountSyncState(): Promise<AccountSyncState> {
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) {
-      return {
-        status: "not_connected",
-        handle: null,
-        displayName: null,
-        followersCount: null,
-        followingCount: null,
-        lastSuccessfulSyncAt: null,
-        lastSyncAttemptAt: null,
-        lastError: null,
-        timezone: null,
-      };
-    }
+    if (!user) return emptyAccount();
 
     const { data } = await supabase
       .from("account_connections")
@@ -67,15 +186,9 @@ export async function getAccountSyncState(): Promise<AccountSyncState> {
 
     if (!data?.access_token) {
       return {
-        status: "not_connected",
+        ...emptyAccount(),
         handle: data?.handle || null,
         displayName: data?.display_name || null,
-        followersCount: data?.followers_count ?? null,
-        followingCount: data?.following_count ?? null,
-        lastSuccessfulSyncAt: data?.last_successful_sync_at || null,
-        lastSyncAttemptAt: data?.last_sync_attempt_at || null,
-        lastError: data?.last_sync_error || null,
-        timezone: data?.timezone || null,
       };
     }
 
@@ -96,17 +209,7 @@ export async function getAccountSyncState(): Promise<AccountSyncState> {
       timezone: data.timezone,
     };
   } catch {
-    return {
-      status: "not_connected",
-      handle: null,
-      displayName: null,
-      followersCount: null,
-      followingCount: null,
-      lastSuccessfulSyncAt: null,
-      lastSyncAttemptAt: null,
-      lastError: null,
-      timezone: null,
-    };
+    return emptyAccount();
   }
 }
 
@@ -122,12 +225,93 @@ function emptyToday(): ControlCenterSummary {
   };
 }
 
+async function buildTodaySummary(): Promise<ControlCenterSummary> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return emptyToday();
+
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    const { data: conn } = await supabase
+      .from("account_connections")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", "x")
+      .maybeSingle();
+
+    let actualPublished = 0;
+    if (conn?.id) {
+      const { count } = await supabase
+        .from("account_activities")
+        .select("id", { count: "exact", head: true })
+        .eq("account_id", conn.id)
+        .eq("activity_date", today)
+        .eq("origin", "X_ACTUAL");
+      actualPublished = count || 0;
+    }
+
+    const { count: scheduled } = await supabase
+      .from("SeungContent")
+      .select("id", { count: "exact", head: true })
+      .gte("scheduled_at", `${today}T00:00:00`)
+      .lte("scheduled_at", `${today}T23:59:59`)
+      .in("status", ["scheduled", "scheduling", "reviewed"]);
+
+    return {
+      scheduled: scheduled || 0,
+      wildFreeStatus: "not run",
+      wildGrowthStatus: "not run",
+      manualActions: 0,
+      published: actualPublished,
+      duplicateWarnings: 0,
+      actualPublished,
+    };
+  } catch {
+    return emptyToday();
+  }
+}
+
 export async function getHomeDashboardData(): Promise<HomeDashboardData> {
   const account = await getAccountSyncState();
+  const today = await buildTodaySummary();
+
+  let recentActual: CalendarActivity[] = [];
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: conn } = await supabase
+        .from("account_connections")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("platform", "x")
+        .maybeSingle();
+      if (conn?.id) {
+        const { data } = await supabase
+          .from("account_activities")
+          .select(
+            "id, activity_date, origin, action_type, status, x_post_id, text_body, source_post_url, published_at, topic"
+          )
+          .eq("account_id", conn.id)
+          .eq("origin", "X_ACTUAL")
+          .order("published_at", { ascending: false })
+          .limit(8);
+        recentActual = (data || []).map(mapXActivity);
+      }
+    }
+  } catch {
+    recentActual = [];
+  }
+
   return {
     account,
-    today: emptyToday(),
-    recentActual: [],
+    today,
+    recentActual,
     todayPlan: [],
   };
 }
