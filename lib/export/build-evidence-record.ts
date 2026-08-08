@@ -35,9 +35,7 @@ export type ExportRecord = {
   collection_source: string | null;
 };
 
-function asMetricObject(
-  raw: unknown
-): Record<string, number> | null {
+function asMetricObject(raw: unknown): Record<string, number> | null {
   if (raw == null) return null;
   if (typeof raw !== "object") return null;
   const out: Record<string, number> = {};
@@ -48,7 +46,6 @@ function asMetricObject(
       out[k] = n;
       any = true;
     }
-    // non-finite keys omitted — missing, not zero
   }
   return any ? out : null;
 }
@@ -62,7 +59,6 @@ function classifyPostType(row: Record<string, unknown>): string {
   if (pt.includes("REPOST") || pt.includes("RETWEET")) return "REPOST";
   if (pt.includes("MENTION")) return "MENTION";
   if (pt.includes("ORIGINAL") || pt === "POST") return "ORIGINAL";
-  // referenced tweets fallback
   const meta = (row.meta || {}) as Record<string, unknown>;
   const refs = (meta.referenced_tweets || []) as Array<{ type?: string }>;
   const types = refs.map((r) => String(r.type || ""));
@@ -78,11 +74,13 @@ function extractMedia(meta: Record<string, unknown>): ExportRecord["media"] {
     | null
     | undefined;
   const keys = attachments?.media_keys || [];
-  // raw includes may carry media types if present
   const raw = meta.raw as Record<string, unknown> | null | undefined;
   const includes = (raw?.includes as Record<string, unknown>) || {};
-  const mediaArr = (includes.media as Array<{ type?: string; media_key?: string }>) || [];
-  const types = mediaArr.map((m) => String(m.type || "unknown")).filter(Boolean);
+  const mediaArr =
+    (includes.media as Array<{ type?: string; media_key?: string }>) || [];
+  const types = mediaArr
+    .map((m) => String(m.type || "unknown"))
+    .filter(Boolean);
   return {
     present: keys.length > 0 || types.length > 0,
     types: Array.from(new Set(types)),
