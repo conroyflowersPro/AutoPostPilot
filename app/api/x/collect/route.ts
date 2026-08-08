@@ -26,26 +26,25 @@ export async function POST(req: NextRequest) {
       includeMentions: body.includeMentions !== false,
     });
 
-    // result.phase = POSTS | MENTIONS | COMPLETE (collection sub-phase)
-    // operation = API-level label (no key clash with result.phase)
     return NextResponse.json({
       success: result.ok,
       operation: "PHASE_1A_BATCH",
       phaseStatus: "STOP_FOR_REVIEW_WHEN_COMPLETE",
       learned: false,
-      version: "5.5.8",
+      version: "5.6.1",
       ...result,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("phase1a batch", e);
     return NextResponse.json(
       {
         success: false,
-        error: String(e?.message || e),
+        error: msg,
         shouldContinue: true,
         status: "FAILED_RETRYABLE",
         learned: false,
-        version: "5.5.8",
+        version: "5.6.1",
       },
       { status: 500 }
     );
@@ -65,10 +64,11 @@ export async function GET() {
     const status = await getPhase1ACollectStatus();
     return NextResponse.json({
       operation: "PHASE_1A_BATCH",
-      version: "5.5.8",
+      version: "5.6.1",
       ...status,
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
