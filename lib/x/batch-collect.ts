@@ -51,6 +51,14 @@ const DEFAULT_PAGES_PER_BATCH = 2;
 const TIME_BUDGET_MS = 18_000;
 const OVERALL_PAGE_SAFETY = 200;
 
+/** Statuses that must stop auto-continue */
+const STOP_STATUSES: readonly RunStatus[] = [
+  "COMPLETE",
+  "FAILED_FATAL",
+  "CANCELLED",
+  "PAUSED",
+];
+
 function classifyAction(
   refs?: { type: string; id: string }[]
 ): "ORIGINAL" | "REPLY" | "QUOTE" | "REPOST" | "UNKNOWN" {
@@ -510,6 +518,10 @@ export async function runPhase1ABatch(opts?: {
         ? "Rate limit — 잠시 후 자동 재개"
         : `배치 완료 (${batchPages}p) — 계속… phase=${phase}`;
 
+  // Use includes() so TS does not narrow away valid RunStatus members
+  const continueOk =
+    shouldContinue && !STOP_STATUSES.includes(status as RunStatus);
+
   return {
     ok: !error || status === "RATE_LIMITED" || status === "FAILED_RETRYABLE",
     runId,
@@ -525,12 +537,7 @@ export async function runPhase1ABatch(opts?: {
     earliestDate: earliest,
     latestDate: latest,
     endReason,
-    shouldContinue:
-      shouldContinue &&
-      status !== "COMPLETE" &&
-      status !== "FAILED_FATAL" &&
-      status !== "CANCELLED" &&
-      status !== "PAUSED",
+    shouldContinue: continueOk,
     retryAfterSeconds: retryAfter,
     error,
     messageKo: msg,
