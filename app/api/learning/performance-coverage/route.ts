@@ -21,11 +21,12 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // platform is stored as "x" everywhere else (oauth, sync, collect, calendar)
     const { data: conn, error: connErr } = await supabase
       .from("account_connections")
       .select("id, handle, platform")
       .eq("user_id", user.id)
-      .eq("platform", "twitter")
+      .eq("platform", "x")
       .maybeSingle();
 
     if (connErr) {
@@ -36,7 +37,7 @@ export async function GET() {
     }
     if (!conn?.id) {
       return NextResponse.json(
-        { error: "No Twitter account_connection found" },
+        { error: "No X account_connection found (platform=x)" },
         { status: 404 }
       );
     }
