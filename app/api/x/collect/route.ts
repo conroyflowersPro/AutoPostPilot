@@ -1,41 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { runPhase1AMaxCollection } from "@/lib/x/collect";
-import { getXConnectionMeta } from "@/lib/x/client";
+import { runPhase1ABatch } from "@/lib/x/batch-collect";
 
-export const maxDuration = 60;
+export const maxDuration = 26;
 
-/**
- * Phase 1A — Maximum X API collection
- * POST: run collection (auth required)
- * GET: connection status only (no collection)
- * Does NOT run DNA learning.
- */
-export async function GET() {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const meta = await getXConnectionMeta();
-    return NextResponse.json({
-      phase: "PHASE_1A_X_API_MAX_COLLECTION",
-      connection: meta,
-      usage:
-        'POST /api/x/collect  body optional: { includeMentions?: boolean, maxPages?: number }',
-      note: "Does not learn DNA. Collect only.",
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: String(e?.message || e) },
-      { status: 500 }
-    );
-  }
-}
-
+/** One short batch per request. UI auto-continues while shouldContinue. */
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -47,33 +16,57 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const result = await runPhase1AMaxCollection({
+    const result = await runPhase1ABatch({
+      maxPagesPerBatch:
+        typeof body.maxPagesPerBatch === "number"
+          ? body.maxPagesPerBatch
+          : typeof body.maxPages === "number"
+            ? body.maxPages
+            : 2,
       includeMentions: body.includeMentions !== false,
-      maxPages: typeof body.maxPages === "number" ? body.maxPages : undefined,
     });
 
     return NextResponse.json({
       success: result.ok,
-      error: result.error || null,
-      phase: "PHASE_1A_X_API_MAX_COLLECTION",
-      phaseStatus: "STOP_FOR_REVIEW",
+      phase: "PHASE_1A_BATCH",
+      phaseStatus: "STOP_FOR_REVIEW_WHEN_COMPLETE",
       learned: false,
-      itemsCreated: result.itemsCreated,
-      itemsUpdated: result.itemsUpdated,
-      mentionsCreated: result.mentionsCreated,
-      report: result.report,
-      messageKo:
-        "X API 최대 수집 시도 완료. DNA Learning은 실행하지 않았습니다. Coverage Report를 검토하세요.",
+      version: "5.5.8",
+      ...result,
     });
   } catch (e: any) {
-    console.error("phase1a collect", e);
+    console.error("phase1a batch", e);
     return NextResponse.json(
       {
+        success: false,
         error: String(e?.message || e),
-        phaseStatus: "STOP_FOR_REVIEW",
+        shouldContinue: true,
+        status: "FAILED_RETRYABLE",
         learned: false,
+        version: "5.5.8",
       },
       { status: 500 }
     );
+  }
+}
+
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { getPhase1ACollectStatus } = await import("@/lib/x/batch-collect");
+    const status = await getPhase1ACollectStatus();
+    return NextResponse.json({
+      phase: "PHASE_1A_BATCH",
+      version: "5.5.8",
+      ...status,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
   }
 }
