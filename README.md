@@ -6,20 +6,18 @@ Specialized content management PWA for **@Seung4680**.
 
 ## v5.4.1
 
-- Weekly Planner diversity guardrail: `enforcePortfolioDiversity` soft-replaces over-narrow core slots with authentic expansion candidates (LAFC, daily ownership, Grok/xAI work, vision…)
-- Creator DNA remains evidence lens, not topic fence
-- Creator Intent Signal + Editorial Portfolio evaluation
-- Per-slot Post Strategy hypothesis (not writing formula)
-- Strategy features + actionTypeWins in Performance DNA (validated published only)
-- Wild Card action selection policy (ORIGINAL | QUOTE | REPOST | SKIP)
-- X Account OAuth Daily Sync + Calendar (v5.1+)
+- Weekly Planner diversity guardrail (`enforcePortfolioDiversity`)
+- Soft-replace over-narrow FSD/Cybertruck monoculture with authentic expansion slots
+- Post Strategy hypothesis per slot + strategyWins / actionTypeWins learning
+- Creator DNA = evidence lens (not topic fence); Creator Intent Signal
 
 ## v5.4.0
 
-- Post Strategy hypothesis per slot
-- Portfolio evaluation + expansion value
-- strategyWins / actionTypeWins learning paths
+- Editorial portfolio evaluation + Post Strategy hypothesis
+- Performance DNA strategyWins from validated published only
+- Wild Card action selection policy (ORIGINAL|QUOTE|REPOST|SKIP)
 
 ## Earlier
 
-See git history for v5.0–v5.3 (Calendar Control Center, X sync, originality evaluator) and v4.x Growth Engine.
+- v5.x: X OAuth Daily Sync, Calendar Control Center, Creator originality
+- v4.x: Growth Engine, authenticity framework, weekly planning
