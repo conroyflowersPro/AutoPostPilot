@@ -1,6 +1,7 @@
 /**
  * Phase 1A — Maximum X API data collection (own account)
  * Collect only. Do NOT run Creator/Performance DNA learning here.
+ * Persists via lib/x/evidence (canonical posts + metric snapshots).
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +14,11 @@ import {
   type XMentionPost,
   type MetricBag,
 } from "@/lib/x/client";
+import {
+  persistXPostEvidence,
+  persistMentionEvidence,
+  coverageFromStoredEvidence,
+} from "@/lib/x/evidence";
 
 export type LimitationClass =
   | "AVAILABLE"
@@ -124,10 +130,6 @@ function classifyAction(
   if (types.includes("quoted")) return "QUOTE";
   if (types.includes("replied_to")) return "REPLY";
   return "UNKNOWN";
-}
-
-function activityDateFromIso(iso: string): string {
-  return (iso || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
 }
 
 function metricPresent(pm: MetricBag | null | undefined, key: string): boolean {
@@ -354,6 +356,7 @@ export async function runPhase1AMaxCollection(opts?: {
   const allPosts: XTimelinePost[] = [];
   let itemsCreated = 0;
   let itemsUpdated = 0;
+  let metricSnapshotsWritten = 0;
   let metricFieldEvidence: Record<string, unknown> | null = null;
   let fieldsMode: string | null = null;
   let nonPublicAccepted: boolean | null = null;
@@ -404,53 +407,28 @@ export async function runPhase1AMaxCollection(opts?: {
     for (const p of page.posts) {
       allPosts.push(p);
       const action = classifyAction(p.referencedTweets);
-      const row = {
-        account_id: accountId,
-        activity_date: activityDateFromIso(p.createdAt),
-        origin: "X_ACTUAL",
-        action_type: action,
-        status: "PUBLISHED",
-        x_post_id: p.id,
-        text_body: p.text,
-        source_post_url: `https://x.com/${me.username}/status/${p.id}`,
-        published_at: p.createdAt || null,
-        meta: {
-          public_metrics: p.publicMetrics ?? null,
-          non_public_metrics: p.nonPublicMetrics ?? null,
-          organic_metrics: p.organicMetrics ?? null,
-          referenced_tweets: p.referencedTweets || [],
-          conversation_id: p.conversationId || null,
-          in_reply_to_user_id: p.inReplyToUserId || null,
-          lang: p.lang || null,
-          attachments: p.attachments || null,
-          entities: p.entities || null,
-          context_annotations: p.contextAnnotations || null,
-          raw: p.raw || null,
-          collection: "phase1a",
-        },
-      };
-
-      const { data: existing } = await supabase
-        .from("account_activities")
-        .select("id")
-        .eq("account_id", accountId)
-        .eq("x_post_id", p.id)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("account_activities")
-          .update({
-            text_body: row.text_body,
-            meta: row.meta,
-            action_type: row.action_type,
-            published_at: row.published_at,
-          })
-          .eq("id", existing.id);
-        itemsUpdated += 1;
-      } else {
-        const { error } = await supabase.from("account_activities").insert(row);
-        if (!error) itemsCreated += 1;
+      try {
+        const result = await persistXPostEvidence(supabase, {
+          accountId,
+          xUserId: me.id,
+          handle: me.username,
+          post: p,
+          origin: "X_ACTUAL",
+          actionType: action,
+          status: "PUBLISHED",
+          collectionSource: "phase1a",
+          collectionRunId: runId || null,
+          systemOriginClass: "UNKNOWN",
+          requestMeta: {
+            fieldsMode,
+            metricFieldEvidence,
+          },
+        });
+        if (result.postStatus === "NEW") itemsCreated += 1;
+        else if (result.postStatus === "UPDATED") itemsUpdated += 1;
+        if (result.snapshotWritten) metricSnapshotsWritten += 1;
+      } catch (persistErr) {
+        console.error("persist post", p.id, persistErr);
       }
     }
 
@@ -627,43 +605,19 @@ export async function runPhase1AMaxCollection(opts?: {
       mPages += 1;
       for (const p of page.posts) {
         mentions.push(p);
-        const row = {
-          account_id: accountId,
-          activity_date: activityDateFromIso(p.createdAt),
-          origin: "X_MENTION",
-          action_type: "MENTION",
-          status: "RECEIVED",
-          x_post_id: p.id,
-          text_body: p.text,
-          published_at: p.createdAt || null,
-          meta: {
-            author_id: p.authorId,
-            conversation_id: p.conversationId || null,
-            in_reply_to_user_id: p.inReplyToUserId || null,
-            referenced_tweets: p.referencedTweets || [],
-            public_metrics: p.publicMetrics ?? null,
-            non_public_metrics: p.nonPublicMetrics ?? null,
-            organic_metrics: p.organicMetrics ?? null,
-            collection: "phase1a_mentions",
-            raw: p.raw || null,
-          },
-        };
-        const { data: existing } = await supabase
-          .from("account_activities")
-          .select("id")
-          .eq("account_id", accountId)
-          .eq("x_post_id", p.id)
-          .maybeSingle();
-        if (existing) {
-          await supabase
-            .from("account_activities")
-            .update({ text_body: row.text_body, meta: row.meta })
-            .eq("id", existing.id);
-        } else {
-          const { error } = await supabase
-            .from("account_activities")
-            .insert(row);
-          if (!error) mentionsCreated += 1;
+        try {
+          const result = await persistMentionEvidence(supabase, {
+            accountId,
+            creatorXUserId: me.id,
+            mention: p,
+            collectionSource: "phase1a_mentions",
+            collectionRunId: runId || null,
+            requestMeta: { fieldsMode: "public_only" },
+          });
+          if (result.postStatus === "NEW") mentionsCreated += 1;
+          if (result.snapshotWritten) metricSnapshotsWritten += 1;
+        } catch (e) {
+          console.error("persist mention", p.id, e);
         }
       }
       if (!page.nextToken) {
@@ -760,6 +714,17 @@ export async function runPhase1AMaxCollection(opts?: {
         items_fetched: allPosts.length + mentions.length,
         items_created: itemsCreated + mentionsCreated,
         items_updated: itemsUpdated,
+        pages_fetched: pages,
+        posts_discovered: allPosts.length,
+        posts_new: itemsCreated,
+        posts_updated: itemsUpdated,
+        mentions_discovered: mentions.length,
+        metric_snapshots_written: metricSnapshotsWritten,
+        earliest_post_at: earliest,
+        latest_post_at: latest,
+        end_reason: endReason,
+        rate_limited: endReason === "RATE_LIMIT",
+        metric_field_evidence: metricFieldEvidence,
       })
       .eq("id", runId);
   }
@@ -819,6 +784,19 @@ export async function runPhase1AMaxCollection(opts?: {
       class: "RATE_COST_LIMITATION",
       detail: `Stopped at safety max_pages=${maxPages}.`,
     });
+  }
+
+  if (runId) {
+    await supabase
+      .from("x_sync_runs")
+      .update({ limitation_notes: collectionLimits })
+      .eq("id", runId);
+  }
+
+  try {
+    await coverageFromStoredEvidence(supabase, accountId);
+  } catch {
+    /* store may lack migration yet */
   }
 
   const report: Phase1ACoverageReport = {
