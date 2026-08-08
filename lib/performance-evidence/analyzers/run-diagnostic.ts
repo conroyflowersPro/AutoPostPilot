@@ -1,5 +1,6 @@
 /**
  * Source-agnostic diagnostic runner.
+ * v5.6.2: D_DEEP_METRICS_LIMITED also when organic/non_public PARTIAL (<50%).
  */
 import type {
   EvidenceSourceAdapter,
@@ -87,6 +88,22 @@ export async function runPerformanceDiagnostic(
       code: "NO_MISSING_OBSERVED",
       severity: "info",
       message: "No MISSING public keys in sample",
+    });
+  }
+
+  const snapTotal = all.reduce((a, r) => a + (r.snapshotCount || 0), 0);
+  if (snapTotal > 0) {
+    issues.push({
+      code: "SNAPSHOT_LAYER_ATTACHED",
+      severity: "info",
+      message: `Temporal snapshots attached via adapter: sum(snapshotCount)=${snapTotal}`,
+      count: snapTotal,
+    });
+  } else if (all.length > 0) {
+    issues.push({
+      code: "SNAPSHOT_LAYER_EMPTY",
+      severity: "warn",
+      message: "No x_metric_snapshots linked to activities for this account",
     });
   }
 
@@ -242,11 +259,12 @@ export async function runPerformanceDiagnostic(
     });
   }
 
-  const counts = all.map((r) => r.snapshotCount);
+  const counts = all.map((r) => r.snapshotCount || 0);
   const sortedCounts = counts.slice().sort((a, b) => a - b);
   const byPostType: Record<string, number> = {};
   for (const r of all) {
-    byPostType[r.postType] = (byPostType[r.postType] || 0) + r.snapshotCount;
+    byPostType[r.postType] =
+      (byPostType[r.postType] || 0) + (r.snapshotCount || 0);
   }
   const snapshotStats: SnapshotStats = {
     totalSnapshots: counts.reduce((a, b) => a + b, 0),
@@ -333,10 +351,21 @@ export async function runPerformanceDiagnostic(
       `Insufficient creator public metrics (n=${creatorN}, usable=${pubCreator?.usable ?? 0})`
     );
   }
-  if ((orgCreator?.usable ?? 0) + (nonCreator?.usable ?? 0) < 30) {
+
+  // D is not exclusive of A: deep layer may be limited while public is sufficient
+  const deepUsable =
+    (orgCreator?.usable ?? 0) + (nonCreator?.usable ?? 0);
+  const deepPartial =
+    orgCreator?.status === "PARTIAL" ||
+    orgCreator?.status === "NOT_COLLECTED" ||
+    nonCreator?.status === "PARTIAL" ||
+    nonCreator?.status === "NOT_COLLECTED" ||
+    (orgCreator?.coveragePct != null && orgCreator.coveragePct < 70) ||
+    deepUsable < 30;
+  if (deepPartial) {
     verdicts.push("D_DEEP_METRICS_LIMITED");
     rationale.push(
-      `Deep limited: organic=${orgCreator?.usable ?? 0}, non_public=${nonCreator?.usable ?? 0}`
+      `Deep limited: organic=${orgCreator?.usable ?? 0}/${orgCreator?.eligible ?? 0} (${orgCreator?.status}), non_public=${nonCreator?.usable ?? 0}/${nonCreator?.eligible ?? 0} (${nonCreator?.status})`
     );
   }
 
@@ -368,11 +397,11 @@ export async function runPerformanceDiagnostic(
     verdicts,
     verdictRationale: rationale,
     recommendedNextSteps: [
-      "Review Creator Publishing coverage before Performance DNA expansion",
-      "Keep ORIGINAL+QUOTE separate from REPLY",
-      "Do not validate Candidate Patterns until coverage supports it",
+      "Public historical evidence is usable for Performance DNA baseline (A)",
+      "Keep ORIGINAL+QUOTE separate from REPLY; treat deep metrics as partial layer",
+      "Do not validate Candidate Patterns until explicit human approval",
     ],
     architectureNote:
-      "Analyzers use NormalizedEvidence only. XArchiveAdapter can plug in without changing analyzers.",
+      "Analyzers use NormalizedEvidence only. Snapshot counts come from x_metric_snapshots via adapter. XArchiveAdapter can plug in without changing analyzers.",
   };
 }
