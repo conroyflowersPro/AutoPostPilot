@@ -43,7 +43,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v5.5.8
+              v5.5.9
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -79,7 +79,7 @@ export default async function HomePage() {
                 <div className="mt-0.5 text-xs text-zinc-500">
                   {account.status === "not_connected"
                     ? "Connect X to enable profile + Daily Sync."
-                    : "Connected — Phase1A 최대 수집 (배치) or Sync Now."}
+                    : "Connected — 오른쪽 Phase1A 상태 박스 확인"}
                 </div>
               )}
             </div>
