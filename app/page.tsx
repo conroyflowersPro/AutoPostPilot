@@ -4,6 +4,7 @@ import Link from "next/link";
 import PostList from "./components/PostList";
 import CollectMaxButton from "./components/CollectMaxButton";
 import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
+import EvidenceExportButton from "./components/EvidenceExportButton";
 import { getHomeDashboardData } from "@/lib/calendar/activity-provider";
 
 function syncLabel(status: string) {
@@ -44,7 +45,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v5.6.0
+              v5.6.3
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -105,6 +106,7 @@ export default async function HomePage() {
                   <>
                     <CollectMaxButton />
                     <PerformanceCoverageButton />
+                    <EvidenceExportButton />
                     <a
                       href="/api/x/sync"
                       className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500"
