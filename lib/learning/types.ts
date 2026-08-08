@@ -1,4 +1,4 @@
-/** Growth Intelligence Engine v4 — normalized models */
+/** Growth Intelligence Engine v4 + strategy features v5.4 */
 
 export type MetricOrigin = "ai" | "manual" | "unknown";
 
@@ -14,6 +14,23 @@ export type ContentFeatures = {
   hasEmoji: boolean;
   hasCta: boolean;
   topicGuess: string;
+  actionType?: "ORIGINAL" | "QUOTE" | "REPOST" | "REPLY" | "UNKNOWN";
+  subtopic?: string;
+  strategicAngle?: string;
+  hookStyle?: string;
+  writingApproach?: string;
+  experienceUsage?: string;
+  opinionStrength?: string;
+  observationLevel?: string;
+  technicalDepth?: string;
+  emotionalLevel?: string;
+  predictionLevel?: string;
+  questionUsage?: boolean;
+  ctaUsage?: boolean;
+  mediaType?: string;
+  mediaPresence?: boolean;
+  targetGrowthObjective?: string;
+  strategySource?: "hypothesis" | "observed" | "unknown";
 };
 
 export type NormalizedPostMetrics = {
@@ -78,6 +95,8 @@ export type PerformanceDnaPayload = {
   topStructures: string[];
   lengthWins: string[];
   topicWins: string[];
+  strategyWins: string[];
+  actionTypeWins: string[];
   summaryKo: string;
 };
 
@@ -87,10 +106,6 @@ export type RevenueDnaPayload = {
   summaryKo: string;
 };
 
-/**
- * Success signal priority (v4):
- * Followers > Profile > Revenue > Bookmarks > Replies > Reposts > Quotes > Likes > Impressions
- */
 export const METRIC_WEIGHTS = {
   followersGained: 40,
   profileVisits: 18,
