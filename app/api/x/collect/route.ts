@@ -26,9 +26,11 @@ export async function POST(req: NextRequest) {
       includeMentions: body.includeMentions !== false,
     });
 
+    // result.phase = POSTS | MENTIONS | COMPLETE (collection sub-phase)
+    // operation = API-level label (no key clash with result.phase)
     return NextResponse.json({
       success: result.ok,
-      phase: "PHASE_1A_BATCH",
+      operation: "PHASE_1A_BATCH",
       phaseStatus: "STOP_FOR_REVIEW_WHEN_COMPLETE",
       learned: false,
       version: "5.5.8",
@@ -62,7 +64,7 @@ export async function GET() {
     const { getPhase1ACollectStatus } = await import("@/lib/x/batch-collect");
     const status = await getPhase1ACollectStatus();
     return NextResponse.json({
-      phase: "PHASE_1A_BATCH",
+      operation: "PHASE_1A_BATCH",
       version: "5.5.8",
       ...status,
     });
