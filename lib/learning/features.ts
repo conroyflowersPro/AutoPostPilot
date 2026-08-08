@@ -1,7 +1,30 @@
 import type { ContentFeatures } from "./types";
 
+export type StrategyFeatureInput = {
+  actionType?: ContentFeatures["actionType"];
+  subtopic?: string;
+  strategicAngle?: string;
+  hookStyle?: string;
+  writingApproach?: string;
+  experienceUsage?: string;
+  opinionStrength?: string;
+  observationLevel?: string;
+  technicalDepth?: string;
+  emotionalLevel?: string;
+  predictionLevel?: string;
+  questionUsage?: boolean;
+  ctaUsage?: boolean;
+  mediaType?: string;
+  mediaPresence?: boolean;
+  targetGrowthObjective?: string;
+  strategySource?: ContentFeatures["strategySource"];
+};
+
 /** Rule-based feature extraction — no Grok calls */
-export function extractFeatures(text: string): ContentFeatures {
+export function extractFeatures(
+  text: string,
+  strategy?: StrategyFeatureInput
+): ContentFeatures {
   const t = String(text || "").trim();
   const charCount = t.length;
   let lengthBucket: ContentFeatures["lengthBucket"] = "medium";
@@ -34,6 +57,13 @@ export function extractFeatures(text: string): ContentFeatures {
   else if (isReply) topicGuess = "reply";
   else if (/솔직|실패|수리|비용|고백/.test(t)) topicGuess = "honest_fail";
 
+  let actionType: ContentFeatures["actionType"] = strategy?.actionType || "UNKNOWN";
+  if (!strategy?.actionType) {
+    if (isReply) actionType = "REPLY";
+    else if (/^rt\s|rt @|리트윗/i.test(t)) actionType = "REPOST";
+    else actionType = "ORIGINAL";
+  }
+
   return {
     lengthBucket,
     charCount,
@@ -46,5 +76,22 @@ export function extractFeatures(text: string): ContentFeatures {
     hasEmoji,
     hasCta,
     topicGuess,
+    actionType,
+    subtopic: strategy?.subtopic,
+    strategicAngle: strategy?.strategicAngle,
+    hookStyle: strategy?.hookStyle,
+    writingApproach: strategy?.writingApproach,
+    experienceUsage: strategy?.experienceUsage,
+    opinionStrength: strategy?.opinionStrength,
+    observationLevel: strategy?.observationLevel,
+    technicalDepth: strategy?.technicalDepth,
+    emotionalLevel: strategy?.emotionalLevel,
+    predictionLevel: strategy?.predictionLevel,
+    questionUsage: strategy?.questionUsage ?? hasQuestion,
+    ctaUsage: strategy?.ctaUsage ?? hasCta,
+    mediaType: strategy?.mediaType,
+    mediaPresence: strategy?.mediaPresence ?? hasMediaLink,
+    targetGrowthObjective: strategy?.targetGrowthObjective,
+    strategySource: strategy?.strategySource || "unknown",
   };
 }
