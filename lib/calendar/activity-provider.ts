@@ -24,6 +24,11 @@ function demoEnabled(): boolean {
   );
 }
 
+/** DB null → undefined for CalendarActivity optional strings */
+function optStr(v: string | null | undefined): string | undefined {
+  return v ?? undefined;
+}
+
 function mapXActivity(row: {
   id: string;
   activity_date: string;
@@ -41,16 +46,16 @@ function mapXActivity(row: {
   return {
     activity_id: row.id,
     date: row.activity_date,
-    scheduled_at: row.scheduled_at,
-    published_at: row.published_at,
+    scheduled_at: row.scheduled_at ?? null,
+    published_at: row.published_at ?? null,
     origin: (row.origin as ActivityOrigin) || "X_ACTUAL",
     action_type: (row.action_type as ActivityAction) || "ORIGINAL",
     status: (row.status as ActivityStatus) || "PUBLISHED",
-    x_post_id: row.x_post_id,
-    final_text: row.text_body,
-    source_post_url: row.source_post_url,
-    topic: row.topic,
-    duplicate_warning: row.duplicate_warning,
+    x_post_id: optStr(row.x_post_id),
+    final_text: optStr(row.text_body),
+    source_post_url: optStr(row.source_post_url),
+    topic: optStr(row.topic),
+    duplicate_warning: optStr(row.duplicate_warning),
   };
 }
 
@@ -83,9 +88,9 @@ function mapPlanned(row: {
     origin,
     action_type: "ORIGINAL",
     status,
-    final_text: row.content,
-    generated_text: row.content,
-    fedica_pipeline_id: row.pipeline_id,
+    final_text: optStr(row.content),
+    generated_text: optStr(row.content),
+    fedica_pipeline_id: optStr(row.pipeline_id),
   };
 }
 
