@@ -194,7 +194,10 @@ function buildZip(files: { name: string; content: string }[]): Blob {
   ]);
 
   const zipBytes = concat([...localParts, centralDir, end]);
-  return new Blob([zipBytes], { type: "application/zip" });
+  // Plain ArrayBuffer-backed view for BlobPart (TS strict / lib.dom)
+  const ab = new ArrayBuffer(zipBytes.byteLength);
+  new Uint8Array(ab).set(zipBytes);
+  return new Blob([ab], { type: "application/zip" });
 }
 
 function downloadBlob(filename: string, blob: Blob) {
