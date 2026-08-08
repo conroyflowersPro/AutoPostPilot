@@ -1,18 +1,22 @@
-# AutoPostPilot v5.4.2
+# AutoPostPilot v5.5.3
 
 Specialized content management PWA for **@Seung4680**.
 
-## v5.4.2
-- Multi-signal soft diversity (topic + angle + approach + sequence)
-- Creator Intent strength (explicit_focus → relax guardrail)
-- Dynamic expansion seeds (not closed whitelist)
-- Progressive strategy confidence: observed → emerging → validated
-- Portfolio product language: weeklyStrategy (not Creator identity)
-- Wild Card: Claim Gate + Creator Voice Pass required on path
-- 7-day default preserved; no autonomous short week
+## v5.5.3 — Auth password-reset callback
 
-## v5.4.1
-- enforcePortfolioDiversity soft-replace over-narrow core slots
+- `GET /auth/callback` — exchanges Supabase PKCE `code` for session (reset / confirm)
+- `/auth/update-password` — set new password after recovery link
+- Login: **비밀번호를 잊으셨나요?** → `resetPasswordForEmail` with redirect to callback
 
-## v5.4.0
-- Editorial portfolio + Post Strategy hypothesis + strategyWins learning
+### Supabase Dashboard 설정 (필수)
+Authentication → URL Configuration
+- **Site URL**: `https://YOUR_DEPLOYED_DOMAIN`
+- **Redirect URLs**에 추가:
+  - `https://YOUR_DEPLOYED_DOMAIN/auth/callback`
+  - `https://YOUR_DEPLOYED_DOMAIN/auth/update-password`
+
+## v5.5.2
+- Priority 1: Analytics Coverage / Deduplication API + import dedup
+
+## v5.5.1 / v5.5.0
+- Quality Engagement Evaluation Layer, X Algorithm Intelligence, Reply Strategy
