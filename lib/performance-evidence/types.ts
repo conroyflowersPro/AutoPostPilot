@@ -9,6 +9,7 @@ export type EvidenceSource =
   | "X_ARCHIVE"
   | "X_ANALYTICS"
   | "FEDICA"
+  | "X_MONETIZATION"
   | "UNKNOWN";
 
 export type MetricPresence = "PRESENT_NON_ZERO" | "PRESENT_ZERO" | "MISSING";
@@ -50,6 +51,10 @@ export type NormalizedEvidence = {
     organic: boolean;
     nonPublic: boolean;
   };
+  /** Optional contract-v1 extensions — backward compatible */
+  evidenceTier?: "HISTORICAL_CUMULATIVE" | "LONGITUDINAL_AGE_BUCKET" | "UNKNOWN";
+  ageBucket?: "EARLY" | "DAY" | "MULTI_DAY" | "MATURE" | "UNKNOWN";
+  generationSource?: "MANUAL" | "SYSTEM_ASSISTED" | "UNKNOWN";
 };
 
 export type Population =
@@ -59,6 +64,7 @@ export type Population =
   | "QUOTE"
   | "REPLY"
   | "REPOST"
+  | "MENTION"
   | "SOCIAL_INTERACTION"; // REPLY (alias)
 
 export type MetricCoverage = {
@@ -191,4 +197,4 @@ export interface EvidenceSourceAdapter {
   ): AsyncGenerator<NormalizedEvidence[], void, unknown>;
   /** Optional: total estimate without full scan */
   estimateCount?(options?: { accountId?: string }): Promise<number | null>;
-};
+}
