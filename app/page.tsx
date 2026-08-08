@@ -42,7 +42,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v5.2.0
+              v5.3.0
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -72,7 +72,9 @@ export default async function HomePage() {
               </div>
               {!account.lastSuccessfulSyncAt && (
                 <div className="mt-0.5 text-xs text-zinc-500">
-                  Daily Sync (00:10 local) requires X OAuth — not configured yet.
+                  {account.status === "not_connected"
+                    ? "Connect X to enable profile + Daily Sync."
+                    : "Connected — run Daily Sync to load timeline."}
                 </div>
               )}
             </div>
@@ -84,6 +86,25 @@ export default async function HomePage() {
               <div className="mt-1 text-zinc-500 text-xs">Following</div>
               <div className="font-semibold">
                 {account.followingCount != null ? account.followingCount : "—"}
+              </div>
+              <div className="mt-3 flex flex-col items-end gap-2">
+                {account.status === "not_connected" ? (
+                  <a
+                    href="/api/x/oauth/start"
+                    className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium hover:bg-sky-500"
+                  >
+                    Connect X
+                  </a>
+                ) : (
+                  <form action="/api/x/oauth/disconnect" method="post">
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
+                    >
+                      Disconnect X
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>
