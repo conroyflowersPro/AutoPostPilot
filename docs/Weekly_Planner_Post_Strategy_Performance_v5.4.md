@@ -1,63 +1,64 @@
-# Weekly Planner Diversity + Post Strategy + Performance Learning v5.4.1
+# Weekly Planner / Post Strategy Refinement v5.4.2
 
 **Project:** AutoPostPilot / @Seung4680  
 **Date:** 2026-08-08  
-**Status:** Implemented + server-side diversity guardrail
+**Status:** Implemented per Creator-approved ORDER
 
-## Core loop
+## Core loop (unchanged)
 
-1. **WHAT** should this Creator talk about? → Weekly Planner topic selection  
-2. **HOW** should this Creator post it strategically on X? → Post Strategy (hypothesis)  
-3. **DID** it work? → Real X / Fedica published metrics → Performance DNA  
+1. **WHAT** → Weekly Planner topic selection  
+2. **HOW** → Post Strategy (hypothesis)  
+3. **DID** → Real X / Fedica published metrics → Performance DNA  
 
-Wild Card adds: Opportunity → **ACTION** (ORIGINAL|QUOTE|REPOST|SKIP) → strategy → draft.
+Wild Card: Opportunity → **ACTION** → Claim Gate → Creator Voice Pass → suggestion
 
-## What changed (v5.4 → v5.4.1)
+## v5.4.2 product changes
 
-### Weekly Planner (`app/api/grok/plan/route.ts`)
-- Creator DNA reframed: evidence lens, not topic fence  
-- Creator input keywords = **Creator Intent Signal** (must shape week)  
-- Editorial **portfolio** evaluation (`audienceRead.portfolio` + server-side `analyzePortfolio`)  
-- **Expansion value** on slots  
-- Per-slot **postStrategy** hypothesis object  
-- `actionType: ORIGINAL` fixed for weekly slots  
-- **NEW: `enforcePortfolioDiversity`** — when coreShare high, soft-replace 1–2 core slots with authentic expansion candidates (LAFC, daily ownership, Grok/xAI work, vision, etc.). DNA remains the writing lens. No mechanical quotas.
-- Fallback plan itself is now balanced (core + expansion) and runs the same guard.
+### 1. Diversity guardrail (soft, multi-signal)
+- Still soft replace (~1 at coreShare≥55%, ~2 at ≥75%) — **not** hard quotas
+- Narrowing also considers: angle similarity, writingApproach repetition, sequential same-cluster runs
+- Prefer replacing the most similar core slots
 
-### Post Strategy
-Stored per slot; passed through generate page → Edge `generate-post`.  
-Not a writing formula: no forced hook/question/CTA/story.
+### 2. Dynamic expansion (not fixed whitelist)
+- EXPANSION_SEED_CANDIDATES are seeds for server soft-replace only
+- Model may propose broader legitimate topics; CI answers "what can this Creator say", not "topic forbidden"
 
-### Learning (`lib/learning/*`)
-- `ContentFeatures` extended with strategy fields  
-- `extractFeatures(text, strategy?)`  
-- `PerformanceDnaPayload.strategyWins` + `actionTypeWins` from **validated successes only**  
+### 3. Authenticity + expansion
+- Expansion does not require prior personal episode
+- Observation / limited analysis / genuine question / attribution allowed
+- Never invent experience
 
-### Wild Card (`lib/wild/action-select.ts`)
-Deterministic action selection policy before drafting.
+### 4. Creator Intent strength
+- explicit_focus | preferred | open | absent
+- Explicit core focus → soft guardrail relaxed
+- Weak/absent Intent → protect breadth more actively
 
-### DB
-- `20260808_strategy_features_v54.sql` — optional `action_type`, `strategy_json` on `post_metrics`
+### 5. Performance learning confidence
+- Progressive: observed → emerging → validated
+- Single success is evidence, not a strong Planner weight
+- strategyWinEntries with observation counts
 
-## Hard constraints preserved
-- Authenticity > engagement  
-- No learning from drafts  
-- Creator Intelligence ≠ Performance DNA  
-- Impressions never sole success metric  
-- Fedica keywords not primaryTopic  
-- No AI self-reinforcement of strategy hypotheses
+### 6–7. Wild Card real loop
+- FREE + GROWTH preserved
+- Action selection returns requiresClaimGate / requiresCreatorVoicePass
+- runClaimGate() blocks unsupported first-person experience claims
+- Claim Gate + Creator Voice Pass are required on the generation path
 
-## Not in this release
-- Full Wild Card generator UI/runtime (policy module only)  
-- Automatic nightly strategy retrain job  
-- Changing Creator Intelligence v0.9/v1.0 candidate content  
+### 8. Portfolio UI product language
+- Prefer weeklyStrategy / "This Week's Strategy"
+- Avoid framing as Creator identity (identityStatement kept only as legacy alias)
+- Surface: weekly direction, Intent reflection, narrowing risk, portfolioAdjustment
+
+### 9. Intentional whitespace
+- Default remains 7-day planning
+- Short observation Originals are legitimate
+- No autonomous drop to 5-post weeks
+
+### 10–17. Strategy lifetime (recency decay), evidence classification, CI independence preserved
 
 ## Files
-- `lib/planning/types.ts`  
-- `lib/planning/portfolio.ts` (enforcePortfolioDiversity + EXPANSION_CANDIDATES)  
-- `lib/wild/action-select.ts`  
-- `app/api/grok/plan/route.ts`  
-- `app/generate/page.tsx`  
-- `supabase/functions/generate-post/index.ts`  
-- `lib/learning/types.ts`, `features.ts`, `score.ts`  
-- `supabase/migrations/20260808_strategy_features_v54.sql`  
+- lib/planning/portfolio.ts
+- lib/planning/types.ts
+- lib/learning/types.ts, score.ts
+- lib/wild/action-select.ts
+- app/api/grok/plan/route.ts
