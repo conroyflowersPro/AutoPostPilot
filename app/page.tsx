@@ -45,7 +45,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
             <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              v5.6.3
+              v5.6.5
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -129,7 +129,12 @@ export default async function HomePage() {
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-          <div className="mb-3 text-xs font-medium uppercase tracking-wide text-zinc-500">Today</div>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">Today</div>
+            <Link href="/today" className="text-xs text-emerald-400 hover:underline">
+              Open Today Plan
+            </Link>
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 text-sm">
             <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
               <div className="text-[10px] text-zinc-500">Actual published</div>
@@ -182,9 +187,10 @@ export default async function HomePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Content queue</h2>
           <div className="flex flex-wrap gap-2">
+            <Link href="/today" className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium hover:bg-emerald-600">Today</Link>
+            <Link href="/today/write" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500">직접 쓰기</Link>
             <Link href="/calendar" className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600">Calendar</Link>
             <Link href="/generate" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500">Grok 자동 생성</Link>
-            <Link href="/posts/new" className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600">+ 직접 작성</Link>
             <Link href="/learning" className="rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-600">주간 학습</Link>
           </div>
         </div>
