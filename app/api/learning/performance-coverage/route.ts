@@ -21,7 +21,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // platform is stored as "x" everywhere else (oauth, sync, collect, calendar)
     const { data: conn, error: connErr } = await supabase
       .from("account_connections")
       .select("id, handle, platform")
@@ -42,15 +41,99 @@ export async function GET() {
       );
     }
 
-    const adapter = new SupabaseEvidenceAdapter(supabase, conn.id);
+    const accountId = conn.id;
+
+    // --- DB inventory (no date filter; maximum available period) ---
+    const { count: activitiesCount, error: cntErr } = await supabase
+      .from("account_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId);
+
+    const { data: earliestRow } = await supabase
+      .from("account_activities")
+      .select("published_at")
+      .eq("account_id", accountId)
+      .not("published_at", "is", null)
+      .order("published_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: latestRow } = await supabase
+      .from("account_activities")
+      .select("published_at")
+      .eq("account_id", accountId)
+      .not("published_at", "is", null)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { count: xActualCount } = await supabase
+      .from("account_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId)
+      .eq("origin", "X_ACTUAL");
+
+    const { count: xMentionCount } = await supabase
+      .from("account_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId)
+      .eq("origin", "X_MENTION");
+
+    const { count: snapshotCount } = await supabase
+      .from("x_metric_snapshots")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId);
+
+    const { data: snapEarliest } = await supabase
+      .from("x_metric_snapshots")
+      .select("snapshot_at")
+      .eq("account_id", accountId)
+      .order("snapshot_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: snapLatest } = await supabase
+      .from("x_metric_snapshots")
+      .select("snapshot_at")
+      .eq("account_id", accountId)
+      .order("snapshot_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: syncRuns } = await supabase
+      .from("x_sync_runs")
+      .select(
+        "id, source, run_status, phase, pages_fetched, posts_discovered, posts_new, posts_updated, mentions_discovered, earliest_post_at, latest_post_at, end_reason, started_at, finished_at"
+      )
+      .eq("account_id", accountId)
+      .order("started_at", { ascending: false })
+      .limit(5);
+
+    const dbInventory = {
+      accountId,
+      activitiesExactCount: activitiesCount ?? null,
+      activitiesCountError: cntErr?.message ?? null,
+      publishedAtMin: earliestRow?.published_at ?? null,
+      publishedAtMax: latestRow?.published_at ?? null,
+      originXActual: xActualCount ?? null,
+      originXMention: xMentionCount ?? null,
+      snapshotsExactCount: snapshotCount ?? null,
+      snapshotAtMin: snapEarliest?.snapshot_at ?? null,
+      snapshotAtMax: snapLatest?.snapshot_at ?? null,
+      recentSyncRuns: syncRuns ?? [],
+      note: "No date filter applied. Counts are maximum rows present for this account_id.",
+    };
+
+    const adapter = new SupabaseEvidenceAdapter(supabase, accountId);
     const report = await runPerformanceDiagnostic(adapter, {
-      accountId: conn.id,
-      pageSize: 200,
+      accountId,
+      pageSize: 500,
     });
 
     return NextResponse.json({
-      version: "performance-evidence-v1",
+      version: "performance-evidence-v1.1",
       handle: conn.handle,
+      dbInventory,
       report,
     });
   } catch (e: unknown) {
