@@ -170,6 +170,8 @@ export function buildPerformanceDna(
   const topStructures: string[] = [];
   const lengthWins: string[] = [];
   const topicWins: string[] = [];
+  const strategyWins: string[] = [];
+  const actionTypeWins: string[] = [];
 
   for (const s of successes) {
     const reasons: string[] = [];
@@ -193,12 +195,29 @@ export function buildPerformanceDna(
       topStructures.push("숫자+저장");
     if (!s.features?.isReply && s.profileVisits > 0)
       topStructures.push("원글+프로필");
+
+    if (s.features?.actionType && s.features.actionType !== "UNKNOWN") {
+      actionTypeWins.push(s.features.actionType);
+    } else if (s.features?.isReply) {
+      actionTypeWins.push("REPLY");
+    } else {
+      actionTypeWins.push("ORIGINAL");
+    }
+    if (s.features?.writingApproach || s.features?.strategicAngle) {
+      strategyWins.push(
+        `${s.features.actionType || "ORIGINAL"} / ${s.features.topicGuess || "?"} / ${s.features.writingApproach || "?"}`
+      );
+    }
   }
 
   const lengthCount: Record<string, number> = {};
   for (const l of lengthWins) lengthCount[l] = (lengthCount[l] || 0) + 1;
   const topicCount: Record<string, number> = {};
   for (const t of topicWins) topicCount[t] = (topicCount[t] || 0) + 1;
+  const actionCount: Record<string, number> = {};
+  for (const a of actionTypeWins) actionCount[a] = (actionCount[a] || 0) + 1;
+  const stratCount: Record<string, number> = {};
+  for (const s of strategyWins) stratCount[s] = (stratCount[s] || 0) + 1;
 
   return {
     whyPatterns: whyPatterns.slice(0, 12),
@@ -207,6 +226,13 @@ export function buildPerformanceDna(
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k}×${v}`),
     topicWins: Object.entries(topicCount)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}×${v}`),
+    strategyWins: Object.entries(stratCount)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}×${v}`)
+      .slice(0, 12),
+    actionTypeWins: Object.entries(actionCount)
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k}×${v}`),
     summaryKo:
