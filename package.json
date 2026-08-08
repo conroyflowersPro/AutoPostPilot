@@ -1,12 +1,13 @@
 {
   "name": "autopostpilot",
-  "version": "5.0.0",
+  "version": "5.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:originality": "node scripts/run-originality-tests.mjs"
   },
   "dependencies": {
     "@netlify/plugin-nextjs": "^5.9.2",
