@@ -63,8 +63,9 @@ export default function TodayEngagementClient({
   function replyHref(o: EngagementOpportunity): string {
     if (o.reply_href) return o.reply_href;
     const params = new URLSearchParams();
-    if (o.x_url) params.set("url", o.x_url);
-    params.set("topic", o.topic);
+    if (o.x_url || o.tweet_url) params.set("url", o.x_url || o.tweet_url || "");
+    const topic = o.topic || o.title || "";
+    if (topic) params.set("topic", topic);
     if (o.suggested_intent) params.set("intent", o.suggested_intent);
     return `/today/reply?${params.toString()}`;
   }
@@ -112,19 +113,23 @@ export default function TodayEngagementClient({
               className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-3"
             >
               <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase text-zinc-500">
-                <span className="text-sky-400">{o.opportunity_type}</span>
-                <span>{o.suggested_intent}</span>
+                <span className="text-sky-400">{o.opportunity_type || o.source}</span>
+                {o.suggested_intent && <span>{o.suggested_intent}</span>}
                 {o.api_required ? (
                   <span className="text-amber-400">API 필요</span>
                 ) : (
                   <span className="text-emerald-500">저장 정보</span>
                 )}
               </div>
-              <div className="mt-1 text-sm font-medium text-zinc-200">{o.topic}</div>
-              <p className="mt-1 text-xs text-zinc-400">{o.why_relevant}</p>
+              <div className="mt-1 text-sm font-medium text-zinc-200">
+                {o.topic || o.title}
+              </div>
+              {(o.why_relevant || o.reason) && (
+                <p className="mt-1 text-xs text-zinc-400">{o.why_relevant || o.reason}</p>
+              )}
               {o.event_context?.phase && (
                 <p className="mt-1 text-[10px] text-zinc-500">
-                  이벤트 단계: {o.event_context.phase}
+                  이벤트 단계: {String(o.event_context.phase)}
                 </p>
               )}
               <div className="mt-2 flex flex-wrap gap-2">
