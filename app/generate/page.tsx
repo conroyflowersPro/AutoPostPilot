@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
@@ -51,6 +51,31 @@ function emptyUsedRecord(): UsedRecord {
   };
 }
 
+async function compressImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 800;
+  let { width, height } = bitmap;
+  if (width > maxSide || height > maxSide) {
+    const scale = maxSide / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas failed");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("compress failed"))),
+      "image/jpeg",
+      0.7
+    );
+  });
+}
+
 async function readJson(res: Response) {
   const rawText = await res.text();
   let data: any;
@@ -86,12 +111,64 @@ function GeneratePageInner() {
     if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) setStartDate(s);
   }, [searchParams]);
   const [keywords, setKeywords] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const max = 1;
+    const room = max - files.length;
+    if (room <= 0) return;
+    const nextFiles: File[] = [];
+    Array.from(list)
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, room)
+      .forEach((file) => {
+        nextFiles.push(file);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setPreviews((prev) => [...prev, reader.result as string].slice(0, max));
+        };
+        reader.readAsDataURL(file);
+      });
+    setFiles((prev) => [...prev, ...nextFiles].slice(0, max));
+  }
+
+  function removePreview(index: number) {
+    setPreviews((prev) => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadKeywordImages(): Promise<string[]> {
+    const urls: string[] = [];
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("로그인이 필요합니다");
+    for (let i = 0; i < files.length; i++) {
+      const blob = await compressImage(files[i]);
+      const path = `keywords/${user.id}/${Date.now()}-${i}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from("media")
+        .upload(path, blob, { contentType: "image/jpeg", upsert: true });
+      if (upErr) throw new Error(`스샷 업로드 실패: ${upErr.message}`);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("media").getPublicUrl(path);
+      if (!publicUrl || !publicUrl.startsWith("http")) {
+        throw new Error("공개 URL 생성 실패");
+      }
+      urls.push(publicUrl);
+    }
+    return urls;
+  }
 
   async function callGenerateDay(
     jobId: string,
@@ -129,13 +206,21 @@ function GeneratePageInner() {
       let audienceTopicCategories: string[] = [];
       let audienceSentiment: string | null = null;
 
-      if (keywords.trim()) {
-        setPhase("Audience Intelligence 변환 중...");
+      if (files.length > 0 || keywords.trim()) {
         try {
+          let imageUrls: string[] = [];
+          if (files.length > 0) {
+            setPhase("스샷 업로드 중...");
+            imageUrls = await uploadKeywordImages();
+          }
+          setPhase("Audience Intelligence 변환 중...");
           const extractRes = await fetch("/api/grok/extract-keywords", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keywords: keywords.trim() }),
+            body: JSON.stringify({
+              images: imageUrls.length ? imageUrls : undefined,
+              keywords: keywords.trim() || undefined,
+            }),
           });
           const extractData = await readJson(extractRes);
           mergedKeywords =
@@ -172,7 +257,7 @@ function GeneratePageInner() {
           .select("content, status")
           .in("status", ["published", "scheduled"])
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(40);
         for (const r of topicRows || []) {
           const snippet = String((r as any).content || "")
             .replace(/\s+/g, " ")
@@ -182,8 +267,8 @@ function GeneratePageInner() {
           if ((r as any).status === "published") publishedTopics.push(snippet);
           else if ((r as any).status === "scheduled") scheduledTopics.push(snippet);
         }
-        publishedTopics = publishedTopics.slice(0, 20);
-        scheduledTopics = scheduledTopics.slice(0, 20);
+        publishedTopics = publishedTopics.slice(0, 12);
+        scheduledTopics = scheduledTopics.slice(0, 12);
       } catch {
         /* non-fatal */
       }
@@ -317,8 +402,8 @@ function GeneratePageInner() {
           </span>
         </div>
         <p className="mt-1 text-sm text-zinc-400">
-          관심사 키워드는 글에 넣지 않고 신호로만 씁니다. Planner 실패 시 자동 대체 초안을 만들지
-          않습니다.
+          키워드·스샷은 글에 넣지 않고 관심사 신호로만 씁니다. Planner 실패 시 자동 대체 초안을
+          만들지 않습니다.
         </p>
         <p className="mt-0.5 text-[10px] text-zinc-600">{BUILD_STAMP}</p>
       </div>
@@ -351,6 +436,46 @@ function GeneratePageInner() {
             placeholder="예: Terafab, Optimus, Grimes County"
             className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500"
           />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs text-zinc-400">키워드 스크린샷 (선택, 1장)</label>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-600 bg-zinc-900/80 px-4 py-5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+          >
+            🖼 스샷 / 사진 추가
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              handleFiles(e.target.files);
+              e.target.value = "";
+            }}
+            className="hidden"
+          />
+          {previews.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {previews.map((src, i) => (
+                <div
+                  key={i}
+                  className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`keyword-${i}`} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removePreview(i)}
+                    className="absolute right-1 top-1 rounded bg-black/70 px-1.5 text-[10px] text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {error && (
           <div className="space-y-2 rounded-lg bg-red-900/30 px-3 py-3">
