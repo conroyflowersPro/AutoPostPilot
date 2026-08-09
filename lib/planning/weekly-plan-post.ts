@@ -10,60 +10,24 @@ import {
 } from "@/lib/context/planner-attach";
 import {
   buildCreatorDnaPlannerBlock,
-  isEmptyDnaBlock,
 } from "@/lib/intelligence/creator-dna-runtime";
 import {
   buildPerformanceDnaPlannerBlock,
-  isEmptyPerformanceBlock,
 } from "@/lib/intelligence/performance-dna-runtime";
 
 const MODEL = "grok-4.5";
 
 const SYSTEM = `You are the weekly account-operating strategist for @Seung4680 — an AI account manager, not a post generator.
 
-MISSION
-Maximize long-term account growth while preserving authentic creator voice.
-Every planning decision must answer: "Will this help grow this account over the next several months?"
-NOT: "Can I generate another good-looking post?"
-Impressions alone must never dominate. Prefer follower quality, profile curiosity, bookmarks, meaningful replies, and durable relevance.
+MISSION: long-term account growth + authentic creator voice. Impressions alone must never dominate.
 
-THREE-STAGE LOOP (always)
-1) WHAT should this Creator talk about? → Topic selection (this planner)
-2) HOW should this Creator post it strategically on X? → Post Strategy (per slot, HYPOTHESIS)
-3) DID that strategy work? → only real published X metrics later (Performance DNA). Never treat AI strategy choice as validated knowledge.
-
-AUTHENTICITY OVER ENGAGEMENT (HARD)
-Planner prioritizes Creator Authenticity over viral hooks.
-Never plan slots that require invented personal interventions, fake tests, or unsupported first-person drama.
-Angles must be writable as observation or known opinion without Level-3 inference.
-Do not learn creator behavior from AI-generated drafts — only from validated real performance of authentic posts.
-
-CREATOR DNA ROLE
-Creator DNA answers: "Once a topic is selected, how can THIS creator see it and what evidence can they use?"
-Identity preservation ≠ topic monoculture. Do NOT collapse every week into FSD + Cybertruck only.
-
-CREATOR INTENT SIGNAL (HARD)
-Keywords or themes the Creator types for this planning cycle are CREATOR INTENT.
-Creator Intent must visibly shape the week. Never copy raw intent keywords into primaryTopic as spam; translate into creator-framed themes.
-
-AUDIENCE SIGNALS
-Fedica/screenshot signals are audience interest hints — NOT writing titles.
-Never copy Fedica keywords as primaryTopic. Translate into creator-owned angles when DNA allows.
-Posting-time optimization is OWNED BY FEDICA only — never score or recommend post times here.
-
-WEEKLY POSTS ARE ORIGINAL POSTS ONLY (actionType=ORIGINAL).
-
-SUCCESS SIGNAL PRIORITY
-Followers gained > Profile visits > Revenue > Bookmarks > Replies > Reposts > Quotes > Likes > Impressions
-
-FORBIDDEN
-- 주가/등락/매매/TSLA chart
-- Invented experiences
-- Fedica keywords as primaryTopic
-- Learning from drafts
-- Treating Post Strategy as proven fact
-
-Output JSON only with generationDays, audienceRead, days[], rationale.`;
+AUTHENTICITY OVER ENGAGEMENT (HARD): never invent firsthand experiences; Level1/2 only.
+Creator Intent must shape the week. Audience/Fedica keywords are signals — never copy as primaryTopic.
+Posting time is owned by Fedica only.
+WEEKLY POSTS = ORIGINAL only. Do not learn from drafts.
+FORBIDDEN: 주가/등락/TSLA chart · invented experiences · Fedica keywords as primaryTopic.
+Output JSON only: generationDays, audienceRead, days[], rationale.
+Aim ~5 ORIGINAL slots/day max; keep postStrategy compact.`;
 
 export async function handleWeeklyPlanPost(req: NextRequest) {
   try {
@@ -87,18 +51,16 @@ export async function handleWeeklyPlanPost(req: NextRequest) {
         .join(" | ");
 
     const publishedTopics: string[] = Array.isArray(body.publishedTopics)
-      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 24)
+      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 12)
       : Array.isArray(body.recentTopics)
-        ? body.recentTopics.map(String).filter(Boolean).slice(0, 24)
+        ? body.recentTopics.map(String).filter(Boolean).slice(0, 12)
         : [];
     const scheduledTopics: string[] = Array.isArray(body.scheduledTopics)
-      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 20)
+      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 10)
       : [];
 
     const creatorSnap = buildCreatorDnaPlannerBlock();
     const perfSnap = buildPerformanceDnaPlannerBlock();
-    const creatorDnaBlock = creatorSnap.block;
-    const performanceDnaBlock = perfSnap.block;
     const dna_sources = {
       creator: "runtime_snapshot" as const,
       performance: "baseline_candidates" as const,
@@ -106,39 +68,32 @@ export async function handleWeeklyPlanPost(req: NextRequest) {
 
     const topicSignalBlock = [
       publishedTopics.length
-        ? `PUBLISHED (history/diversity — not drafts):\n${publishedTopics
-            .map((t, i) => `${i + 1}. ${t.slice(0, 80)}`)
-            .join("\n")}`
+        ? `PUBLISHED:\n${publishedTopics.map((t, i) => `${i + 1}. ${t.slice(0, 60)}`).join("\n")}`
         : "PUBLISHED: (none)",
       scheduledTopics.length
-        ? `SCHEDULED (duplication avoidance only — NOT success evidence):\n${scheduledTopics
-            .map((t, i) => `${i + 1}. ${t.slice(0, 80)}`)
-            .join("\n")}`
+        ? `SCHEDULED (dup only):\n${scheduledTopics.map((t, i) => `${i + 1}. ${t.slice(0, 60)}`).join("\n")}`
         : "SCHEDULED: (none)",
     ].join("\n\n");
 
     const sharedContext = buildPlannerSharedContext(body, topic);
-    const userPrompt = `Creator Intent (must shape this week): ${topic || "(없음)"}
+    const userPrompt = `Creator Intent: ${topic || "(없음)"}
 
-Creator DNA:
-${creatorDnaBlock}
+Creator DNA:\n${creatorSnap.block}
 
-Audience DNA / signals: ${
+Audience signals: ${
       typeof audienceHint === "string"
-        ? audienceHint.slice(0, 1200)
-        : JSON.stringify(audienceHint).slice(0, 1200)
+        ? audienceHint.slice(0, 800)
+        : JSON.stringify(audienceHint).slice(0, 800)
     }
 
-Performance DNA (CANDIDATE only — validated=0; soft advisory):
-${performanceDnaBlock}
+Performance DNA (CANDIDATE only):\n${perfSnap.block}
 
 ${topicSignalBlock}
 
 ${sharedContextPlanInstructions(sharedContext)}
 
-JSON only. Every slot needs postStrategy + actionType=ORIGINAL.
-If portfolio risks narrowing into FSD/Cybertruck only, expand before final output.
-Never use draft content as success evidence.`;
+JSON only. Each slot: primaryTopic, angle, contentType, postStrategy (compact), actionType=ORIGINAL.
+Expand beyond FSD/Cybertruck monoculture when possible.`;
 
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
@@ -149,7 +104,7 @@ Never use draft content as success evidence.`;
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 24000);
+    const timeout = setTimeout(() => controller.abort(), 22000);
 
     let rawText = "";
     try {
@@ -162,7 +117,7 @@ Never use draft content as success evidence.`;
         body: JSON.stringify({
           model: MODEL,
           temperature: 0.55,
-          max_tokens: 4500,
+          max_tokens: 3000,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: userPrompt },
@@ -228,7 +183,7 @@ Never use draft content as success evidence.`;
 
     for (let i = 0; i < days.length; i++) {
       let posts = Array.isArray(days[i]?.posts) ? days[i].posts : [];
-      if (posts.length > 8) posts = posts.slice(0, 8);
+      if (posts.length > 6) posts = posts.slice(0, 6);
 
       posts = posts.map((p: any, pi: number) => {
         const ps = p.postStrategy && typeof p.postStrategy === "object" ? p.postStrategy : {};
@@ -268,7 +223,7 @@ Never use draft content as success evidence.`;
             mediaUsefulness: ["optional", "helpful", "essential"].includes(String(ps.mediaUsefulness))
               ? String(ps.mediaUsefulness)
               : "optional",
-            hypothesisNote: String(ps.hypothesisNote || "Hypothesis only — validate after publish.").slice(0, 200),
+            hypothesisNote: String(ps.hypothesisNote || "Hypothesis only — validate after publish.").slice(0, 160),
           },
         };
       });
@@ -308,24 +263,15 @@ Never use draft content as success evidence.`;
       ...(parsed?.audienceRead || {}),
       portfolio: {
         ...(parsed?.audienceRead?.portfolio || {}),
-        identityStatement:
-          parsed?.audienceRead?.portfolio?.identityStatement || "주간 포트폴리오 자동 점검",
         diversityNotes: diversity.note || portfolioStats.noteKo,
         riskOfNarrowing:
           parsed?.audienceRead?.portfolio?.riskOfNarrowing || portfolioStats.narrowingRisk,
-        creatorIntentReflection:
-          parsed?.audienceRead?.portfolio?.creatorIntentReflection ||
-          (topic
-            ? intentOk
-              ? "Creator Intent 신호가 주제/앵글에 반영됨"
-              : "Creator Intent 입력됨 — 반영 약함"
-            : "Creator Intent 입력 없음"),
-        expansionMoves: [
-          ...(parsed?.audienceRead?.portfolio?.expansionMoves || []),
-          ...(diversity.changed ? ["서버 다양성 가드레일 적용"] : []),
-        ],
+        creatorIntentReflection: topic
+          ? intentOk
+            ? "Creator Intent 반영"
+            : "Creator Intent 약함"
+          : "Creator Intent 없음",
       },
-      creatorIntent: parsed?.audienceRead?.creatorIntent || (topic ? String(topic).slice(0, 200) : null),
       portfolioStats,
       creatorIntentAligned: intentOk,
       diversityGuardApplied: diversity.changed,
