@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 type MemoryRow = {
   id: string;
@@ -98,7 +99,7 @@ export default function LearningPage() {
           </Link>
           <h1 className="text-lg font-semibold">주간 학습 (Learning)</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v4.5.0
+            {APP_VERSION_LABEL}
           </span>
         </div>
       </header>
