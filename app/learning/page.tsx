@@ -48,45 +48,45 @@ export default function LearningPage() {
     setCsvText(text);
   }
 
-  async function runCycle(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleImport() {
+    if (!csvText.trim()) {
+      setError("CSV 내용이 필요합니다.");
+      return;
+    }
     setLoading(true);
     setError(null);
     setResult(null);
+    setPhase("CSV 가져오는 중…");
     try {
-      setPhase("CSV 가져오는 중…");
-      const impRes = await fetch("/api/learning/import", {
+      const res = await fetch("/api/learning/import-csv", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          csvText,
+          csv: csvText,
           origin,
-          notes: notes || undefined,
+          notes: notes.trim() || undefined,
         }),
       });
-      const imp = await impRes.json();
-      if (!impRes.ok) {
-        throw new Error(imp.detail || imp.error || "import failed");
-      }
-
-      setPhase("성과 분석 & Memory 갱신 중…");
-      const anRes = await fetch("/api/learning/analyze", {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setPhase("성과 분석 & 학습 반영 중…");
+      const res2 = await fetch("/api/learning/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ learningRunId: imp.learningRunId }),
+        body: JSON.stringify({ importId: data.import?.id }),
       });
-      const an = await anRes.json();
-      if (!anRes.ok) {
-        throw new Error(an.detail || an.error || "analyze failed");
+      const data2 = await res2.json().catch(() => ({}));
+      if (!res2.ok && !data.import) {
+        throw new Error(data2.error || "분석 실패");
       }
-
-      setResult({ import: imp, analyze: an });
+      setResult({ import: data.import || data, analyze: data2 });
       await refreshMemory();
-    } catch (err: any) {
-      setError(err.message || String(err));
+      setPhase(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+      setPhase(null);
     } finally {
       setLoading(false);
-      setPhase(null);
     }
   }
 
@@ -97,7 +97,7 @@ export default function LearningPage() {
           <Link href="/" className="text-zinc-400 hover:text-zinc-200">
             ←
           </Link>
-          <h1 className="text-lg font-semibold">주간 학습 (Learning)</h1>
+          <h1 className="text-lg font-semibold">성장 인사이트 · 학습</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
             {APP_VERSION_LABEL}
           </span>
@@ -105,120 +105,67 @@ export default function LearningPage() {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-300">
-          <p className="font-medium text-zinc-100">Growth Intelligence Engine v4</p>
-          <p className="mt-2 text-xs text-zinc-400 leading-relaxed">
-            X Analytics Content CSV 우선. 생성·발행 직후 Memory 갱신 안 함.
-            검증된 고성과만 Planner Memory / Creator·Audience·Performance·Revenue DNA에 반영.
-            권장 학습 주기: 약 14일. 노출만으로 학습하지 않습니다.
-          </p>
-        </div>
+        <p className="text-sm text-zinc-400">
+          성과 데이터를 반영해 다음에 무엇을 할지 정리합니다. 발행 직후 바로 학습하지 않습니다.
+          충분히 확인된 성과만 전략·크리에이터 이해에 반영합니다.
+        </p>
 
         {latestMemory && (
-          <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-sm">
-            <p className="text-xs text-emerald-400">
-              최신 Planner Memory · v{latestMemory.version}
-            </p>
+          <section className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
+            <div className="text-xs text-emerald-400">
+              최신 학습 요약 · v{latestMemory.version}
+            </div>
             <p className="mt-1 text-zinc-200">{latestMemory.summary_ko}</p>
             {Array.isArray(latestMemory.patterns) &&
               latestMemory.patterns.length > 0 && (
-                <ul className="mt-3 space-y-1 text-xs text-zinc-400">
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-zinc-400">
                   {latestMemory.patterns.slice(0, 5).map((p, i) => (
-                    <li key={i} className="truncate">
-                      · {p}
-                    </li>
+                    <li key={i}>{p}</li>
                   ))}
                 </ul>
               )}
-          </div>
+          </section>
         )}
 
-        <form onSubmit={runCycle} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs text-zinc-400">
-              X Analytics Content CSV (우선) / Fedica CSV
+        <details className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4" open>
+          <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
+            데이터 가져오기 (Advanced)
+          </summary>
+          <div className="mt-3 space-y-3">
+            <label className="block text-xs text-zinc-400">
+              성과 CSV 가져오기 (X Analytics 우선)
             </label>
             <input
               type="file"
               accept=".csv,text/csv"
               onChange={(e) => handleFile(e.target.files?.[0] || null)}
-              className="mb-2 block w-full text-xs text-zinc-400"
+              className="block w-full text-xs text-zinc-400"
             />
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
-              rows={8}
-              placeholder="Post text,Impressions,Likes,New follows,Profile visits,Bookmarks,..."
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs outline-none focus:border-emerald-500"
+              rows={6}
+              placeholder="CSV 붙여넣기 가능"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-emerald-500"
             />
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-zinc-400">출처</label>
-              <select
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value as any)}
-                className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
-              >
-                <option value="unknown">unknown</option>
-                <option value="ai">AI 생성</option>
-                <option value="manual">수동 작성 (premium)</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-zinc-400">메모</label>
-              <input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="예: 2026-07-25~08-07 X Analytics export"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <p className="rounded-lg bg-red-900/30 px-3 py-2 text-xs text-red-300">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || !csvText.trim()}
-            className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {loading ? phase || "처리 중…" : "가져오기 → 분석 → Memory 갱신"}
-          </button>
-        </form>
-
-        {result && (
-          <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-sm">
-            <p className="font-medium text-emerald-300">학습 주기 완료</p>
-            <p className="mt-1 text-xs text-zinc-300">
-              import {result.import.imported}건 · Memory v
-              {result.analyze.version} · 고성과{" "}
-              {result.analyze.memory?.successCount ?? "—"} /{" "}
-              {result.analyze.memory?.analyzedCount ?? "—"}
-            </p>
-            {result.analyze.memory?.summaryKo && (
-              <p className="mt-2 text-xs text-zinc-400">
-                {result.analyze.memory.summaryKo}
+            <button
+              type="button"
+              disabled={loading || !csvText.trim()}
+              onClick={handleImport}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm hover:bg-indigo-500 disabled:opacity-40"
+            >
+              {loading ? phase || "처리 중…" : "가져오기 → 분석 → 학습 반영"}
+            </button>
+            {error && (
+              <p className="text-xs text-red-300">{error}</p>
+            )}
+            {result && (
+              <p className="text-xs text-zinc-400">
+                가져오기 완료 · 다음 주 계획 만들 때 이 학습 결과를 참고합니다.
               </p>
             )}
-            {result.analyze.performanceDna?.summaryKo && (
-              <p className="mt-1 text-xs text-emerald-400/80">
-                {result.analyze.performanceDna.summaryKo}
-                {result.analyze.performanceDna.topicWins?.length
-                  ? ` · ${result.analyze.performanceDna.topicWins.join(", ")}`
-                  : ""}
-              </p>
-            )}
-            <p className="mt-3 text-xs text-zinc-500">
-              다음 주 생성 시 plan이 이 Memory·DNA를 읽습니다.
-            </p>
           </div>
-        )}
+        </details>
       </main>
     </div>
   );
