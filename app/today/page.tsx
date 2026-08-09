@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { buildStoredEngagementRecommendations } from "@/lib/reply/recommendations";
+import { APP_VERSION_LABEL } from "@/lib/version";
+import TodayEngagementClient from "./TodayEngagementClient";
 
 export default async function TodayPage() {
   const supabase = await createClient();
@@ -17,6 +20,8 @@ export default async function TodayPage() {
     .order("created_at", { ascending: false })
     .limit(8);
 
+  const engagement = buildStoredEngagementRecommendations({});
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
@@ -26,7 +31,7 @@ export default async function TodayPage() {
           </Link>
           <h1 className="text-lg font-semibold">Today</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            optional
+            {APP_VERSION_LABEL}
           </span>
         </div>
       </header>
@@ -44,12 +49,20 @@ export default async function TodayPage() {
           <p className="mt-1 text-sm text-zinc-300">
             평소처럼 한 칸에 생각을 적습니다. 주제/프롬프트 입력 없음.
           </p>
-          <Link
-            href="/today/write"
-            className="mt-3 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
-          >
-            직접 쓰기
-          </Link>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/today/write"
+              className="inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
+            >
+              직접 쓰기
+            </Link>
+            <Link
+              href="/today/reply"
+              className="inline-block rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium hover:bg-sky-600"
+            >
+              Manual Reply
+            </Link>
+          </div>
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
@@ -59,20 +72,14 @@ export default async function TodayPage() {
           <p className="mt-2 text-sm text-zinc-500">
             Planner 카드는 아직 optional 자리만 있습니다. 강제 과제 없음.
           </p>
-          <p className="mt-2 text-xs text-zinc-600">
-            EXPERIENCE_OPPORTUNITY / CREATOR_INPUT_REQUIRED 패턴은 이후 Weekly
-            연동 시 채웁니다.
-          </p>
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Conversation opportunities
-          </h2>
-          <p className="mt-2 text-sm text-zinc-500">
-            0–5 dynamic · post-level · 지금은 비어 있을 수 있음. 자동 답글 없음.
-          </p>
-        </section>
+        <TodayEngagementClient
+          initialOpportunities={engagement.opportunities}
+          apiActions={engagement.api_required_actions}
+          indicators={engagement.indicators}
+          contextTimestamp={engagement.context_timestamp}
+        />
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
           <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
