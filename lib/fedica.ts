@@ -1,125 +1,60 @@
-/**
- * Fedica Publishing API helpers
- * Base: https://fedica.com/api/publish
- */
+/** Fedica publishing helpers — media + post scheduling */
 
-const FEDICA_BASE = "https://fedica.com/api/publish";
+export type FedicaAccount = {
+  Platform?: string;
+  AccountId?: string;
+  [key: string]: unknown;
+};
 
-function getToken() {
-  const token = process.env.FEDICA_API_TOKEN;
-  if (!token) throw new Error("FEDICA_API_TOKEN not configured");
-  return token;
+const BASE = "https://fedica.com/api/publish";
+
+function token(): string {
+  const t = process.env.FEDICA_API_TOKEN || process.env.FEDICA_TOKEN || "";
+  if (!t) throw new Error("FEDICA_API_TOKEN not configured");
+  return t;
 }
 
-async function fedicaFetch(path: string, options: RequestInit = {}) {
-  const token = getToken();
-  const res = await fetch(`${FEDICA_BASE}${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.Success === false) {
-    throw new Error(data.Error || `Fedica ${path} failed (${res.status})`);
+export async function fedicaFetch(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token()}`);
+  if (!headers.has("Content-Type") && init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text.slice(0, 500) };
+  }
+  if (!res.ok) {
+    const msg = data?.message || data?.error || text.slice(0, 200) || res.statusText;
+    throw new Error(`Fedica ${res.status}: ${msg}`);
   }
   return data;
 }
 
-/** Initialize media upload session → returns fileId (used as MediaId) */
-export async function initMediaUpload(): Promise<string> {
-  const data = await fedicaFetch("/media/init", { method: "POST" });
-  if (!data.Id) throw new Error("No fileId returned from /media/init");
-  return data.Id as string;
+export async function listAccounts() {
+  return fedicaFetch("/accounts");
 }
 
-/** Upload a single chunk (base64). For simplicity we send the whole file as chunk 0. */
-export async function uploadMediaChunk(
-  fileId: string,
-  base64Data: string,
-  chunkIndex = 0
-) {
-  await fedicaFetch("/media/upload", {
+export async function listPipelines() {
+  return fedicaFetch("/pipelines");
+}
+
+export async function schedulePost(body: {
+  PipelineId?: number | string;
+  DateTime?: string;
+  Posts: Array<{
+    Accounts?: unknown[];
+    Messages?: string[];
+    MediaId?: string | number;
+  }>;
+  Id?: string | number;
+}) {
+  return fedicaFetch("/post", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chunkIndex,
-      fileId,
-      file: base64Data,
-    }),
+    body: JSON.stringify(body),
   });
-}
-
-/** Finalize upload with metadata. fileId becomes the MediaId. */
-export async function finalizeMediaUpload(
-  fileId: string,
-  metadata: {
-    altText: string;
-    mimeType: string;
-    fileName: string;
-    size: number;
-    width?: number;
-    height?: number;
-    duration?: number;
-  }
-) {
-  await fedicaFetch("/media/finalize", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileId,
-      metadata,
-    }),
-  });
-}
-
-/**
- * Full flow: download from public URL → init → upload → finalize
- * Returns MediaId (fileId)
- */
-export async function uploadMediaFromUrl(
-  url: string,
-  altText = "@Seung4680 content"
-): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch media: ${url}`);
-
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const base64 = buffer.toString("base64");
-  const size = buffer.length;
-
-  // Derive filename
-  const urlPath = new URL(url).pathname;
-  const fileName = urlPath.split("/").pop() || `media-${Date.now()}.jpg`;
-
-  const fileId = await initMediaUpload();
-  await uploadMediaChunk(fileId, base64, 0);
-  await finalizeMediaUpload(fileId, {
-    altText,
-    mimeType: contentType,
-    fileName,
-    size,
-  });
-
-  return fileId;
-}
-
-/**
- * Upload multiple media URLs and return array of MediaIds
- */
-export async function uploadMultipleMedia(
-  urls: string[],
-  altTextPrefix = "@Seung4680"
-): Promise<string[]> {
-  const mediaIds: string[] = [];
-  for (let i = 0; i < urls.length; i++) {
-    const id = await uploadMediaFromUrl(
-      urls[i],
-      `${altTextPrefix} media ${i + 1}`
-    );
-    mediaIds.push(id);
-  }
-  return mediaIds;
 }
