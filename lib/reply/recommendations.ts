@@ -107,7 +107,17 @@ export function buildStoredEngagementRecommendations(
     },
   ];
 
-  const capped = opportunities.slice(0, 5);
+  const capped = opportunities.slice(0, 5).map((o) => {
+    const params = new URLSearchParams();
+    if (o.x_url) params.set("url", o.x_url);
+    params.set("topic", o.topic);
+    if (o.suggested_intent) params.set("intent", o.suggested_intent);
+    if (o.event_context?.phase) params.set("phase", o.event_context.phase);
+    return {
+      ...o,
+      reply_href: `/today/reply?${params.toString()}`,
+    };
+  });
 
   return {
     opportunities: capped,
