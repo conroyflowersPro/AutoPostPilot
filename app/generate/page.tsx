@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -149,11 +149,16 @@ function loadLatestJob(): GenerationJobState | null {
   }
 }
 
-export default function GeneratePage() {
+function GeneratePageInner() {
+  const searchParams = useSearchParams();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     return d.toISOString().slice(0, 10);
   });
+  useEffect(() => {
+    const s = searchParams.get("start");
+    if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) setStartDate(s);
+  }, [searchParams]);
   const [keywords, setKeywords] = useState("");
   const [previews, setPreviews] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -515,127 +520,130 @@ export default function GeneratePage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="text-zinc-400 hover:text-zinc-200">
-            ←
-          </Link>
-          <h1 className="text-lg font-semibold">이번 주 계획</h1>
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v6.3.0
-          </span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-        <p className="text-sm text-zinc-400">
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div>
+        <h1 className="text-xl font-medium">이번 주 계획</h1>
+        <p className="mt-1 text-sm text-zinc-400">
           이번 주 전략을 먼저 잡고, 날짜별 초안을 만듭니다. 관심사 키워드는 글에 넣지 않고 신호로만 씁니다.
         </p>
+      </div>
 
-        {resumeJob && !loading && !result && (
-          <div className="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm">
-            <p className="text-amber-200">
-              이전 작업이 중단되어 있습니다 (Day {resumeJob.nextDayOffset + 1}/
-              {resumeJob.generationDays}부터).
-            </p>
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={handleResume} className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs hover:bg-amber-600">
-                이어서 만들기
-              </button>
-              <button type="button" onClick={() => setResumeJob(null)} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600">
-                새로 시작
-              </button>
+      {resumeJob && !loading && !result && (
+        <div className="rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm">
+          <p className="text-amber-200">
+            이전 작업이 중단되어 있습니다 (Day {resumeJob.nextDayOffset + 1}/
+            {resumeJob.generationDays}부터).
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={handleResume} className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs hover:bg-amber-600">
+              이어서 만들기
+            </button>
+            <button type="button" onClick={() => setResumeJob(null)} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600">
+              새로 시작
+            </button>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleGenerate} className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-xs text-zinc-400">시작 날짜</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs text-zinc-400">
+            관심사 키워드 / 테마 (선택 · 글에 넣지 않음, 신호만)
+          </label>
+          <input type="text" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="예: Terafab, Optimus, Grimes County" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs text-zinc-400">키워드 스크린샷 (선택, 1장)</label>
+          <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-600 bg-zinc-900/80 px-4 py-5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200">
+            🖼 스샷 / 사진 추가
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} className="hidden" />
+          {previews.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {previews.map((src, i) => (
+                <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`keyword-${i}`} className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => removePreview(i)} className="absolute right-1 top-1 rounded bg-black/70 px-1.5 text-[10px] text-white">✕</button>
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="space-y-2 rounded-lg bg-red-900/30 px-3 py-3">
+            <p className="text-xs text-red-300">{error}</p>
+            <button type="button" onClick={() => router.push("/")} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600">홈으로 →</button>
           </div>
         )}
 
-        <form onSubmit={handleGenerate} className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs text-zinc-400">시작 날짜</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
-          </div>
+        <button type="submit" disabled={loading} className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50">
+          {loading ? phase || "처리 중..." : "이번 주 전략 만들기"}
+        </button>
+      </form>
 
-          <div>
-            <label className="mb-1.5 block text-xs text-zinc-400">
-              관심사 키워드 / 테마 (선택 · 글에 넣지 않음, 신호만)
-            </label>
-            <input type="text" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="예: Terafab, Optimus, Grimes County" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-emerald-500" />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs text-zinc-400">키워드 스크린샷 (선택, 1장)</label>
-            <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center rounded-xl border border-dashed border-zinc-600 bg-zinc-900/80 px-4 py-5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200">
-              🖼 스샷 / 사진 추가
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} className="hidden" />
-            {previews.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {previews.map((src, i) => (
-                  <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-zinc-700">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`keyword-${i}`} className="h-full w-full object-cover" />
-                    <button type="button" onClick={() => removePreview(i)} className="absolute right-1 top-1 rounded bg-black/70 px-1.5 text-[10px] text-white">✕</button>
+      {result && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-sm space-y-2">
+            <p className="text-[10px] uppercase tracking-wide text-emerald-500">이번 주 전략 요약</p>
+            {result.rationale && (
+              <p className="text-sm text-zinc-200">{result.rationale}</p>
+            )}
+            {result.plan && (
+              <div className="rounded-lg bg-zinc-950/40 px-3 py-2 text-xs text-zinc-300">
+                <div className="mb-1 text-[10px] uppercase text-zinc-500">7일 편집 계획</div>
+                {result.plan.map((d: any) => (
+                  <div key={d.dayOffset} className="flex gap-2 border-b border-zinc-800/80 py-1 last:border-0">
+                    <span className="w-10 text-zinc-500">D{d.dayOffset + 1}</span>
+                    <span>
+                      {d.count}개
+                      {d.themes?.length ? ` · ${d.themes.slice(0, 3).join(", ")}` : ""}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
+            <p className="font-medium text-emerald-300">{result.count}개 초안이 draft로 저장되었습니다.</p>
+            {result.batchErrors?.length > 0 && (
+              <p className="text-xs text-amber-300">일부 날짜 실패: {result.batchErrors.join(" · ")}</p>
+            )}
+            <button onClick={() => router.push("/")} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs hover:bg-emerald-600">목록으로 →</button>
           </div>
-
-          {error && (
-            <div className="space-y-2 rounded-lg bg-red-900/30 px-3 py-3">
-              <p className="text-xs text-red-300">{error}</p>
-              <button type="button" onClick={() => router.push("/")} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600">홈으로 →</button>
-            </div>
-          )}
-
-          <button type="submit" disabled={loading} className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50">
-            {loading ? phase || "처리 중..." : "이번 주 전략 만들기"}
-          </button>
-        </form>
-
-        {result && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-sm space-y-2">
-              <p className="text-[10px] uppercase tracking-wide text-emerald-500">이번 주 전략 요약</p>
-              {result.rationale && (
-                <p className="text-sm text-zinc-200">{result.rationale}</p>
-              )}
-              {result.plan && (
-                <div className="rounded-lg bg-zinc-950/40 px-3 py-2 text-xs text-zinc-300">
-                  <div className="mb-1 text-[10px] uppercase text-zinc-500">7일 편집 계획</div>
-                  {result.plan.map((d: any) => (
-                    <div key={d.dayOffset} className="flex gap-2 border-b border-zinc-800/80 py-1 last:border-0">
-                      <span className="w-10 text-zinc-500">D{d.dayOffset + 1}</span>
-                      <span>
-                        {d.count}개
-                        {d.themes?.length ? ` · ${d.themes.slice(0, 3).join(", ")}` : ""}
-                      </span>
-                    </div>
-                  ))}
+          <div className="space-y-3">
+            {result.posts?.map((p: any, i: number) => (
+              <div key={p.id || i} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
+                  <span>Day +{p.dayOffset ?? 0}</span>
+                  {p.slotId && <span>{p.slotId}</span>}
+                  {p.score != null && <span className="text-emerald-400">점수 {p.score}</span>}
                 </div>
-              )}
-              <p className="font-medium text-emerald-300">{result.count}개 초안이 draft로 저장되었습니다.</p>
-              {result.batchErrors?.length > 0 && (
-                <p className="text-xs text-amber-300">일부 날짜 실패: {result.batchErrors.join(" · ")}</p>
-              )}
-              <button onClick={() => router.push("/")} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs hover:bg-emerald-600">목록으로 →</button>
-            </div>
-            <div className="space-y-3">
-              {result.posts?.map((p: any, i: number) => (
-                <div key={p.id || i} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
-                    <span>Day +{p.dayOffset ?? 0}</span>
-                    {p.slotId && <span>{p.slotId}</span>}
-                    {p.score != null && <span className="text-emerald-400">점수 {p.score}</span>}
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{p.content}</p>
-                </div>
-              ))}
-            </div>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{p.content}</p>
+              </div>
+            ))}
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-3xl px-4 py-6 text-sm text-zinc-500">
+          계획 화면 준비 중…
+        </div>
+      }
+    >
+      <GeneratePageInner />
+    </Suspense>
   );
 }
