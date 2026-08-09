@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 type Thread = {
@@ -26,7 +27,8 @@ type Reaction = {
   author_id?: string | null;
 };
 
-export default function ManualReplyPage() {
+function ManualReplyInner() {
+  const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [pastedComment, setPastedComment] = useState("");
   const [myReply, setMyReply] = useState("");
@@ -41,6 +43,22 @@ export default function ManualReplyPage() {
   const [apiState, setApiState] = useState<string>("LOCAL_STORED");
   const [postedId, setPostedId] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [topicHint, setTopicHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    const qUrl = searchParams.get("url");
+    const qTopic = searchParams.get("topic");
+    const qIntent = searchParams.get("intent");
+    const qPhase = searchParams.get("phase");
+    if (qUrl && qUrl.trim()) setUrl(qUrl.trim());
+    if (qTopic) {
+      setTopicHint(
+        [qTopic, qIntent ? `의도: ${qIntent}` : null, qPhase ? `단계: ${qPhase}` : null]
+          .filter(Boolean)
+          .join(" · ")
+      );
+    }
+  }, [searchParams]);
 
   const targetText = useMemo(
     () => thread?.target_text || pastedComment.trim(),
@@ -281,6 +299,16 @@ export default function ManualReplyPage() {
         <p className="text-xs text-zinc-500">
           일반 포스트는 Fedica · 답글은 X 직접 게시. 링크만 붙여도 비용 없음.
         </p>
+        {topicHint && (
+          <div className="rounded-lg border border-sky-900/50 bg-sky-950/30 px-3 py-2 text-xs text-sky-200">
+            Today에서 넘어온 기회: {topicHint}
+            {!url.trim() && (
+              <span className="block mt-1 text-zinc-500">
+                X 링크를 붙여 대상을 읽거나, 아래 텍스트로 제안만 받을 수 있습니다.
+              </span>
+            )}
+          </div>
+        )}
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
           <input
@@ -368,5 +396,19 @@ export default function ManualReplyPage() {
         {error && <p className="text-xs text-red-300">{error}</p>}
       </main>
     </div>
+  );
+}
+
+export default function ManualReplyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 text-sm text-zinc-500">
+          답글 화면 준비 중…
+        </div>
+      }
+    >
+      <ManualReplyInner />
+    </Suspense>
   );
 }
