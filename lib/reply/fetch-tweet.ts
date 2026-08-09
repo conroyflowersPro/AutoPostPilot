@@ -1,5 +1,6 @@
 /**
- * Fetch a single tweet + minimal parent/root context via X API.
+ * X target fetch — TARGET ONLY by default.
+ * Parent/root/other replies require separate explicit calls.
  * Must only be called after requireExplicitApiConsent.
  */
 
@@ -12,6 +13,43 @@ type Conn = {
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
+};
+
+export type RequestScope =
+  | "TARGET_POST_ONLY"
+  | "TARGET_REPLY_ONLY"
+  | "PARENT_ONLY"
+  | "ROOT_ONLY"
+  | "OTHER_REACTIONS";
+
+export type TargetFetchResult = {
+  target: ThreadContext;
+  request_scope: RequestScope;
+  other_replies_requested: false;
+  other_reply_fetch_count: 0;
+  conversation_pagination_count: 0;
+  x_endpoint: string;
+  x_query_summary: string;
+  is_reply: boolean;
+  parent_id_hint?: string | null;
+  conversation_id?: string | null;
+};
+
+export type OtherReactionsResult = {
+  conversation_id: string;
+  max_requested: number;
+  replies: Array<{
+    id: string;
+    text: string;
+    author_id?: string | null;
+    created_at?: string | null;
+  }>;
+  request_scope: "OTHER_REACTIONS";
+  other_replies_requested: true;
+  other_reply_fetch_count: number;
+  conversation_pagination_count: 0;
+  x_endpoint: string;
+  x_query_summary: string;
 };
 
 async function getToken(): Promise<string> {
@@ -65,17 +103,14 @@ async function getToken(): Promise<string> {
   return tokens.access_token;
 }
 
-async function fetchTweetsByIds(
+async function fetchTweetByIdOnly(
   token: string,
-  ids: string[]
-): Promise<{ byId: Record<string, any>; users: Record<string, any>; raw: any }> {
-  const unique = [...new Set(ids.filter(Boolean))].slice(0, 8);
-  if (!unique.length) return { byId: {}, users: {}, raw: {} };
-
+  id: string
+): Promise<{ tweet: any; user?: any }> {
   const q = new URLSearchParams({
-    ids: unique.join(","),
+    ids: id,
     "tweet.fields": TWEET_FIELDS_PUBLIC_ONLY,
-    expansions: "author_id,referenced_tweets.id",
+    expansions: "author_id",
     "user.fields": "username,name",
   });
 
@@ -89,61 +124,146 @@ async function fetchTweetsByIds(
     );
   }
 
-  const byId: Record<string, any> = {};
-  for (const t of data.data || []) {
-    byId[String(t.id)] = t;
-  }
-  for (const t of data.includes?.tweets || []) {
-    byId[String(t.id)] = t;
-  }
-  const users: Record<string, any> = {};
-  for (const u of data.includes?.users || []) {
-    users[String(u.id)] = u;
-  }
-  return { byId, users, raw: data };
+  const tweet = (data.data || []).find((t: any) => String(t.id) === String(id));
+  if (!tweet) throw new Error("Tweet not found or not accessible");
+
+  const users = data.includes?.users || [];
+  const user = users.find((u: any) => String(u.id) === String(tweet.author_id));
+  return { tweet, user };
 }
 
+function isReplyTweet(tweet: any): boolean {
+  const refs: { type: string; id: string }[] = tweet.referenced_tweets || [];
+  return refs.some((r) => r.type === "replied_to") || Boolean(tweet.in_reply_to_user_id);
+}
+
+function parentIdHint(tweet: any): string | null {
+  const refs: { type: string; id: string }[] = tweet.referenced_tweets || [];
+  const parent = refs.find((r) => r.type === "replied_to");
+  return parent?.id ? String(parent.id) : null;
+}
+
+export async function fetchTargetOnly(statusId: string): Promise<TargetFetchResult> {
+  const token = await getToken();
+  const { tweet, user } = await fetchTweetByIdOnly(token, statusId);
+  const reply = isReplyTweet(tweet);
+  const scope: RequestScope = reply ? "TARGET_REPLY_ONLY" : "TARGET_POST_ONLY";
+
+  const target: ThreadContext = {
+    target_id: String(tweet.id),
+    target_text: String(tweet.text || ""),
+    target_author_id: tweet.author_id ? String(tweet.author_id) : null,
+    target_author_username: user?.username || null,
+    created_at: tweet.created_at || null,
+    conversation_id: tweet.conversation_id || null,
+    parent_id: parentIdHint(tweet),
+    parent_text: null,
+    root_id: null,
+    root_text: null,
+    fetched_via: "X_API",
+  };
+
+  return {
+    target,
+    request_scope: scope,
+    other_replies_requested: false,
+    other_reply_fetch_count: 0,
+    conversation_pagination_count: 0,
+    x_endpoint: "GET https://api.x.com/2/tweets",
+    x_query_summary: `ids=${statusId}; expansions=author_id only; no referenced_tweets; no search; no pagination`,
+    is_reply: reply,
+    parent_id_hint: parentIdHint(tweet),
+    conversation_id: tweet.conversation_id ? String(tweet.conversation_id) : null,
+  };
+}
+
+export async function fetchSingleRelated(
+  statusId: string,
+  kind: "parent" | "root"
+): Promise<{
+  text: string;
+  id: string;
+  author_username?: string | null;
+  request_scope: RequestScope;
+  other_reply_fetch_count: 0;
+  x_endpoint: string;
+  x_query_summary: string;
+}> {
+  const token = await getToken();
+  const { tweet } = await fetchTweetByIdOnly(token, statusId);
+  const refs: { type: string; id: string }[] = tweet.referenced_tweets || [];
+  const parent = refs.find((r) => r.type === "replied_to");
+  const relatedId =
+    kind === "parent"
+      ? parent?.id
+      : parent?.id || tweet.conversation_id || null;
+
+  if (!relatedId) {
+    throw new Error(kind === "parent" ? "No parent reference on target" : "No root/parent id available");
+  }
+
+  const related = await fetchTweetByIdOnly(token, String(relatedId));
+  return {
+    id: String(related.tweet.id),
+    text: String(related.tweet.text || ""),
+    author_username: related.user?.username || null,
+    request_scope: kind === "parent" ? "PARENT_ONLY" : "ROOT_ONLY",
+    other_reply_fetch_count: 0,
+    x_endpoint: "GET https://api.x.com/2/tweets",
+    x_query_summary: `ids=${relatedId}; expansions=author_id only; single related object`,
+  };
+}
+
+export async function fetchOtherReactions(
+  conversationId: string,
+  maxResults: 10 | 20 | 50 = 10
+): Promise<OtherReactionsResult> {
+  const token = await getToken();
+  const capped = Math.min(Math.max(maxResults, 10), 50) as 10 | 20 | 50;
+
+  const q = new URLSearchParams({
+    query: `conversation_id:${conversationId}`,
+    max_results: String(Math.min(capped, 100)),
+    "tweet.fields": "created_at,author_id,text,conversation_id",
+  });
+
+  const res = await fetch(`https://api.x.com/2/tweets/search/recent?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      data.detail ||
+        data.title ||
+        data.errors?.[0]?.message ||
+        `X search ${res.status} (other reactions may require search access)`
+    );
+  }
+
+  const rows = (data.data || []).slice(0, capped).map((t: any) => ({
+    id: String(t.id),
+    text: String(t.text || ""),
+    author_id: t.author_id ? String(t.author_id) : null,
+    created_at: t.created_at || null,
+  }));
+
+  return {
+    conversation_id: conversationId,
+    max_requested: capped,
+    replies: rows,
+    request_scope: "OTHER_REACTIONS",
+    other_replies_requested: true,
+    other_reply_fetch_count: rows.length,
+    conversation_pagination_count: 0,
+    x_endpoint: "GET https://api.x.com/2/tweets/search/recent",
+    x_query_summary: `conversation_id:${conversationId}; max_results=${capped}; no next_token pagination`,
+  };
+}
+
+/** @deprecated Use fetchTargetOnly */
 export async function fetchThreadContextByStatusId(
   statusId: string
 ): Promise<ThreadContext> {
-  const token = await getToken();
-  const first = await fetchTweetsByIds(token, [statusId]);
-  const target = first.byId?.[statusId];
-  if (!target) {
-    throw new Error("Tweet not found or not accessible");
-  }
-
-  const refs: { type: string; id: string }[] = target.referenced_tweets || [];
-  const parentRef = refs.find((r) => r.type === "replied_to");
-  const rootish = refs.find((r) => r.type === "replied_to") || refs[0];
-
-  const extraIds = [parentRef?.id, rootish?.id].filter(Boolean) as string[];
-  let parent: any = null;
-  let root: any = null;
-
-  if (extraIds.length) {
-    const more = await fetchTweetsByIds(token, extraIds);
-    if (parentRef?.id) parent = more.byId?.[parentRef.id] || null;
-    if (rootish?.id && rootish.id !== parentRef?.id) {
-      root = more.byId?.[rootish.id] || null;
-    }
-    Object.assign(first.byId || {}, more.byId || {});
-    Object.assign(first.users || {}, more.users || {});
-  }
-
-  const author = first.users?.[String(target.author_id)];
-
-  return {
-    target_id: String(target.id),
-    target_text: String(target.text || ""),
-    target_author_id: target.author_id ? String(target.author_id) : null,
-    target_author_username: author?.username || null,
-    created_at: target.created_at || null,
-    conversation_id: target.conversation_id || null,
-    parent_id: parent ? String(parent.id) : parentRef?.id || null,
-    parent_text: parent ? String(parent.text || "") : null,
-    root_id: root ? String(root.id) : null,
-    root_text: root ? String(root.text || "") : null,
-    fetched_via: "X_API",
-  };
+  const r = await fetchTargetOnly(statusId);
+  return r.target;
 }
