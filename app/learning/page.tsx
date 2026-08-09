@@ -58,28 +58,29 @@ export default function LearningPage() {
     setResult(null);
     setPhase("CSV 가져오는 중…");
     try {
-      const res = await fetch("/api/learning/import-csv", {
+      const res = await fetch("/api/learning/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          csv: csvText,
+          csvText,
           origin,
           notes: notes.trim() || undefined,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+
       setPhase("성과 분석 & 학습 반영 중…");
       const res2 = await fetch("/api/learning/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ importId: data.import?.id }),
+        body: JSON.stringify({ learningRunId: data.learningRunId }),
       });
       const data2 = await res2.json().catch(() => ({}));
-      if (!res2.ok && !data.import) {
-        throw new Error(data2.error || "분석 실패");
+      if (!res2.ok) {
+        throw new Error(data2.error || data2.detail || "분석 실패");
       }
-      setResult({ import: data.import || data, analyze: data2 });
+      setResult({ import: data, analyze: data2 });
       await refreshMemory();
       setPhase(null);
     } catch (e: unknown) {
@@ -127,7 +128,7 @@ export default function LearningPage() {
           </section>
         )}
 
-        <details className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4" open>
+        <details className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
           <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
             데이터 가져오기 (Advanced)
           </summary>
@@ -148,6 +149,20 @@ export default function LearningPage() {
               placeholder="CSV 붙여넣기 가능"
               className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-emerald-500"
             />
+            <div className="flex gap-2 text-xs">
+              <label className="flex items-center gap-1 text-zinc-400">
+                origin
+                <select
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value as any)}
+                  className="rounded bg-zinc-900 border border-zinc-700 px-2 py-1"
+                >
+                  <option value="unknown">unknown</option>
+                  <option value="ai">ai</option>
+                  <option value="manual">manual</option>
+                </select>
+              </label>
+            </div>
             <button
               type="button"
               disabled={loading || !csvText.trim()}
@@ -156,12 +171,11 @@ export default function LearningPage() {
             >
               {loading ? phase || "처리 중…" : "가져오기 → 분석 → 학습 반영"}
             </button>
-            {error && (
-              <p className="text-xs text-red-300">{error}</p>
-            )}
+            {error && <p className="text-xs text-red-300">{error}</p>}
             {result && (
               <p className="text-xs text-zinc-400">
-                가져오기 완료 · 다음 주 계획 만들 때 이 학습 결과를 참고합니다.
+                가져오기 {result.import?.imported ?? "?"}건 · 다음 주 계획 만들 때 이 학습 결과를
+                참고합니다.
               </p>
             )}
           </div>
