@@ -60,20 +60,29 @@ export default function TodayEngagementClient({
     }
   }
 
+  function replyHref(o: EngagementOpportunity): string {
+    if (o.reply_href) return o.reply_href;
+    const params = new URLSearchParams();
+    if (o.x_url) params.set("url", o.x_url);
+    params.set("topic", o.topic);
+    if (o.suggested_intent) params.set("intent", o.suggested_intent);
+    return `/today/reply?${params.toString()}`;
+  }
+
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-          Today&apos;s Engagement
+          오늘의 대화 기회
         </h2>
         <Link href="/today/reply" className="text-xs text-sky-400 hover:underline">
-          Manual Reply →
+          답글 작성 →
         </Link>
       </div>
 
       <p className="text-sm text-zinc-500">
-        자동 댓글 목록이 아닙니다. 참여하면 의미 있을 수 있는 대화 기회입니다.
-        페이지 로드 시 외부 API 호출 없음.
+        자동 댓글 목록이 아닙니다. 참여하면 의미 있을 수 있는 기회입니다. 페이지
+        로드만으로 외부 API는 호출되지 않습니다.
       </p>
 
       {indicators?.length > 0 && (
@@ -93,7 +102,7 @@ export default function TodayEngagementClient({
 
       {!opportunities.length ? (
         <p className="text-sm text-zinc-600">
-          저장된 context 기준 추천이 없습니다. 비어 있어도 정상입니다.
+          저장된 기준으로 추천이 없습니다. 비어 있어도 정상입니다.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -106,22 +115,22 @@ export default function TodayEngagementClient({
                 <span className="text-sky-400">{o.opportunity_type}</span>
                 <span>{o.suggested_intent}</span>
                 {o.api_required ? (
-                  <span className="text-amber-400">API REQUIRED</span>
+                  <span className="text-amber-400">API 필요</span>
                 ) : (
-                  <span className="text-emerald-500">LOCAL / STORED</span>
+                  <span className="text-emerald-500">저장 정보</span>
                 )}
               </div>
               <div className="mt-1 text-sm font-medium text-zinc-200">{o.topic}</div>
               <p className="mt-1 text-xs text-zinc-400">{o.why_relevant}</p>
               {o.event_context?.phase && (
                 <p className="mt-1 text-[10px] text-zinc-500">
-                  Event phase: {o.event_context.phase}
+                  이벤트 단계: {o.event_context.phase}
                 </p>
               )}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link
-                  href="/today/reply"
-                  className="rounded bg-zinc-800 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-700"
+                  href={replyHref(o)}
+                  className="rounded bg-emerald-800/80 px-2.5 py-1 text-[11px] font-medium text-emerald-100 hover:bg-emerald-700"
                 >
                   답글 작성
                 </Link>
