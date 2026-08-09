@@ -1,7 +1,7 @@
 /**
  * Weekly Planner — Supabase Edge
- * Engines: Creator Intent + Creator DNA + Audience signals + Performance DNA (candidates)
- * NO silent hard-coded FSD/CT fallback.
+ * Compact JSON to avoid max_tokens truncation.
+ * Engines preserved; no silent fallback.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -14,83 +14,59 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const CREATOR_DNA_BLOCK = [
-  "creator-dna-runtime-v1.3.1-snapshot",
-  "WHO: Korean Tesla multi-vehicle owner-creator; FSD/product observation primary; LAFC/gaming/daily retained.",
-  "PUBLISHING: inform/explain · experience · light opinion; polite intentional; 음슴체 RECENTLY_EMERGING for light opinion.",
-  "NEVER: stock daytrade · invent firsthand tests · REPOST text as writing voice · single global tone",
-  "STANCE: long-term Tesla investor / product progress; authenticity ≥80",
-].join("\n");
+const CREATOR_DNA = `creator-dna-v1.3.1: Korean Tesla owner-creator; FSD/product observation; LAFC/gaming ok; no stock daytrade; no invented tests; authenticity high; 음슴체 ok for light opinion.`;
+const PERF_DNA = `perf-dna candidates only VALIDATED=0: prefer followers/profile/bookmarks/replies over impressions; never learn from drafts.`;
 
-const PERFORMANCE_DNA_BLOCK = [
-  "performance-dna-runtime-baseline-v1-candidates",
-  "VALIDATED=0; candidates only; soft advisory",
-  "Priority: followers > profile visits > revenue > bookmarks > replies > likes > impressions",
-  "Never learn from drafts; never impressions-only",
-].join("\n");
+const SYSTEM = `You plan 7 days of ORIGINAL X posts for @Seung4680.
+Output ONLY compact JSON. No markdown. No trailing commentary.
+Schema:
+{"generationDays":7,"rationale":"short ko","days":[{"dayOffset":0,"posts":[{"slotId":"D1P1","primaryTopic":"...","angle":"...","contentType":"observation","targetLength":"medium","actionType":"ORIGINAL"}]}]}
+Rules: dayOffset 0-6; exactly 3 posts per day; primaryTopic creator-framed never raw Fedica keywords; no stock chatter; no invented first-hand tests.`;
 
-const SYSTEM = `You are the weekly planner for @Seung4680.
-Return ONLY valid JSON (no markdown fences, no commentary).
-Shape:
-{
-  "generationDays": 7,
-  "rationale": "short Korean string",
-  "days": [
-    {
-      "dayOffset": 0,
-      "posts": [
-        {
-          "slotId": "D1P1",
-          "primaryTopic": "creator-framed topic",
-          "angle": "angle",
-          "contentType": "observation",
-          "targetLength": "medium",
-          "actionType": "ORIGINAL",
-          "postStrategy": {
-            "strategicAngle": "...",
-            "writingApproach": "observation",
-            "experienceUsage": "none",
-            "hypothesisNote": "Hypothesis only"
-          }
-        }
-      ]
-    }
-  ]
-}
-Rules:
-- Exactly generationDays day objects, dayOffset 0..N-1
-- About 4 posts per day, actionType always ORIGINAL
-- primaryTopic is creator-framed — NEVER paste Fedica/audience keywords as title
-- Do not invent firsthand driving tests
-- Avoid FSD+Cybertruck monoculture every slot
-- No stock price chatter`;
-
-function parsePlanJson(rawText: string): any | null {
-  if (!rawText || !String(rawText).trim()) return null;
-  let text = String(rawText).trim();
-  text = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+function extractJsonObject(raw: string): any | null {
+  let t = String(raw || "").trim();
+  if (!t) return null;
+  t = t.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
   try {
-    return JSON.parse(text);
+    return JSON.parse(t);
   } catch {
-    /* continue */
+    /* fall through */
   }
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    try {
-      return JSON.parse(text.slice(start, end + 1));
-    } catch {
-      /* continue */
+  const start = t.indexOf("{");
+  if (start < 0) return null;
+  // Balance braces to find end even if truncated tail has noise
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < t.length; i++) {
+    const c = t[i];
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
     }
   }
-  // Try to find a days array even if wrapper is messy
-  const daysMatch = text.match(/"days"\s*:\s*(\[[\s\S]*\])/);
-  if (daysMatch) {
+  if (end > start) {
     try {
-      const days = JSON.parse(daysMatch[1]);
-      if (Array.isArray(days)) return { days, generationDays: days.length };
+      return JSON.parse(t.slice(start, end + 1));
     } catch {
-      /* ignore */
+      /* fall through */
+    }
+  }
+  // Last resort: truncated JSON — try close open braces
+  if (start >= 0 && depth > 0) {
+    let frag = t.slice(start);
+    // Remove trailing incomplete string
+    frag = frag.replace(/,\s*"[^"]*$/, "");
+    frag = frag.replace(/,\s*\{[^{}]*$/, "");
+    frag = frag.replace(/,\s*$/, "");
+    frag += "}".repeat(depth);
+    try {
+      return JSON.parse(frag);
+    } catch {
+      return null;
     }
   }
   return null;
@@ -118,7 +94,7 @@ Deno.serve(async (req: Request) => {
     const xaiKey = Deno.env.get("XAI_API_KEY");
     if (!xaiKey) {
       return json(
-        { success: false, error: "XAI_API_KEY not configured in Supabase secrets", fallback: true, days: [] },
+        { success: false, error: "XAI_API_KEY missing in secrets", fallback: true, days: [] },
         500
       );
     }
@@ -140,52 +116,43 @@ Deno.serve(async (req: Request) => {
     ).trim();
     const daysCount = Math.min(Math.max(Number(body.generationDays) || 7, 1), 7);
 
-    const audienceHint = [
-      Array.isArray(body.interests) ? `interests: ${body.interests.slice(0, 12).join(", ")}` : "",
-      Array.isArray(body.topicCategories)
-        ? `categories: ${body.topicCategories.slice(0, 10).join(", ")}`
-        : "",
-      body.sentiment ? `sentiment: ${body.sentiment}` : "",
-    ]
-      .filter(Boolean)
-      .join(" | ");
-
-    const publishedTopics: string[] = Array.isArray(body.publishedTopics)
-      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 10)
+    const interests = Array.isArray(body.interests)
+      ? body.interests.map(String).slice(0, 10)
+      : [];
+    const categories = Array.isArray(body.topicCategories)
+      ? body.topicCategories.map(String).slice(0, 8)
+      : [];
+    const published = Array.isArray(body.publishedTopics)
+      ? body.publishedTopics.map(String).slice(0, 8)
       : Array.isArray(body.recentTopics)
-        ? body.recentTopics.map(String).filter(Boolean).slice(0, 10)
+        ? body.recentTopics.map(String).slice(0, 8)
         : [];
-    const scheduledTopics: string[] = Array.isArray(body.scheduledTopics)
-      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 8)
+    const scheduled = Array.isArray(body.scheduledTopics)
+      ? body.scheduledTopics.map(String).slice(0, 6)
       : [];
 
-    const userPrompt = `Creator Intent: ${topic || "(없음)"}
+    const userPrompt = `Intent/keywords signal: ${topic || "(none)"}
+Audience interests (signals only): ${interests.join(", ") || "(none)"}
+Audience categories: ${categories.join(", ") || "(none)"}
+Sentiment: ${body.sentiment || "(none)"}
+${CREATOR_DNA}
+${PERF_DNA}
+Avoid repeating published themes: ${published.map((t) => t.slice(0, 40)).join(" | ") || "(none)"}
+Avoid scheduled dup: ${scheduled.map((t) => t.slice(0, 40)).join(" | ") || "(none)"}
 
-Creator DNA:
-${CREATOR_DNA_BLOCK}
-
-Audience signals (NOT titles): ${audienceHint.slice(0, 600) || "(none)"}
-
-Performance DNA (candidate only):
-${PERFORMANCE_DNA_BLOCK}
-
-PUBLISHED (history): ${publishedTopics.map((t) => t.slice(0, 50)).join(" | ") || "(none)"}
-SCHEDULED (dup only): ${scheduledTopics.map((t) => t.slice(0, 50)).join(" | ") || "(none)"}
-
-Generate JSON for ${daysCount} days (dayOffset 0..${daysCount - 1}), ~4 ORIGINAL posts per day.
-JSON only. No markdown.`;
+Return compact JSON only: ${daysCount} days, 3 posts each.`;
 
     const dna_sources = {
       creator: "runtime_snapshot",
       performance: "baseline_candidates",
       runtime: "supabase_edge_weekly_plan",
+      audience_signals: interests.length + categories.length,
     };
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 90000);
 
     let rawText = "";
-    let xaiStatus = 0;
     try {
       const res = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
@@ -195,8 +162,8 @@ JSON only. No markdown.`;
         },
         body: JSON.stringify({
           model: MODEL,
-          temperature: 0.4,
-          max_tokens: 4000,
+          temperature: 0.35,
+          max_tokens: 6000,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: userPrompt },
@@ -205,14 +172,13 @@ JSON only. No markdown.`;
         signal: controller.signal,
       });
       clearTimeout(timer);
-      xaiStatus = res.status;
       if (!res.ok) {
         const errText = await res.text();
         return json(
           {
             success: false,
             error: `xAI ${res.status}`,
-            detail: errText.slice(0, 400),
+            detail: errText.slice(0, 300),
             fallback: true,
             days: [],
             dna_sources,
@@ -224,12 +190,11 @@ JSON only. No markdown.`;
       rawText = data?.choices?.[0]?.message?.content || "";
     } catch (e: any) {
       clearTimeout(timer);
-      const isAbort = e?.name === "AbortError";
       return json(
         {
           success: false,
           error: "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
-          detail: isAbort ? "timeout" : String(e?.message || e).slice(0, 160),
+          detail: e?.name === "AbortError" ? "timeout" : String(e?.message || e).slice(0, 160),
           fallback: true,
           days: [],
           dna_sources,
@@ -238,21 +203,7 @@ JSON only. No markdown.`;
       );
     }
 
-    if (!rawText.trim()) {
-      return json(
-        {
-          success: false,
-          error: "xAI가 빈 응답을 반환했습니다.",
-          detail: `status=${xaiStatus}`,
-          fallback: true,
-          days: [],
-          dna_sources,
-        },
-        503
-      );
-    }
-
-    const parsed = parsePlanJson(rawText);
+    const parsed = extractJsonObject(rawText);
     let days: any[] = Array.isArray(parsed?.days) ? parsed.days : [];
 
     if (days.length === 0) {
@@ -260,10 +211,9 @@ JSON only. No markdown.`;
         {
           success: false,
           error: "주간 계획 결과가 비어 있습니다.",
-          detail: `parse_failed_or_empty; raw_preview=${rawText.slice(0, 280)}`,
+          detail: `parse_failed_or_empty; raw_preview=${String(rawText).slice(0, 320)}`,
           fallback: true,
           days: [],
-          generationDays: 0,
           dna_sources,
         },
         503
@@ -272,50 +222,34 @@ JSON only. No markdown.`;
 
     for (let i = 0; i < days.length; i++) {
       let posts = Array.isArray(days[i]?.posts) ? days[i].posts : [];
-      if (posts.length > 6) posts = posts.slice(0, 6);
-      posts = posts.map((p: any, pi: number) => {
-        const ps = p.postStrategy && typeof p.postStrategy === "object" ? p.postStrategy : {};
-        return {
-          slotId: String(p.slotId || `D${i + 1}P${pi + 1}`),
-          primaryTopic: String(p.primaryTopic || "관찰"),
-          angle: String(p.angle || ""),
-          contentType: String(p.contentType || "observation"),
-          allowedContext: Array.isArray(p.allowedContext)
-            ? p.allowedContext.map(String).slice(0, 2)
-            : [],
-          forbiddenTopics: Array.isArray(p.forbiddenTopics)
-            ? p.forbiddenTopics.map(String)
-            : ["주가", "등락"],
-          targetLength: ["short", "medium", "long"].includes(p.targetLength)
-            ? p.targetLength
-            : "medium",
-          actionType: "ORIGINAL",
-          postStrategy: {
-            strategicAngle: String(ps.strategicAngle || p.angle || "observation-first").slice(0, 120),
-            writingApproach: String(ps.writingApproach || "observation"),
-            experienceUsage: String(ps.experienceUsage || "none"),
-            hypothesisNote: String(
-              ps.hypothesisNote || "Hypothesis only — validate after publish."
-            ).slice(0, 160),
-          },
-        };
-      });
+      posts = posts.slice(0, 3).map((p: any, pi: number) => ({
+        slotId: String(p.slotId || `D${i + 1}P${pi + 1}`),
+        primaryTopic: String(p.primaryTopic || "관찰").slice(0, 80),
+        angle: String(p.angle || "").slice(0, 120),
+        contentType: String(p.contentType || "observation"),
+        allowedContext: [],
+        forbiddenTopics: ["주가", "등락"],
+        targetLength: ["short", "medium", "long"].includes(p.targetLength)
+          ? p.targetLength
+          : "medium",
+        actionType: "ORIGINAL",
+        postStrategy: {
+          strategicAngle: String(p.angle || "observation").slice(0, 80),
+          writingApproach: "observation",
+          experienceUsage: "none",
+          hypothesisNote: "Hypothesis only",
+        },
+      }));
       days[i] = {
         dayOffset: typeof days[i].dayOffset === "number" ? days[i].dayOffset : i,
         posts,
       };
     }
 
-    days = days.filter((d) => Array.isArray(d.posts) && d.posts.length > 0);
-    if (days.length === 0) {
+    days = days.filter((d) => d.posts?.length > 0);
+    if (!days.length) {
       return json(
-        {
-          success: false,
-          error: "주간 계획 슬롯이 비어 있습니다.",
-          fallback: true,
-          days: [],
-          dna_sources,
-        },
+        { success: false, error: "주간 계획 슬롯이 비어 있습니다.", fallback: true, days: [], dna_sources },
         503
       );
     }
