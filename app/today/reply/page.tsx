@@ -40,16 +40,20 @@ export default function ManualReplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [apiState, setApiState] = useState<string>("LOCAL_STORED");
   const [lastScope, setLastScope] = useState<string | null>(null);
+  const [postedId, setPostedId] = useState<string | null>(null);
 
   const targetText = useMemo(
     () => thread?.target_text || pastedComment.trim(),
     [thread, pastedComment]
   );
 
+  const canPost = Boolean(thread?.target_id && myReply.trim() && !postedId);
+
   async function fetchTarget() {
     if (!url.trim()) return;
     setBusy(true);
     setError(null);
+    setPostedId(null);
     setMsg("대상만 조회 중… (다른 댓글 0)");
     setApiState("API_LOADING");
     try {
@@ -185,7 +189,7 @@ export default function ManualReplyPage() {
     }
     setBusy(true);
     setError(null);
-    setMsg("답글 제안 생성 중… (X 댓글 트리 추가 조회 없음)");
+    setMsg("답글 제안 생성 중… (의도 입력 없음 · 댓글 트리 조회 없음)");
     setApiState("API_LOADING");
     try {
       const res = await fetch("/api/reply/suggest", {
@@ -201,7 +205,7 @@ export default function ManualReplyPage() {
             feature: "reply_manual",
             action: "suggest_reply",
             service: "XAI_GROK",
-            purpose: "Suggest reply candidates",
+            purpose: "Suggest reply candidates from DNA + target",
           },
         }),
       });
@@ -209,7 +213,7 @@ export default function ManualReplyPage() {
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setSuggestions(body.suggestions || []);
       setApiState("API_RESULT");
-      setMsg("제안은 AI 가설 · 자동 게시 없음 · 다른 사용자 댓글 자동 조회 없음");
+      setMsg("제안은 AI 가설 · 자동 게시 없음 · 「게시」를 눌러야 X에 올라갑니다");
     } catch (e: unknown) {
       setApiState("API_ERROR");
       setError(e instanceof Error ? e.message : String(e));
@@ -248,7 +252,53 @@ export default function ManualReplyPage() {
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setMyReply(body.text || myReply);
       setApiState("API_RESULT");
-      setMsg("다듬기 완료 — X에서 직접 게시");
+      setMsg("다듬기 완료 — 「게시」로 X에 올리거나 복사 가능");
+    } catch (e: unknown) {
+      setApiState("API_ERROR");
+      setError(e instanceof Error ? e.message : String(e));
+      setMsg(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function postReply() {
+    if (!canPost) {
+      setError(
+        thread?.target_id
+          ? "게시할 답글 텍스트가 필요합니다."
+          : "먼저 「API로 포스트/댓글 읽기」로 대상을 불러오세요. (붙여넣기만으로는 게시 대상 ID가 없습니다)"
+      );
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMsg("X에 답글 게시 중… (Fedica 아님 · 원클릭 게시)");
+    setApiState("API_LOADING");
+    try {
+      const res = await fetch("/api/reply/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: myReply.trim(),
+          in_reply_to_tweet_id: thread!.target_id,
+          api_consent: {
+            user_initiated: true,
+            feature: "reply_manual",
+            action: "POST_REPLY",
+            service: "X_API",
+            purpose: "Publish reply to X after Creator edit",
+          },
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      setPostedId(body.posted?.id || "ok");
+      setLastScope("POST_REPLY");
+      setApiState("API_RESULT");
+      setMsg(
+        `게시 완료 · id=${body.posted?.id || "?"} · AI 초안은 evidence 아님 · 실제 게시만 행동 evidence 후보`
+      );
     } catch (e: unknown) {
       setApiState("API_ERROR");
       setError(e instanceof Error ? e.message : String(e));
@@ -260,7 +310,7 @@ export default function ManualReplyPage() {
 
   function copyText(t: string) {
     navigator.clipboard?.writeText(t).then(
-      () => setMsg("복사됨 — X에서 직접 붙여넣기"),
+      () => setMsg("복사됨 — 필요 시 X에서 직접 붙여넣기"),
       () => setMsg("클립보드 권한을 확인하세요")
     );
   }
@@ -291,9 +341,9 @@ export default function ManualReplyPage() {
 
       <main className="mx-auto max-w-3xl space-y-5 px-4 py-6">
         <p className="text-xs text-zinc-500">
-          링크만 붙여도 API는 호출되지 않습니다. 기본 조회는{" "}
-          <strong className="text-zinc-300">대상 1개만</strong>입니다. 다른 사용자
-          댓글·전체 스레드는 기본에 포함되지 않습니다.
+          일반 포스트 예약은 Fedica · 답글 게시는{" "}
+          <strong className="text-zinc-300">X 직접</strong>
+          입니다. 링크만 붙여도 API는 호출되지 않습니다. 기본 조회는 대상 1개만입니다.
         </p>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
@@ -315,7 +365,6 @@ export default function ManualReplyPage() {
             {primaryLabel}
           </button>
           <p className="text-[11px] text-zinc-600">{primaryHint}</p>
-          <p className="text-[11px] text-zinc-600">X API 사용 · 예상 금액 미표시</p>
 
           {thread && (
             <div className="flex flex-wrap gap-2 border-t border-zinc-800 pt-3">
@@ -358,23 +407,17 @@ export default function ManualReplyPage() {
               </div>
             </div>
           )}
-          {thread && (
-            <p className="text-[11px] text-zinc-600">
-              「원문/부모」「다른 반응」은 각각 별도 승인·별도 비용입니다. 기본
-              Suggest에는 필요 없습니다.
-            </p>
-          )}
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-2">
           <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            Direct text mode (API 없음)
+            Direct text mode (조회·게시 ID 없음 → 복사용)
           </h2>
           <textarea
             value={pastedComment}
             onChange={(e) => setPastedComment(e.target.value)}
             rows={3}
-            placeholder="상대 포스트/댓글 텍스트를 직접 붙여넣기"
+            placeholder="상대 텍스트 붙여넣기 (제안·다듬기 가능, 원클릭 게시는 대상 ID 필요)"
             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
         </section>
@@ -383,7 +426,7 @@ export default function ManualReplyPage() {
           <section className="rounded-xl border border-emerald-900/50 bg-emerald-950/20 p-4 space-y-2 text-sm">
             <div className="text-[10px] uppercase text-emerald-400">
               Target · @{thread.target_author_username || "?"} ·{" "}
-              {isReply ? "REPLY" : "POST"}
+              {isReply ? "REPLY" : "POST"} · id={thread.target_id}
             </div>
             <p className="text-zinc-200 whitespace-pre-wrap">{thread.target_text}</p>
             {thread.parent_text && (
@@ -416,13 +459,16 @@ export default function ManualReplyPage() {
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-            내 답글
+            수정 & 게시
           </h2>
           <textarea
             value={myReply}
-            onChange={(e) => setMyReply(e.target.value)}
+            onChange={(e) => {
+              setMyReply(e.target.value);
+              setPostedId(null);
+            }}
             rows={5}
-            placeholder="직접 답글을 쓰거나, 제안을 받은 뒤 수정하세요."
+            placeholder="직접 쓰거나 제안을 넣은 뒤 수정하세요. 의도 입력창 없음."
             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
           <div className="flex flex-wrap gap-2">
@@ -440,17 +486,32 @@ export default function ManualReplyPage() {
               onClick={polish}
               className="rounded-lg bg-zinc-700 px-4 py-2 text-sm hover:bg-zinc-600 disabled:opacity-40"
             >
-              내 답글 다듬기
+              다듬기
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canPost}
+              onClick={postReply}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-40"
+            >
+              게시
             </button>
             <button
               type="button"
               disabled={!myReply.trim()}
               onClick={() => copyText(myReply)}
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm hover:bg-emerald-600 disabled:opacity-40"
+              className="rounded-lg border border-zinc-600 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-40"
             >
               복사
             </button>
           </div>
+          <p className="text-[11px] text-zinc-600">
+            「게시」= Creator가 누를 때만 X API로 답글 전송 (자동 전송 없음 · Fedica 아님).
+            쓰기 권한 오류 시 앱에서 X 재연결이 필요합니다.
+          </p>
+          {postedId && (
+            <p className="text-xs text-emerald-400">게시됨 · {postedId}</p>
+          )}
         </section>
 
         {suggestions.length > 0 && (
@@ -470,7 +531,8 @@ export default function ManualReplyPage() {
                   className="text-xs text-emerald-400 hover:underline"
                   onClick={() => {
                     setMyReply(s.text);
-                    setMsg("제안을 편집창에 넣었습니다.");
+                    setPostedId(null);
+                    setMsg("제안을 편집창에 넣었습니다. 수정 후 「게시」");
                   }}
                 >
                   사용 (편집창에 넣기)
@@ -486,11 +548,6 @@ export default function ManualReplyPage() {
             {error}
           </p>
         )}
-
-        <p className="text-[11px] leading-relaxed text-zinc-600">
-          기본 Reply Assist 비용은 대상 포스트/댓글 1개 기준입니다. 게시물에 댓글이
-          5만 개여도 기본 조회 범위는 동일합니다.
-        </p>
       </main>
     </div>
   );
