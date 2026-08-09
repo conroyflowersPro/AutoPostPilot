@@ -3,8 +3,17 @@ import { createHash, randomBytes } from "crypto";
 const AUTH_URL = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL = "https://api.x.com/2/oauth2/token";
 
-/** Scopes for Calendar / Home sync (read + refresh). */
-export const X_OAUTH_SCOPES = ["tweet.read", "users.read", "offline.access"].join(" ");
+/**
+ * OAuth 2.0 scopes.
+ * tweet.write required for Manual Reply one-click publish (not Fedica).
+ * User must re-connect X after this change for write to take effect.
+ */
+export const X_OAUTH_SCOPES = [
+  "tweet.read",
+  "tweet.write",
+  "users.read",
+  "offline.access",
+].join(" ");
 
 export function getOAuthConfig() {
   const clientId = process.env.X_CLIENT_ID;
