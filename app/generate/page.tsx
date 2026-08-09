@@ -523,7 +523,7 @@ export default function GeneratePage() {
           </Link>
           <h1 className="text-lg font-semibold">이번 주 계획</h1>
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            v6.2.3
+            v6.3.0
           </span>
         </div>
       </header>
@@ -596,19 +596,30 @@ export default function GeneratePage() {
 
         {result && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-sm">
-              <p className="font-medium text-emerald-300">{result.count}개 포스트가 draft로 저장되었습니다.</p>
+            <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-sm space-y-2">
+              <p className="text-[10px] uppercase tracking-wide text-emerald-500">이번 주 전략 요약</p>
+              {result.rationale && (
+                <p className="text-sm text-zinc-200">{result.rationale}</p>
+              )}
               {result.plan && (
-                <p className="mt-2 text-xs text-zinc-300">
-                  계획:{" "}
-                  {result.plan.map((d: any) => `D${d.dayOffset + 1}=${d.count}개` + (d.themes?.length ? `(${d.themes.slice(0, 2).join(", ")})` : "")).join(" · ")}
-                </p>
+                <div className="rounded-lg bg-zinc-950/40 px-3 py-2 text-xs text-zinc-300">
+                  <div className="mb-1 text-[10px] uppercase text-zinc-500">7일 편집 계획</div>
+                  {result.plan.map((d: any) => (
+                    <div key={d.dayOffset} className="flex gap-2 border-b border-zinc-800/80 py-1 last:border-0">
+                      <span className="w-10 text-zinc-500">D{d.dayOffset + 1}</span>
+                      <span>
+                        {d.count}개
+                        {d.themes?.length ? ` · ${d.themes.slice(0, 3).join(", ")}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
-              {result.rationale && <p className="mt-1 text-xs text-zinc-400">{result.rationale}</p>}
+              <p className="font-medium text-emerald-300">{result.count}개 초안이 draft로 저장되었습니다.</p>
               {result.batchErrors?.length > 0 && (
-                <p className="mt-1 text-xs text-amber-300">일부 날짜 실패: {result.batchErrors.join(" · ")}</p>
+                <p className="text-xs text-amber-300">일부 날짜 실패: {result.batchErrors.join(" · ")}</p>
               )}
-              <button onClick={() => router.push("/")} className="mt-3 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs hover:bg-emerald-600">목록으로 →</button>
+              <button onClick={() => router.push("/")} className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs hover:bg-emerald-600">목록으로 →</button>
             </div>
             <div className="space-y-3">
               {result.posts?.map((p: any, i: number) => (
