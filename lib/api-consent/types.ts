@@ -20,10 +20,15 @@ export type ApiInvocationAudit = {
   service: ExternalService;
   purpose: string;
   user_initiated: true;
+  request_scope?: string;
+  other_replies_requested?: boolean;
+  other_reply_fetch_count?: number;
+  conversation_pagination_count?: number;
+  x_endpoint?: string;
+  x_query_summary?: string;
 };
 
 export type ExplicitApiConsent = {
-  /** Must be true — set only after Creator clicks an action */
   user_initiated: true;
   feature: string;
   action: string;
