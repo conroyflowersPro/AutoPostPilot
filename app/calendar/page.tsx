@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import CalendarControlCenter from "@/app/components/CalendarControlCenter";
 import { getCalendarActivities, getAccountSyncState } from "@/lib/calendar/activity-provider";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -33,7 +34,7 @@ export default async function CalendarPage() {
               AutoPostPilot
             </Link>
             <span className="rounded bg-indigo-900/60 px-1.5 py-0.5 text-[10px] text-indigo-300">
-              v5.2.0
+              {APP_VERSION_LABEL}
             </span>
           </div>
           <div className="flex items-center gap-3">
