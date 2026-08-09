@@ -1,6 +1,7 @@
 export type EngagementOpportunity = {
   id: string;
   source: "LOCAL" | "STORED" | "X_API";
+  /** Primary label (legacy / list title) */
   title: string;
   reason?: string;
   tweet_id?: string;
@@ -8,6 +9,21 @@ export type EngagementOpportunity = {
   author?: string;
   text_preview?: string;
   live?: boolean;
+
+  /** UI / reply deep-link fields (Today engagement) */
+  topic?: string;
+  reply_href?: string;
+  x_url?: string;
+  suggested_intent?: string;
+  opportunity_type?: string;
+  api_required?: boolean;
+  why_relevant?: string;
+  event_context?: {
+    phase?: string;
+    event_id?: string;
+    label?: string;
+    [key: string]: unknown;
+  };
 };
 
 export type ReplyContextScope =
