@@ -55,6 +55,8 @@ export type EngagementOpportunity = {
   api_required: boolean;
   api_action_label?: string | null;
   source: "SHARED_CONTEXT" | "CREATOR_DNA" | "STORED" | "X_API";
+  x_url?: string | null;
+  reply_href?: string | null;
 };
 
 export type ThreadContext = {
