@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
 const LS_PREFIX = "autopostpilot_generation_job_";
@@ -142,7 +143,9 @@ function GeneratePageInner() {
             (extractData.keywords || []).join(", ") ||
             keywords.trim();
           if (Array.isArray(extractData.interests)) {
-            audienceInterests = extractData.interests.map((x: unknown) => String(x).trim()).filter(Boolean);
+            audienceInterests = extractData.interests
+              .map((x: unknown) => String(x).trim())
+              .filter(Boolean);
           }
           if (Array.isArray(extractData.topicCategories)) {
             audienceTopicCategories = extractData.topicCategories
@@ -171,7 +174,10 @@ function GeneratePageInner() {
           .order("created_at", { ascending: false })
           .limit(50);
         for (const r of topicRows || []) {
-          const snippet = String((r as any).content || "").replace(/\s+/g, " ").trim().slice(0, 80);
+          const snippet = String((r as any).content || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 80);
           if (!snippet) continue;
           if ((r as any).status === "published") publishedTopics.push(snippet);
           else if ((r as any).status === "scheduled") scheduledTopics.push(snippet);
@@ -196,7 +202,9 @@ function GeneratePageInner() {
             publishedTopics: publishedTopics.length ? publishedTopics : undefined,
             scheduledTopics: scheduledTopics.length ? scheduledTopics : undefined,
             interests: audienceInterests.length ? audienceInterests : undefined,
-            topicCategories: audienceTopicCategories.length ? audienceTopicCategories : undefined,
+            topicCategories: audienceTopicCategories.length
+              ? audienceTopicCategories
+              : undefined,
             sentiment: audienceSentiment || undefined,
           }),
         });
@@ -302,10 +310,17 @@ function GeneratePageInner() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
       <div>
-        <h1 className="text-xl font-medium">이번 주 계획</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-medium">이번 주 계획</h1>
+          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+            {APP_VERSION_LABEL}
+          </span>
+        </div>
         <p className="mt-1 text-sm text-zinc-400">
-          관심사 키워드는 글에 넣지 않고 신호로만 씁니다. Planner 실패 시 자동 대체 초안을 만들지 않습니다.
+          관심사 키워드는 글에 넣지 않고 신호로만 씁니다. Planner 실패 시 자동 대체 초안을 만들지
+          않습니다.
         </p>
+        <p className="mt-0.5 text-[10px] text-zinc-600">{BUILD_STAMP}</p>
       </div>
 
       <form
@@ -365,13 +380,17 @@ function GeneratePageInner() {
             {result.rationale && <p className="text-sm text-zinc-200">{result.rationale}</p>}
             {result.dna_sources && (
               <p className="text-[10px] text-zinc-500">
-                DNA: creator={result.dna_sources.creator} · performance={result.dna_sources.performance}
+                DNA: creator={result.dna_sources.creator} · performance=
+                {result.dna_sources.performance}
               </p>
             )}
             {result.plan && (
               <div className="rounded-lg bg-zinc-950/40 px-3 py-2 text-xs text-zinc-300">
                 {result.plan.map((d: any) => (
-                  <div key={d.dayOffset} className="flex gap-2 border-b border-zinc-800/80 py-1 last:border-0">
+                  <div
+                    key={d.dayOffset}
+                    className="flex gap-2 border-b border-zinc-800/80 py-1 last:border-0"
+                  >
                     <span className="w-10 text-zinc-500">D{d.dayOffset + 1}</span>
                     <span>
                       {d.count}개
@@ -381,9 +400,13 @@ function GeneratePageInner() {
                 ))}
               </div>
             )}
-            <p className="font-medium text-emerald-300">{result.count}개 초안이 draft로 저장되었습니다.</p>
+            <p className="font-medium text-emerald-300">
+              {result.count}개 초안이 draft로 저장되었습니다.
+            </p>
             {result.batchErrors?.length > 0 && (
-              <p className="text-xs text-amber-300">일부 날짜 실패: {result.batchErrors.join(" · ")}</p>
+              <p className="text-xs text-amber-300">
+                일부 날짜 실패: {result.batchErrors.join(" · ")}
+              </p>
             )}
             <button
               onClick={() => router.push("/")}
