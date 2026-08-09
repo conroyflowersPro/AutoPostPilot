@@ -3,10 +3,16 @@
  * modes: POLISH | AI_WRITE
  * Creator-initiated text is the source. No topic/prompt box.
  * Never invent firsthand experience.
+ * Shares Shared Current Context with Planner.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authenticityGate } from "@/lib/performance-evidence/authenticity-gate";
+import {
+  buildSharedCurrentContext,
+  inferHintsFromUserText,
+  manualComposerPriorityNote,
+} from "@/lib/context";
 
 export const maxDuration = 26;
 
@@ -100,6 +106,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const sharedContext = buildSharedCurrentContext({
+      events: Array.isArray(body.events) ? body.events : [],
+      xTopics: Array.isArray(body.xTopics) ? body.xTopics : body.xContext || [],
+      planner: body.planner || {},
+      timezone: body.timezone || "America/Los_Angeles",
+    });
+    const inputHints = inferHintsFromUserText(input);
+
     const system = mode === "POLISH" ? POLISH_SYSTEM : AI_WRITE_SYSTEM;
     const userMsg = `Creator raw input (do not invent extra firsthand facts):
 ---
@@ -108,6 +122,14 @@ ${input}
 length_control: ${lengthControl}
 ${lengthHint(lengthControl)}
 initiative_origin: ${initiative}
+
+${manualComposerPriorityNote()}
+
+SHARED CURRENT CONTEXT (same as Planner — evidence not command):
+${sharedContext.prompt_block}
+
+Input hints (weak, do not override user text): ${inputHints.join(" | ") || "(none)"}
+If LIVE LAFC / match context is active and input is stadium atmosphere, treat as Match-Day Live Creator Observation — not generic daily filler.
 Return JSON only.`;
 
     const controller = new AbortController();
@@ -179,6 +201,14 @@ Return JSON only.`;
       creator_raw_input: input,
       authenticity: gate,
       model: MODEL,
+      sharedCurrentContext: {
+        indicators: sharedContext.indicators,
+        active_events: sharedContext.active_events,
+        upcoming_events: sharedContext.upcoming_events,
+        recent_events: sharedContext.recent_events,
+        context_timestamp: sharedContext.context_timestamp,
+      },
+      input_hints: inputHints,
     });
   } catch (err: unknown) {
     const msg =
