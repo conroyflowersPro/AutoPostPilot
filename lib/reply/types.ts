@@ -22,3 +22,10 @@ export type ReplySuggestRequest = {
   scope?: ReplyContextScope;
   consent?: boolean;
 };
+
+/** AI reply suggestion — not Creator evidence */
+export type ReplySuggestion = {
+  text: string;
+  style?: "SHORT_NATURAL" | "EXPLAIN" | "HUMOR" | "OTHER" | string;
+  notes?: string | null;
+};
