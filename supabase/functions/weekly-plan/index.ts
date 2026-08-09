@@ -1,8 +1,6 @@
 /**
  * Weekly Planner — Supabase Edge
- * Engine contract preserved:
- * Creator Intent + Creator DNA + Audience signals + Performance DNA (candidates)
- * + published/scheduled topic split → days[] slots.
+ * Engines: Creator Intent + Creator DNA + Audience signals + Performance DNA (candidates)
  * NO silent hard-coded FSD/CT fallback.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -17,35 +15,86 @@ const corsHeaders = {
 };
 
 const CREATOR_DNA_BLOCK = [
-  "creator-dna-runtime-v1.3.1-snapshot (Archive/Historical learning)",
-  "WHO: Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC) retained.",
-  "WHY WRITE: inform/explain · share experience · light opinion · social reply",
-  "PUBLISHING DNA: two-speed; media often; informational → polite intentional; light-opinion 음슴체 = RECENTLY_EMERGING preference.",
-  "REPLY DNA (SEPARATE): short, communicative — NEVER average into Publishing voice.",
-  "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice",
-  "REPOST: manual by Creator only; REPOST text excluded from Writing DNA",
-  "CONTENT STANCE: long-term Tesla investor / product progress; not short-term stock price chatter",
-  "SAFETY: never invent firsthand driving tests; Level1/2 only without evidence; authenticity ≥80",
+  "creator-dna-runtime-v1.3.1-snapshot",
+  "WHO: Korean Tesla multi-vehicle owner-creator; FSD/product observation primary; LAFC/gaming/daily retained.",
+  "PUBLISHING: inform/explain · experience · light opinion; polite intentional; 음슴체 RECENTLY_EMERGING for light opinion.",
+  "NEVER: stock daytrade · invent firsthand tests · REPOST text as writing voice · single global tone",
+  "STANCE: long-term Tesla investor / product progress; authenticity ≥80",
 ].join("\n");
 
 const PERFORMANCE_DNA_BLOCK = [
   "performance-dna-runtime-baseline-v1-candidates",
-  "STATUS: INITIAL BASELINE v1 previously run — candidates only; VALIDATED = 0",
-  "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > likes > impressions",
-  "CANDIDATE only (NOT proven): practical investigation+video; community how-to; authentic FSD essay; milestone gratitude; honest incident",
-  "FORBIDDEN: impressions-only · learn from drafts · promote candidate→validated here",
-  "Soft preference only; never override Creator DNA or Creator Intent",
+  "VALIDATED=0; candidates only; soft advisory",
+  "Priority: followers > profile visits > revenue > bookmarks > replies > likes > impressions",
+  "Never learn from drafts; never impressions-only",
 ].join("\n");
 
-const SYSTEM = `You are the weekly account-operating strategist for @Seung4680 — AI account manager, not a post generator.
-MISSION: long-term growth + authentic creator voice. Impressions alone must never dominate.
-AUTHENTICITY HARD: never invent firsthand experiences; Level1/2 only.
-Creator Intent must shape the week. Audience/Fedica keywords are signals — NEVER copy as primaryTopic.
-Posting time is owned by Fedica only. WEEKLY POSTS = ORIGINAL only. Do not learn from drafts.
-FORBIDDEN: 주가/등락/TSLA chart · invented experiences · Fedica keywords as primaryTopic · FSD+Cybertruck monoculture every slot.
-Output JSON only with: generationDays, rationale, days (array of { dayOffset, posts }).
-Each post: slotId, primaryTopic, angle, contentType, targetLength (short|medium|long), actionType "ORIGINAL", postStrategy { strategicAngle, writingApproach, experienceUsage, hypothesisNote }.
-Aim about 4-5 ORIGINAL posts per day. Compact JSON.`;
+const SYSTEM = `You are the weekly planner for @Seung4680.
+Return ONLY valid JSON (no markdown fences, no commentary).
+Shape:
+{
+  "generationDays": 7,
+  "rationale": "short Korean string",
+  "days": [
+    {
+      "dayOffset": 0,
+      "posts": [
+        {
+          "slotId": "D1P1",
+          "primaryTopic": "creator-framed topic",
+          "angle": "angle",
+          "contentType": "observation",
+          "targetLength": "medium",
+          "actionType": "ORIGINAL",
+          "postStrategy": {
+            "strategicAngle": "...",
+            "writingApproach": "observation",
+            "experienceUsage": "none",
+            "hypothesisNote": "Hypothesis only"
+          }
+        }
+      ]
+    }
+  ]
+}
+Rules:
+- Exactly generationDays day objects, dayOffset 0..N-1
+- About 4 posts per day, actionType always ORIGINAL
+- primaryTopic is creator-framed — NEVER paste Fedica/audience keywords as title
+- Do not invent firsthand driving tests
+- Avoid FSD+Cybertruck monoculture every slot
+- No stock price chatter`;
+
+function parsePlanJson(rawText: string): any | null {
+  if (!rawText || !String(rawText).trim()) return null;
+  let text = String(rawText).trim();
+  text = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* continue */
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      return JSON.parse(text.slice(start, end + 1));
+    } catch {
+      /* continue */
+    }
+  }
+  // Try to find a days array even if wrapper is messy
+  const daysMatch = text.match(/"days"\s*:\s*(\[[\s\S]*\])/);
+  if (daysMatch) {
+    try {
+      const days = JSON.parse(daysMatch[1]);
+      if (Array.isArray(days)) return { days, generationDays: days.length };
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -60,23 +109,16 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader)
-      return json(
-        { success: false, error: "Missing Authorization", fallback: true, days: [] },
-        401
-      );
+    if (!authHeader) {
+      return json({ success: false, error: "Missing Authorization", fallback: true, days: [] }, 401);
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const xaiKey = Deno.env.get("XAI_API_KEY");
     if (!xaiKey) {
       return json(
-        {
-          success: false,
-          error: "XAI_API_KEY not configured in Supabase secrets",
-          fallback: true,
-          days: [],
-        },
+        { success: false, error: "XAI_API_KEY not configured in Supabase secrets", fallback: true, days: [] },
         500
       );
     }
@@ -88,11 +130,9 @@ Deno.serve(async (req: Request) => {
       data: { user },
       error: userErr,
     } = await supabase.auth.getUser();
-    if (userErr || !user)
-      return json(
-        { success: false, error: "Not authenticated", fallback: true, days: [] },
-        401
-      );
+    if (userErr || !user) {
+      return json({ success: false, error: "Not authenticated", fallback: true, days: [] }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const topic = String(
@@ -101,9 +141,7 @@ Deno.serve(async (req: Request) => {
     const daysCount = Math.min(Math.max(Number(body.generationDays) || 7, 1), 7);
 
     const audienceHint = [
-      Array.isArray(body.interests)
-        ? `interests: ${body.interests.slice(0, 12).join(", ")}`
-        : "",
+      Array.isArray(body.interests) ? `interests: ${body.interests.slice(0, 12).join(", ")}` : "",
       Array.isArray(body.topicCategories)
         ? `categories: ${body.topicCategories.slice(0, 10).join(", ")}`
         : "",
@@ -113,43 +151,29 @@ Deno.serve(async (req: Request) => {
       .join(" | ");
 
     const publishedTopics: string[] = Array.isArray(body.publishedTopics)
-      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 12)
+      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 10)
       : Array.isArray(body.recentTopics)
-        ? body.recentTopics.map(String).filter(Boolean).slice(0, 12)
+        ? body.recentTopics.map(String).filter(Boolean).slice(0, 10)
         : [];
     const scheduledTopics: string[] = Array.isArray(body.scheduledTopics)
-      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 10)
+      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 8)
       : [];
 
-    const topicSignalBlock = [
-      publishedTopics.length
-        ? `PUBLISHED (history only — not drafts):\n${publishedTopics
-            .map((t, i) => `${i + 1}. ${t.slice(0, 60)}`)
-            .join("\n")}`
-        : "PUBLISHED: (none)",
-      scheduledTopics.length
-        ? `SCHEDULED (duplication avoidance only):\n${scheduledTopics
-            .map((t, i) => `${i + 1}. ${t.slice(0, 60)}`)
-            .join("\n")}`
-        : "SCHEDULED: (none)",
-    ].join("\n\n");
-
-    const userPrompt = `Creator Intent (must shape this week): ${topic || "(없음)"}
+    const userPrompt = `Creator Intent: ${topic || "(없음)"}
 
 Creator DNA:
 ${CREATOR_DNA_BLOCK}
 
-Audience DNA / signals (NOT writing titles):
-${audienceHint.slice(0, 800) || "(none)"}
+Audience signals (NOT titles): ${audienceHint.slice(0, 600) || "(none)"}
 
-Performance DNA (CANDIDATE only — validated=0; soft advisory):
+Performance DNA (candidate only):
 ${PERFORMANCE_DNA_BLOCK}
 
-${topicSignalBlock}
+PUBLISHED (history): ${publishedTopics.map((t) => t.slice(0, 50)).join(" | ") || "(none)"}
+SCHEDULED (dup only): ${scheduledTopics.map((t) => t.slice(0, 50)).join(" | ") || "(none)"}
 
-Return JSON only for ${daysCount} days (dayOffset 0..${daysCount - 1}).
-Every slot actionType=ORIGINAL. Never copy audience keywords into primaryTopic.
-Expand beyond FSD/Cybertruck monoculture when possible.`;
+Generate JSON for ${daysCount} days (dayOffset 0..${daysCount - 1}), ~4 ORIGINAL posts per day.
+JSON only. No markdown.`;
 
     const dna_sources = {
       creator: "runtime_snapshot",
@@ -161,6 +185,7 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
     const timer = setTimeout(() => controller.abort(), 90000);
 
     let rawText = "";
+    let xaiStatus = 0;
     try {
       const res = await fetch("https://api.x.ai/v1/chat/completions", {
         method: "POST",
@@ -170,8 +195,8 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
         },
         body: JSON.stringify({
           model: MODEL,
-          temperature: 0.55,
-          max_tokens: 3500,
+          temperature: 0.4,
+          max_tokens: 4000,
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: userPrompt },
@@ -180,13 +205,14 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
         signal: controller.signal,
       });
       clearTimeout(timer);
+      xaiStatus = res.status;
       if (!res.ok) {
         const errText = await res.text();
         return json(
           {
             success: false,
             error: `xAI ${res.status}`,
-            detail: errText.slice(0, 300),
+            detail: errText.slice(0, 400),
             fallback: true,
             days: [],
             dna_sources,
@@ -202,9 +228,8 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
       return json(
         {
           success: false,
-          error:
-            "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
-          detail: isAbort ? "timeout" : String(e?.message || e).slice(0, 120),
+          error: "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
+          detail: isAbort ? "timeout" : String(e?.message || e).slice(0, 160),
           fallback: true,
           days: [],
           dna_sources,
@@ -213,31 +238,29 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
       );
     }
 
-    let parsed: any = null;
-    try {
-      const cleaned = rawText
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch {
-          parsed = null;
-        }
-      }
+    if (!rawText.trim()) {
+      return json(
+        {
+          success: false,
+          error: "xAI가 빈 응답을 반환했습니다.",
+          detail: `status=${xaiStatus}`,
+          fallback: true,
+          days: [],
+          dna_sources,
+        },
+        503
+      );
     }
 
+    const parsed = parsePlanJson(rawText);
     let days: any[] = Array.isArray(parsed?.days) ? parsed.days : [];
+
     if (days.length === 0) {
       return json(
         {
           success: false,
           error: "주간 계획 결과가 비어 있습니다.",
+          detail: `parse_failed_or_empty; raw_preview=${rawText.slice(0, 280)}`,
           fallback: true,
           days: [],
           generationDays: 0,
@@ -251,8 +274,7 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
       let posts = Array.isArray(days[i]?.posts) ? days[i].posts : [];
       if (posts.length > 6) posts = posts.slice(0, 6);
       posts = posts.map((p: any, pi: number) => {
-        const ps =
-          p.postStrategy && typeof p.postStrategy === "object" ? p.postStrategy : {};
+        const ps = p.postStrategy && typeof p.postStrategy === "object" ? p.postStrategy : {};
         return {
           slotId: String(p.slotId || `D${i + 1}P${pi + 1}`),
           primaryTopic: String(p.primaryTopic || "관찰"),
@@ -269,9 +291,7 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
             : "medium",
           actionType: "ORIGINAL",
           postStrategy: {
-            strategicAngle: String(
-              ps.strategicAngle || p.angle || "observation-first"
-            ).slice(0, 120),
+            strategicAngle: String(ps.strategicAngle || p.angle || "observation-first").slice(0, 120),
             writingApproach: String(ps.writingApproach || "observation"),
             experienceUsage: String(ps.experienceUsage || "none"),
             hypothesisNote: String(
@@ -316,9 +336,8 @@ Expand beyond FSD/Cybertruck monoculture when possible.`;
     return json(
       {
         success: false,
-        error:
-          "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
-        detail: String(err?.message || err).slice(0, 120),
+        error: "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
+        detail: String(err?.message || err).slice(0, 160),
         fallback: true,
         days: [],
       },
