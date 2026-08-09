@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +28,25 @@ export default function CreatorWritePage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [contextIndicators, setContextIndicators] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/context/current");
+        if (!res.ok) return;
+        const body = await res.json();
+        const ind = body?.context?.indicators;
+        if (!cancelled && Array.isArray(ind)) setContextIndicators(ind.map(String));
+      } catch {
+        /* optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canAct = useMemo(() => text.trim().length > 0 && !busy, [text, busy]);
 
@@ -144,6 +163,18 @@ export default function CreatorWritePage() {
           X에 쓰듯 그냥 적으세요. 주제/프롬프트 입력창은 없습니다. 필요할 때만
           다듬기 또는 AI 작성.
         </p>
+        {contextIndicators.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {contextIndicators.map((ind) => (
+              <span
+                key={ind}
+                className="rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-0.5 text-[10px] text-emerald-300"
+              >
+                {ind}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <button
