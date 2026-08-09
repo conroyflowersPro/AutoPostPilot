@@ -20,12 +20,12 @@ import { ChevronLeft, ChevronRight, AlertTriangle, ExternalLink, Copy, Check } f
 import { CalendarActivity, ControlCenterSummary } from "@/lib/calendar/types";
 
 const ORIGIN_LABEL: Record<string, string> = {
-  WEEKLY_PLANNER: "Planned",
-  WILD_FREE: "Wild FREE",
-  WILD_GROWTH: "Wild GROWTH",
-  CREATOR_REQUEST: "Request",
-  MANUAL_CREATOR: "Manual",
-  X_ACTUAL: "X Actual",
+  WEEKLY_PLANNER: "계획",
+  WILD_FREE: "자유",
+  WILD_GROWTH: "성장",
+  CREATOR_REQUEST: "요청",
+  MANUAL_CREATOR: "직접",
+  X_ACTUAL: "실제 게시",
 };
 
 const ORIGIN_COLOR: Record<string, string> = {
@@ -49,6 +49,10 @@ const STATUS_LABEL: Record<string, string> = {
   SKIPPED: "skipped",
   NOT_RUN: "not run",
 };
+
+function dayIso(d: Date) {
+  return format(d, "yyyy-MM-dd");
+}
 
 function buildSummary(activities: CalendarActivity[], focusDate: Date): ControlCenterSummary {
   const todayStr = format(focusDate, "yyyy-MM-dd");
@@ -123,30 +127,30 @@ export default function CalendarControlCenter({ initialActivities = [], syncStat
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Today · Control Center</div>
+        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">오늘 요약</div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 text-sm">
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Scheduled</div>
+            <div className="text-[10px] text-zinc-500">예약</div>
             <div className="font-semibold">{summary.scheduled}</div>
           </div>
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Wild FREE</div>
+            <div className="text-[10px] text-zinc-500">자유 콘텐츠</div>
             <div className="font-semibold capitalize">{summary.wildFreeStatus}</div>
           </div>
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Wild GROWTH</div>
+            <div className="text-[10px] text-zinc-500">성장 콘텐츠</div>
             <div className="font-semibold capitalize">{summary.wildGrowthStatus}</div>
           </div>
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Manual Actions</div>
+            <div className="text-[10px] text-zinc-500">직접 작성</div>
             <div className={`font-semibold ${summary.manualActions > 0 ? "text-amber-400" : ""}`}>{summary.manualActions}</div>
           </div>
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Published</div>
+            <div className="text-[10px] text-zinc-500">게시됨</div>
             <div className="font-semibold">{summary.published}</div>
           </div>
           <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-            <div className="text-[10px] text-zinc-500">Duplicates</div>
+            <div className="text-[10px] text-zinc-500">유사 주의</div>
             <div className={`font-semibold ${summary.duplicateWarnings > 0 ? "text-rose-400" : ""}`}>{summary.duplicateWarnings}</div>
           </div>
         </div>
@@ -212,7 +216,7 @@ export default function CalendarControlCenter({ initialActivities = [], syncStat
         {selectedActs.length === 0 && (
           <p className="text-sm text-zinc-500">
             {syncStatus === "not_connected" || syncStatus === "never_synced"
-              ? "No operational activity for this day (X not synced)."
+              ? "이 날짜에 운영 데이터가 없습니다 (X 미동기화)."
               : "이 날짜에 등록된 활동이 없습니다."}
           </p>
         )}
@@ -239,12 +243,12 @@ export default function CalendarControlCenter({ initialActivities = [], syncStat
                   {a.generated_text && (
                     <button type="button" onClick={() => copyText(a.activity_id, a.generated_text || "")} className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2.5 py-1.5 text-xs hover:bg-zinc-700">
                       {copiedId === a.activity_id ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                      Copy Text
+                      복사
                     </button>
                   )}
                   {a.source_post_url && (
                     <a href={a.source_post_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2.5 py-1.5 text-xs hover:bg-zinc-700">
-                      <ExternalLink className="h-3.5 w-3.5" /> Open on X
+                      <ExternalLink className="h-3.5 w-3.5" /> X에서 열기
                     </a>
                   )}
                 </div>
@@ -254,9 +258,40 @@ export default function CalendarControlCenter({ initialActivities = [], syncStat
         </div>
       </div>
 
+      {selectedDate && (
+        <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+          <div className="w-full text-[10px] uppercase tracking-wide text-zinc-500">
+            선택한 날 · {format(selectedDate, "M월 d일 (EEE)", { locale: ko })}
+          </div>
+          <Link
+            href={`/today`}
+            className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium hover:bg-emerald-600"
+          >
+            오늘 화면
+          </Link>
+          <Link
+            href={`/generate?start=${dayIso(selectedDate)}`}
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500"
+          >
+            이 날부터 주간 계획
+          </Link>
+          <Link
+            href={`/today/write`}
+            className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
+          >
+            이 날 직접 쓰기
+          </Link>
+          <Link
+            href={`/today/reply`}
+            className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
+          >
+            답글 작성
+          </Link>
+        </div>
+      )}
       <p className="text-center text-[11px] text-zinc-600">
-        v5.2.0 · Operational calendar ·{" "}
-        <Link href="/" className="text-zinc-500 underline hover:text-zinc-300">Home</Link>
+        캘린더 · 계획과 연결 ·{" "}
+        <Link href="/" className="text-zinc-500 underline hover:text-zinc-300">홈</Link>
       </p>
     </div>
   );
