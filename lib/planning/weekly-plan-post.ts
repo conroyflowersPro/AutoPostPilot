@@ -8,6 +8,14 @@ import {
   buildPlannerSharedContext,
   sharedContextPlanInstructions,
 } from "@/lib/context/planner-attach";
+import {
+  buildCreatorDnaPlannerBlock,
+  isEmptyDnaBlock,
+} from "@/lib/intelligence/creator-dna-runtime";
+import {
+  buildPerformanceDnaPlannerBlock,
+  isEmptyPerformanceBlock,
+} from "@/lib/intelligence/performance-dna-runtime";
 
 const MODEL = "grok-4.5";
 
@@ -28,41 +36,25 @@ AUTHENTICITY OVER ENGAGEMENT (HARD)
 Planner prioritizes Creator Authenticity over viral hooks.
 Never plan slots that require invented personal interventions, fake tests, or unsupported first-person drama.
 Angles must be writable as observation or known opinion without Level-3 inference.
-High impressions from embellished/inauthentic patterns must NOT become planning targets.
 Do not learn creator behavior from AI-generated drafts — only from validated real performance of authentic posts.
 
-CREATOR DNA ROLE (critical reframe)
-Creator DNA is NOT a fence that says "only talk about these topics forever."
+CREATOR DNA ROLE
 Creator DNA answers: "Once a topic is selected, how can THIS creator see it and what evidence can they use?"
-Do NOT collapse every week into FSD + Cybertruck only because those have the richest evidence.
-Identity preservation ≠ topic monoculture.
+Identity preservation ≠ topic monoculture. Do NOT collapse every week into FSD + Cybertruck only.
 
 CREATOR INTENT SIGNAL (HARD)
-Keywords or themes the Creator types for this planning cycle are CREATOR INTENT — not optional flavor text and not writing keywords to dump into posts.
-Interpret Creator Intent together with Audience DNA, Performance DNA, X context, long-term strategy, and diversity.
-Creator Intent must visibly shape the week (topics and/or angles and/or expansion moves). It must not silently disappear.
-Never copy raw intent keywords into primaryTopic as spam; translate into creator-framed themes.
+Keywords or themes the Creator types for this planning cycle are CREATOR INTENT.
+Creator Intent must visibly shape the week. Never copy raw intent keywords into primaryTopic as spam; translate into creator-framed themes.
 
-WEEKLY PLAN = EDITORIAL PORTFOLIO
-Evaluate the full 7-day plan as one portfolio.
-Ask: "If someone follows this account for the whole week, what identity emerges?"
-Preserve core identity while deliberately expanding surface area.
+AUDIENCE SIGNALS
+Fedica/screenshot signals are audience interest hints — NOT writing titles.
+Never copy Fedica keywords as primaryTopic. Translate into creator-owned angles when DNA allows.
+Posting-time optimization is OWNED BY FEDICA only — never score or recommend post times here.
 
-WEEKLY POSTS ARE ORIGINAL POSTS ONLY
-Weekly Planner outputs ORIGINAL posts only (actionType=ORIGINAL).
-Quote/Repost/Skip belong to Wild Card action selection — not this planner.
-
-POST STRATEGY (between topic and writing — required per slot)
-For each slot, after choosing topic+angle, choose a Post Strategy HYPOTHESIS.
-Do NOT force every post to have strong hook + question + CTA + personal story.
+WEEKLY POSTS ARE ORIGINAL POSTS ONLY (actionType=ORIGINAL).
 
 SUCCESS SIGNAL PRIORITY
 Followers gained > Profile visits > Revenue > Bookmarks > Replies > Reposts > Quotes > Likes > Impressions
-
-INTELLIGENCE SEPARATION
-- Creator DNA = how topics are owned/written (identity). Independent of Performance DNA.
-- Audience DNA = which themes score this week.
-- Performance DNA = validated published patterns only.
 
 FORBIDDEN
 - 주가/등락/매매/TSLA chart
@@ -76,24 +68,77 @@ Output JSON only with generationDays, audienceRead, days[], rationale.`;
 export async function handleWeeklyPlanPost(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const topic = String(body.topic || body.creatorIntent || "").trim();
+    const topic = String(
+      body.topic || body.creatorIntent || body.keywords || body.mergedKeywords || ""
+    ).trim();
     const daysCount = Math.min(Math.max(Number(body.generationDays) || 7, 1), 7);
-    const audienceHint = body.audienceHint || body.audienceDna || "";
-    const performanceHint = body.performanceHint || body.performanceDna || "";
-    const recentTopics = Array.isArray(body.recentTopics)
-      ? body.recentTopics.map(String).slice(0, 40)
+
+    const audienceHint =
+      body.audienceHint ||
+      body.audienceDna ||
+      [
+        Array.isArray(body.interests) ? `interests: ${body.interests.slice(0, 12).join(", ")}` : "",
+        Array.isArray(body.topicCategories)
+          ? `categories: ${body.topicCategories.slice(0, 10).join(", ")}`
+          : "",
+        body.sentiment ? `sentiment: ${body.sentiment}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+    const publishedTopics: string[] = Array.isArray(body.publishedTopics)
+      ? body.publishedTopics.map(String).filter(Boolean).slice(0, 24)
+      : Array.isArray(body.recentTopics)
+        ? body.recentTopics.map(String).filter(Boolean).slice(0, 24)
+        : [];
+    const scheduledTopics: string[] = Array.isArray(body.scheduledTopics)
+      ? body.scheduledTopics.map(String).filter(Boolean).slice(0, 20)
       : [];
+
+    const creatorSnap = buildCreatorDnaPlannerBlock();
+    const perfSnap = buildPerformanceDnaPlannerBlock();
+    const creatorDnaBlock = creatorSnap.block;
+    const performanceDnaBlock = perfSnap.block;
+    const dna_sources = {
+      creator: "runtime_snapshot" as const,
+      performance: "baseline_candidates" as const,
+    };
+
+    const topicSignalBlock = [
+      publishedTopics.length
+        ? `PUBLISHED (history/diversity — not drafts):\n${publishedTopics
+            .map((t, i) => `${i + 1}. ${t.slice(0, 80)}`)
+            .join("\n")}`
+        : "PUBLISHED: (none)",
+      scheduledTopics.length
+        ? `SCHEDULED (duplication avoidance only — NOT success evidence):\n${scheduledTopics
+            .map((t, i) => `${i + 1}. ${t.slice(0, 80)}`)
+            .join("\n")}`
+        : "SCHEDULED: (none)",
+    ].join("\n\n");
 
     const sharedContext = buildPlannerSharedContext(body, topic);
     const userPrompt = `Creator Intent (must shape this week): ${topic || "(없음)"}
-Audience DNA / signals: ${typeof audienceHint === "string" ? audienceHint.slice(0, 1200) : JSON.stringify(audienceHint).slice(0, 1200)}
-Performance DNA (validated only): ${typeof performanceHint === "string" ? performanceHint.slice(0, 1200) : JSON.stringify(performanceHint).slice(0, 1200)}
-Recent topics (dedupe, not learning): ${recentTopics.join(", ")}
+
+Creator DNA:
+${creatorDnaBlock}
+
+Audience DNA / signals: ${
+      typeof audienceHint === "string"
+        ? audienceHint.slice(0, 1200)
+        : JSON.stringify(audienceHint).slice(0, 1200)
+    }
+
+Performance DNA (CANDIDATE only — validated=0; soft advisory):
+${performanceDnaBlock}
+
+${topicSignalBlock}
 
 ${sharedContextPlanInstructions(sharedContext)}
 
 JSON only. Every slot needs postStrategy + actionType=ORIGINAL.
-If portfolio risks narrowing into FSD/Cybertruck only, expand before final output.`;
+If portfolio risks narrowing into FSD/Cybertruck only, expand before final output.
+Never use draft content as success evidence.`;
 
     const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
@@ -129,7 +174,14 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
       if (!res.ok) {
         const errText = await res.text();
         return NextResponse.json(
-          { success: false, error: `xAI ${res.status}`, detail: errText.slice(0, 300) },
+          {
+            success: false,
+            error: `xAI ${res.status}`,
+            detail: errText.slice(0, 300),
+            fallback: true,
+            days: [],
+            dna_sources,
+          },
           { status: 502 }
         );
       }
@@ -137,7 +189,6 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
       rawText = data?.choices?.[0]?.message?.content || "";
     } catch (e: any) {
       clearTimeout(timeout);
-      if (e?.name === "AbortError") throw e;
       throw e;
     }
 
@@ -162,33 +213,21 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
 
     let days: any[] = Array.isArray(parsed?.days) ? parsed.days : [];
     if (days.length === 0) {
-      days = Array.from({ length: daysCount }, (_, i) => ({ dayOffset: i, posts: [] }));
+      return NextResponse.json(
+        {
+          success: false,
+          error: "주간 계획 결과가 비어 있습니다.",
+          fallback: true,
+          days: [],
+          generationDays: 0,
+          dna_sources,
+        },
+        { status: 503 }
+      );
     }
 
     for (let i = 0; i < days.length; i++) {
       let posts = Array.isArray(days[i]?.posts) ? days[i].posts : [];
-      if (posts.length < 5) {
-        const domainFallbacks = [
-          { primaryTopic: "FSD 실사용 체감", angle: "도심·고속도로에서 느낀 판단 변화", contentType: "fsd_field", targetLength: "medium" },
-          { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 체감한 디테일", contentType: "observation", targetLength: "short" },
-          { primaryTopic: "LAFC / 축구 일상", angle: "경기장·시즌 분위기 관찰", contentType: "other_interest", targetLength: "short" },
-          { primaryTopic: "소유 팁", angle: "실소유 경험에서 나온 실용 메모", contentType: "observation", targetLength: "short" },
-          { primaryTopic: "앱·업무 운영", angle: "개발·반복 테스트에서 느낀 실무 포인트", contentType: "observation", targetLength: "medium" },
-        ];
-        while (posts.length < 5) {
-          const idx = posts.length + 1;
-          const fb = domainFallbacks[(i * 3 + posts.length) % domainFallbacks.length];
-          posts.push({
-            slotId: `D${i + 1}P${idx}`,
-            primaryTopic: fb.primaryTopic,
-            angle: fb.angle,
-            contentType: fb.contentType,
-            allowedContext: [],
-            forbiddenTopics: ["주가", "등락", "매매"],
-            targetLength: fb.targetLength,
-          });
-        }
-      }
       if (posts.length > 8) posts = posts.slice(0, 8);
 
       posts = posts.map((p: any, pi: number) => {
@@ -199,11 +238,19 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
           subtopic: p.subtopic ? String(p.subtopic).slice(0, 80) : undefined,
           angle: String(p.angle || ""),
           contentType: String(p.contentType || "observation"),
-          allowedContext: Array.isArray(p.allowedContext) ? p.allowedContext.map(String).slice(0, 2) : [],
-          forbiddenTopics: Array.isArray(p.forbiddenTopics) ? p.forbiddenTopics.map(String) : ["주가", "등락"],
-          targetLength: ["short", "medium", "long"].includes(p.targetLength) ? p.targetLength : "medium",
+          allowedContext: Array.isArray(p.allowedContext)
+            ? p.allowedContext.map(String).slice(0, 2)
+            : [],
+          forbiddenTopics: Array.isArray(p.forbiddenTopics)
+            ? p.forbiddenTopics.map(String)
+            : ["주가", "등락"],
+          targetLength: ["short", "medium", "long"].includes(p.targetLength)
+            ? p.targetLength
+            : "medium",
           actionType: "ORIGINAL" as const,
-          expansionValue: ["low", "medium", "high"].includes(String(p.expansionValue)) ? String(p.expansionValue) : "medium",
+          expansionValue: ["low", "medium", "high"].includes(String(p.expansionValue))
+            ? String(p.expansionValue)
+            : "medium",
           creatorIntentAligned: Boolean(p.creatorIntentAligned ?? true),
           postStrategy: {
             strategicAngle: String(ps.strategicAngle || p.angle || "observation-first").slice(0, 120),
@@ -218,32 +265,61 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
             questionUsage: Boolean(ps.questionUsage),
             ctaUsage: Boolean(ps.ctaUsage),
             targetGrowthObjective: String(ps.targetGrowthObjective || "balanced"),
-            mediaUsefulness: ["optional", "helpful", "essential"].includes(String(ps.mediaUsefulness)) ? String(ps.mediaUsefulness) : "optional",
+            mediaUsefulness: ["optional", "helpful", "essential"].includes(String(ps.mediaUsefulness))
+              ? String(ps.mediaUsefulness)
+              : "optional",
             hypothesisNote: String(ps.hypothesisNote || "Hypothesis only — validate after publish.").slice(0, 200),
           },
         };
       });
 
-      days[i] = { dayOffset: typeof days[i].dayOffset === "number" ? days[i].dayOffset : i, posts };
+      days[i] = {
+        dayOffset: typeof days[i].dayOffset === "number" ? days[i].dayOffset : i,
+        posts,
+      };
+    }
+
+    days = days.filter((d) => Array.isArray(d.posts) && d.posts.length > 0);
+    if (days.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "주간 계획 슬롯이 비어 있습니다.",
+          fallback: true,
+          days: [],
+          dna_sources,
+        },
+        { status: 503 }
+      );
     }
 
     const diversity = enforcePortfolioDiversity(days, topic || "");
     days = diversity.days;
 
-    const allTopics = days.flatMap((d: any) => (d.posts || []).map((p: any) => String(p.primaryTopic || "")));
-    const allAngles = days.flatMap((d: any) => (d.posts || []).map((p: any) => String(p.angle || "")));
+    const allTopics = days.flatMap((d: any) =>
+      (d.posts || []).map((p: any) => String(p.primaryTopic || ""))
+    );
+    const allAngles = days.flatMap((d: any) =>
+      (d.posts || []).map((p: any) => String(p.angle || ""))
+    );
     const portfolioStats = analyzePortfolio(allTopics);
     const intentOk = creatorIntentPresent(topic, allTopics, allAngles);
     const audienceRead = {
       ...(parsed?.audienceRead || {}),
       portfolio: {
         ...(parsed?.audienceRead?.portfolio || {}),
-        identityStatement: parsed?.audienceRead?.portfolio?.identityStatement || "주간 포트폴리오 자동 점검",
+        identityStatement:
+          parsed?.audienceRead?.portfolio?.identityStatement || "주간 포트폴리오 자동 점검",
         diversityNotes: diversity.note || portfolioStats.noteKo,
-        riskOfNarrowing: parsed?.audienceRead?.portfolio?.riskOfNarrowing || portfolioStats.narrowingRisk,
+        riskOfNarrowing:
+          parsed?.audienceRead?.portfolio?.riskOfNarrowing || portfolioStats.narrowingRisk,
         creatorIntentReflection:
           parsed?.audienceRead?.portfolio?.creatorIntentReflection ||
-          (topic ? (intentOk ? "Creator Intent 신호가 주제/앵글에 반영됨" : "Creator Intent 입력됨 — 반영 약함") : "Creator Intent 입력 없음"),
+          (topic
+            ? intentOk
+              ? "Creator Intent 신호가 주제/앵글에 반영됨"
+              : "Creator Intent 입력됨 — 반영 약함"
+            : "Creator Intent 입력 없음"),
         expansionMoves: [
           ...(parsed?.audienceRead?.portfolio?.expansionMoves || []),
           ...(diversity.changed ? ["서버 다양성 가드레일 적용"] : []),
@@ -264,70 +340,24 @@ If portfolio risks narrowing into FSD/Cybertruck only, expand before final outpu
       audienceRead,
       totalPlanned: days.reduce((s: number, d: any) => s + d.posts.length, 0),
       sharedCurrentContext: sharedContext,
+      dna_sources,
+      fallback: false,
     });
   } catch (err: any) {
     console.error(err);
-    const domainSlots = [
-      { primaryTopic: "FSD 실사용 체감", angle: "도심·고속도로에서 느낀 판단 변화", contentType: "fsd_field", targetLength: "medium" as const },
-      { primaryTopic: "Cybertruck 일상 활용", angle: "적재·주차·실사용에서 체감한 디테일", contentType: "observation", targetLength: "short" as const },
-      { primaryTopic: "LAFC / 축구 일상", angle: "경기장·시즌 분위기 관찰", contentType: "other_interest", targetLength: "short" as const },
-      { primaryTopic: "소유 팁 / 실사용 메모", angle: "장기 소유하면서 반복적으로 느낀 실용 디테일", contentType: "observation", targetLength: "short" as const },
-      { primaryTopic: "앱·업무 / Grok 관찰", angle: "실제 사용·테스트하면서 느낀 실무 포인트", contentType: "observation", targetLength: "medium" as const },
-    ];
-    let fallbackDays = Array.from({ length: 7 }, (_, i) => ({
-      dayOffset: i,
-      posts: domainSlots.map((s, n) => ({
-        slotId: `D${i + 1}P${n + 1}`,
-        primaryTopic: s.primaryTopic,
-        angle: s.angle,
-        contentType: s.contentType,
-        allowedContext: [],
-        forbiddenTopics: ["주가", "등락", "매매"],
-        targetLength: s.targetLength,
-        actionType: "ORIGINAL" as const,
-        expansionValue: n < 2 ? "medium" : "high",
-        creatorIntentAligned: true,
-        postStrategy: {
-          strategicAngle: "observation-first",
-          hookStyle: "direct_observation",
-          writingApproach: "observation",
-          experienceUsage: "low",
-          opinionStrength: "low",
-          observationLevel: "medium",
-          technicalDepth: "low",
-          emotionalLevel: "low",
-          predictionLevel: "none",
-          questionUsage: false,
-          ctaUsage: false,
-          targetGrowthObjective: n < 2 ? "balanced" : "expansion",
-          mediaUsefulness: "optional",
-          hypothesisNote: "fallback hypothesis — validate after publish",
-        },
-      })),
-    }));
-
-    const diversity = enforcePortfolioDiversity(fallbackDays, "");
-    fallbackDays = diversity.days;
-
-    return NextResponse.json({
-      success: true,
-      model: MODEL,
-      generationDays: 7,
-      days: fallbackDays,
-      rationale: "계획 지연 — 기본 7일 슬롯 캘린더 사용 (다양성 가드레일 적용)",
-      audienceRead: {
-        portfolio: {
-          identityStatement: "기본 포트폴리오 (timeout fallback)",
-          diversityNotes: diversity.note,
-          riskOfNarrowing: "low",
-          creatorIntentReflection: "Creator Intent 미입력 (fallback)",
-          expansionMoves: diversity.changed ? ["fallback 다양성 가드레일 적용"] : [],
-        },
-        diversityGuardApplied: diversity.changed,
+    return NextResponse.json(
+      {
+        success: false,
+        error: "주간 계획 생성에 실패했습니다. 자동 대체 계획으로 초안을 생성하지 않습니다.",
+        fallback: true,
+        generationDays: 0,
+        days: [],
+        detail:
+          err?.name === "AbortError"
+            ? "timeout"
+            : String(err?.message || err).slice(0, 120),
       },
-      totalPlanned: 35,
-      fallback: true,
-      detail: err?.name === "AbortError" ? "timeout" : String(err?.message || err).slice(0, 120),
-    });
+      { status: 503 }
+    );
   }
 }
