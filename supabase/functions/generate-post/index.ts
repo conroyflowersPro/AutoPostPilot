@@ -4,13 +4,22 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const MODEL = "grok-4.5";
 
 const SYSTEM_PROMPT = `You are the content generation engine for AutoPostPilot.
-Your only job is to write X posts that the creator would actually publish.
+Write X posts @Seung4680 would actually publish.
 
-Do not sound like an AI. Write as this Korean Tesla owner would type on X.
-Primary vehicle: Cybertruck. Follow each slot primaryTopic and angle strictly.
-- primaryTopic is the single clear main topic (creator-framed; never Fedica keyword labels)
-- Do not insert trending keywords or place names unless the slot itself is an authentic owner observation
-Never invent experiences. No stock-price chatter. Natural 해요체 mix. JSON only.`;
+Voice: Korean Tesla owner (Cybertruck primary), FSD tester, LAFC STH. Natural 해요체 + casual. Not pure 반말.
+
+Follow each slot primaryTopic, angle, and postBrief if present. postBrief.core_point / concrete_subject = the ONE main point.
+Never dump source_keywords or Fedica labels into the post as stuffing.
+Never invent firsthand experiences. No stock-price chatter.
+
+CLARITY (required):
+- First 1–2 sentences must make clear: who/what subject + the point.
+- Forbidden padding: 조금, 약간, 느낌이, ~인 것 같다, 나쁘지 않다, 괜찮은 편, 그런 느낌, 미묘하게, 뭔가, 전반적으로 alone without object.
+- Prefer shorter concrete lines over long soft hedges.
+
+LAFC slots: name competition when relevant (MLS/리그컵/플레이오프/CONCACAF). BMO home = 직관 voice OK without inventing match events. Away/비직관 = fan distance, not in-stadium.
+
+JSON only. Each post: slotId, content, score.`;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,36 +86,8 @@ Deno.serve(async (req: Request) => {
 
     let effectiveSlots = Array.isArray(slots) ? slots : [];
     if (effectiveSlots.length === 0) {
-      const legacyCount = Math.min(8, Math.max(1, Number(body.count) || 1));
-      const themes = Array.isArray(body.themes) ? body.themes.map(String) : [];
-      const legacyTopics = [
-        "FSD 실사용 체감",
-        "Cybertruck 일상 활용",
-        "Robotaxi / 자율주행 관찰",
-        "LAFC / 축구 일상",
-        "앱·업무 운영 관찰",
-        "기술·AI 사용 메모",
-        "장기 투자 관점",
-        "소유 팁",
-      ];
-      // Audience/Fedica keywords must NEVER become primaryTopic/angle
-      for (let i = 0; i < legacyCount; i++) {
-        const fallbackTopic = legacyTopics[i % legacyTopics.length];
-        effectiveSlots.push({
-          slotId: `D${offset + 1}P${i + 1}`,
-          primaryTopic: themes[i] || fallbackTopic,
-          angle: themes[i] || fallbackTopic,
-          contentType: "observation",
-          allowedContext: [],
-          forbiddenTopics: ["주가", "등락", "매매"],
-          targetLength: i % 3 === 0 ? "short" : i % 3 === 1 ? "medium" : "long",
-        });
-      }
-    }
-
-    if (effectiveSlots.length === 0) {
       return new Response(
-        JSON.stringify({ error: "slots array required and must not be empty" }),
+        JSON.stringify({ error: "slots array required and must not be empty — no silent theme fallback" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -114,21 +95,21 @@ Deno.serve(async (req: Request) => {
     const workingSlots = effectiveSlots;
     const usedJson = JSON.stringify(usedRecord, null, 0);
     const scheduleMeta = startDate
-      ? `startDate=${startDate} (scheduling metadata only — do NOT treat as evidence that events happened today)`
-      : `startDate not provided (scheduling metadata only — do NOT invent "오늘/방금/아까")`;
+      ? `startDate=${startDate} (scheduling metadata only — do NOT invent 오늘/방금 events)`
+      : `startDate not provided`;
 
     async function callGrok(slotsSubset: any[]): Promise<any> {
       const subsetJson = JSON.stringify(slotsSubset, null, 0);
       const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
 ${scheduleMeta}
 
-SLOTS (follow each strictly; primaryTopic is creator-framed — never invent Fedica keyword dumps):
+SLOTS (follow primaryTopic, angle, postBrief; one main point each; never keyword-stuff):
 ${subsetJson}
 
-USED RECORD (do not repeat these topics/angles/examples/places/openings/conclusions):
+USED RECORD (avoid repeats):
 ${usedJson}
 
-Return JSON only with posts array of length ${slotsSubset.length}. Each object must have slotId, content, score.`;
+Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 120000);
@@ -148,7 +129,7 @@ Return JSON only with posts array of length ${slotsSubset.length}. Each object m
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: userMsg },
             ],
-            temperature: 0.75,
+            temperature: 0.7,
             reasoning_effort: "low",
           }),
           signal: controller.signal,
@@ -168,7 +149,6 @@ Return JSON only with posts array of length ${slotsSubset.length}. Each object m
       return data;
     }
 
-    // Batch all slots in one or two calls if many
     const batchSize = 8;
     const allGenerated: any[] = [];
     for (let i = 0; i < workingSlots.length; i += batchSize) {
@@ -196,37 +176,20 @@ Return JSON only with posts array of length ${slotsSubset.length}. Each object m
       })
       .slice(0, workingSlots.length);
 
-    const inserted = [];
-    for (let i = 0; i < qualityPosts.length; i++) {
-      const p = qualityPosts[i];
-      const slot = workingSlots[i] || workingSlots[0];
-      const { data: row, error } = await supabase
-        .from("SeungContent")
-        .insert({
-          content: p.content,
-          status: "draft",
-          pipeline_id: "42303",
-          user_id: user.id,
-        })
-        .select()
-        .single();
-
-      if (!error && row) {
-        inserted.push({
-          ...row,
-          score: p.score,
-          slotId: p.slotId || slot?.slotId,
-          dayOffset: offset,
-        });
-      }
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
         model: MODEL,
-        count: inserted.length,
-        posts: inserted,
+        count: qualityPosts.length,
+        posts: qualityPosts.map((p: any, i: number) => ({
+          slotId: p.slotId || workingSlots[i]?.slotId,
+          content: p.content,
+          final_text: p.content,
+          score: p.score,
+          dayOffset: offset,
+          planning_source: workingSlots[i]?.planning_source,
+        })),
+        usedRecord,
         dayOffset: offset,
       }),
       {
