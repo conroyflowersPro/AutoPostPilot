@@ -28,6 +28,16 @@ async function readJson(res: Response) {
   return data;
 }
 
+function pickSeeds(part: any): any[] {
+  if (Array.isArray(part?.gated_seeds) && part.gated_seeds.length) return part.gated_seeds;
+  if (Array.isArray(part?.candidates) && part.candidates.length) return part.candidates;
+  if (Array.isArray(part?.seeds) && part.seeds.length) return part.seeds;
+  if (Array.isArray(part?.gated_seeds)) return part.gated_seeds;
+  if (Array.isArray(part?.candidates)) return part.candidates;
+  if (Array.isArray(part?.seeds)) return part.seeds;
+  return [];
+}
+
 function GeneratePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -133,6 +143,7 @@ function GeneratePageInner() {
 
       const base = {
         generationDays: GENERATION_DAYS,
+        postsPerDay: 6,
         startDate,
         topic: topic.trim() || undefined,
         creatorIntent: topic.trim() || undefined,
@@ -140,6 +151,8 @@ function GeneratePageInner() {
         publishedTopics: publishedTopics21d,
         scheduledTopics,
         lafc_matches: lafcMatches,
+        expand_with_xai: true,
+        allow_xai_enrich: true,
       };
 
       const allGated: any[] = [];
@@ -156,21 +169,30 @@ function GeneratePageInner() {
           dim_batch_index: dimBatch,
           prior_subjects: priorSubjects,
           id_counter: idCounter,
+          expand_with_xai: true,
+          allow_xai_enrich: true,
         });
         if (!part.success) {
           throw new Error(part.detail || part.error || `Expand ${dimBatch + 1} 실패`);
         }
         dimTotal = Number(part.dim_batch_total) || dimTotal;
-        const seeds = Array.isArray(part.gated_seeds) ? part.gated_seeds : [];
+        const seeds = pickSeeds(part);
         allGated.push(...seeds);
         for (const s of seeds) {
           if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
         }
         priorSubjects = priorSubjects.slice(-40);
         idCounter = Number(part.id_counter) || idCounter + seeds.length;
-        expandDone = !!part.expand_done;
+        expandDone = part.expand_done !== false;
         dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
         if (dimBatch > 40) break;
+        if (part.expand_done === true && dimTotal <= 1) break;
+      }
+
+      if (allGated.length === 0) {
+        throw new Error(
+          "Expand 시드 0개 — XAI_API_KEY 또는 dimension expand 실패. Edge 시크릿과 로그를 확인하세요."
+        );
       }
 
       const allJudged: any[] = [];
@@ -182,6 +204,7 @@ function GeneratePageInner() {
         const part = await edgeCall(session, {
           ...base,
           phase: "judge",
+          seeds: batch,
           candidates: batch,
         });
         if (!part.success) {
@@ -191,10 +214,11 @@ function GeneratePageInner() {
         allJudged.push(...judged);
       }
 
-      setPhase("Weekly Select (로컬)…");
+      setPhase("Weekly Select…");
       const planData = await edgeCall(session, {
         ...base,
         phase: "select",
+        seeds: allJudged,
         candidates: allJudged,
       });
       if (!planData.success || !Array.isArray(planData.days) || planData.days.length === 0) {
@@ -210,18 +234,24 @@ function GeneratePageInner() {
           .join(", ");
         return `D${(d.dayOffset ?? 0) + 1}  ${d.posts?.length || 0}개  ${topics}`;
       });
+      const totalPlanned = mergedDays.reduce((s: number, d: any) => s + (d.posts?.length || 0), 0);
       setPlanSummary(
         [
-          planData.rationale || "",
-          `history: ${planData.history_mode || ""} (${planData.history_count ?? ""})`,
+          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned}`,
+          planData.mode_supply_low ? "MODE_SUPPLY_LOW" : "",
           planData.topic_supply_low ? "TOPIC_SUPPLY_LOW" : "",
           planData.diagnostics ? `diag: ${JSON.stringify(planData.diagnostics)}` : "",
-          `DNA: ${JSON.stringify(planData.dna_sources || {})}`,
           ...lines,
         ]
           .filter(Boolean)
           .join("\n")
       );
+
+      if (totalPlanned < 10) {
+        setError(
+          `계획 슬롯이 ${totalPlanned}개뿐입니다 (7일 목표 ~35–42). Expand/Select 공급을 확인하세요.`
+        );
+      }
 
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       let totalSaved = 0;
@@ -290,7 +320,7 @@ function GeneratePageInner() {
         </span>
       </div>
       <p className="text-sm text-zinc-400 mb-4">
-        분할 실행: Expand → Judge → Select (요청당 xAI 1회). 504 방지. Fedica 주간 스샷 미사용.
+        v9.1.1: Expand는 dimension→구체 시드 xAI 기본 경로. 템플릿 bootstrap 없음. 7일 목표 약 35–42 draft.
       </p>
       <label className="block text-sm mb-1 text-zinc-300">시작일</label>
       <input
