@@ -7,13 +7,19 @@ import { createClient } from "@/lib/supabase/client";
 
 type Post = {
   id: string;
-  content: string;
+  content?: string | null;
+  final_text?: string | null;
+  topic?: string | null;
   status: string;
   pipeline_id: string | null;
   media_urls: string[] | null;
   scheduled_at: string | null;
   created_at?: string;
 };
+
+function postBody(p: Post) {
+  return String(p.content || p.final_text || p.topic || "").trim();
+}
 
 const FILTERS = [
   { key: "all", label: "전체" },
@@ -399,7 +405,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
             )}
             {scheduleResult.skipped?.length > 0 && (
               <p className="text-zinc-500">
-                건너힤 {scheduleResult.skipped.length}개 (이미 예약됨 등)
+                건너뜀 {scheduleResult.skipped.length}개 (이미 예약됨 등)
               </p>
             )}
           </div>
@@ -449,7 +455,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
-                      {post.content}
+                      {postBody(post) || "(본문 없음)"}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                       <StatusBadge status={post.status} />
