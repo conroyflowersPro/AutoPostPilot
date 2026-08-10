@@ -168,12 +168,17 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
 
     const qualityPosts = allGenerated
       .filter((p: any) => {
-        const t = (p.content || "").trim();
-        if (!t) return false;
+        const t = String(p.content || p.final_text || "").trim();
+        if (t.length < 8) return false;
         const latinChars = (t.match(/[A-Za-z]/g) || []).length;
         const totalChars = t.replace(/\s/g, "").length || 1;
-        return latinChars / totalChars < 0.45;
+        return latinChars / totalChars < 0.75;
       })
+      .map((p: any) => ({
+        ...p,
+        content: String(p.content || p.final_text || "").trim(),
+        final_text: String(p.final_text || p.content || "").trim(),
+      }))
       .slice(0, workingSlots.length);
 
     return new Response(
@@ -185,9 +190,11 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
           slotId: p.slotId || workingSlots[i]?.slotId,
           content: p.content,
           final_text: p.content,
+          text: p.content,
           score: p.score,
           dayOffset: offset,
           planning_source: workingSlots[i]?.planning_source,
+          primaryTopic: workingSlots[i]?.primaryTopic,
         })),
         usedRecord,
         dayOffset: offset,
