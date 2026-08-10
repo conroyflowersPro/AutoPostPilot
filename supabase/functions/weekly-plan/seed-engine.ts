@@ -1,8 +1,8 @@
 /**
- * Dynamic Concrete Seed Engine v9.0.3 — Edge pack (quality gates + idea angle)
- * Full monolith: artifacts/AutoPostPilot-v9.0.3-RELEASE.zip
+ * Dynamic Concrete Seed Engine v9.1.0 — Edge pack (quality gates + idea angle + mode helpers)
+ * No production concrete bootstrap templates. Full pack: AutoPostPilot-v9.1.0-EDGE-SOURCES.zip
  */
-export type SeedStatus = "NEW" | "ELIGIBLE" | "HIGH_VALUE" | "REJECTED" | "HOLD" | "FACT_CONTEXT_REQUIRED";
+export type SeedStatus = "NEW" | "ELIGIBLE" | "HIGH_VALUE" | "REJECTED" | "HOLD" | "FACT_CONTEXT_REQUIRED" | "NEEDS_CREATOR_CONTEXT";
 export type ConcreteSeed = {
   seed_id: string;
   cluster: string;
@@ -16,12 +16,18 @@ export type ConcreteSeed = {
   requested_editorial_mode?: string;
   creator_evidence_available?: boolean;
   editorial_fit?: string;
+  length_mode?: string;
+  experience_required?: boolean;
   [key: string]: unknown;
 };
 export type EditorialMode = "INFORMATIVE" | "COMPARE" | "OPINION" | "EXPERIENCE" | "CASUAL_OBSERVATION";
 export type AiSpecificity = "STRONG" | "ACCEPTABLE" | "GENERIC";
 export type InformationalValue = "STRONG" | "ACCEPTABLE" | "WEAK";
 export type ConceptualRepetition = "LOW" | "MEDIUM" | "HIGH";
+
+export const WEEKLY_EDITORIAL_MODES: EditorialMode[] = [
+  "INFORMATIVE", "COMPARE", "OPINION", "EXPERIENCE", "CASUAL_OBSERVATION",
+];
 
 export function createSeedIdFactory(prefix = "s") {
   let n = 0;
@@ -46,6 +52,9 @@ export function applyLocalGates(raw: any[], _recent: string[], nextId: () => str
       primary_source: r.primary_source || "XAI_EXPANSION",
       supporting_sources: r.supporting_sources || ["DIMENSION_REGISTRY"],
       status: "ELIGIBLE",
+      creator_evidence_available: !!r.creator_evidence_available,
+      point_or_tension: r.point_or_tension,
+      requested_editorial_mode: r.requested_editorial_mode,
     });
   }
   return { passed, local_gate_rejected: 0, reject_reasons: {} };
@@ -59,10 +68,15 @@ export function canonicalSemanticGroupKey(seed: any): string {
 export function extractJson(raw: string): any | null {
   try { return JSON.parse(String(raw || "").replace(/^```json\s*/i, "").replace(/```$/i, "").trim()); } catch { return null; }
 }
-export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string }> = [
-  { cluster: "FSD", dimension: "PEDESTRIAN" },
-  { cluster: "CYBERTRUCK", dimension: "OWNER_OPS" },
-  { cluster: "ROBOTAXI", dimension: "CURBSIDE" },
+export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string; core?: boolean }> = [
+  { cluster: "FSD", dimension: "SUPERVISION", core: true },
+  { cluster: "FSD", dimension: "MERGE_BEHAVIOR", core: true },
+  { cluster: "CYBERTRUCK", dimension: "CHARGING", core: true },
+  { cluster: "CYBERTRUCK", dimension: "OWNER_TRADEOFF", core: true },
+  { cluster: "ROBOTAXI", dimension: "CURBSIDE_OPS", core: true },
+  { cluster: "AI_TECH", dimension: "TOOL_LIMITS" },
+  { cluster: "LAFC", dimension: "MATCHDAY" },
+  { cluster: "GAMING", dimension: "SHORT_SESSION" },
 ];
 export const QUALITY_REFERENCE: any[] = [];
 
@@ -71,15 +85,9 @@ function textOf(seed: Partial<ConcreteSeed>): string {
 }
 
 const AI_GENERIC_PATTERNS = [
-  /ai\s*답변은\s*검증/,
-  /전제를?\s*(확인|밝혀|남기|빠)/,
-  /프롬프트를?\s*(명확|자세)/,
-  /수치보다\s*전제/,
-  /전제\s*문장/,
-  /톤을?\s*(한\s*번에\s*)?맞추/,
-  /요약\s*도구가?\s*전제/,
-  /always\s*verify/i,
-  /clear\s*prompts?/i,
+  /ai\s*답변은\s*검증/, /전제를?\s*(확인|밝혀|남기|빠)/, /프롬프트를?\s*(명확|자세)/,
+  /수치보다\s*전제/, /전제\s*문장/, /톤을?\s*(한\s*번에\s*)?맞추/, /요약\s*도구가?\s*전제/,
+  /always\s*verify/i, /clear\s*prompts?/i, /톤을?\s*맞추다가/, /전제를?\s*먼저/,
 ];
 
 export function isAiTopicSeed(seed: Partial<ConcreteSeed>): boolean {
@@ -105,6 +113,18 @@ export function scoreInformationalValue(seed: Partial<ConcreteSeed>): Informatio
   return "ACCEPTABLE";
 }
 
+export function scoreCasualEditorialFit(seed: Partial<ConcreteSeed>): {
+  fit: "STRONG" | "ACCEPTABLE" | "POOR";
+  reclassify_to?: "INFORMATIVE" | "OPINION";
+  reasons: string[];
+} {
+  const t = textOf(seed);
+  const analysis = /(원인|구조|판단\s*기준|여러\s*조건|기술[적]?\s*의미|때문에|분석|지표|병목)/i.test(t);
+  if (analysis) return { fit: "POOR", reclassify_to: "INFORMATIVE", reasons: ["CASUAL_TOO_ANALYTICAL"] };
+  if (t.length <= 90) return { fit: "ACCEPTABLE", reasons: ["CASUAL_SHORT"] };
+  return { fit: "POOR", reclassify_to: "INFORMATIVE", reasons: ["CASUAL_NEEDS_EXPLANATION"] };
+}
+
 const UNSUPPORTED_TEMPORAL = [/오늘/, /어제/, /이번\s*주/, /퇴근길/, /출근길/, /방금/, /지금\s*막/];
 export function seedTemporalGrounding(seed: Partial<ConcreteSeed>): { ok: boolean; reasons: string[] } {
   const subject = String(seed.concrete_subject || "");
@@ -116,7 +136,7 @@ export function seedTemporalGrounding(seed: Partial<ConcreteSeed>): { ok: boolea
 export function evaluateEditorialSeedQuality(
   seed: Partial<ConcreteSeed>,
   requested?: string
-): { pass: boolean; reasons: string[]; ai_specificity?: AiSpecificity; informational_value?: InformationalValue } {
+): { pass: boolean; reasons: string[]; ai_specificity?: AiSpecificity; informational_value?: InformationalValue; casual_fit?: string } {
   const mode = String(requested || seed.requested_editorial_mode || "").toUpperCase();
   const ground = seedTemporalGrounding(seed);
   if (!ground.ok) return { pass: false, reasons: ground.reasons };
@@ -128,6 +148,10 @@ export function evaluateEditorialSeedQuality(
     const iv = scoreInformationalValue(seed);
     if (iv === "WEAK") return { pass: false, informational_value: iv, reasons: ["INFO_WEAK"] };
   }
+  if (mode === "CASUAL_OBSERVATION") {
+    const c = scoreCasualEditorialFit(seed);
+    if (c.fit === "POOR") return { pass: false, casual_fit: c.fit, reasons: c.reasons };
+  }
   if (mode === "EXPERIENCE" && !seed.creator_evidence_available) {
     return { pass: false, reasons: ["NEEDS_CREATOR_CONTEXT"] };
   }
@@ -138,6 +162,44 @@ export function canServeEditorialMode(seed: Partial<ConcreteSeed>, mode: string)
   const m = String(mode || "").toUpperCase();
   if (m === "HUMOR") return false;
   return evaluateEditorialSeedQuality(seed, m).pass && (m !== "EXPERIENCE" || !!seed.creator_evidence_available);
+}
+
+export function parseEditorialMode(v: unknown): EditorialMode | undefined {
+  const u = String(v || "").toUpperCase();
+  if (u === "HUMOR") return undefined;
+  return (WEEKLY_EDITORIAL_MODES as string[]).includes(u) ? (u as EditorialMode) : undefined;
+}
+
+export function modeAwareExpandInstructions(mode: string): string {
+  const m = String(mode || "").toUpperCase();
+  if (m === "COMPARE") return "Provide contrast axes only; no forced opinion.";
+  if (m === "EXPERIENCE") return "Only evidence-backed first-person material; never invent.";
+  if (m === "CASUAL_OBSERVATION") return "Short momentary observation; no analysis essay.";
+  if (m === "OPINION") return "Trade-off or stance space; not pure fact dump.";
+  return "Concrete informative subject; reject generic advice.";
+}
+
+export function annotateSeedsWithModeFitness(seeds: ConcreteSeed[], mode: string): ConcreteSeed[] {
+  return (seeds || []).map((s) => {
+    const q = evaluateEditorialSeedQuality(s, mode);
+    return {
+      ...s,
+      requested_editorial_mode: mode,
+      editorial_fit: q.pass ? "ACCEPTABLE" : "POOR",
+      status: q.pass ? (s.status || "ELIGIBLE") : "HOLD",
+    };
+  });
+}
+
+export function buildModeSupplyReport(seeds: ConcreteSeed[], modes: string[] = WEEKLY_EDITORIAL_MODES as any): any {
+  const per_mode: Record<string, { eligible: number; short: number }> = {};
+  let mode_supply_low = false;
+  for (const m of modes) {
+    const eligible = (seeds || []).filter((s) => canServeEditorialMode(s, m) && isSelectableStatus(s.status as any)).length;
+    per_mode[m] = { eligible, short: eligible === 0 ? 1 : 0 };
+    if (eligible === 0) mode_supply_low = true;
+  }
+  return { mode_supply_low, per_mode };
 }
 
 const ANGLE_LOCATION_STRIP = [/공항|airport|경기장|stadium|호텔|hotel|bmo|집\s*근처|목적지|도심|퇴근길|학교\s*앞|공사\s*구간|고속도로|램프|횡단보도|우회전|합류\s*램프/gi];
@@ -215,4 +277,12 @@ export function ideaAngleGuardAllow(
     return { allow: false, angle_key: key, same_angle_count: 1, reason: "ANGLE_NEAR_DUPLICATE" };
   }
   return { allow: false, angle_key: key, same_angle_count: same, reason: "ANGLE_REPEAT_DEFER" };
+}
+
+/** Production: no concrete bootstrap stories */
+export function bootstrapCandidatesFromDimensions(_opts: {
+  publishedSubjects: string[];
+  intentText?: string;
+}): any[] {
+  return [];
 }
