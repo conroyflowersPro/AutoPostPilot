@@ -18,7 +18,7 @@ function normalizeSentiment(
 ): "positive" | "neutral" | "negative" | null {
   const s = String(raw || "").toLowerCase().trim();
   if (!s) return null;
-  if (s.includes("pos") || s.includes("귵정") || s.includes("호조"))
+  if (s.includes("pos") || s.includes("긍정") || s.includes("호조"))
     return "positive";
   if (s.includes("neg") || s.includes("부정") || s.includes("비판"))
     return "negative";
@@ -28,37 +28,46 @@ function normalizeSentiment(
 }
 
 /**
- * Fedica keywords are audience signals, NOT writing prompts.
- * Pipeline: Keywords → Keyword Intelligence → Interests → Topic Categories
+ * Fedica keywords = follower vocabulary signals (that day), NOT writing prompts.
+ * Larger text in the cloud ≈ higher relative audience attention.
+ * Pipeline: visual rank → topKeyword (1 mandatory plan slot upstream) + other signals for system choice.
  */
-const EXTRACT_SYSTEM = `You convert Fedica follower keywords into Audience Intelligence for @Seung4680 (Tesla / FSD / Cybertruck / LAFC creator).
+const EXTRACT_SYSTEM = `You read Fedica follower keyword clouds for @Seung4680.
 
-Fedica keywords are NOT hashtags, NOT post topics to copy, NOT sentences to write.
-They only explain what the audience currently cares about.
+These keywords are what followers are talking about / associated with — NOT hashtags to paste into posts, NOT post titles.
+
+On Fedica keyword screenshots, LARGER text usually means MORE relative attention. You MUST rank by apparent visual size when an image is present.
 
 Return JSON only:
 {
-  "keywords": ["surface signals as given — short strings"],
-  "interests": ["3-8 broader themes the audience cares about — NEVER raw keyword copies"],
-  "topicCategories": ["2-6 reusable planning categories"],
+  "keywords": ["all readable keywords, short strings"],
+  "rankedKeywords": [
+    { "keyword": "exact text as seen", "visualRank": 1, "relativeWeight": "high|medium|low" }
+  ],
+  "topKeyword": "the single largest / most prominent keyword string",
+  "topKeywordInterest": "1 short theme for planning (NOT a raw paste if codename; e.g. Elon Musk → Elon/Tesla ecosystem public conversation)",
+  "interests": ["3-8 broader audience themes — not raw keyword dumps"],
+  "topicCategories": ["2-6 categories"],
   "sentiment": "positive|neutral|negative|null"
 }
 
-Interpretation examples (do this kind of transform):
-- "Grimes County Texas" → interest: manufacturing expansion / AI infrastructure; category: Manufacturing
-- "Terafab" → interest: AI factory scale / vertical integration; category: AI Infrastructure
-- "Optimus" → interest: humanoid robotics / future of labor; category: Robotics
-- "TSLA" → interest: long-term Tesla vision (NOT stock price chatter); category: Long-term Vision
-- "Megapack" → category: Energy
-- "Robotaxi" / "Cybercab" → category: Mobility
-- "FSD" / "HW3" / "v14" → category: FSD Field
+ratedKeywords rules:
+- visualRank 1 = largest on screen; then 2, 3, ...
+- Do NOT invent fake mention counts
+- relativeWeight from visual size only: high / medium / low
+- If no image, rankedKeywords may be empty; topKeyword may be null
+
+Interest mapping examples:
+- Elon Musk → public conversation around Elon / Tesla ecosystem (not stock tips)
+- Terafab → AI factory / manufacturing scale
+- Optimus → humanoid robotics
+- TSLA → long-term Tesla vision (NOT price)
+- FSD / HW3 → FSD field experience
 
 Rules:
-- interests must be themes, not place names or product codenames pasted as-is
-- topicCategories prefer: Manufacturing, AI Infrastructure, Robotics, Mobility, Energy, FSD Field, Long-term Vision, Owner Experience, LAFC, Other
-- Discard pure stock-trading noise when possible; if TSLA appears, map to long-term product/vision not price
-- sentiment = mood of the keyword set if inferable; else null
-- JSON only, no prose`;
+- keywords stay surface forms; interests are themes
+- topicCategories prefer: Manufacturing, AI Infrastructure, Robotics, Mobility, Energy, FSD Field, Long-term Vision, Owner Experience, LAFC, Other, Public Figures
+- JSON only`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +94,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         keywords: [],
         mergedKeywords: "",
+        rankedKeywords: [],
+        topKeyword: null,
+        topKeywordInterest: null,
         interests: [],
         topicCategories: [],
         sentiment: null,
@@ -93,15 +105,16 @@ export async function POST(req: NextRequest) {
 
     const userContent: any[] = [];
     const textParts: string[] = [
-      "Convert the following Fedica audience signals into Audience Intelligence.",
-      "Do NOT treat keywords as post titles or phrases to insert.",
+      "Extract Fedica audience keyword intelligence.",
+      "If an image is attached, rank keywords by visual size (largest = rank 1).",
+      "Do NOT treat keywords as post titles to copy.",
     ];
     if (textKw) {
       textParts.push(`Text keywords:\n${textKw}`);
     }
     if (imageList.length > 0) {
       textParts.push(
-        "Also read keywords from the attached Fedica screenshot if present."
+        "Read the Fedica keyword cloud image. Identify the largest keyword as topKeyword."
       );
     }
     userContent.push({ type: "text", text: textParts.join("\n\n") });
@@ -129,7 +142,7 @@ export async function POST(req: NextRequest) {
             { role: "system", content: EXTRACT_SYSTEM },
             { role: "user", content: userContent },
           ],
-          temperature: 0.2,
+          temperature: 0.15,
         }),
         signal: controller.signal,
       });
@@ -146,6 +159,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         keywords: fallbackKws,
         mergedKeywords: textKw,
+        rankedKeywords: [],
+        topKeyword: fallbackKws[0] || null,
+        topKeywordInterest: null,
         interests: [],
         topicCategories: [],
         sentiment: null,
@@ -160,6 +176,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         keywords: fallbackKws,
         mergedKeywords: textKw,
+        rankedKeywords: [],
+        topKeyword: fallbackKws[0] || null,
+        topKeywordInterest: null,
         interests: [],
         topicCategories: [],
         sentiment: null,
@@ -179,10 +198,38 @@ export async function POST(req: NextRequest) {
     const fromModel = Array.isArray(parsed.keywords)
       ? parsed.keywords.map((k: any) => String(k).trim()).filter(Boolean)
       : [];
-    const merged = Array.from(new Set([...fromModel, ...fallbackKws])).slice(
-      0,
-      12
-    );
+    const merged = Array.from(new Set([...fromModel, ...fallbackKws])).slice(0, 16);
+
+    const rankedKeywords = Array.isArray(parsed.rankedKeywords)
+      ? parsed.rankedKeywords
+          .map((r: any, idx: number) => ({
+            keyword: String(r?.keyword || "").trim(),
+            visualRank:
+              typeof r?.visualRank === "number" && r.visualRank > 0
+                ? r.visualRank
+                : idx + 1,
+            relativeWeight: ["high", "medium", "low"].includes(
+              String(r?.relativeWeight || "").toLowerCase()
+            )
+              ? String(r.relativeWeight).toLowerCase()
+              : idx === 0
+                ? "high"
+                : "medium",
+          }))
+          .filter((r: any) => r.keyword)
+          .sort((a: any, b: any) => a.visualRank - b.visualRank)
+          .slice(0, 12)
+      : [];
+
+    let topKeyword =
+      typeof parsed.topKeyword === "string" && parsed.topKeyword.trim()
+        ? parsed.topKeyword.trim()
+        : rankedKeywords[0]?.keyword || merged[0] || null;
+
+    let topKeywordInterest =
+      typeof parsed.topKeywordInterest === "string" && parsed.topKeywordInterest.trim()
+        ? parsed.topKeywordInterest.trim().slice(0, 120)
+        : null;
 
     const interests = Array.isArray(parsed.interests)
       ? parsed.interests
@@ -202,6 +249,9 @@ export async function POST(req: NextRequest) {
       success: true,
       keywords: merged,
       mergedKeywords: merged.join(", "),
+      rankedKeywords,
+      topKeyword,
+      topKeywordInterest,
       interests,
       topicCategories,
       sentiment: normalizeSentiment(parsed.sentiment),
@@ -212,6 +262,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       keywords: [],
       mergedKeywords: "",
+      rankedKeywords: [],
+      topKeyword: null,
+      topKeywordInterest: null,
       interests: [],
       topicCategories: [],
       sentiment: null,
