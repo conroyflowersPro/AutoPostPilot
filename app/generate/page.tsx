@@ -217,45 +217,71 @@ function GeneratePageInner() {
           .filter(Boolean);
       } catch {}
 
-      setPhase("주간 계획 생성 (Supabase Edge)…");
+      setPhase("주간 계획 생성 (분할 Edge)…");
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
 
-      const planRes = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-        },
-        body: JSON.stringify({
-          generationDays: GENERATION_DAYS,
-          topic: topic.trim() || mergedKeywords,
-          keywords: mergedKeywords,
-          mergedKeywords,
-          publishedTopics,
-          scheduledTopics,
-          interests: audienceInterests.length ? audienceInterests : undefined,
-          topicCategories: audienceTopicCategories.length
-            ? audienceTopicCategories
-            : undefined,
-          sentiment: audienceSentiment || undefined,
-          topKeyword: topKeyword || undefined,
-          topKeywordInterest: topKeywordInterest || undefined,
-          rankedKeywords: rankedKeywords.length ? rankedKeywords : undefined,
-        }),
-      });
-      const planData = await readJson(planRes);
-      if (!planData.success || !Array.isArray(planData.days) || planData.days.length === 0) {
-        throw new Error(
-          planData.error || "주간 계획 결과가 비어 있습니다. 자동 대체 초안을 만들지 않습니다."
+      const dayBatches: number[][] = [];
+      for (let s = 0; s < GENERATION_DAYS; s += 2) {
+        dayBatches.push(
+          Array.from({ length: Math.min(2, GENERATION_DAYS - s) }, (_, j) => s + j)
         );
       }
 
+      const basePlanBody = {
+        generationDays: GENERATION_DAYS,
+        topic: topic.trim() || mergedKeywords,
+        keywords: mergedKeywords,
+        mergedKeywords,
+        publishedTopics,
+        scheduledTopics,
+        interests: audienceInterests.length ? audienceInterests : undefined,
+        topicCategories: audienceTopicCategories.length
+          ? audienceTopicCategories
+          : undefined,
+        sentiment: audienceSentiment || undefined,
+        topKeyword: topKeyword || undefined,
+        topKeywordInterest: topKeywordInterest || undefined,
+        rankedKeywords: rankedKeywords.length ? rankedKeywords : undefined,
+      };
+
+      const mergedDays: ContentPlanDay[] = [];
+      let planRationale = "";
+      let planData: any = {};
+      for (let bi = 0; bi < dayBatches.length; bi++) {
+        const offsets = dayBatches[bi];
+        setPhase(
+          `주간 계획 ${bi + 1}/${dayBatches.length} (D${offsets[0] + 1}–D${offsets[offsets.length - 1] + 1})…`
+        );
+        const planRes = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+          },
+          body: JSON.stringify({ ...basePlanBody, dayOffsets: offsets }),
+        });
+        const part = await readJson(planRes);
+        if (!part.success || !Array.isArray(part.days) || part.days.length === 0) {
+          throw new Error(
+            part.detail
+              ? `${part.error || "주간 계획 실패"}: ${part.detail}`
+              : part.error ||
+                `주간 계획 분할 ${bi + 1}/${dayBatches.length} 실패. 자동 대체 초안 없음.`
+          );
+        }
+        for (const d of part.days) mergedDays.push(d);
+        if (part.rationale) planRationale = part.rationale;
+        planData = part;
+      }
+
+      mergedDays.sort((a, b) => (a.dayOffset ?? 0) - (b.dayOffset ?? 0));
+
       const plan: ContentPlan = {
-        generationDays: planData.generationDays || GENERATION_DAYS,
-        days: planData.days,
-        rationale: planData.rationale,
+        generationDays: GENERATION_DAYS,
+        days: mergedDays,
+        rationale: planRationale || planData.rationale,
       };
 
       const lines = plan.days.map((d) => {
@@ -301,7 +327,7 @@ function GeneratePageInner() {
           },
           body: JSON.stringify({
             startDate,
-            dayOffset,
+            dayOffset: day.dayOffset ?? dayOffset,
             slots: day.posts,
             usedRecord,
             mergedKeywords,
@@ -312,7 +338,6 @@ function GeneratePageInner() {
           for (const p of genData.posts) {
             const text = String(p.final_text || p.content || p.text || "").trim();
             if (!text) continue;
-            // PostList reads `content` — not final_text
             let insErr = (
               await supabase.from("SeungContent").insert({
                 content: text,
@@ -371,7 +396,7 @@ function GeneratePageInner() {
       </div>
 
       <p className="text-sm text-zinc-400 mb-4">
-        키워드 스샷 = 팔로워 관심 신호. 하루 약 1슬롯. 초안은 홈 콘텐츠 큐에 표시됩니다.
+        키워드 스샷 = 팔로워 관심 신호. 주간 계획은 2일 단위로 분할 호출합니다. 초안은 홈 콘텐츠 큐에 표시됩니다.
       </p>
 
       <label className="block text-sm mb-1 text-zinc-300">시작일</label>
