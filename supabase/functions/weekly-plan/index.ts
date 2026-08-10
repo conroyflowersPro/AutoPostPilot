@@ -1,9 +1,9 @@
 /**
- * Weekly Planner — Supabase Edge (P0 stability)
- * - Split xAI into Part A (days 0-3) + Part B (days 4-6) to avoid JSON truncation
- * - Target ~5 ORIGINAL slots/day (policy 5–8; code max 8) — NOT hard-capped at 3
- * - Engines: Creator DNA + Performance candidates + Audience signals + published/scheduled
- * - NO silent hard-coded FSD/CT fallback
+ * Weekly Planner — Supabase Edge
+ * Fedica keyword cloud = follower vocabulary that day (visual size ≈ attention).
+ * Policy: ~1 audience-linked slot per day among 5–8; top keyword weight decays across the week
+ * (day0 ~100%, day1 ~80%, day2 ~60% ...). Other slots = system strategic choice.
+ * NO silent hard-coded fallback. NO primaryTopic = "creator-framed" placeholder.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -18,20 +18,35 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const CREATOR_DNA = `creator-dna-v1.3.1: Korean Tesla owner-creator; FSD/product observation primary; LAFC/gaming/daily ok; no stock daytrade; no invented firsthand tests; authenticity high; light-opinion 음슴체 RECENTLY_EMERGING; REPOST text excluded from writing voice.`;
-const PERF_DNA = `perf-dna baseline candidates only VALIDATED=0: soft advisory; prefer followers > profile visits > revenue > bookmarks > replies > likes > impressions; never learn from drafts; never impressions-only success.`;
+const CREATOR_DNA = `creator-dna-v1.3.1: Korean Tesla owner-creator; FSD/product observation; LAFC/gaming/daily ok; no stock daytrade; no invented tests; authenticity high.`;
+const PERF_DNA = `perf-dna candidates only VALIDATED=0: soft advisory; followers>profile>revenue>bookmarks>replies>likes>impressions; never learn from drafts.`;
+
+/** Decay of top-keyword emphasis by dayOffset (0-based). */
+function decayLabel(dayOffset: number): string {
+  const pct = Math.max(20, Math.round(100 * Math.pow(0.8, dayOffset)));
+  return `${pct}%`;
+}
 
 const SYSTEM = `You are weekly planner for @Seung4680.
-Output ONLY compact valid JSON. No markdown fences. No commentary.
-Schema:
-{"rationale":"short ko","days":[{"dayOffset":0,"posts":[{"slotId":"D1P1","primaryTopic":"creator-framed","angle":"...","contentType":"observation","targetLength":"medium","actionType":"ORIGINAL"}]}]}
-Rules:
-- Exactly the requested dayOffsets
-- About ${POSTS_PER_DAY_TARGET} posts per day (min 4, max ${POSTS_PER_DAY_MAX})
-- primaryTopic is creator-framed — NEVER paste Fedica/audience keywords as titles
-- No stock price chatter; no invented firsthand tests
-- Avoid FSD+Cybertruck monoculture every slot; allow LAFC/gaming/daily/AI infra when fit
-- actionType always ORIGINAL`;
+Output ONLY compact valid JSON. No markdown. No commentary.
+
+Schema (example structure — NEVER copy example strings as real topics):
+{"rationale":"short ko","days":[{"dayOffset":0,"posts":[{"slotId":"D1P1","primaryTopic":"실제 주제","angle":"...","contentType":"observation","targetLength":"medium","actionType":"ORIGINAL","audienceLinked":false}]}]}
+
+Slot count: about ${POSTS_PER_DAY_TARGET} posts/day (4–${POSTS_PER_DAY_MAX}).
+actionType always ORIGINAL.
+primaryTopic must be a real Korean/English topic phrase — NEVER the words creator-framed, primaryTopic, or placeholder text.
+
+AUDIENCE KEYWORD POLICY (Fedica cloud = what followers talk about that day):
+- Larger cloud text = higher relative attention (not a post-count quota beyond rules below).
+- Each day: aim for EXACTLY ONE post with audienceLinked=true that engages the audience signal in the creator's own voice.
+- Top keyword emphasis DECAYS across the week — do NOT repeat the same max-keyword focus at full strength every day:
+  dayOffset 0 ≈ 100% emphasis on top signal, 1 ≈ 80%, 2 ≈ 60%, 3 ≈ 48%, 4 ≈ 38%, 5 ≈ 30%, 6 ≈ 24%.
+- Early week: the one audienceLinked slot should clearly address the topKeywordInterest (theme), not paste the raw keyword as the whole post topic unless natural.
+- Later week: the one audienceLinked slot may use secondary ranked keywords or a lighter angle on the same ecosystem — still only ~1 slot/day.
+- Remaining 4–7 slots/day: strategic (Creator DNA, diversity, published history, LAFC/gaming/daily/FSD as fit) — audienceLinked=false.
+- NEVER fill all 5–8 slots with Elon/Tesla/Musk just because the cloud is large.
+- NEVER invent firsthand experiences. No stock-price chatter.`;
 
 function extractJsonObject(raw: string): any | null {
   let t = String(raw || "").trim();
@@ -78,7 +93,7 @@ function extractJsonObject(raw: string): any | null {
   return null;
 }
 
-function normalizeDays(rawDays: any[], partLabel: string): any[] {
+function normalizeDays(rawDays: any[]): any[] {
   if (!Array.isArray(rawDays)) return [];
   const out: any[] = [];
   for (let i = 0; i < rawDays.length; i++) {
@@ -86,9 +101,13 @@ function normalizeDays(rawDays: any[], partLabel: string): any[] {
     let posts = Array.isArray(d?.posts) ? d.posts : [];
     posts = posts.slice(0, POSTS_PER_DAY_MAX).map((p: any, pi: number) => {
       const dayOff = typeof d.dayOffset === "number" ? d.dayOffset : i;
+      let topic = String(p.primaryTopic || "관찰").slice(0, 100);
+      if (/^creator-framed$/i.test(topic.trim()) || /^primaryTopic$/i.test(topic.trim())) {
+        topic = String(p.angle || "일상 관찰").slice(0, 100) || "일상 관찰";
+      }
       return {
         slotId: String(p.slotId || `D${dayOff + 1}P${pi + 1}`),
-        primaryTopic: String(p.primaryTopic || "관찰").slice(0, 100),
+        primaryTopic: topic,
         angle: String(p.angle || "").slice(0, 140),
         contentType: String(p.contentType || "observation"),
         allowedContext: Array.isArray(p.allowedContext)
@@ -101,6 +120,7 @@ function normalizeDays(rawDays: any[], partLabel: string): any[] {
           ? p.targetLength
           : "medium",
         actionType: "ORIGINAL",
+        audienceLinked: Boolean(p.audienceLinked),
         postStrategy: {
           strategicAngle: String(
             (p.postStrategy && p.postStrategy.strategicAngle) || p.angle || "observation"
@@ -116,10 +136,9 @@ function normalizeDays(rawDays: any[], partLabel: string): any[] {
               "Hypothesis only — validate after publish."
           ).slice(0, 160),
         },
-        _part: partLabel,
       };
     });
-    if (posts.length === 0) continue;
+    if (!posts.length) continue;
     out.push({
       dayOffset: typeof d.dayOffset === "number" ? d.dayOffset : i,
       posts,
@@ -155,8 +174,7 @@ async function callXaiPlan(
     return { ok: false, error: errText.slice(0, 400), status: res.status };
   }
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || "";
-  return { ok: true, text };
+  return { ok: true, text: data?.choices?.[0]?.message?.content || "" };
 }
 
 Deno.serve(async (req: Request) => {
@@ -218,13 +236,46 @@ Deno.serve(async (req: Request) => {
       ? body.scheduledTopics.map(String).slice(0, 6)
       : [];
 
-    const sharedContext = `Intent/keywords signal: ${topic || "(none)"}
-Audience interests (signals only, NOT titles): ${interests.join(", ") || "(none)"}
-Audience categories: ${categories.join(", ") || "(none)"}
+    const topKeyword =
+      typeof body.topKeyword === "string" && body.topKeyword.trim()
+        ? body.topKeyword.trim()
+        : null;
+    const topKeywordInterest =
+      typeof body.topKeywordInterest === "string" && body.topKeywordInterest.trim()
+        ? body.topKeywordInterest.trim()
+        : null;
+    const ranked = Array.isArray(body.rankedKeywords)
+      ? body.rankedKeywords
+          .map((r: any) => ({
+            keyword: String(r?.keyword || "").trim(),
+            visualRank: Number(r?.visualRank) || 99,
+            relativeWeight: String(r?.relativeWeight || "medium"),
+          }))
+          .filter((r: any) => r.keyword)
+          .slice(0, 10)
+      : [];
+
+    const decayLines = Array.from({ length: daysCount }, (_, i) =>
+      `dayOffset ${i}: top-signal emphasis ${decayLabel(i)} → still only ~1 audienceLinked slot that day`
+    ).join("\n");
+
+    const audienceBlock = topKeyword
+      ? `FEDICA TOP KEYWORD (largest on cloud): ${topKeyword}
+TOP KEYWORD INTEREST (theme for planning): ${topKeywordInterest || topKeyword}
+RANKED (by visual size): ${ranked.map((r) => `${r.visualRank}. ${r.keyword}(${r.relativeWeight})`).join(" | ") || topKeyword}
+DECAY SCHEDULE:
+${decayLines}
+Policy reminder: ~1 audienceLinked slot/day; other slots strategic; do not monopolize the week with the top keyword.`
+      : `No topKeyword from screenshot — use interests only as soft signals; no forced audienceLinked quota.`;
+
+    const sharedContext = `Creator Intent / text: ${topic || "(none)"}
+Audience interests: ${interests.join(", ") || "(none)"}
+Categories: ${categories.join(", ") || "(none)"}
 Sentiment: ${body.sentiment || "(none)"}
+${audienceBlock}
 ${CREATOR_DNA}
 ${PERF_DNA}
-Avoid repeating published: ${published.map((t) => t.slice(0, 40)).join(" | ") || "(none)"}
+Avoid published themes: ${published.map((t) => t.slice(0, 40)).join(" | ") || "(none)"}
 Avoid scheduled dup: ${scheduled.map((t) => t.slice(0, 40)).join(" | ") || "(none)"}`;
 
     const dna_sources = {
@@ -232,11 +283,13 @@ Avoid scheduled dup: ${scheduled.map((t) => t.slice(0, 40)).join(" | ") || "(non
       performance: "baseline_candidates",
       runtime: "supabase_edge_weekly_plan_split",
       audience_signals: interests.length + categories.length,
+      topKeyword: topKeyword || null,
+      audience_slot_policy: topKeyword
+        ? "one_per_day_with_weekly_decay"
+        : "soft_signals_only",
       posts_per_day_target: POSTS_PER_DAY_TARGET,
-      posts_per_day_max: POSTS_PER_DAY_MAX,
     };
 
-    // Part A: first half of week; Part B: remainder — reduces truncation
     const splitAt = Math.min(4, daysCount);
     const offsetsA = Array.from({ length: splitAt }, (_, i) => i);
     const offsetsB = Array.from({ length: Math.max(0, daysCount - splitAt) }, (_, i) => splitAt + i);
@@ -248,12 +301,11 @@ Avoid scheduled dup: ${scheduled.map((t) => t.slice(0, 40)).join(" | ") || "(non
     let rationaleParts: string[] = [];
 
     try {
-      // Part A
       const promptA = `${sharedContext}
 
-PART A only. dayOffset values: ${offsetsA.join(", ")}.
-About ${POSTS_PER_DAY_TARGET} ORIGINAL posts per day (4–${POSTS_PER_DAY_MAX}).
-Return JSON only with days covering those offsets.`;
+PART A. dayOffsets: ${offsetsA.join(", ")}.
+~${POSTS_PER_DAY_TARGET} posts/day. Mark audienceLinked true on at most one post per day.
+Return JSON only.`;
       const resA = await callXaiPlan(xaiKey, promptA, controller.signal);
       if (!resA.ok) {
         clearTimeout(timer);
@@ -270,8 +322,8 @@ Return JSON only with days covering those offsets.`;
         );
       }
       const parsedA = extractJsonObject(resA.text);
-      const daysA = normalizeDays(parsedA?.days || [], "A");
-      if (daysA.length === 0) {
+      const daysA = normalizeDays(parsedA?.days || []);
+      if (!daysA.length) {
         clearTimeout(timer);
         return json(
           {
@@ -288,26 +340,24 @@ Return JSON only with days covering those offsets.`;
       days = days.concat(daysA);
       if (parsedA?.rationale) rationaleParts.push(String(parsedA.rationale));
 
-      // Part B (if any days remain)
       if (offsetsB.length > 0) {
         const usedTopics = daysA
           .flatMap((d) => d.posts.map((p: any) => p.primaryTopic))
-          .slice(0, 20)
+          .slice(0, 24)
           .join(" | ");
         const promptB = `${sharedContext}
 
-PART B only. dayOffset values: ${offsetsB.join(", ")}.
-About ${POSTS_PER_DAY_TARGET} ORIGINAL posts per day (4–${POSTS_PER_DAY_MAX}).
-Do NOT repeat these Part A topics: ${usedTopics || "(none)"}
-Return JSON only with days covering Part B offsets.`;
+PART B. dayOffsets: ${offsetsB.join(", ")}.
+~${POSTS_PER_DAY_TARGET} posts/day. At most one audienceLinked per day; weaker top-keyword emphasis (decay).
+Do NOT repeat Part A topics: ${usedTopics || "(none)"}
+Return JSON only.`;
         const resB = await callXaiPlan(xaiKey, promptB, controller.signal);
         if (!resB.ok) {
           clearTimeout(timer);
-          // Partial success policy: do NOT invent Part B; return failure (no silent fill)
           return json(
             {
               success: false,
-              error: `주간 계획 Part B 실패 (Part A만 있음 — 자동 채우지 않음)`,
+              error: "주간 계획 Part B 실패 (자동 채우지 않음)",
               detail: resB.error,
               fallback: true,
               days: [],
@@ -317,8 +367,8 @@ Return JSON only with days covering Part B offsets.`;
           );
         }
         const parsedB = extractJsonObject(resB.text);
-        const daysB = normalizeDays(parsedB?.days || [], "B");
-        if (daysB.length === 0) {
+        const daysB = normalizeDays(parsedB?.days || []);
+        if (!daysB.length) {
           clearTimeout(timer);
           return json(
             {
@@ -351,23 +401,13 @@ Return JSON only with days covering Part B offsets.`;
       );
     }
 
-    // Dedupe dayOffset — keep first
     const byOffset = new Map<number, any>();
     for (const d of days) {
       if (!byOffset.has(d.dayOffset)) byOffset.set(d.dayOffset, d);
     }
     days = Array.from(byOffset.values()).sort((a, b) => a.dayOffset - b.dayOffset);
 
-    // Strip internal _part
-    days = days.map((d) => ({
-      dayOffset: d.dayOffset,
-      posts: d.posts.map((p: any) => {
-        const { _part, ...rest } = p;
-        return rest;
-      }),
-    }));
-
-    if (days.length === 0) {
+    if (!days.length) {
       return json(
         {
           success: false,
