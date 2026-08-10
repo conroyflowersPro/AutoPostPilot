@@ -26,9 +26,12 @@ function dayTopicCounts(day: PlaceableSlot[]): Map<string, number> {
   return m;
 }
 
-/** Max same-topic share on a day (e.g. 6 posts → allow at most 3 of one topic by default soft target). */
+/**
+ * Soft max same primary topic per day.
+ * ORDER 2: tighter than 50% — 6 posts → softCap via max(2, ceil(n*0.4))
+ */
 export function softDailyCap(postsPerDay: number): number {
-  return Math.max(2, Math.ceil(postsPerDay * 0.5));
+  return Math.max(2, Math.ceil(postsPerDay * 0.4));
 }
 
 /**
