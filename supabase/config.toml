@@ -1,0 +1,17 @@
+# AutoPostPilot — Supabase project config (Edge auto-deploy via GitHub Actions)
+# project_id is also set in the workflow env
+
+[project]
+id = "ihhiyecifxrqxfpyylpt"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[functions.weekly-plan]
+verify_jwt = true
+
+[functions.generate-post]
+verify_jwt = true
