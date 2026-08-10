@@ -161,6 +161,7 @@ function GeneratePageInner() {
       let dimBatch = 0;
       let dimTotal = 1;
       let expandDone = false;
+      let lastExpandDiag: any = null;
       while (!expandDone) {
         setPhase(`Seed Expand ${dimBatch + 1}/${dimTotal}…`);
         const part = await edgeCall(session, {
@@ -175,6 +176,7 @@ function GeneratePageInner() {
         if (!part.success) {
           throw new Error(part.detail || part.error || `Expand ${dimBatch + 1} 실패`);
         }
+        lastExpandDiag = part;
         dimTotal = Number(part.dim_batch_total) || dimTotal;
         const seeds = pickSeeds(part);
         allGated.push(...seeds);
@@ -190,9 +192,16 @@ function GeneratePageInner() {
       }
 
       if (allGated.length === 0) {
-        throw new Error(
-          "Expand 시드 0개 — XAI_API_KEY 또는 dimension expand 실패. Edge 시크릿과 로그를 확인하세요."
-        );
+        const d = lastExpandDiag || {};
+        const bits = [
+          `Expand 시드 0개`,
+          d.xai_api_used === true ? `xai_api_used=true` : `xai_api_used=${String(d.xai_api_used)}`,
+          d.xai_error ? `xai_error=${String(d.xai_error)}` : null,
+          d.seed_count != null ? `seed_count=${d.seed_count}` : null,
+          d.engine ? `engine=${d.engine}` : null,
+          d.note ? `note=${String(d.note).slice(0, 80)}` : null,
+        ].filter(Boolean);
+        throw new Error(bits.join(" · "));
       }
 
       const allJudged: any[] = [];
