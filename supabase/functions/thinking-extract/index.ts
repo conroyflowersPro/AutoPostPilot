@@ -8,11 +8,15 @@
  * - Stores structure features only (not raw post copy as pattern)
  * - Rails written only as CANDIDATE via aggregate action
  *
+ * Auth:
+ * - Prefer logged-in user JWT
+ * - Fallback: service role (Supabase Dashboard Test / Role postgres)
+ *
  * Actions (JSON body.action):
  * - start | tick | status | aggregate
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 const EXTRACTOR_VERSION = "thinking_feature_v1_pilot";
 const DEFAULT_BATCH = 8;
@@ -129,21 +133,41 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Missing Authorization" }, 401);
-
+    const authHeader = req.headers.get("Authorization") || "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const xaiKey = Deno.env.get("XAI_API_KEY");
 
-    const supabase = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
-    if (userErr || !user) return json({ error: "Not authenticated" }, 401);
+    let supabase: SupabaseClient;
+    let authMode: "user" | "service_role" = "user";
+
+    // 1) Prefer real user JWT
+    if (authHeader) {
+      const userClient = createClient(supabaseUrl, supabaseAnon, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const {
+        data: { user },
+        error: userErr,
+      } = await userClient.auth.getUser();
+      if (!userErr && user) {
+        supabase = userClient;
+        authMode = "user";
+      } else if (serviceRole) {
+        // 2) Fallback: service role (Dashboard Test with Role postgres)
+        supabase = createClient(supabaseUrl, serviceRole);
+        authMode = "service_role";
+      } else {
+        return json({ error: "Not authenticated" }, 401);
+      }
+    } else if (serviceRole) {
+      // Dashboard sometimes omits header when Role is selected
+      supabase = createClient(supabaseUrl, serviceRole);
+      authMode = "service_role";
+    } else {
+      return json({ error: "Missing Authorization" }, 401);
+    }
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "status");
@@ -165,6 +189,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         job,
         feature_count: count ?? 0,
+        auth_mode: authMode,
         safety: {
           mutates_creator_dna: false,
           pilot_default: true,
@@ -205,6 +230,7 @@ Deno.serve(async (req: Request) => {
         checkpoint_meta: {
           safety: "no_dna_mutation",
           extractor_version: EXTRACTOR_VERSION,
+          auth_mode: authMode,
         },
       };
       const { data: job, error } = await supabase
@@ -216,6 +242,7 @@ Deno.serve(async (req: Request) => {
       return json({
         success: true,
         job,
+        auth_mode: authMode,
         next: "POST action=tick with job_id",
         xAI_API_USED: false,
       });
@@ -242,7 +269,7 @@ Deno.serve(async (req: Request) => {
       if (jobErr || !job) return json({ error: jobErr?.message || "job not found" }, 400);
 
       if (job.status === "COMPLETE" || job.status === "CANCELLED") {
-        return json({ success: true, job, done: true, xAI_API_USED: false });
+        return json({ success: true, job, done: true, xAI_API_USED: false, auth_mode: authMode });
       }
       if (job.processed_count >= job.pilot_max_posts) {
         await supabase
@@ -258,6 +285,7 @@ Deno.serve(async (req: Request) => {
           done: true,
           reason: "pilot_max_posts reached",
           xAI_API_USED: false,
+          auth_mode: authMode,
         });
       }
 
@@ -326,6 +354,7 @@ Deno.serve(async (req: Request) => {
           done: true,
           reason: "no more eligible posts",
           xAI_API_USED: false,
+          auth_mode: authMode,
         });
       }
 
@@ -421,6 +450,7 @@ Deno.serve(async (req: Request) => {
             last_batch_size: batch.length,
             extractor_version: EXTRACTOR_VERSION,
             elapsed_ms: Date.now() - t0,
+            auth_mode: authMode,
           },
         })
         .eq("id", jobId);
@@ -434,6 +464,7 @@ Deno.serve(async (req: Request) => {
         pilot_max_posts: job.pilot_max_posts,
         extract_error: extractResult.error || null,
         xAI_API_USED: !!extractResult.xai_used,
+        auth_mode: authMode,
         xai_usage: {
           thinking_feature_extract: !!extractResult.xai_used,
           seed_expansion: false,
@@ -515,6 +546,7 @@ Deno.serve(async (req: Request) => {
         feature_count: (features || []).length,
         candidate_count: candidates.length,
         candidates,
+        auth_mode: authMode,
         xAI_API_USED: false,
         safety: {
           mutates_creator_dna: false,
