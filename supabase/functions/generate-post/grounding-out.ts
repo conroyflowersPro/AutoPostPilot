@@ -1,4 +1,4 @@
-/** ORDER 3+4 hotfix — post-generation grounding evaluation + ORDER 1 stage fields */
+/** ORDER 3+4 hotfix + ORDER 1 stages + ORDER 2 humor/density diagnostics */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -38,10 +38,16 @@ export function buildGroundedPostsOut(
       primaryTopic: slot.primaryTopic || slot.concrete_subject,
       editorial_mode: slot.editorial_mode,
       length_mode: slot.length_mode,
-      // ORDER 1 intermediate stages (diagnostics + Judge)
+      // ORDER 1 intermediate stages
       core_thought: p.core_thought ?? null,
       thinking_rail: p.thinking_rail ?? null,
       audience_translation: p.audience_translation ?? null,
+      // ORDER 2 Natural Humor + density diagnostics
+      natural_humor_present: p.natural_humor_present ?? false,
+      natural_humor_fit: p.natural_humor_fit ?? "N/A",
+      writing_density: p.writing_density ?? null,
+      ai_tone_risk: p.ai_tone_risk ?? "UNKNOWN",
+      unnecessary_length: p.unnecessary_length ?? false,
       claim_types: slot.claim_types || [],
       grounding_status: slot.grounding_status,
       grounding_reasons: slot.grounding_reasons || [],
