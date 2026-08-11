@@ -41,6 +41,10 @@ export type GroundingInput = {
   relationship_evidence_ids?: string[];
   runtime_joint_context_id?: string;
   interests?: string[];
+  /** ORDER 3 verified sets from Evidence Packet */
+  verified_locations?: string[];
+  verified_entities?: string[];
+  verified_events?: string[];
 };
 
 const EXPERIENCE_CLAIM = [
@@ -163,6 +167,98 @@ export function judgeSeedGrounding(input: GroundingInput): {
           inference_type: "UNKNOWN",
           grounding_status: "NEEDS_RELATIONSHIP_EVIDENCE",
           reasons: ["CROSS_INTEREST_WITHOUT_RELATIONSHIP"],
+        },
+      };
+    }
+  }
+
+  // ORDER 3: entity/location must appear in verified Evidence Packet sets
+  const LOCATION_TOKENS = [
+    { id: "BMO", re: /\bbmo\b|비모/i },
+    { id: "SEOUL", re: /서울|seoul/i },
+    { id: "INCHEON", re: /인천/i },
+    { id: "JEJU", re: /제주/i },
+    { id: "HONGDAE", re: /홍대/i },
+    { id: "SF", re: /샌프란|san\s*francisco/i },
+    { id: "REDWOOD_CITY", re: /레드우드|redwood/i },
+    { id: "LA", re: /로스앤젤레스|\bla\b(?![a-z])/i },
+  ];
+  const claimedLocs = LOCATION_TOKENS.filter((l) => l.re.test(t)).map((l) => l.id);
+  const verifiedLoc = new Set((input.verified_locations || []).map((x) => String(x).toUpperCase()));
+  for (const loc of claimedLocs) {
+    if (!verifiedLoc.has(loc) && !verifiedLoc.has(loc.toUpperCase())) {
+      if (!(input.verified_locations || []).length) {
+        return {
+          pass: false,
+          provenance: {
+            source_type: String(input.primary_source || "UNKNOWN"),
+            source_id: input.evidence_source_ids?.[0],
+            claim_types,
+            inference_type: "UNKNOWN",
+            grounding_status: "REJECTED",
+            reasons: ["UNSUPPORTED_LOCATION", loc],
+          },
+        };
+      }
+      if (!verifiedLoc.has(loc)) {
+        return {
+          pass: false,
+          provenance: {
+            source_type: String(input.primary_source || "UNKNOWN"),
+            source_id: input.evidence_source_ids?.[0],
+            claim_types,
+            inference_type: "UNKNOWN",
+            grounding_status: "REJECTED",
+            reasons: ["LOCATION_NOT_IN_VERIFIED_SET", loc],
+          },
+        };
+      }
+    }
+  }
+
+  // Korean language ≠ Korea location
+  if (/서울|인천|제주|홍대|경부고속|한국\s*지하철/.test(t)) {
+    const ok = (input.verified_locations || []).some((v) =>
+      /SEOUL|INCHEON|JEJU|HONGDAE|KOREA/i.test(String(v))
+    );
+    if (!ok) {
+      return {
+        pass: false,
+        provenance: {
+          source_type: String(input.primary_source || "UNKNOWN"),
+          source_id: input.evidence_source_ids?.[0],
+          claim_types,
+          inference_type: "UNKNOWN",
+          grounding_status: "REJECTED",
+          reasons: ["KOREAN_LOCATION_WITHOUT_EVIDENCE"],
+        },
+      };
+    }
+  }
+
+  // Expanded current-context signals (match day, price, software, policy)
+  const CURRENT_EXPANDED = [
+    /현재\s*(경기|스쿼드|로테이션|라인업)/,
+    /오늘\s*(경기|직관)/,
+    /선수\s*(상태|출전|부상)/,
+    /가격|재고|availab/i,
+    /최신\s*(소프트웨어|빌드|버전|업데이트)/,
+    /현재\s*(요금|정책|규정)/,
+    /지금\s*(타는|운영|운행)/,
+  ];
+  if (CURRENT_EXPANDED.some((r) => r.test(t))) {
+    const hasEvidence =
+      !!input.creator_evidence_available || (input.evidence_source_ids?.length ?? 0) > 0;
+    if (!hasEvidence) {
+      return {
+        pass: false,
+        provenance: {
+          source_type: String(input.primary_source || "UNKNOWN"),
+          source_id: input.evidence_source_ids?.[0],
+          claim_types,
+          inference_type: "UNKNOWN",
+          grounding_status: "CURRENT_CONTEXT_REQUIRED",
+          reasons: ["UNSUPPORTED_CURRENT_CONTEXT", "XAI_WOULD_HAVE_BEEN_REQUIRED"],
         },
       };
     }
