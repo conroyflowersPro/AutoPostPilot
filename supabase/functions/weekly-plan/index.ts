@@ -51,7 +51,7 @@ const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
 const APP_VERSION = "9.1.2";
-const WEEKLY_ENGINE_VERSION = "phased_v9.1.2";
+const WEEKLY_ENGINE_VERSION = "phased_v9.1.2_order3_evidence";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -88,6 +88,18 @@ function compactSlot(seed: ConcreteSeed, dayOffset: number, slot: number, mode: 
     seed_id: seed.seed_id,
     creator_evidence_available: !!seed.creator_evidence_available,
     primary_source: seed.primary_source,
+    source_type: seed.source_type || seed.primary_source,
+    source_id: Array.isArray(seed.evidence_source_ids) ? seed.evidence_source_ids[0] : undefined,
+    evidence_source_ids: seed.evidence_source_ids || [],
+    claim_types: seed.claim_types || [],
+    inference_type: seed.inference_type || "UNKNOWN",
+    grounding_status: seed.grounding_status || "UNKNOWN",
+    grounding_reasons: seed.grounding_reasons || [],
+    idea_angle_family: seed.idea_angle_family || ideaAngleKey(seed),
+    verified_locations: seed.verified_locations || [],
+    verified_entities: seed.verified_entities || [],
+    relationship_evidence_ids: seed.relationship_evidence_ids || [],
+    xai_would_have_been_required: !!seed.xai_would_have_been_required,
   };
 }
 
@@ -135,22 +147,36 @@ Deno.serve(async (req) => {
         .gte("published_at", since)
         .limit(400);
       const evidenceSubjects: string[] = [];
+      const publishedEvidence: Array<{ text: string; source_id?: string; published_at?: string; post_type?: string }> = [];
       for (const row of actRows || []) {
         const t = String((row as any).text_body || "").trim();
         if (t.length < 12) continue;
         const pt = String((row as any).post_type || (row as any).action_type || "").toUpperCase();
         if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
+        const soc = String((row as any).system_origin_class || "").toUpperCase();
+        if (soc && /APP|SYSTEM|AUTOPOST|GENERATED/.test(soc)) continue;
         evidenceSubjects.push(t.slice(0, 160));
+        publishedEvidence.push({
+          text: t,
+          source_id: (row as any).x_post_id || undefined,
+          published_at: (row as any).published_at || undefined,
+          post_type: pt,
+        });
       }
-      const publishedMerged = [...new Set([...published, ...evidenceSubjects])];
       const local = bootstrapCandidatesFromDimensions({
-        publishedSubjects: publishedMerged,
+        publishedSubjects: published,
+        publishedEvidence,
         intentText,
       });
       const nextId = createSeedIdFactory("s");
-      const gated = applyLocalGates(local, publishedMerged.map(subjectSignature), nextId);
+      const gated = applyLocalGates(local, [], nextId);
       const candidates = [...gated.passed];
       const supply_low = candidates.length < Math.min(required_slots, 8);
+      const xai_would = candidates.filter((c: any) => c.xai_would_have_been_required).length;
+      const raw_copy_guard = candidates.every((c: any) => {
+        const sub = String(c.concrete_subject || "");
+        return !evidenceSubjects.some((e) => e.startsWith(sub) && sub.length > 40);
+      });
       return json({
         success: true,
         phase: "expand",
@@ -182,10 +208,19 @@ Deno.serve(async (req) => {
           expand_model: "none_evidence_only",
           evidence_activity_rows: (actRows || []).length,
           evidence_subjects: evidenceSubjects.length,
+          published_evidence_rows: publishedEvidence.length,
           published_input: published.length,
           order2_xai_expand_blocked: true,
+          order3_evidence_packet_reasoning: true,
           language_policy: "Korean output; location only from Evidence",
           supply_low,
+          raw_post_copy_guard_ok: raw_copy_guard,
+          xai_would_have_been_required_count: xai_would,
+          status_counts: {
+            VALID_INTERNAL: candidates.filter((c: any) => !c.xai_would_have_been_required).length,
+            XAI_WOULD_HAVE_BEEN_REQUIRED: xai_would,
+            SHORTFALL: Math.max(0, Math.min(required_slots, 8) - candidates.length),
+          },
           xai_usage: {
             seed_expansion: false,
             external_supplement: false,
@@ -211,12 +246,32 @@ Deno.serve(async (req) => {
           creator_evidence_available: !!b.creator_evidence_available,
           experience_required: !!b.experience_required,
           primary_source: b.primary_source ? String(b.primary_source) : undefined,
+          evidence_source_ids: Array.isArray(b.evidence_source_ids) ? b.evidence_source_ids.map(String) : undefined,
+          relationship_evidence_ids: Array.isArray(b.relationship_evidence_ids)
+            ? b.relationship_evidence_ids.map(String)
+            : undefined,
+          verified_locations: Array.isArray(b.verified_locations) ? b.verified_locations.map(String) : undefined,
+          verified_entities: Array.isArray(b.verified_entities) ? b.verified_entities.map(String) : undefined,
         });
         if (!g.pass) {
           grounding_reject += 1;
-          judged.push({ ...b, status: "REJECTED", editorial_fit: "POOR" } as any);
+          judged.push({
+            ...b,
+            status: "REJECTED",
+            editorial_fit: "POOR",
+            grounding_status: g.provenance.grounding_status,
+            grounding_reasons: g.provenance.reasons,
+            claim_types: g.provenance.claim_types,
+            inference_type: g.provenance.inference_type,
+            source_type: g.provenance.source_type,
+          } as any);
           continue;
         }
+        b.grounding_status = g.provenance.grounding_status;
+        b.grounding_reasons = g.provenance.reasons;
+        b.claim_types = g.provenance.claim_types;
+        b.inference_type = g.provenance.inference_type;
+        b.source_type = g.provenance.source_type;
         const q = evaluateEditorialSeedQuality(b, mode);
         if (!q.pass) {
           judged.push({ ...b, status: "HOLD", editorial_fit: "POOR" });
