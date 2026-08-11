@@ -1,4 +1,4 @@
-/** ORDER 3+4 hotfix — post-generation grounding evaluation */
+/** ORDER 3+4 hotfix — post-generation grounding evaluation + ORDER 1 stage fields */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -38,6 +38,10 @@ export function buildGroundedPostsOut(
       primaryTopic: slot.primaryTopic || slot.concrete_subject,
       editorial_mode: slot.editorial_mode,
       length_mode: slot.length_mode,
+      // ORDER 1 intermediate stages (diagnostics + Judge)
+      core_thought: p.core_thought ?? null,
+      thinking_rail: p.thinking_rail ?? null,
+      audience_translation: p.audience_translation ?? null,
       claim_types: slot.claim_types || [],
       grounding_status: slot.grounding_status,
       grounding_reasons: slot.grounding_reasons || [],
