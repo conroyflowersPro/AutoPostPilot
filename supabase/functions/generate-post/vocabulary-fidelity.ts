@@ -1,7 +1,7 @@
 /**
  * ORDER 4 — Vocabulary Fidelity vs Creator Style Baseline
  * Distance metrics, not forced word insertion.
- * ORDER 3+4 hotfix: detectUnsupportedAdditions compares draft vs grounding boundary.
+ * ORDER 3+4 FINAL HOTFIX: detectUnsupportedAdditions uses allowed_facts + verified sets.
  */
 
 import { getStyleBaseline } from "./creator-style-data.ts";
@@ -124,8 +124,8 @@ const ENTITY_DETECT: Array<{ id: string; re: RegExp }> = [
 ];
 
 /**
- * ORDER 3+4 hotfix: compare Generated Draft against supplied grounding boundary.
- * Returns list of unsupported additions (empty = grounding preserved).
+ * ORDER 3+4 FINAL HOTFIX: compare Generated Draft against supplied grounding boundary.
+ * Returns list of unsupported additions (empty = grounding_preserved true).
  */
 export function detectUnsupportedAdditions(
   text: string,
