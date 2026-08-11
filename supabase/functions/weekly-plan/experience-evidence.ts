@@ -1,8 +1,7 @@
 /**
- * EXPERIENCE evidence pipeline — ORDER 4
- * Priority: (1) recent 14d handmade X  (2) Archive TIMELESS  (3) Archive HISTORICAL with framing
- * Never invent 1st-person experience. Never republish original post text.
- * Evidence constraint > Editorial Ratio fill pressure.
+ * EXPERIENCE evidence pipeline — Production canonical (v9.1.2)
+ * Priority: (1) recent 14d handmade X only in production default
+ * Static catalog REMOVED — never invent 1st-person experience.
  */
 
 export type ExperienceProvenance =
@@ -149,76 +148,8 @@ export function buildRecentExperienceCandidates(
   return out;
 }
 
-export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = [
-  {
-    cluster: "CYBERTRUCK",
-    dimension: "OWNERSHIP",
-    concrete_subject: "사이버트럭 일상 소유 중 적재·스케일이 도심 동선에 주는 제약",
-    point_or_tension: "소유 경험 기반 — 특정 일시를 현재 사건처럼 쓰지 말 것",
-    experience_class: "TIMELESS",
-    provenance: "ARCHIVE_TIMELESS",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: false,
-    idea_angle_hint: "OWNERSHIP_CONSTRAINT",
-  },
-  {
-    cluster: "CYBERTRUCK",
-    dimension: "CHARGING",
-    concrete_subject: "장거리 EV 이동에서 피크 속도보다 체류 시간이 일정을 가른 경험",
-    experience_class: "TIMELESS",
-    provenance: "ARCHIVE_TIMELESS",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: false,
-    idea_angle_hint: "TRIP_DWELL",
-  },
-  {
-    cluster: "FSD",
-    dimension: "SUPERVISION",
-    concrete_subject: "FSD 실사용 중 구간 유형에 따라 감시 집중도가 달라진 체감",
-    experience_class: "TIMELESS",
-    provenance: "ARCHIVE_TIMELESS",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: false,
-    idea_angle_hint: "SUPERVISION_RHYTHM",
-  },
-  {
-    cluster: "LAFC",
-    dimension: "MATCHDAY",
-    concrete_subject: "BMO 홈 직관 때 주차·출차 동선이 병목으로 잡힌 경험",
-    experience_class: "TIMELESS",
-    provenance: "ARCHIVE_TIMELESS",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: false,
-    idea_angle_hint: "MATCHDAY_FLOW",
-  },
-  {
-    cluster: "GAMING",
-    dimension: "SHORT_SESSION",
-    concrete_subject: "저녁 짧은 세션에 맞춰 한 판 클리어만 목표로 둔 플레이 습관",
-    experience_class: "TIMELESS",
-    provenance: "ARCHIVE_TIMELESS",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: false,
-    idea_angle_hint: "SESSION_HABIT",
-  },
-  {
-    cluster: "CYBERTRUCK",
-    dimension: "UI_HISTORY",
-    concrete_subject: "과거 차량 소프트웨어 UI 구성이 지금과 달랐던 사용 기억",
-    point_or_tension: "당시 UI — 현재 UI로 단정 금지",
-    experience_class: "HISTORICAL",
-    provenance: "ARCHIVE_HISTORICAL",
-    creator_evidence_available: true,
-    experience_required: true,
-    historical_framing_required: true,
-    idea_angle_hint: "THEN_UI",
-  },
-];
+/** Production static catalog REMOVED — empty by design */
+export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = [];
 
 const EXAMPLE_CONTAMINATION = [
   /fsd\s*v10/i,
@@ -235,7 +166,7 @@ export function isExampleContamination(text: string): boolean {
 export function resolveExperienceSupply(
   need: number,
   recent: ExperienceCandidate[],
-  archive: ExperienceCandidate[] = ARCHIVE_EXPERIENCE_FALLBACK
+  archive: ExperienceCandidate[] = []
 ): {
   selected: ExperienceCandidate[];
   report: ExperienceSupplyReport;
@@ -263,7 +194,7 @@ export function resolveExperienceSupply(
   const recent_adopted = selected.length;
   if (selected.length < need) {
     archive_explored = true;
-    notes.push("RECENT_SUPPLY_SHORT → archive fallback");
+    notes.push("RECENT_SUPPLY_SHORT → archive empty or short");
     const timeless = archive.filter((a) => a.experience_class === "TIMELESS");
     const historical = archive.filter((a) => a.experience_class === "HISTORICAL");
     take(timeless, need);

@@ -1,12 +1,13 @@
 /**
- * Weekly Planner Edge v9.1.1 — expand timeout + JSON parse fix
+ * Weekly Planner Edge — Production canonical (v9.1.2)
+ * Expand: Evidence/Intent only. Language=Korean output; Location=Evidence only.
+ * No production templates. Location never inferred from language alone.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   DIMENSION_REGISTRY,
   applyLocalGates,
-  extractJson,
   subjectSignature,
   consolidateSemanticGroups,
   createSeedIdFactory,
@@ -38,8 +39,8 @@ import {
   buildRecentExperienceCandidates,
   resolveExperienceSupply,
   experienceCandidateToSeedFields,
-  ARCHIVE_EXPERIENCE_FALLBACK,
 } from "./experience-evidence.ts";
+import { judgeSeedGrounding, countIntegrityOk } from "./runtime-grounding.ts";
 import {
   redistributeDailyTopics,
   topicDistributionReport,
@@ -49,9 +50,10 @@ import {
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const MODEL_EXPAND = "grok-4.20-non-reasoning";
-const MODEL = "grok-4.5";
-const EXPAND_TIMEOUT_MS = 28000;
+const APP_VERSION = "9.1.2";
+const WEEKLY_ENGINE_VERSION = "phased_v9.1.2";
+const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -96,90 +98,6 @@ function seedArrayFromBody(body: any): any[] {
   return [];
 }
 
-function extractSeedsList(raw: string): any[] {
-  let t = String(raw || "").trim();
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence?.[1]) t = fence[1].trim();
-  const tryParse = (s: string) => { try { return JSON.parse(s); } catch { return null; } };
-  let parsed = tryParse(t) || extractJson(t);
-  if (!parsed) {
-    const sObj = t.indexOf("{");
-    const sArr = t.indexOf("[");
-    const s = sObj >= 0 && (sArr < 0 || sObj < sArr) ? sObj : sArr;
-    if (s >= 0) {
-      const open = t[s];
-      const close = open === "{" ? "}" : "]";
-      let d = 0, e = -1;
-      for (let i = s; i < t.length; i++) {
-        if (t[i] === open) d++;
-        else if (t[i] === close) { d--; if (d === 0) { e = i; break; } }
-      }
-      if (e > s) parsed = tryParse(t.slice(s, e + 1));
-    }
-  }
-  if (!parsed) {
-    const seedsKey = t.search(/"seeds"\s*:\s*\[/);
-    if (seedsKey >= 0) {
-      const arrStart = t.indexOf("[", seedsKey);
-      let depth = 0, arrEnd = -1;
-      for (let i = arrStart; i < t.length; i++) {
-        if (t[i] === "[") depth++;
-        else if (t[i] === "]") { depth--; if (depth === 0) { arrEnd = i; break; } }
-      }
-      if (arrEnd > arrStart) {
-        const arr = tryParse(t.slice(arrStart, arrEnd + 1));
-        if (Array.isArray(arr)) return arr;
-      }
-    }
-    return [];
-  }
-  if (Array.isArray(parsed)) return parsed;
-  if (Array.isArray(parsed.seeds)) return parsed.seeds;
-  if (Array.isArray(parsed.candidates)) return parsed.candidates;
-  if (Array.isArray(parsed.data)) return parsed.data;
-  return [];
-}
-
-async function callXai(
-  xaiKey: string,
-  system: string,
-  user: string,
-  maxTokens: number,
-  timeoutMs: number,
-  model: string = MODEL,
-) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${xaiKey}` },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: maxTokens,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(t);
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`xAI ${res.status}: ${body.slice(0, 180)}`);
-    }
-    const data = await res.json();
-    return String(data?.choices?.[0]?.message?.content || "");
-  } catch (e: any) {
-    clearTimeout(t);
-    const msg = String(e?.message || e);
-    if (/abort/i.test(msg)) throw new Error(`xAI timeout after ${timeoutMs}ms (model=${model})`);
-    throw e;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const json = (b: unknown, status = 200) =>
@@ -200,7 +118,6 @@ Deno.serve(async (req) => {
     const daysCount = Math.min(Math.max(Number(body.generationDays) || 7, 1), 7);
     const required_slots = postsPerDay * daysCount;
     const xaiKey = (Deno.env.get("XAI_API_KEY") || "").trim();
-    const skipXaiExpand = body.expand_with_xai === false || body.allow_xai_enrich === false;
     const t0 = Date.now();
 
     if (phase === "expand") {
@@ -210,89 +127,30 @@ Deno.serve(async (req) => {
           ? body.publishedTopics21d.map(String)
           : [];
       const intentText = String(body.creatorIntent || body.topic || "").trim();
-      const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
-      const local = bootstrapCandidatesFromDimensions({ publishedSubjects: published, intentText });
+      const ORDER2_BLOCK_XAI_EXPAND = true;
+      const since = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
+      const { data: actRows } = await supabase
+        .from("account_activities")
+        .select("text_body, post_type, action_type, published_at, origin, system_origin_class, x_post_id")
+        .gte("published_at", since)
+        .limit(400);
+      const evidenceSubjects: string[] = [];
+      for (const row of actRows || []) {
+        const t = String((row as any).text_body || "").trim();
+        if (t.length < 12) continue;
+        const pt = String((row as any).post_type || (row as any).action_type || "").toUpperCase();
+        if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
+        evidenceSubjects.push(t.slice(0, 160));
+      }
+      const publishedMerged = [...new Set([...published, ...evidenceSubjects])];
+      const local = bootstrapCandidatesFromDimensions({
+        publishedSubjects: publishedMerged,
+        intentText,
+      });
       const nextId = createSeedIdFactory("s");
-      const gated = applyLocalGates(local, published.map(subjectSignature), nextId);
-      let xaiSeeds: any[] = [];
-      let xai_api_used = false;
-      let xai_error: string | undefined;
-      let xai_raw_len = 0;
-      let xai_parse_ok = false;
-
-      if (!skipXaiExpand && xaiKey) {
-        const allDims = DIMENSION_REGISTRY.slice(0, 12);
-        const batches = [allDims.slice(0, 6), allDims.slice(6, 12)].filter((b) => b.length > 0);
-        const avoid = [...priorSubjects, ...published].slice(0, 12).join(" | ") || "(none)";
-        const sys =
-          "You are a JSON generator. Reply with ONLY a single JSON object, no markdown fences, no commentary. " +
-          'Schema: {"seeds":[{"cluster":"FSD|CYBERTRUCK|ROBOTAXI|LAFC|AI_TECH|GAMING|OTHER","dimension":"string","concrete_subject":"Korean specific subject","point_or_tension":"string","editorial_mode":"INFORMATIVE|COMPARE|OPINION|CASUAL_OBSERVATION"}]}. ' +
-          "concrete_subject must be specific real-world post topics for Tesla/FSD/Cybertruck/LAFC owner. No HUMOR. 2 seeds per dimension.";
-        const collected: any[] = [];
-        const batchErrors: string[] = [];
-        let rawPreview = "";
-        for (let bi = 0; bi < batches.length; bi++) {
-          const dims = batches[bi];
-          const userP =
-            `Dimensions: ${JSON.stringify(dims)}\n` +
-            `Avoid: ${avoid}\n` +
-            (intentText ? `Intent: ${intentText.slice(0, 120)}\n` : "") +
-            `Return JSON only. About ${Math.ceil(required_slots / batches.length)} seeds.`;
-          try {
-            const raw = await callXai(xaiKey, sys, userP, 2200, EXPAND_TIMEOUT_MS, MODEL_EXPAND);
-            xai_raw_len += String(raw || "").length;
-            if (!rawPreview) rawPreview = String(raw || "").slice(0, 120).replace(/\s+/g, " ");
-            const seeds = extractSeedsList(raw);
-            if (seeds.length) xai_parse_ok = true;
-            collected.push(...seeds);
-            xai_api_used = true;
-            if (!seeds.length) {
-              batchErrors.push(`b${bi}:parse0 raw0=${String(raw || "").slice(0, 60).replace(/\s+/g, " ")}`);
-            }
-          } catch (e: any) {
-            batchErrors.push(`b${bi}:${String(e?.message || e).slice(0, 90)}`);
-          }
-        }
-        xaiSeeds = collected
-          .map((s: any) => ({
-            cluster: String(s?.cluster || "OTHER").toUpperCase(),
-            dimension: String(s?.dimension || "GENERAL"),
-            concrete_subject: String(s?.concrete_subject || s?.subject || s?.title || "").trim(),
-            point_or_tension: s?.point_or_tension ? String(s.point_or_tension) : undefined,
-            editorial_mode: s?.editorial_mode || s?.requested_editorial_mode || "INFORMATIVE",
-            primary_source: "XAI_DIMENSION_EXPAND",
-            creator_evidence_available: false,
-          }))
-          .filter((s: any) => s.concrete_subject.length >= 8);
-        if (xaiSeeds.length === 0) {
-          xai_error = batchErrors.length
-            ? batchErrors.join(" | ")
-            : `xAI response not JSON (raw_len=${xai_raw_len} preview=${rawPreview})`;
-        } else if (batchErrors.length) {
-          xai_error = `partial: ${batchErrors.join(" | ")}`;
-        }
-      } else if (!xaiKey) {
-        xai_error = "XAI_API_KEY missing — expand cannot produce dimension seeds";
-      } else if (skipXaiExpand) {
-        xai_error = "expand_with_xai disabled by client";
-      }
-
-      const xaiGated = applyLocalGates(xaiSeeds, published.map(subjectSignature), nextId);
-      let xaiPassed = xaiGated.passed;
-      if (xaiSeeds.length > 0 && xaiPassed.length === 0) {
-        xaiPassed = xaiSeeds.map((s: any, i: number) => ({
-          ...s,
-          seed_id: `xf${i + 1}`,
-          subject_signature: subjectSignature(s.concrete_subject),
-          status: "ELIGIBLE",
-          intent: "OBSERVATION",
-          seed_type: "OBSERVATION",
-          experience_required: false,
-          creator_evidence_available: false,
-          primary_source: "XAI_DIMENSION_EXPAND",
-        }));
-      }
-      const candidates = [...gated.passed, ...xaiPassed];
+      const gated = applyLocalGates(local, publishedMerged.map(subjectSignature), nextId);
+      const candidates = [...gated.passed];
+      const supply_low = candidates.length < Math.min(required_slots, 8);
       return json({
         success: true,
         phase: "expand",
@@ -303,27 +161,38 @@ Deno.serve(async (req) => {
         dim_batch_total: 1,
         next_dim_batch_index: 1,
         id_counter: candidates.length,
-        engine: "phased_v9.1.1",
-        xai_api_used,
-        xai_error,
+        engine: WEEKLY_ENGINE_VERSION,
+        xai_api_used: false,
+        xai_error: ORDER2_BLOCK_XAI_EXPAND
+          ? "v9.1.2: expand uses Evidence/Intent only (xAI content supply blocked)"
+          : undefined,
         seed_count: candidates.length,
         key_present: !!xaiKey,
         key_len: xaiKey.length,
-        expand_model: MODEL_EXPAND,
+        expand_model: "none_evidence_only",
+        supply_low,
         diagnostics: {
+          app_version: APP_VERSION,
+          weekly_engine_version: WEEKLY_ENGINE_VERSION,
+          generator_version: GENERATOR_VERSION,
+          git_commit: GIT_COMMIT,
           local_raw: local.length,
           local_passed: gated.passed.length,
           local_rejected: gated.local_gate_rejected,
-          expand_model: MODEL_EXPAND,
-          xai_raw: xaiSeeds.length,
-          xai_gated_passed: xaiGated.passed.length,
-          xai_gate_rejected: xaiGated.local_gate_rejected,
-          xai_reject_reasons: xaiGated.reject_reasons,
-          xai_raw_len,
-          xai_parse_ok,
-          published_topics: published.length,
+          expand_model: "none_evidence_only",
+          evidence_activity_rows: (actRows || []).length,
+          evidence_subjects: evidenceSubjects.length,
+          published_input: published.length,
+          order2_xai_expand_blocked: true,
+          language_policy: "Korean output; location only from Evidence",
+          supply_low,
+          xai_usage: {
+            seed_expansion: false,
+            external_supplement: false,
+            creator_generation: false,
+          },
         },
-        note: "v9.1.1: expand JSON-only + robust extractSeedsList.",
+        note: "v9.1.2 canonical: no location invention from language; no production templates; no xAI expand.",
         timing: { total_ms: Date.now() - t0 },
       });
     }
@@ -331,8 +200,23 @@ Deno.serve(async (req) => {
     if (phase === "judge") {
       const batch = seedArrayFromBody(body);
       const judged: ConcreteSeed[] = [];
+      let grounding_reject = 0;
       for (const b of batch) {
         const mode = parseEditorialMode(b.requested_editorial_mode || b.editorial_mode) || "INFORMATIVE";
+        const g = judgeSeedGrounding({
+          concrete_subject: String(b.concrete_subject || ""),
+          point_or_tension: b.point_or_tension ? String(b.point_or_tension) : undefined,
+          editorial_mode: mode,
+          cluster: b.cluster ? String(b.cluster) : undefined,
+          creator_evidence_available: !!b.creator_evidence_available,
+          experience_required: !!b.experience_required,
+          primary_source: b.primary_source ? String(b.primary_source) : undefined,
+        });
+        if (!g.pass) {
+          grounding_reject += 1;
+          judged.push({ ...b, status: "REJECTED", editorial_fit: "POOR" } as any);
+          continue;
+        }
         const q = evaluateEditorialSeedQuality(b, mode);
         if (!q.pass) {
           judged.push({ ...b, status: "HOLD", editorial_fit: "POOR" });
@@ -349,7 +233,16 @@ Deno.serve(async (req) => {
         success: true,
         phase: "judge",
         judged: consolidateSemanticGroups(judged),
-        engine: "phased_v9.1.1",
+        engine: WEEKLY_ENGINE_VERSION,
+        diagnostics: {
+          app_version: APP_VERSION,
+          weekly_engine_version: WEEKLY_ENGINE_VERSION,
+          generator_version: GENERATOR_VERSION,
+          git_commit: GIT_COMMIT,
+          grounding_reject,
+          xai_api_used: false,
+          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
+        },
       });
     }
 
@@ -367,11 +260,7 @@ Deno.serve(async (req) => {
       const interestMix = blendInterestMix(DEFAULT_INTEREST_MIX, intent);
       const recentExp = buildRecentExperienceCandidates(acts || []);
       const expNeed = Math.max(0, Number((mix.allocation as any)?.EXPERIENCE) || 0);
-      const expResolved = resolveExperienceSupply(
-        expNeed,
-        recentExp,
-        recentExp.length ? [] : ARCHIVE_EXPERIENCE_FALLBACK
-      );
+      const expResolved = resolveExperienceSupply(expNeed, recentExp, []);
       let pool: ConcreteSeed[] = seedsIn.filter((s) => isSelectableStatus(s.status as any));
       if (pool.length < seedsIn.length) {
         for (const s of seedsIn) {
@@ -488,9 +377,7 @@ Deno.serve(async (req) => {
         if (!filled) break;
       }
       flatCount = outDays.reduce((s, d) => s + d.posts.length, 0);
-      if (flatCount < baseNeed) {
-        xai_supplement_would_be_required = baseNeed - flatCount;
-      }
+      if (flatCount < baseNeed) xai_supplement_would_be_required = baseNeed - flatCount;
       const mode_shortfall: Record<string, number> = {};
       for (const m of WEEKLY_EDITORIAL_MODES) {
         const target = Number((mix.allocation as any)[m] || 0);
@@ -538,8 +425,14 @@ Deno.serve(async (req) => {
           consecutive_same_topic_pairs: redistributed.consecutive_same_topic_pairs,
           topic_distribution: topicDistributionReport(redistributed.days),
           experience: expResolved.report,
-          engine: "phased_v9.1.1",
+          app_version: APP_VERSION,
+          weekly_engine_version: WEEKLY_ENGINE_VERSION,
+          generator_version: GENERATOR_VERSION,
+          git_commit: GIT_COMMIT,
+          engine: WEEKLY_ENGINE_VERSION,
           input_seed_count: seedsIn.length,
+          count_integrity: countIntegrityOk(mix.base_required_slots, totalPlanned),
+          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
         },
         timing: { total_ms: Date.now() - t0 },
       });
@@ -549,7 +442,7 @@ Deno.serve(async (req) => {
       {
         success: false,
         error: "phase required: expand | judge | select",
-        engine: "phased_v9.1.1",
+        engine: WEEKLY_ENGINE_VERSION,
         days: [],
       },
       400
