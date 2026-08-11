@@ -1,6 +1,7 @@
 /**
  * Dynamic Concrete Seed Engine v9.1.0 — Edge pack (quality gates + idea angle + mode helpers)
  * No production concrete bootstrap templates. ORDER 3 evidence-packet reasoning.
+ * ORDER 3+4 FINAL HOTFIX: allowed_facts / factual_anchors propagation.
  */
 import {
   extractEvidencePacket,
@@ -35,6 +36,13 @@ export type ConcreteSeed = {
   verified_entities?: string[];
   relationship_evidence_ids?: string[];
   xai_would_have_been_required?: boolean;
+  allowed_facts?: string[];
+  factual_anchors?: string[];
+  do_not_invent?: string[];
+  experience_facts?: string[];
+  static_facts?: string[];
+  current_facts?: string[];
+  creator_opinion?: string[];
   [key: string]: unknown;
 };
 export type EditorialMode = "INFORMATIVE" | "COMPARE" | "OPINION" | "EXPERIENCE" | "CASUAL_OBSERVATION";
@@ -86,6 +94,13 @@ export function applyLocalGates(raw: any[], _recent: string[], nextId: () => str
       verified_entities: r.verified_entities,
       relationship_evidence_ids: r.relationship_evidence_ids,
       xai_would_have_been_required: !!r.xai_would_have_been_required,
+      allowed_facts: Array.isArray(r.allowed_facts) ? r.allowed_facts.map(String) : undefined,
+      factual_anchors: Array.isArray(r.factual_anchors) ? r.factual_anchors.map(String) : undefined,
+      do_not_invent: Array.isArray(r.do_not_invent) ? r.do_not_invent.map(String) : undefined,
+      experience_facts: Array.isArray(r.experience_facts) ? r.experience_facts.map(String) : undefined,
+      static_facts: Array.isArray(r.static_facts) ? r.static_facts.map(String) : undefined,
+      current_facts: Array.isArray(r.current_facts) ? r.current_facts.map(String) : undefined,
+      creator_opinion: Array.isArray(r.creator_opinion) ? r.creator_opinion.map(String) : undefined,
     });
   }
   return { passed, local_gate_rejected: 0, reject_reasons: {} };
@@ -317,7 +332,7 @@ export type PublishedEvidenceRow = {
   post_type?: string;
 };
 
-/** ORDER 3 — Evidence-based seed reasoning (NOT raw post copy). */
+/** ORDER 3 — Evidence-based seed reasoning (NOT raw post copy). ORDER34 HOTFIX: attach allowed_facts. */
 export function bootstrapCandidatesFromDimensions(opts: {
   publishedSubjects: string[];
   intentText?: string;
@@ -370,6 +385,19 @@ export function bootstrapCandidatesFromDimensions(opts: {
       verified_entities: packet.entities,
       relationship_evidence_ids: [],
       xai_would_have_been_required: reasoned.needs_xai,
+      factual_anchors: packet.factual_anchors,
+      experience_facts: packet.experience_facts,
+      static_facts: packet.static_facts,
+      current_facts: packet.current_facts,
+      creator_opinion: packet.creator_opinion,
+      allowed_facts: [
+        ...packet.factual_anchors,
+        ...packet.experience_facts,
+        ...packet.static_facts,
+        ...packet.current_facts,
+        ...packet.creator_opinion,
+      ].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 12),
+      do_not_invent: [],
       status: "ELIGIBLE",
     });
   }
@@ -402,6 +430,19 @@ export function bootstrapCandidatesFromDimensions(opts: {
           verified_locations: packet.verified_locations,
           verified_entities: packet.entities,
           xai_would_have_been_required: false,
+          factual_anchors: packet.factual_anchors,
+          experience_facts: packet.experience_facts,
+          static_facts: packet.static_facts,
+          current_facts: packet.current_facts,
+          creator_opinion: packet.creator_opinion,
+          allowed_facts: [
+            ...packet.factual_anchors,
+            ...packet.experience_facts,
+            ...packet.static_facts,
+            ...packet.current_facts,
+            ...packet.creator_opinion,
+          ].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 12),
+          do_not_invent: [],
           status: "ELIGIBLE",
         });
       }

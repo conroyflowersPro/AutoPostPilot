@@ -224,10 +224,11 @@ export function resolveExperienceSupply(
 }
 
 export function experienceCandidateToSeedFields(c: ExperienceCandidate): Record<string, unknown> {
+  const subject = String(c.concrete_subject || "").trim();
   return {
     cluster: c.cluster,
     dimension: c.dimension,
-    concrete_subject: c.concrete_subject,
+    concrete_subject: subject,
     point_or_tension: c.point_or_tension,
     intent: "EXPERIENCE",
     seed_type: "EXPERIENCE",
@@ -244,6 +245,16 @@ export function experienceCandidateToSeedFields(c: ExperienceCandidate): Record<
     experience_class: c.experience_class,
     historical_framing_required: c.historical_framing_required,
     status: "ELIGIBLE",
+    claim_types: ["PERSONAL_EXPERIENCE"],
+    allowed_facts: subject ? [subject.slice(0, 120)] : [],
+    factual_anchors: subject ? [subject.slice(0, 120)] : [],
+    do_not_invent: [
+      "오늘/어제/이번 주 시점 발명",
+      "출퇴근 경로 발명",
+      "방문 장소 발명",
+      "직접 테스트/체험 발명",
+      "구체 거리/시간/횟수 발명",
+    ],
   };
 }
 

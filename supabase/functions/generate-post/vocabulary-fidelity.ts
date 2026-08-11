@@ -1,6 +1,7 @@
 /**
  * ORDER 4 — Vocabulary Fidelity vs Creator Style Baseline
  * Distance metrics, not forced word insertion.
+ * ORDER 3+4 FINAL HOTFIX: detectUnsupportedAdditions uses allowed_facts + verified sets.
  */
 
 import { getStyleBaseline } from "./creator-style-data.ts";
@@ -88,25 +89,136 @@ export function scoreVocabularyFidelity(text: string): VocabularyFidelityResult 
   };
 }
 
+export type GroundingAllowed = {
+  do_not_invent?: string[];
+  allowed_facts?: string[];
+  factual_anchors?: string[];
+  claim_types?: string[];
+  grounding_status?: string;
+  verified_entities?: string[];
+  verified_locations?: string[];
+  experience_facts?: string[];
+  current_facts?: string[];
+};
+
+const LOCATION_DETECT: Array<{ id: string; re: RegExp }> = [
+  { id: "BMO", re: /\bbmo\b|비모/i },
+  { id: "SEOUL", re: /서울|seoul/i },
+  { id: "INCHEON", re: /인천/i },
+  { id: "JEJU", re: /제주/i },
+  { id: "HONGDAE", re: /홍대/i },
+  { id: "SF", re: /샌프란|san\s*francisco/i },
+  { id: "REDWOOD_CITY", re: /레드우드|redwood/i },
+  { id: "LA", re: /로스앤젤레스|\bla\b(?![a-z])/i },
+  { id: "SUPERCHARGER", re: /슈퍼차저|supercharger/i },
+];
+
+const ENTITY_DETECT: Array<{ id: string; re: RegExp }> = [
+  { id: "FSD", re: /\bfsd\b|오토파일럿/i },
+  { id: "CYBERTRUCK", re: /cybertruck|사이버\s*트럭|사이버트럭/i },
+  { id: "ROBOTAXI", re: /robotaxi|로보\s*택시/i },
+  { id: "LAFC", re: /\blafc\b/i },
+  { id: "MODEL_S", re: /model\s*s|모델\s*s|s\s*plaid/i },
+  { id: "MODEL_3", re: /model\s*3|모델\s*3|m3\s*perf/i },
+  { id: "GROK", re: /\bgrok\b|그록/i },
+];
+
+/**
+ * ORDER 3+4 FINAL HOTFIX: compare Generated Draft against supplied grounding boundary.
+ * Returns list of unsupported additions (empty = grounding_preserved true).
+ */
 export function detectUnsupportedAdditions(
   text: string,
-  allowed: {
-    do_not_invent?: string[];
-    allowed_facts?: string[];
-    claim_types?: string[];
-    grounding_status?: string;
-  }
+  allowed: GroundingAllowed
 ): string[] {
   const t = String(text || "");
   const issues: string[] = [];
   const claims = new Set((allowed.claim_types || []).map((c) => String(c).toUpperCase()));
-  if (/오늘|어제|방금|퇴근길|출근길/.test(t) && !claims.has("CURRENT_FACT") && !claims.has("PERSONAL_EXPERIENCE")) {
-    if (allowed.grounding_status !== "GROUNDED") {
-      issues.push("POSSIBLE_TEMPORAL_INVENTION");
+  const verifiedLoc = new Set(
+    (allowed.verified_locations || []).map((x) => String(x).toUpperCase())
+  );
+  const verifiedEnt = new Set(
+    (allowed.verified_entities || []).map((x) => String(x).toUpperCase())
+  );
+  const factPool = [
+    ...(allowed.allowed_facts || []),
+    ...(allowed.factual_anchors || []),
+    ...(allowed.experience_facts || []),
+    ...(allowed.current_facts || []),
+  ]
+    .map((s) => String(s || "").toLowerCase())
+    .filter(Boolean);
+  const hasAnyFacts = factPool.length > 0;
+  const factBlob = factPool.join(" ");
+
+  for (const loc of LOCATION_DETECT) {
+    if (!loc.re.test(t)) continue;
+    if (verifiedLoc.size === 0 && !hasAnyFacts) {
+      if (["SEOUL", "INCHEON", "JEJU", "HONGDAE"].includes(loc.id)) {
+        issues.push(`UNSUPPORTED_LOCATION:${loc.id}`);
+      }
+      continue;
+    }
+    if (verifiedLoc.size > 0 && !verifiedLoc.has(loc.id) && !verifiedLoc.has(loc.id.toUpperCase())) {
+      if (!loc.re.test(factBlob)) {
+        issues.push(`UNSUPPORTED_LOCATION:${loc.id}`);
+      }
     }
   }
-  if (/직접\s*(해|타|가|보)|테스트했|체험했/.test(t) && !claims.has("PERSONAL_EXPERIENCE")) {
-    issues.push("POSSIBLE_EXPERIENCE_INVENTION");
+  if (/서울|인천|제주|홍대|경부고속|한국\s*지하철/.test(t)) {
+    const ok =
+      [...verifiedLoc].some((v) => /SEOUL|INCHEON|JEJU|HONGDAE|KOREA/i.test(v)) ||
+      /서울|인천|제주|홍대/.test(factBlob);
+    if (!ok) issues.push("UNSUPPORTED_LOCATION:KOREA_WITHOUT_EVIDENCE");
   }
-  return issues;
+
+  if (verifiedEnt.size > 0) {
+    for (const ent of ENTITY_DETECT) {
+      if (!ent.re.test(t)) continue;
+      if (!verifiedEnt.has(ent.id) && !verifiedEnt.has(ent.id.toUpperCase())) {
+        if (!ent.re.test(factBlob)) {
+          issues.push(`UNSUPPORTED_ENTITY:${ent.id}`);
+        }
+      }
+    }
+  }
+
+  const expClaim =
+    /직접\s*(해|타|가|보)|내가\s*(해|타|가|보|느)|테스트했|체험했|타\s*보|운전했|충전했|직관\s*(갔|함)|해봤|가봤/.test(
+      t
+    );
+  if (expClaim && !claims.has("PERSONAL_EXPERIENCE")) {
+    issues.push("UNSUPPORTED_EXPERIENCE");
+  }
+  if (expClaim && claims.has("PERSONAL_EXPERIENCE") && hasAnyFacts) {
+    const expFacts = (allowed.experience_facts || []).length > 0;
+    const anchorLooksExp = /직접|타\s*보|충전|직관|체감|운전|해봤/.test(factBlob);
+    if (!expFacts && !anchorLooksExp && allowed.grounding_status !== "GROUNDED") {
+      issues.push("UNSUPPORTED_PERSONAL_ACTION");
+    }
+  }
+
+  const temporal =
+    /오늘|어제|방금|퇴근길|출근길|이번\s*주|지금\s*(은|은\s*)?|현재\s*(는|은)?|최신\s*(버전|빌드|업데이트)/.test(
+      t
+    );
+  if (
+    temporal &&
+    !claims.has("CURRENT_FACT") &&
+    !claims.has("PERSONAL_EXPERIENCE")
+  ) {
+    if (allowed.grounding_status !== "GROUNDED" || !hasAnyFacts) {
+      issues.push("UNSUPPORTED_CURRENT_FACT");
+    }
+  }
+
+  if (/오늘\s*(경기|직관)|현재\s*(경기|스쿼드|라인업)|선수\s*(상태|출전|부상)/.test(t)) {
+    const ok =
+      claims.has("CURRENT_FACT") ||
+      claims.has("PERSONAL_EXPERIENCE") ||
+      /경기|직관|라인업|스쿼드/.test(factBlob);
+    if (!ok) issues.push("UNSUPPORTED_EVENT_TIME_CONTEXT");
+  }
+
+  return [...new Set(issues)];
 }

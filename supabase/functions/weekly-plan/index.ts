@@ -2,6 +2,7 @@
  * Weekly Planner Edge — Production canonical (v9.1.2)
  * Expand: Evidence/Intent only. Language=Korean output; Location=Evidence only.
  * No production templates. Location never inferred from language alone.
+ * ORDER 3+4 FINAL HOTFIX: allowed_facts propagation in compactSlot.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -51,7 +52,7 @@ const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
 const APP_VERSION = "9.1.2";
-const WEEKLY_ENGINE_VERSION = "phased_v9.1.2_order3_evidence";
+const WEEKLY_ENGINE_VERSION = "phased_v9.1.2_order34_grounding_hotfix";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -100,6 +101,13 @@ function compactSlot(seed: ConcreteSeed, dayOffset: number, slot: number, mode: 
     verified_entities: seed.verified_entities || [],
     relationship_evidence_ids: seed.relationship_evidence_ids || [],
     xai_would_have_been_required: !!seed.xai_would_have_been_required,
+    allowed_facts: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts : [],
+    factual_anchors: Array.isArray((seed as any).factual_anchors) ? (seed as any).factual_anchors : [],
+    do_not_invent: Array.isArray((seed as any).do_not_invent) ? (seed as any).do_not_invent : [],
+    experience_facts: Array.isArray((seed as any).experience_facts) ? (seed as any).experience_facts : [],
+    static_facts: Array.isArray((seed as any).static_facts) ? (seed as any).static_facts : [],
+    current_facts: Array.isArray((seed as any).current_facts) ? (seed as any).current_facts : [],
+    creator_opinion: Array.isArray((seed as any).creator_opinion) ? (seed as any).creator_opinion : [],
   };
 }
 
