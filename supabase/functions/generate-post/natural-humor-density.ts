@@ -12,14 +12,14 @@ NATURAL HUMOR CHECK (final expression stage only — not a content strategy):
 Allow a small natural humor beat ONLY if ALL of the following hold:
 - It connects directly to the Core Thought already decided
 - It does not interrupt or rewrite the Thinking Rail flow
-- It matches how this Creator actually speaks (light 위위 / observational aside OK; forced punchlines not OK)
+- It matches how this Creator actually speaks (light ㅋㅋ / observational aside OK; forced punchlines not OK)
 - It does not feel like a joke was bolted on after the fact
 - It makes the core point more memorable, not less serious for its own sake
 - The Creator themselves might 피식 at it
 
 If no suitable natural point exists → do NOT add humor.
 Do NOT change Editorial Mode because humor appeared.
-Do NOT force 위위, memes, or internet slang the Creator does not use.
+Do NOT force ㅋㅋ, memes, or internet slang the Creator does not use.
 Do NOT invent situations or experiences as comedy material.
 Do NOT change Core Thought or Thinking Rail to create a joke opportunity.
 Humor is never a goal. Absence of humor is a normal PASS.
@@ -58,16 +58,21 @@ export type HumorDensityDiagnostics = {
  */
 export function diagnoseHumorAndDensity(content: string): HumorDensityDiagnostics {
   const t = String(content || "");
+  // Hangul filler + common light-laugh / observational markers
   const humorMarkers =
-    /위위|흐흐|ᄏ\s|피식|어이없|웃기|장난|ㅎ|아이고|와\.\.|좀 이상|무섭네/i.test(t);
+    /\u314b\u314b|\u314e\u314e|\u314b\s|\ud53c\uc2dd|\uc5b4\uc774\uc5c6|\uc6c3\uae30|\uc7a5\ub09c|\u314e|\uc544\uc774\uace0|\uc640\.\.|\uc880 \uc774\uc0c1|\ubb34\uc12d\ub124/i.test(
+      t
+    );
   const aiToneHits =
-    (t.match(/전반적으로|이러한|따라서|결론적으로|살펴보면|중요한 점은|다음과 같/g) || [])
+    (t.match(/\uc804\ubc18\uc801\uc73c\ub85c|\uc774\ub7ec\ud55c|\ub530\ub77c\uc11c|\uacb0\ub860\uc801\uc73c\ub85c|\uc0b4\ud3b4\ubcf4\uba74|\uc911\uc694\ud55c \uc810\uc740|\ub2e4\uc74c\uacfc \uac19/g) || [])
       .length;
   const length = t.replace(/\s/g, "").length;
 
   let natural_humor_fit: HumorDensityDiagnostics["natural_humor_fit"] = "N/A";
   if (humorMarkers) {
-    const forced = (t.match(/위위/g) || []).length >= 3 || /ㄹㅇ|개웃|레전드|미침위위위/i.test(t);
+    const forced =
+      (t.match(/\u314b\u314b/g) || []).length >= 3 ||
+      /\u3139\u3147|\uac1c\uc6c3|\ub808\uc804\ub4dc|\ubbf8\uce68\u314b\u314b\u314b/i.test(t);
     natural_humor_fit = forced ? "RISK" : "PASS";
   }
 
