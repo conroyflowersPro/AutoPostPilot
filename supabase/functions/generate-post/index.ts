@@ -10,9 +10,13 @@ import {
   scoreVocabularyFidelity,
   detectUnsupportedAdditions,
 } from "./vocabulary-fidelity.ts";
+import {
+  buildGroundedPostsOut,
+  compactSlotForModel,
+} from "./grounding-out.ts";
 
 const MODEL = "grok-4.5";
-const GENERATOR_VERSION = "creator_style_data_v1_order4";
+const GENERATOR_VERSION = "creator_style_data_v1_order34_grounding_hotfix";
 
 function buildSystemPrompt(): string {
   const voice = getCreatorDnaVoice();
@@ -72,32 +76,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-function compactSlotForModel(s: any): Record<string, unknown> {
-  return {
-    slotId: s.slotId,
-    primaryTopic: s.primaryTopic || s.concrete_subject,
-    angle: s.angle,
-    editorial_mode: s.editorial_mode || null,
-    length_mode: s.length_mode || "MEDIUM",
-    writing_mode: s.writing_mode || null,
-    core_point: s.postBrief?.core_point || s.concrete_subject,
-    why: s.postBrief?.why_this_topic || s.angle,
-    claim_types: s.claim_types || s.postBrief?.claim_types || [],
-    grounding_status: s.grounding_status || null,
-    grounding_reasons: s.grounding_reasons || [],
-    source_type: s.source_type || s.primary_source || null,
-    source_id: s.source_id || (Array.isArray(s.evidence_source_ids) ? s.evidence_source_ids[0] : null),
-    evidence_source_ids: s.evidence_source_ids || [],
-    allowed_facts: s.allowed_facts || s.postBrief?.allowed_facts || [],
-    do_not_invent: s.do_not_invent || s.postBrief?.do_not_invent || [],
-    historical_framing: s.historical_framing || s.historical_framing_required || false,
-    experience_class: s.experience_class || null,
-    verified_locations: s.verified_locations || [],
-    verified_entities: s.verified_entities || [],
-    xai_api_tag: s.xai_api_tag || (s.xai_external_enrichment ? "[xAI API 이용]" : undefined),
-  };
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -218,24 +196,7 @@ Deno.serve(async (req: Request) => {
     async function callGrok(slotsSubset: any[]): Promise<any> {
       const compact = slotsSubset.map(compactSlotForModel);
       const subsetJson = JSON.stringify(compact, null, 0);
-      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
-${scheduleMeta}
-
-SLOTS (WHAT + grounding metadata — rewrite into Creator DNA voice from Data Layer; do not copy stiff seed wording):
-${subsetJson}
-
-Rules reminder:
-- editorial_mode must shape the post (INFORMATIVE ≠ OPINION ≠ COMPARE ≠ CASUAL)
-- Preserve tech names / proper nouns / verified facts from allowed_facts only
-- Never invent first-person tests or locations/times not in anchors
-- Respect do_not_invent and claim_types / grounding_status per slot
-- VOCABULARY FIDELITY: match Publishing corpus rhythm — not polished report Korean
-- Return slotId EXACTLY as given for each post
-
-USED RECORD (avoid repeats):
-${usedJson}
-
-Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
+      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.\n${scheduleMeta}\n\nSLOTS (WHAT + grounding metadata — rewrite into Creator DNA voice from Data Layer; do not copy stiff seed wording):\n${subsetJson}\n\nRules reminder:\n- editorial_mode must shape the post (INFORMATIVE ≠ OPINION ≠ COMPARE ≠ CASUAL)\n- Preserve tech names / proper nouns / verified facts from allowed_facts only\n- Never invent first-person tests or locations/times not in anchors\n- Respect do_not_invent and claim_types / grounding_status per slot\n- VOCABULARY FIDELITY: match Publishing corpus rhythm — not polished report Korean\n- Return slotId EXACTLY as given for each post\n\nUSED RECORD (avoid repeats):\n${usedJson}\n\nReturn JSON only: {\"posts\":[{\"slotId\":\"...\",\"content\":\"...\",\"score\":1-10}]}.`;
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 120000);
@@ -336,53 +297,12 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
     }
 
     const style = getCreatorStyle();
-    const postsOut = qualityPosts.map((p: any) => {
-      const slot = slotById.get(String(p.slotId)) || {};
-      const xaiTag =
-        slot.xai_api_tag ||
-        (slot.xai_external_enrichment ? "[xAI API 이용]" : undefined);
-      const fid = scoreVocabularyFidelity(String(p.content || ""));
-      const unsupported = detectUnsupportedAdditions(String(p.content || ""), {
-        do_not_invent: slot.do_not_invent || slot.postBrief?.do_not_invent,
-        allowed_facts: slot.allowed_facts || slot.postBrief?.allowed_facts,
-        claim_types: slot.claim_types,
-        grounding_status: slot.grounding_status,
-      });
-      return {
-        slotId: p.slotId,
-        content: p.content,
-        final_text: p.content,
-        text: p.content,
-        score: p.score,
-        dayOffset: offset,
-        planning_source: slot.planning_source,
-        primaryTopic: slot.primaryTopic || slot.concrete_subject,
-        editorial_mode: slot.editorial_mode,
-        length_mode: slot.length_mode,
-        claim_types: slot.claim_types || [],
-        grounding_status: slot.grounding_status,
-        grounding_reasons: slot.grounding_reasons || [],
-        source_type: slot.source_type || slot.primary_source,
-        source_id: slot.source_id || (Array.isArray(slot.evidence_source_ids) ? slot.evidence_source_ids[0] : undefined),
-        evidence_source_ids: slot.evidence_source_ids || [],
-        xai_api_tag: xaiTag,
-        xai_external_enrichment: !!slot.xai_external_enrichment,
-        voice_source: GENERATOR_VERSION,
-        style_data_version: style.version,
-        vocabulary_fidelity: {
-          score: fid.score,
-          distance: fid.distance,
-          pass: fid.pass,
-          abstract_hits: fid.abstract_hits,
-          length_distance: fid.length_distance,
-          register_distance: fid.register_distance,
-          abstraction_distance: fid.abstraction_distance,
-          reasons: fid.reasons,
-        },
-        unsupported_additions: unsupported,
-        grounding_preserved: true,
-      };
-    });
+    const postsOut = buildGroundedPostsOut(
+      qualityPosts,
+      slotById,
+      offset,
+      GENERATOR_VERSION
+    );
 
     return new Response(
       JSON.stringify({
