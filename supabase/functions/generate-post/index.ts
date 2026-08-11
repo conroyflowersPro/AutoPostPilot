@@ -14,20 +14,28 @@ import {
   buildGroundedPostsOut,
   compactSlotForModel,
 } from "./grounding-out.ts";
+import {
+  buildThoughtStagesInstructions,
+  selectThinkingRailHint,
+  THINKING_RAIL_LIBRARY,
+} from "./thought-stages.ts";
 
 const MODEL = "grok-4.5";
-const GENERATOR_VERSION = "creator_style_data_v1_order34_grounding_hotfix";
+const GENERATOR_VERSION = "core_thought_rail_audience_v1_order1";
 
 function buildSystemPrompt(): string {
   const voice = getCreatorDnaVoice();
   const vocab = getVocabularyFidelityInstructions();
   const style = getCreatorStyle();
+  const stages = buildThoughtStagesInstructions();
   return `You are the content generation engine for AutoPostPilot.
 
 ROLE SPLIT:
 - Seed / primaryTopic / angle / postBrief = WHAT (facts, points, topic) — NOT final wording
 - editorial_mode + length_mode = editorial intent / format from Planner
-- Creator DNA (from Data Layer) = HOW (vocabulary, rhythm, tone, sentence structure)
+- Creator DNA (from Data Layer) = HOW (vocabulary, rhythm, tone, sentence structure) — FINAL EXPRESSION ONLY
+
+${stages}
 
 ${voice}
 
@@ -68,7 +76,10 @@ SAFETY:
 - Never invent firsthand experiences or recent unverified announcements
 - No stock-price chatter
 
-JSON only. Each post: slotId, content, score. slotId MUST match input slotId exactly.`;
+JSON only. Each post MUST include:
+slotId, core_thought, thinking_rail, audience_translation, content, score.
+slotId MUST match input slotId exactly.
+core_thought = one short thought (not full post). thinking_rail = rail id or label. audience_translation = short note or null.`;
 }
 
 const corsHeaders = {
@@ -194,9 +205,46 @@ Deno.serve(async (req: Request) => {
     const SYSTEM_PROMPT = buildSystemPrompt();
 
     async function callGrok(slotsSubset: any[]): Promise<any> {
-      const compact = slotsSubset.map(compactSlotForModel);
-      const subsetJson = JSON.stringify(compact, null, 0);
-      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.\n${scheduleMeta}\n\nSLOTS (WHAT + grounding metadata — rewrite into Creator DNA voice from Data Layer; do not copy stiff seed wording):\n${subsetJson}\n\nRules reminder:\n- editorial_mode must shape the post (INFORMATIVE ≠ OPINION ≠ COMPARE ≠ CASUAL)\n- Preserve tech names / proper nouns / verified facts from allowed_facts only\n- Never invent first-person tests or locations/times not in anchors\n- Respect do_not_invent and claim_types / grounding_status per slot\n- VOCABULARY FIDELITY: match Publishing corpus rhythm — not polished report Korean\n- Return slotId EXACTLY as given for each post\n\nUSED RECORD (avoid repeats):\n${usedJson}\n\nReturn JSON only: {\"posts\":[{\"slotId\":\"...\",\"content\":\"...\",\"score\":1-10}]}.`;
+      const withHints = slotsSubset.map((s: any) => {
+        const hint = selectThinkingRailHint({
+          topic: s.primaryTopic || s.concrete_subject,
+          editorial_mode: s.editorial_mode,
+        });
+        return {
+          ...compactSlotForModel(s),
+          thinking_rail_hint: hint.id,
+          thinking_rail_structure: hint.structure,
+        };
+      });
+      const subsetJson = JSON.stringify(withHints, null, 0);
+      const railCatalog = THINKING_RAIL_LIBRARY.map((r) => `${r.id}:${r.label}`).join(" | ");
+      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
+${scheduleMeta}
+
+FLOW (required order per post):
+Seed → Core Thought (one) → Thinking Rail → Audience Translation → Writing DNA → final content
+
+Available thinking rails (structure only): ${railCatalog}
+
+SLOTS (WHAT + grounding + optional rail hint — do not treat hint as mandatory):
+${subsetJson}
+
+Rules reminder:
+- Decide ONE core_thought first (short claim/observation/interpretation — not full post)
+- Choose thinking_rail that fits topic + mode + core thought + evidence
+- Audience-translate where helpful (일상/사람/돈/시간/직장/생활) without distorting facts
+- Only then apply Creator Writing DNA for final wording
+- editorial_mode must shape the post (INFORMATIVE ≠ OPINION ≠ COMPARE ≠ CASUAL)
+- Preserve tech names / proper nouns / verified facts from allowed_facts only
+- Never invent first-person tests or locations/times not in anchors
+- Respect do_not_invent and claim_types / grounding_status per slot
+- VOCABULARY FIDELITY: match Publishing corpus rhythm — not polished report Korean
+- Return slotId EXACTLY as given for each post
+
+USED RECORD (avoid repeats):
+${usedJson}
+
+Return JSON only: {"posts":[{"slotId":"...","core_thought":"...","thinking_rail":"...","audience_translation":"...|null","content":"...","score":1-10}]}.`;
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 120000);
@@ -288,6 +336,12 @@ Deno.serve(async (req: Request) => {
         slotId: sid,
         content: t,
         final_text: t,
+        core_thought: String(p.core_thought || "").trim() || null,
+        thinking_rail: String(p.thinking_rail || "").trim() || null,
+        audience_translation:
+          p.audience_translation === null || p.audience_translation === undefined
+            ? null
+            : String(p.audience_translation).trim() || null,
       });
     }
 
