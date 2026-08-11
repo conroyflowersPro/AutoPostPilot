@@ -1,7 +1,13 @@
 /**
  * Dynamic Concrete Seed Engine v9.1.0 — Edge pack (quality gates + idea angle + mode helpers)
- * No production concrete bootstrap templates. Full pack: AutoPostPilot-v9.1.0-EDGE-SOURCES.zip
+ * No production concrete bootstrap templates. ORDER 3 evidence-packet reasoning.
  */
+import {
+  extractEvidencePacket,
+  reasonSeedSubjectFromPacket,
+  type EvidencePacket,
+} from "./evidence-packet.ts";
+
 export type SeedStatus = "NEW" | "ELIGIBLE" | "HIGH_VALUE" | "REJECTED" | "HOLD" | "FACT_CONTEXT_REQUIRED" | "NEEDS_CREATOR_CONTEXT";
 export type ConcreteSeed = {
   seed_id: string;
@@ -18,6 +24,17 @@ export type ConcreteSeed = {
   editorial_fit?: string;
   length_mode?: string;
   experience_required?: boolean;
+  evidence_source_ids?: string[];
+  claim_types?: string[];
+  inference_type?: string;
+  grounding_status?: string;
+  grounding_reasons?: string[];
+  source_type?: string;
+  idea_angle_family?: string;
+  verified_locations?: string[];
+  verified_entities?: string[];
+  relationship_evidence_ids?: string[];
+  xai_would_have_been_required?: boolean;
   [key: string]: unknown;
 };
 export type EditorialMode = "INFORMATIVE" | "COMPARE" | "OPINION" | "EXPERIENCE" | "CASUAL_OBSERVATION";
@@ -43,18 +60,32 @@ export function applyLocalGates(raw: any[], _recent: string[], nextId: () => str
   const passed: ConcreteSeed[] = [];
   for (const r of raw || []) {
     if (!r?.concrete_subject) continue;
+    const sub = String(r.concrete_subject);
+    if (sub.length > 120 && /[.!?。]/.test(sub)) continue;
     passed.push({
       seed_id: nextId(),
       cluster: String(r.cluster || "OTHER"),
       dimension: String(r.dimension || "GENERAL"),
-      concrete_subject: String(r.concrete_subject),
-      subject_signature: subjectSignature(r.concrete_subject),
-      primary_source: r.primary_source || "XAI_EXPANSION",
-      supporting_sources: r.supporting_sources || ["DIMENSION_REGISTRY"],
-      status: "ELIGIBLE",
+      concrete_subject: sub,
+      subject_signature: subjectSignature(sub),
+      primary_source: r.primary_source || "EVIDENCE_DERIVED",
+      supporting_sources: r.supporting_sources || ["EVIDENCE_PACKET"],
+      status: (r.status as SeedStatus) || "ELIGIBLE",
       creator_evidence_available: !!r.creator_evidence_available,
       point_or_tension: r.point_or_tension,
       requested_editorial_mode: r.requested_editorial_mode,
+      experience_required: !!r.experience_required,
+      evidence_source_ids: r.evidence_source_ids,
+      claim_types: r.claim_types,
+      inference_type: r.inference_type,
+      grounding_status: r.grounding_status,
+      grounding_reasons: r.grounding_reasons,
+      source_type: r.source_type,
+      idea_angle_family: r.idea_angle_family,
+      verified_locations: r.verified_locations,
+      verified_entities: r.verified_entities,
+      relationship_evidence_ids: r.relationship_evidence_ids,
+      xai_would_have_been_required: !!r.xai_would_have_been_required,
     });
   }
   return { passed, local_gate_rejected: 0, reject_reasons: {} };
@@ -279,10 +310,105 @@ export function ideaAngleGuardAllow(
   return { allow: false, angle_key: key, same_angle_count: same, reason: "ANGLE_REPEAT_DEFER" };
 }
 
-/** Production: no concrete bootstrap stories */
-export function bootstrapCandidatesFromDimensions(_opts: {
+export type PublishedEvidenceRow = {
+  text: string;
+  source_id?: string;
+  published_at?: string;
+  post_type?: string;
+};
+
+/** ORDER 3 — Evidence-based seed reasoning (NOT raw post copy). */
+export function bootstrapCandidatesFromDimensions(opts: {
   publishedSubjects: string[];
   intentText?: string;
+  publishedEvidence?: PublishedEvidenceRow[];
 }): any[] {
-  return [];
+  const out: any[] = [];
+  const emitted = new Set<string>();
+  const packets: EvidencePacket[] = [];
+  const rows: PublishedEvidenceRow[] = Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
+    ? opts.publishedEvidence
+    : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
+
+  for (const row of rows.slice(0, 24)) {
+    const text = String(row.text || "").trim();
+    if (text.length < 12) continue;
+    const packet = extractEvidencePacket(text, {
+      source_id: row.source_id || row.published_at,
+      source_type: "ACCOUNT_ACTIVITY",
+      published_at: row.published_at,
+    });
+    if (!packet) continue;
+    if (packet.topic === "OTHER" && packet.entities.length === 0 && packet.experience_facts.length === 0) continue;
+    packets.push(packet);
+    const reasoned = reasonSeedSubjectFromPacket(packet);
+    const sig = subjectSignature(reasoned.concrete_subject);
+    if (emitted.has(sig)) continue;
+    emitted.add(sig);
+    out.push({
+      cluster: packet.topic,
+      dimension: packet.subtopic,
+      concrete_subject: reasoned.concrete_subject,
+      subject_signature: sig,
+      point_or_tension: reasoned.point_or_tension,
+      primary_source: "EVIDENCE_DERIVED",
+      supporting_sources: ["EVIDENCE_PACKET", packet.source_type],
+      evidence_source_ids: packet.source_ids.length ? packet.source_ids : ["PUB"],
+      creator_evidence_available: true,
+      experience_required: packet.experience_facts.length > 0,
+      source_type: packet.source_type,
+      claim_types: packet.experience_facts.length
+        ? ["PERSONAL_EXPERIENCE"]
+        : packet.creator_opinion.length
+          ? ["OPINION"]
+          : ["OBSERVATION"],
+      inference_type: "EVIDENCE_DERIVED",
+      grounding_status: reasoned.needs_xai ? "XAI_WOULD_HAVE_BEEN_REQUIRED" : "GROUNDED",
+      grounding_reasons: reasoned.needs_xai ? ["THIN_ANCHORS"] : ["PACKET_REASONED"],
+      idea_angle_family: reasoned.idea_angle_family,
+      verified_locations: packet.verified_locations,
+      verified_entities: packet.entities,
+      relationship_evidence_ids: [],
+      xai_would_have_been_required: reasoned.needs_xai,
+      status: "ELIGIBLE",
+    });
+  }
+
+  const intent = String(opts.intentText || "").trim();
+  if (intent.length >= 10) {
+    const packet = extractEvidencePacket(intent, { source_id: "INTENT", source_type: "CREATOR_INTENT" });
+    if (packet && packet.topic !== "OTHER") {
+      const reasoned = reasonSeedSubjectFromPacket(packet);
+      const sig = subjectSignature(reasoned.concrete_subject);
+      if (!emitted.has(sig)) {
+        emitted.add(sig);
+        out.push({
+          cluster: packet.topic,
+          dimension: packet.subtopic || "CREATOR_INTENT",
+          concrete_subject: reasoned.concrete_subject,
+          subject_signature: sig,
+          point_or_tension: reasoned.point_or_tension,
+          primary_source: "CREATOR_INTENT",
+          supporting_sources: ["CREATOR_INTENT"],
+          evidence_source_ids: ["INTENT"],
+          creator_evidence_available: true,
+          experience_required: false,
+          source_type: "CREATOR_INTENT",
+          claim_types: ["OBSERVATION"],
+          inference_type: "CREATOR_INTENT",
+          grounding_status: "GROUNDED",
+          grounding_reasons: ["INTENT_PACKET"],
+          idea_angle_family: reasoned.idea_angle_family,
+          verified_locations: packet.verified_locations,
+          verified_entities: packet.entities,
+          xai_would_have_been_required: false,
+          status: "ELIGIBLE",
+        });
+      }
+    }
+  }
+
+  void DIMENSION_REGISTRY.length;
+  void packets.length;
+  return out;
 }
