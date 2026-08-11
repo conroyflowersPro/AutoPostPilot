@@ -4,9 +4,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const MODEL = "grok-4.5";
 
 /**
- * ORDER 3/3 — Creator DNA Final Voice (Publishing DNA only; REPLY excluded)
- * Snapshot aligned with creator-dna-runtime v1.3.1 / Historical learning.
- * Performance DNA must NOT drive voice choice.
+ * Creator DNA Final Voice (HOW only; REPLY excluded).
+ * Must never invent factual WHAT. Performance DNA must NOT drive voice choice.
  */
 const CREATOR_DNA_VOICE = `CREATOR DNA (HOW to write — Publishing voice only):
 WHO: Korean Tesla multi-vehicle owner (Cybertruck + S Plaid + M3 Perf), FSD tester, Robotaxi believer, LAFC STH. Real-world drives, tips, honest takes.
@@ -25,6 +24,62 @@ VOCABULARY / RHYTHM:
 NOT THIS: pure 반말; single global tone; REPOST text as voice; inventing tests; short-term stock chatter
 Performance DNA is reference only — do NOT lock onto one past high-engagement style.`;
 
+/** Creator Vocabulary Fidelity — distance to corpus, not word blacklist */
+const VOCABULARY_FIDELITY = `VOCABULARY FIDELITY (hard preference — HOW):
+- Success = sounds like @Seung4680 would actually say it, NOT “more professional / refined / essay-like”.
+- Prefer creator lived vocabulary, endings, and rhythm over polished abstract analysis.
+- If the seed/source already uses creator-natural wording, KEEP the meaning and surface — do NOT re-abstract into report language.
+- Avoid stacking: 측면/구성/핵심/중요성/전반/효과적/체계적/종합적/본질/시사점/결론적으로/요약하면/이를 통해.
+- Prefer concrete speech: 실제로, 체감, 솔직히, 생각보다, 은근, short 해요체/음슴체 per mode — not textbook connectors.
+- Do not “upgrade” casual observation into lecture or whitepaper tone.
+- One main point; median length close to real posts (~90–120 when MEDIUM); no padded conclusion paragraph.`;
+
+const ABSTRACT_REPORT_MARKERS = [
+  "측면", "구성", "핵심", "중요성", "전반", "효과적", "체계적", "종합적", "본질",
+  "시사점", "고려사항", "개선점", "결론적으로", "요약하면", "이를 통해", "궁극적으로", "본질적으로", "구조적으로",
+];
+
+function scoreVocabularyFidelity(text: string): {
+  score: number;
+  distance: number;
+  reasons: string[];
+  abstract_hits: number;
+  pass: boolean;
+} {
+  const t = String(text || "");
+  const reasons: string[] = [];
+  let distance = 0;
+  let abstract_hits = 0;
+  for (const m of ABSTRACT_REPORT_MARKERS) {
+    if (t.includes(m)) abstract_hits += 1;
+  }
+  if (abstract_hits >= 1) {
+    distance += Math.min(0.45, abstract_hits * 0.12);
+    reasons.push(`ABSTRACT_REPORT_MARKERS:${abstract_hits}`);
+  }
+  if (/따라서|결론적으로|요약하면|이를\s*통해|궁극적으로/.test(t)) {
+    distance += 0.2;
+    reasons.push("REPORT_CONNECTOR");
+  }
+  if ((t.match(/하는\s*것|된\s*부분|에\s*있어|에\s*대한/g) || []).length >= 2) {
+    distance += 0.1;
+    reasons.push("NOMINALIZATION_STACK");
+  }
+  if (t.length > 220) {
+    distance += 0.12;
+    reasons.push("LONGER_THAN_CORPUS_BASELINE");
+  }
+  distance = Math.min(1, distance);
+  const score = Math.max(0, 1 - distance);
+  return {
+    score,
+    distance,
+    reasons,
+    abstract_hits,
+    pass: score >= 0.55 && abstract_hits < 4,
+  };
+}
+
 const SYSTEM_PROMPT = `You are the content generation engine for AutoPostPilot (@Seung4680).
 
 ROLE SPLIT:
@@ -34,10 +89,13 @@ ROLE SPLIT:
 
 ${CREATOR_DNA_VOICE}
 
+${VOCABULARY_FIDELITY}
+
 SEED WORDING RULE:
 - Do NOT copy seed's stiff/technical phrasing verbatim into the post
 - Rewrite into Creator-natural Korean while preserving: proper nouns, tech names (FSD, Cybertruck, Robotaxi, BMO, LAFC), verified facts
 - Never distort meaning of verified facts
+- If seed already sounds like the creator (lived, concrete), preserve that surface — do not polish into abstract analysis
 
 GENERATOR GROUNDING (ORDER 3 — hard rules):
 - Creator DNA = HOW only. Do NOT invent new factual WHAT.
@@ -58,7 +116,7 @@ EDITORIAL MODE (must differ by mode — not all posts sound like explainers):
 
 CLARITY:
 - First 1–2 sentences: who/what + the point
-- Forbidden empty padding: 조금, 약간, 느낌이, ~인 것 같다, 나쁘지 않다, 괜찮은 편, 그런 느낌, 미묘하게, 뭔가, 전반적으로 alone
+- Forbidden empty padding alone: 조금, 약간, ~인 것 같다, 나쁘지 않다, 괜찮은 편, 그런 느낌, 미묘하게, 뭔가, 전반적으로 (as sole content)
 - length_mode SHORT: no pad. LONG: structure only with known context
 - Avoid repeating the same sentence skeleton across consecutive posts
 
@@ -173,6 +231,7 @@ Rules reminder:
 - Preserve tech names / proper nouns / verified facts
 - Never invent first-person tests
 - Performance DNA must not force a single past style
+- VOCABULARY FIDELITY: write like @Seung4680 would actually say it — not polished report/essay Korean
 
 USED RECORD (avoid repeats):
 ${usedJson}
@@ -259,6 +318,7 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
           const xaiTag =
             slot.xai_api_tag ||
             (slot.xai_external_enrichment ? "[xAI API 이용]" : undefined);
+          const fid = scoreVocabularyFidelity(String(p.content || ""));
           return {
             slotId: p.slotId || slot.slotId,
             content: p.content,
@@ -272,12 +332,19 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
             length_mode: slot.length_mode,
             xai_api_tag: xaiTag,
             xai_external_enrichment: !!slot.xai_external_enrichment,
-            voice_source: "creator_dna_publishing_v1.3.1",
+            voice_source: "creator_dna_publishing_v1.3.2_vocab_fidelity",
+            vocabulary_fidelity: {
+              score: fid.score,
+              distance: fid.distance,
+              pass: fid.pass,
+              abstract_hits: fid.abstract_hits,
+              reasons: fid.reasons,
+            },
           };
         }),
         usedRecord,
         dayOffset: offset,
-        voice: "creator_dna_publishing_v1.3.1",
+        voice: "creator_dna_publishing_v1.3.2_vocab_fidelity",
       }),
       {
         status: 200,
