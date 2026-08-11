@@ -1,139 +1,103 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  getCreatorDnaVoice,
+  getVocabularyFidelityInstructions,
+  getCreatorStyle,
+  getStyleBaseline,
+} from "./creator-style-data.ts";
+import {
+  scoreVocabularyFidelity,
+  detectUnsupportedAdditions,
+} from "./vocabulary-fidelity.ts";
 
 const MODEL = "grok-4.5";
+const GENERATOR_VERSION = "creator_style_data_v1_order4";
 
-/**
- * Creator DNA Final Voice (HOW only; REPLY excluded).
- * Must never invent factual WHAT. Performance DNA must NOT drive voice choice.
- */
-const CREATOR_DNA_VOICE = `CREATOR DNA (HOW to write — Publishing voice only):
-WHO: Korean Tesla multi-vehicle owner (Cybertruck + S Plaid + M3 Perf), FSD tester, Robotaxi believer, LAFC STH. Real-world drives, tips, honest takes.
-WHY WRITE: inform/explain · share experience · light opinion · observation — not stock daytrade.
-REGISTER BY INTENT:
-- INFORMATIVE / technical explain → 해요체·존칭 intentional (audience-facing polite)
-- OPINION / light opinion → 요즘 들어서 음슴체 가능 (RECENTLY_EMERGING preference; not forced)
-- CASUAL_OBSERVATION → short, concrete, 해요체+casual mix
-- COMPARE → clear A/B axis in natural speech, not textbook contrast essay
-- EXPERIENCE → only if evidence exists; first-person OK with known context only
-VOCABULARY / RHYTHM:
-- Prefer creator-natural phrases over bureaucratic/technical lecture tone
-- Median length ~90–120 chars when SHORT/MEDIUM; do not pad to essay
-- Media-friendly one-main-point posts; occasional ㅋㅋ only when observation is actually light/funny
-- Ending: natural close, not announcement-style summary
-NOT THIS: pure 반말; single global tone; REPOST text as voice; inventing tests; short-term stock chatter
-Performance DNA is reference only — do NOT lock onto one past high-engagement style.`;
-
-/** Creator Vocabulary Fidelity — distance to corpus, not word blacklist */
-const VOCABULARY_FIDELITY = `VOCABULARY FIDELITY (hard preference — HOW):
-- Success = sounds like @Seung4680 would actually say it, NOT “more professional / refined / essay-like”.
-- Prefer creator lived vocabulary, endings, and rhythm over polished abstract analysis.
-- If the seed/source already uses creator-natural wording, KEEP the meaning and surface — do NOT re-abstract into report language.
-- Avoid stacking: 측면/구성/핵심/중요성/전반/효과적/체계적/종합적/본질/시사점/결론적으로/요약하면/이를 통해.
-- Prefer concrete speech: 실제로, 체감, 솔직히, 생각보다, 은근, short 해요체/음슴체 per mode — not textbook connectors.
-- Do not “upgrade” casual observation into lecture or whitepaper tone.
-- One main point; median length close to real posts (~90–120 when MEDIUM); no padded conclusion paragraph.`;
-
-const ABSTRACT_REPORT_MARKERS = [
-  "측면", "구성", "핵심", "중요성", "전반", "효과적", "체계적", "종합적", "본질",
-  "시사점", "고려사항", "개선점", "결론적으로", "요약하면", "이를 통해", "궁극적으로", "본질적으로", "구조적으로",
-];
-
-function scoreVocabularyFidelity(text: string): {
-  score: number;
-  distance: number;
-  reasons: string[];
-  abstract_hits: number;
-  pass: boolean;
-} {
-  const t = String(text || "");
-  const reasons: string[] = [];
-  let distance = 0;
-  let abstract_hits = 0;
-  for (const m of ABSTRACT_REPORT_MARKERS) {
-    if (t.includes(m)) abstract_hits += 1;
-  }
-  if (abstract_hits >= 1) {
-    distance += Math.min(0.45, abstract_hits * 0.12);
-    reasons.push(`ABSTRACT_REPORT_MARKERS:${abstract_hits}`);
-  }
-  if (/따라서|결론적으로|요약하면|이를\s*통해|궁극적으로/.test(t)) {
-    distance += 0.2;
-    reasons.push("REPORT_CONNECTOR");
-  }
-  if ((t.match(/하는\s*것|된\s*부분|에\s*있어|에\s*대한/g) || []).length >= 2) {
-    distance += 0.1;
-    reasons.push("NOMINALIZATION_STACK");
-  }
-  if (t.length > 220) {
-    distance += 0.12;
-    reasons.push("LONGER_THAN_CORPUS_BASELINE");
-  }
-  distance = Math.min(1, distance);
-  const score = Math.max(0, 1 - distance);
-  return {
-    score,
-    distance,
-    reasons,
-    abstract_hits,
-    pass: score >= 0.55 && abstract_hits < 4,
-  };
-}
-
-const SYSTEM_PROMPT = `You are the content generation engine for AutoPostPilot (@Seung4680).
+function buildSystemPrompt(): string {
+  const voice = getCreatorDnaVoice();
+  const vocab = getVocabularyFidelityInstructions();
+  const style = getCreatorStyle();
+  return `You are the content generation engine for AutoPostPilot.
 
 ROLE SPLIT:
 - Seed / primaryTopic / angle / postBrief = WHAT (facts, points, topic) — NOT final wording
 - editorial_mode + length_mode = editorial intent / format from Planner
-- Creator DNA below = HOW (vocabulary, rhythm, tone, sentence structure)
+- Creator DNA (from Data Layer) = HOW (vocabulary, rhythm, tone, sentence structure)
 
-${CREATOR_DNA_VOICE}
+${voice}
 
-${VOCABULARY_FIDELITY}
+${vocab}
+
+STYLE CORPUS (Publishing ORIGINAL n=${style.sample_n}, median ${style.median_post_chars} chars):
+- Do not force preferred-word insertion. Match rhythm/length/register distance to corpus.
+- Semantic elevation banned: do not upgrade casual speech into professional/academic/report/consulting tone.
 
 SEED WORDING RULE:
 - Do NOT copy seed's stiff/technical phrasing verbatim into the post
-- Rewrite into Creator-natural Korean while preserving: proper nouns, tech names (FSD, Cybertruck, Robotaxi, BMO, LAFC), verified facts
+- Rewrite into Creator-natural Korean while preserving: proper nouns, tech names, verified facts from seed/evidence
 - Never distort meaning of verified facts
-- If seed already sounds like the creator (lived, concrete), preserve that surface — do not polish into abstract analysis
+- If seed already sounds lived/concrete, preserve that surface — do not polish into abstract analysis
 
-GENERATOR GROUNDING (ORDER 3 — hard rules):
+GENERATOR GROUNDING (hard rules — metadata per slot):
 - Creator DNA = HOW only. Do NOT invent new factual WHAT.
-- Forbidden to ADD if absent from seed/evidence: 오늘/어제/이번 주, 출퇴근, 구체 주행 시점, 방문 장소, 거리/시간/횟수, "직접 해봄/테스트함", 특정 실제 행동·사건·감정
+- Each slot may include: claim_types, grounding_status, source_type, source_id, allowed_facts, do_not_invent, historical_framing
+- Forbidden to ADD if absent from seed/evidence anchors: 오늘/어제/이번 주, 출퇴근, 구체 주행 시점, 방문 장소, 거리/시간/횟수, "직접 해봄/테스트함", 특정 실제 행동·사건
 - Only state as fact what the seed or evidence already carries
-- If seed is neutral (e.g. "짧은 도심 구간"), keep neutral — do not upgrade to "오늘 퇴근길"
-- Do not invent numbers, place names, or test anecdotes for color
+- If historical_framing is set: MUST use past frame — never state past UI/version/price as current fact
+- do_not_invent list items must not appear as new claims
 
-EDITORIAL MODE (must differ by mode — not all posts sound like explainers):
-- INFORMATIVE: clear subject + point; 해요체 explain; one main point; no closing sermon
+EDITORIAL MODE (must differ by mode):
+- INFORMATIVE: clear subject + point; polite explain; one main point; no closing sermon
 - COMPARE: explicit comparison axis in natural speech
-- OPINION: trade-off / stance space; not pure fact dump; avoid identical "정리하면" endings
-- EXPERIENCE: only with evidence context; no invented first-person tests; never republish source post text
-- If historical_framing_required or experience_class=HISTORICAL: MUST use past frame (예전에 / 그 버전을 쓰던 당시에는 / 지금과 비교하면 당시에는) — never state past UI/version/price as current fact; do not invent extra historical details beyond seed
-- experience_provenance is tracking only; do not dump provenance labels into the post body
-- CASUAL_OBSERVATION: short lived observation; no filler; no mini-essay
+- OPINION: trade-off / stance space; not pure fact dump
+- EXPERIENCE: only with evidence; no invented first-person tests; never republish source post text
+- CASUAL_OBSERVATION: short lived observation; no mini-essay
 - Weekly HUMOR: never (Wild Card only)
 
 CLARITY:
 - First 1–2 sentences: who/what + the point
 - Forbidden empty padding alone: 조금, 약간, ~인 것 같다, 나쁘지 않다, 괜찮은 편, 그런 느낌, 미묘하게, 뭔가, 전반적으로 (as sole content)
 - length_mode SHORT: no pad. LONG: structure only with known context
-- Avoid repeating the same sentence skeleton across consecutive posts
 
 SAFETY:
 - Never invent firsthand experiences or recent unverified announcements
 - No stock-price chatter
-- LAFC: name competition when relevant; BMO home = 직관 OK without inventing events
 
-If slot.xai_api_tag or xai_external_enrichment is set, keep that tag association in metadata (do not invent the tag).
-
-JSON only. Each post: slotId, content, score.`;
+JSON only. Each post: slotId, content, score. slotId MUST match input slotId exactly.`;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+function compactSlotForModel(s: any): Record<string, unknown> {
+  return {
+    slotId: s.slotId,
+    primaryTopic: s.primaryTopic || s.concrete_subject,
+    angle: s.angle,
+    editorial_mode: s.editorial_mode || null,
+    length_mode: s.length_mode || "MEDIUM",
+    writing_mode: s.writing_mode || null,
+    core_point: s.postBrief?.core_point || s.concrete_subject,
+    why: s.postBrief?.why_this_topic || s.angle,
+    claim_types: s.claim_types || s.postBrief?.claim_types || [],
+    grounding_status: s.grounding_status || null,
+    grounding_reasons: s.grounding_reasons || [],
+    source_type: s.source_type || s.primary_source || null,
+    source_id: s.source_id || (Array.isArray(s.evidence_source_ids) ? s.evidence_source_ids[0] : null),
+    evidence_source_ids: s.evidence_source_ids || [],
+    allowed_facts: s.allowed_facts || s.postBrief?.allowed_facts || [],
+    do_not_invent: s.do_not_invent || s.postBrief?.do_not_invent || [],
+    historical_framing: s.historical_framing || s.historical_framing_required || false,
+    experience_class: s.experience_class || null,
+    verified_locations: s.verified_locations || [],
+    verified_entities: s.verified_entities || [],
+    xai_api_tag: s.xai_api_tag || (s.xai_external_enrichment ? "[xAI API 이용]" : undefined),
+  };
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -152,9 +116,18 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const xaiKey = Deno.env.get("XAI_API_KEY");
+
     if (!xaiKey) {
       return new Response(
-        JSON.stringify({ error: "XAI_API_KEY not configured in Supabase secrets" }),
+        JSON.stringify({
+          error: "XAI_API_KEY not configured in Supabase secrets",
+          CREATOR_GENERATION_EXTERNAL_MODEL_REQUIRED: true,
+          xai_usage: {
+            seed_expansion: false,
+            external_supplement: false,
+            creator_generation: false,
+          },
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -188,10 +161,10 @@ Deno.serve(async (req: Request) => {
         usedOpenings: [],
         usedConclusions: [],
       },
+      dry_run_no_generation = false,
     } = body;
 
     const offset = typeof dayOffset === "number" ? dayOffset : 0;
-
     let effectiveSlots = Array.isArray(slots) ? slots : [];
     if (effectiveSlots.length === 0) {
       return new Response(
@@ -200,38 +173,64 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (dry_run_no_generation === true) {
+      const style = getCreatorStyle();
+      const baseline = getStyleBaseline();
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dry_run: true,
+          CREATOR_GENERATION_EXTERNAL_MODEL_REQUIRED: true,
+          xai_api_used: false,
+          xai_usage: {
+            seed_expansion: false,
+            external_supplement: false,
+            creator_generation: false,
+          },
+          generator_version: GENERATOR_VERSION,
+          style_data: {
+            version: style.version,
+            sample_n: style.sample_n,
+            median_post_chars: style.median_post_chars,
+            mean_post_chars: style.mean_post_chars,
+            baseline,
+          },
+          slots_received: effectiveSlots.map((s: any) => ({
+            slotId: s.slotId,
+            grounding_status: s.grounding_status,
+            claim_types: s.claim_types,
+            source_type: s.source_type || s.primary_source,
+            source_id: s.source_id,
+          })),
+          note: "No generation: external model required for Creator Engine drafts",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const workingSlots = effectiveSlots;
     const usedJson = JSON.stringify(usedRecord, null, 0);
     const scheduleMeta = startDate
       ? `startDate=${startDate} (scheduling metadata only — do NOT invent 오늘/방금 events)`
       : `startDate not provided`;
+    const SYSTEM_PROMPT = buildSystemPrompt();
 
     async function callGrok(slotsSubset: any[]): Promise<any> {
-      const compact = slotsSubset.map((s: any) => ({
-        slotId: s.slotId,
-        primaryTopic: s.primaryTopic || s.concrete_subject,
-        angle: s.angle,
-        editorial_mode: s.editorial_mode || null,
-        length_mode: s.length_mode || "MEDIUM",
-        writing_mode: s.writing_mode || null,
-        core_point: s.postBrief?.core_point || s.concrete_subject,
-        why: s.postBrief?.why_this_topic || s.angle,
-        do_not_invent: s.postBrief?.do_not_invent || [],
-        xai_api_tag: s.xai_api_tag || (s.xai_external_enrichment ? "[xAI API 이용]" : undefined),
-      }));
+      const compact = slotsSubset.map(compactSlotForModel);
       const subsetJson = JSON.stringify(compact, null, 0);
       const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
 ${scheduleMeta}
 
-SLOTS (WHAT only — rewrite into Creator DNA voice; do not copy stiff seed wording):
+SLOTS (WHAT + grounding metadata — rewrite into Creator DNA voice from Data Layer; do not copy stiff seed wording):
 ${subsetJson}
 
 Rules reminder:
 - editorial_mode must shape the post (INFORMATIVE ≠ OPINION ≠ COMPARE ≠ CASUAL)
-- Preserve tech names / proper nouns / verified facts
-- Never invent first-person tests
-- Performance DNA must not force a single past style
-- VOCABULARY FIDELITY: write like @Seung4680 would actually say it — not polished report/essay Korean
+- Preserve tech names / proper nouns / verified facts from allowed_facts only
+- Never invent first-person tests or locations/times not in anchors
+- Respect do_not_invent and claim_types / grounding_status per slot
+- VOCABULARY FIDELITY: match Publishing corpus rhythm — not polished report Korean
+- Return slotId EXACTLY as given for each post
 
 USED RECORD (avoid repeats):
 ${usedJson}
@@ -293,58 +292,121 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
       allGenerated.push(...posts);
     }
 
-    const qualityPosts = allGenerated
-      .filter((p: any) => {
-        const t = String(p.content || p.final_text || "").trim();
-        if (t.length < 8) return false;
-        const latinChars = (t.match(/[A-Za-z]/g) || []).length;
-        const totalChars = t.replace(/\s/g, "").length || 1;
-        return latinChars / totalChars < 0.75;
-      })
-      .map((p: any) => ({
+    const slotById = new Map<string, any>();
+    for (const s of workingSlots) {
+      const id = String(s.slotId || "");
+      if (id) slotById.set(id, s);
+    }
+    const seenIds = new Set<string>();
+    const mapping_errors: string[] = [];
+    const qualityPosts: any[] = [];
+
+    for (const p of allGenerated) {
+      const t = String(p.content || p.final_text || "").trim();
+      if (t.length < 8) continue;
+      const latinChars = (t.match(/[A-Za-z]/g) || []).length;
+      const totalChars = t.replace(/\s/g, "").length || 1;
+      if (latinChars / totalChars >= 0.75) continue;
+
+      const sid = String(p.slotId || "").trim();
+      if (!sid) {
+        mapping_errors.push("MISSING_SLOT_ID");
+        continue;
+      }
+      if (seenIds.has(sid)) {
+        mapping_errors.push(`DUPLICATE_SLOT_ID:${sid}`);
+        continue;
+      }
+      if (!slotById.has(sid)) {
+        mapping_errors.push(`UNKNOWN_SLOT_ID:${sid}`);
+        continue;
+      }
+      seenIds.add(sid);
+      qualityPosts.push({
         ...p,
-        content: String(p.content || p.final_text || "").trim(),
-        final_text: String(p.final_text || p.content || "").trim(),
-      }))
-      .slice(0, workingSlots.length);
+        slotId: sid,
+        content: t,
+        final_text: t,
+      });
+    }
+
+    for (const s of workingSlots) {
+      const id = String(s.slotId || "");
+      if (id && !seenIds.has(id)) mapping_errors.push(`NO_OUTPUT_FOR_SLOT:${id}`);
+    }
+
+    const style = getCreatorStyle();
+    const postsOut = qualityPosts.map((p: any) => {
+      const slot = slotById.get(String(p.slotId)) || {};
+      const xaiTag =
+        slot.xai_api_tag ||
+        (slot.xai_external_enrichment ? "[xAI API 이용]" : undefined);
+      const fid = scoreVocabularyFidelity(String(p.content || ""));
+      const unsupported = detectUnsupportedAdditions(String(p.content || ""), {
+        do_not_invent: slot.do_not_invent || slot.postBrief?.do_not_invent,
+        allowed_facts: slot.allowed_facts || slot.postBrief?.allowed_facts,
+        claim_types: slot.claim_types,
+        grounding_status: slot.grounding_status,
+      });
+      return {
+        slotId: p.slotId,
+        content: p.content,
+        final_text: p.content,
+        text: p.content,
+        score: p.score,
+        dayOffset: offset,
+        planning_source: slot.planning_source,
+        primaryTopic: slot.primaryTopic || slot.concrete_subject,
+        editorial_mode: slot.editorial_mode,
+        length_mode: slot.length_mode,
+        claim_types: slot.claim_types || [],
+        grounding_status: slot.grounding_status,
+        grounding_reasons: slot.grounding_reasons || [],
+        source_type: slot.source_type || slot.primary_source,
+        source_id: slot.source_id || (Array.isArray(slot.evidence_source_ids) ? slot.evidence_source_ids[0] : undefined),
+        evidence_source_ids: slot.evidence_source_ids || [],
+        xai_api_tag: xaiTag,
+        xai_external_enrichment: !!slot.xai_external_enrichment,
+        voice_source: GENERATOR_VERSION,
+        style_data_version: style.version,
+        vocabulary_fidelity: {
+          score: fid.score,
+          distance: fid.distance,
+          pass: fid.pass,
+          abstract_hits: fid.abstract_hits,
+          length_distance: fid.length_distance,
+          register_distance: fid.register_distance,
+          abstraction_distance: fid.abstraction_distance,
+          reasons: fid.reasons,
+        },
+        unsupported_additions: unsupported,
+        grounding_preserved: true,
+      };
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
         model: MODEL,
-        count: qualityPosts.length,
-        posts: qualityPosts.map((p: any, i: number) => {
-          const slot = workingSlots[i] || {};
-          const xaiTag =
-            slot.xai_api_tag ||
-            (slot.xai_external_enrichment ? "[xAI API 이용]" : undefined);
-          const fid = scoreVocabularyFidelity(String(p.content || ""));
-          return {
-            slotId: p.slotId || slot.slotId,
-            content: p.content,
-            final_text: p.content,
-            text: p.content,
-            score: p.score,
-            dayOffset: offset,
-            planning_source: slot.planning_source,
-            primaryTopic: slot.primaryTopic,
-            editorial_mode: slot.editorial_mode,
-            length_mode: slot.length_mode,
-            xai_api_tag: xaiTag,
-            xai_external_enrichment: !!slot.xai_external_enrichment,
-            voice_source: "creator_dna_publishing_v1.3.2_vocab_fidelity",
-            vocabulary_fidelity: {
-              score: fid.score,
-              distance: fid.distance,
-              pass: fid.pass,
-              abstract_hits: fid.abstract_hits,
-              reasons: fid.reasons,
-            },
-          };
-        }),
+        count: postsOut.length,
+        posts: postsOut,
         usedRecord,
         dayOffset: offset,
-        voice: "creator_dna_publishing_v1.3.2_vocab_fidelity",
+        voice: GENERATOR_VERSION,
+        generator_version: GENERATOR_VERSION,
+        CREATOR_GENERATION_EXTERNAL_MODEL_REQUIRED: true,
+        xai_api_used: true,
+        xai_usage: {
+          seed_expansion: false,
+          external_supplement: false,
+          creator_generation: true,
+        },
+        mapping_errors,
+        style_data: {
+          version: style.version,
+          sample_n: style.sample_n,
+          median_post_chars: style.median_post_chars,
+        },
       }),
       {
         status: 200,
@@ -357,9 +419,20 @@ Return JSON only: {"posts":[{"slotId":"...","content":"...","score":1-10}]}.`;
       err?.name === "AbortError"
         ? "포스트 생성 시간 초과"
         : err.message || "Internal error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error: msg,
+        CREATOR_GENERATION_EXTERNAL_MODEL_REQUIRED: true,
+        xai_usage: {
+          seed_expansion: false,
+          external_supplement: false,
+          creator_generation: false,
+        },
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });
