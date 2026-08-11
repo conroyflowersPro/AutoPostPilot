@@ -1,13 +1,12 @@
+/**
+ * ORDER34 HOTFIX — bootstrap with allowed_facts / factual_anchors propagation.
+ * Self-contained (no seed-core import).
+ */
 import {
   extractEvidencePacket,
   reasonSeedSubjectFromPacket,
   type EvidencePacket,
 } from "./evidence-packet.ts";
-import {
-  subjectSignature,
-  DIMENSION_REGISTRY,
-  type ConcreteSeed,
-} from "./seed-core.ts";
 
 const DEFAULT_DO_NOT_INVENT = [
   "오늘/어제/이번 주 시점 발명",
@@ -18,6 +17,10 @@ const DEFAULT_DO_NOT_INVENT = [
   "Evidence 없는 한국/특정 장소",
 ];
 
+function subjectSignature(s: string): string {
+  return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
 function buildAllowedFacts(packet: EvidencePacket): string[] {
   const parts = [
     ...(packet.factual_anchors || []),
@@ -25,7 +28,9 @@ function buildAllowedFacts(packet: EvidencePacket): string[] {
     ...(packet.static_facts || []),
     ...(packet.current_facts || []),
     ...(packet.creator_opinion || []),
-  ].map((s) => String(s || "").trim()).filter((s) => s.length >= 4);
+  ]
+    .map((s) => String(s || "").trim())
+    .filter((s) => s.length >= 4);
   const seen = new Set<string>();
   const out: string[] = [];
   for (const s of parts) {
@@ -53,10 +58,10 @@ export function bootstrapCandidatesFromDimensions(opts: {
 }): any[] {
   const out: any[] = [];
   const emitted = new Set<string>();
-  const packets: EvidencePacket[] = [];
-  const rows: PublishedEvidenceRow[] = Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
-    ? opts.publishedEvidence
-    : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
+  const rows: PublishedEvidenceRow[] =
+    Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
+      ? opts.publishedEvidence
+      : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
 
   for (const row of rows.slice(0, 24)) {
     const text = String(row.text || "").trim();
@@ -67,8 +72,12 @@ export function bootstrapCandidatesFromDimensions(opts: {
       published_at: row.published_at,
     });
     if (!packet) continue;
-    if (packet.topic === "OTHER" && packet.entities.length === 0 && packet.experience_facts.length === 0) continue;
-    packets.push(packet);
+    if (
+      packet.topic === "OTHER" &&
+      packet.entities.length === 0 &&
+      packet.experience_facts.length === 0
+    )
+      continue;
     const reasoned = reasonSeedSubjectFromPacket(packet);
     const sig = subjectSignature(reasoned.concrete_subject);
     if (emitted.has(sig)) continue;
@@ -91,7 +100,9 @@ export function bootstrapCandidatesFromDimensions(opts: {
           ? ["OPINION"]
           : ["OBSERVATION"],
       inference_type: "EVIDENCE_DERIVED",
-      grounding_status: reasoned.needs_xai ? "XAI_WOULD_HAVE_BEEN_REQUIRED" : "GROUNDED",
+      grounding_status: reasoned.needs_xai
+        ? "XAI_WOULD_HAVE_BEEN_REQUIRED"
+        : "GROUNDED",
       grounding_reasons: reasoned.needs_xai ? ["THIN_ANCHORS"] : ["PACKET_REASONED"],
       idea_angle_family: reasoned.idea_angle_family,
       verified_locations: packet.verified_locations,
@@ -111,7 +122,10 @@ export function bootstrapCandidatesFromDimensions(opts: {
 
   const intent = String(opts.intentText || "").trim();
   if (intent.length >= 10) {
-    const packet = extractEvidencePacket(intent, { source_id: "INTENT", source_type: "CREATOR_INTENT" });
+    const packet = extractEvidencePacket(intent, {
+      source_id: "INTENT",
+      source_type: "CREATOR_INTENT",
+    });
     if (packet && packet.topic !== "OTHER") {
       const reasoned = reasonSeedSubjectFromPacket(packet);
       const sig = subjectSignature(reasoned.concrete_subject);
@@ -150,7 +164,5 @@ export function bootstrapCandidatesFromDimensions(opts: {
     }
   }
 
-  void DIMENSION_REGISTRY.length;
-  void packets.length;
   return out;
 }
