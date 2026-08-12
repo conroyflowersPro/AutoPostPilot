@@ -1,4 +1,4 @@
-/** ORDER 3+4 + stages + reaction + everyday language + density */
+/** stages + reaction + everyday + contextual style + density */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -45,6 +45,9 @@ export function buildGroundedPostsOut(
       reaction_reason: p.reaction_reason ?? null,
       everyday_language_clear: p.everyday_language_clear ?? null,
       everyday_rewrite_note: p.everyday_rewrite_note ?? null,
+      style_register: p.style_register ?? null,
+      style_reason: p.style_reason ?? null,
+      self_disclosure_used: p.self_disclosure_used ?? false,
       natural_humor_present: p.natural_humor_present ?? false,
       natural_humor_fit: p.natural_humor_fit ?? "N/A",
       writing_density: p.writing_density ?? null,
