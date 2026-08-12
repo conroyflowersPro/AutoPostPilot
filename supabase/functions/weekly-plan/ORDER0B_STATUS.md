@@ -1,19 +1,33 @@
-# ORDER 0B Manual Post Leakage Separation
+# ORDER 0B Manual Post Leakage Separation — COMPLETE
 
-## Pushed
-- source-roles.ts
-- manual-leakage-guard.ts (semantic/surface/reply + event-claim clusters)
-- experience-evidence.ts (abstract subjects; seed_eligible=false default)
+**Status: COMPLETE**  
+**Branch:** `order0b-manual-leakage`  
+**Netlify:** NOT deployed (per order)
 
-## Local (next commits)
-- seed-engine.ts: ACCOUNT_ACTIVITY learning-only; DIMENSION_REGISTRY abstract SEED_SOURCE
-- evidence-packet.ts: abstract fact labels for ACCOUNT_ACTIVITY
-- index.ts: guard imports + select seed_eligible gate
+## Tip verification
+- `weekly-plan/index.ts` materialized with ORDER 0B expand/select guards
+- APP_VERSION = `10.0.0-order0b`
+- WEEKLY_ENGINE_VERSION = `phased_v10_order0b_manual_leakage`
+- Diagnostics: `order0b_manual_leakage_separation: true`
 
-## Root cause (FSD)
-Manual text_body → extractExperienceMaterial body.slice → concrete_subject → pool.unshift HIGH_VALUE
-+ bootstrapCandidatesFromDimensions publishedEvidence row → seed
+## Modules on tip
+| File | Role |
+|------|------|
+| source-roles.ts | SourceRole enum; isSeedEligibleRole; defaultRoleForAccountActivity |
+| manual-leakage-guard.ts | semantic + surface + eventClaimClusterScore |
+| experience-evidence.ts | abstract subject only; seed_eligible default false; CREATOR_LEARNING_SIGNAL |
+| seed-engine.ts | no ACCOUNT_ACTIVITY auto-SEED; DIMENSION_REGISTRY abstract SEED_SOURCE |
+| evidence-packet.ts | abstract fact labels for ACCOUNT_ACTIVITY (no narrative anchors) |
+| index.ts | expand + select leakage filter; seed_eligible gate; no auto-unshift manuals |
 
-## Tests
-A–G acceptance logic PASS (local harness).
-Netlify: NOT deployed.
+## Acceptance tests
+`node tools/order0b-manual-leakage-test.mjs` → **24 passed, 0 failed** (A–G + file + bootstrap + experience + index + evidence-packet).
+
+## Root cause closed
+Manual `text_body` → `body.slice` → concrete_subject → pool.unshift **blocked**.  
+Bootstrap no longer emits ACCOUNT_ACTIVITY rows as SEED_SOURCE.
+
+## Preserved
+- ORDER 0A dynamic target / count recovery
+- Creator / Performance learning signals (non-seed roles)
+- No narrative/wording reuse of recent manuals as seeds
