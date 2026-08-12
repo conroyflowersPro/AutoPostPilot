@@ -1,0 +1,28 @@
+name: order4-materialize
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/order4-parts/**"
+      - "tools/order4-materialize.cjs"
+    branches: [order4-audience-reaction]
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node tools/order4-materialize.cjs
+      - run: |
+          test -f supabase/functions/weekly-plan/audience-reaction-intelligence.ts
+          grep -q ORDER4_VERSION supabase/functions/weekly-plan/audience-reaction-intelligence.ts
+          grep -q analyzePublishedPostAudience supabase/functions/weekly-plan/audience-reaction-intelligence.ts
+          ORDER4_ROOT=$PWD node tools/order4-audience-reaction-test.mjs
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ORDER4: materialize audience-reaction-intelligence.ts"
+          file_pattern: supabase/functions/weekly-plan/audience-reaction-intelligence.ts
