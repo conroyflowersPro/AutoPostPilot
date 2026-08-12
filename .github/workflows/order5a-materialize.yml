@@ -4,8 +4,8 @@ on:
     branches:
       - order5a-everyday-language-foundation
     paths:
-      - "tools/order5a-text-parts/**"
-      - "tools/order5a-bin-materialize.mjs"
+      - "tools/order5a-parts/**"
+      - "tools/order5a-materialize.mjs"
       - ".github/workflows/order5a-materialize.yml"
   workflow_dispatch:
 jobs:
@@ -18,7 +18,7 @@ jobs:
         with:
           ref: order5a-everyday-language-foundation
       - name: Materialize full production files
-        run: node tools/order5a-bin-materialize.mjs
+        run: node tools/order5a-materialize.mjs
       - name: Run ORDER5A tests
         run: ORDER5A_ROOT=$PWD node tools/order5a-everyday-language-test.mjs
       - name: Commit materialized files
