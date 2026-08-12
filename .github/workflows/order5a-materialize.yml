@@ -1,0 +1,22 @@
+name: ORDER5A Materialize
+on:
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order5a-everyday-language-foundation
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Materialize module and tests
+        run: node tools/order5a-materialize.mjs
+      - name: Run ORDER5A tests
+        run: ORDER5A_ROOT=$PWD node tools/order5a-everyday-language-test.mjs
+      - name: Commit materialized files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/everyday-language-reasoning.ts tools/order5a-everyday-language-test.mjs
+          git diff --cached --quiet || git commit -m "ORDER5A: materialize everyday-language-reasoning + tests"
+          git push origin order5a-everyday-language-foundation
