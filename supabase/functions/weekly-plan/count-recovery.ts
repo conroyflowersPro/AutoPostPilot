@@ -1,6 +1,7 @@
 /**
- * ORDER 0A HOTFIX — Expand / Select count recovery (no quality bypass).
- * Shortfall always uses canonical target (never min(required, 8)).
+ * ORDER 0A HOTFIX 3 — Dynamic shortfall recovery (no angle-variant clones, no fixed refill).
+ * Every cycle recomputes shortfall vs planner canonical minimum.
+ * Recovery candidates must pass the same diversity/safety gates as normal seeds.
  */
 
 import {
@@ -10,10 +11,25 @@ import {
   conceptualRepetitionLevel,
   createSeedIdFactory,
   ideaAngleGuardAllow,
+  ideaAngleKey,
   isSelectableStatus,
   subjectSignature,
   type ConcreteSeed,
 } from "./seed-engine.ts";
+
+export type ReplacementRecord = {
+  original_slot_id?: string;
+  replacement_slot_id: string;
+  replacement_reason:
+    | "EXPAND_SHORTFALL"
+    | "SELECT_SHORTFALL"
+    | "GENERATION_FAILURE"
+    | "PARSER_FAILURE"
+    | "JUDGE_REJECTION"
+    | "PERSISTENCE_FAILURE";
+  source_stage: "expand" | "select" | "generate" | "persist";
+  retry_number: number;
+};
 
 export type ExpandRecoveryResult = {
   candidates: any[];
@@ -22,6 +38,10 @@ export type ExpandRecoveryResult = {
   shortfall_after: number;
   canonical_target: number;
   sources_used: string[];
+  cycles: number;
+  replacements: ReplacementRecord[];
+  target_met: boolean;
+  rejected_as_near_duplicate: number;
 };
 
 export type SelectRecoveryResult = {
@@ -30,112 +50,184 @@ export type SelectRecoveryResult = {
   shortfall_before: number;
   shortfall_after: number;
   canonical_target: number;
+  cycles: number;
+  need_expand_again: boolean;
+  expand_request_count: number;
+  replacements: ReplacementRecord[];
+  target_met: boolean;
 };
+
+const MAX_EXPAND_CYCLES = 10;
+const MAX_SELECT_CYCLES = 16;
 
 export function computeShortfall(canonical: number, current: number): number {
   return Math.max(0, (Number(canonical) || 0) - Math.max(0, Number(current) || 0));
 }
 
+/** Reject near-duplicate meaning (same angle key / high similarity). */
+export function isMeaningfulDistinct(
+  candidate: Partial<ConcreteSeed>,
+  existing: Array<Partial<ConcreteSeed>>
+): boolean {
+  if (!existing.length) return true;
+  if (conceptualRepetitionLevel(candidate, existing) === "HIGH") return false;
+  const guard = ideaAngleGuardAllow(candidate, existing, { softSecond: false });
+  if (!guard.allow) return false;
+  const ck = ideaAngleKey(candidate);
+  for (const e of existing) {
+    if (ideaAngleKey(e) === ck) return false;
+    const a = subjectSignature(String(candidate.concrete_subject || ""));
+    const b = subjectSignature(String(e.concrete_subject || ""));
+    if (a && b && (a === b || a.includes(b) || b.includes(a))) {
+      if (Math.min(a.length, b.length) >= 16) return false;
+    }
+  }
+  return true;
+}
+
+function ingestDistinct(
+  out: any[],
+  seen: Set<string>,
+  list: any[],
+  source: string,
+  sources_used: string[]
+): { added: number; rejected_dup: number } {
+  let added = 0;
+  let rejected_dup = 0;
+  for (const c of list) {
+    const sig = subjectSignature(String(c.concrete_subject || ""));
+    if (!sig || seen.has(sig)) {
+      rejected_dup++;
+      continue;
+    }
+    if (!isMeaningfulDistinct(c, out)) {
+      rejected_dup++;
+      continue;
+    }
+    seen.add(sig);
+    out.push(c);
+    added++;
+  }
+  if (added > 0 && !sources_used.includes(source)) sources_used.push(source);
+  return { added, rejected_dup };
+}
+
+/**
+ * Multi-cycle expand: evidence/intent only — NO suffix angle variants.
+ * Each cycle recomputes shortfall = canonical - current.
+ */
 export function recoverExpandCandidates(opts: {
   existing: any[];
   publishedSubjects: string[];
-  publishedEvidence: Array<{ text: string; source_id?: string; published_at?: string; post_type?: string }>;
+  publishedEvidence: Array<{
+    text: string;
+    source_id?: string;
+    published_at?: string;
+    post_type?: string;
+  }>;
   intentText?: string;
   canonical_target: number;
   id_prefix?: string;
+  max_cycles?: number;
 }): ExpandRecoveryResult {
   const sources_used: string[] = [];
+  const replacements: ReplacementRecord[] = [];
   const canonical = Math.max(0, Number(opts.canonical_target) || 0);
   const seen = new Set<string>();
   const out: any[] = [];
+  const maxCycles = opts.max_cycles ?? MAX_EXPAND_CYCLES;
+  let rejected_as_near_duplicate = 0;
 
-  function ingest(list: any[], source: string) {
-    let added = 0;
-    for (const c of list) {
-      const sig = subjectSignature(String(c.concrete_subject || ""));
-      if (!sig || seen.has(sig)) continue;
-      seen.add(sig);
-      out.push(c);
-      added++;
-    }
-    if (added > 0) sources_used.push(source);
-  }
-
-  ingest(opts.existing || [], "existing");
+  const first = ingestDistinct(out, seen, opts.existing || [], "existing", sources_used);
+  rejected_as_near_duplicate += first.rejected_dup;
   const shortfall_before = computeShortfall(canonical, out.length);
-  if (shortfall_before <= 0) {
-    return {
-      candidates: out,
-      recovered: 0,
-      shortfall_before: 0,
-      shortfall_after: 0,
-      canonical_target: canonical,
-      sources_used,
-    };
-  }
+  let cycles = 0;
+  const existingCount = out.length;
 
-  const nextId = createSeedIdFactory(opts.id_prefix || "r");
-  const local = bootstrapCandidatesFromDimensions({
-    publishedSubjects: opts.publishedSubjects || [],
-    publishedEvidence: opts.publishedEvidence || [],
-    intentText: opts.intentText,
-  });
-  const gated = applyLocalGates(local, [], nextId);
-  ingest(gated.passed, "evidence_rebootstrap");
+  while (computeShortfall(canonical, out.length) > 0 && cycles < maxCycles) {
+    cycles++;
+    const before = out.length;
+    const need = computeShortfall(canonical, out.length);
+    if (need <= 0) break;
 
-  if (out.length < canonical) {
-    const variants: any[] = [];
-    for (const c of out.slice()) {
-      if (out.length + variants.length >= canonical) break;
-      const sub = String(c.concrete_subject || "").trim();
-      if (sub.length < 8) continue;
-      const frames = [
-        { suffix: " — 실사용 관점", family: "REAL_USE" },
-        { suffix: " — 전후 변화", family: "BEFORE_AFTER" },
-        { suffix: " — 선택 기준", family: "DECISION" },
-      ];
-      for (const f of frames) {
-        const subject = sub.length > 90 ? sub : `${sub}${f.suffix}`;
-        const sig = subjectSignature(subject);
-        if (seen.has(sig)) continue;
-        variants.push({
-          ...c,
-          concrete_subject: subject,
-          subject_signature: sig,
-          point_or_tension: c.point_or_tension || f.family,
-          idea_angle_family: f.family,
-          primary_source: c.primary_source || "EVIDENCE_DERIVED",
-          supporting_sources: [...(c.supporting_sources || []), "ANGLE_VARIANT"],
-          status: "ELIGIBLE",
-          creator_evidence_available: !!c.creator_evidence_available,
-        });
-      }
-    }
-    const vg = applyLocalGates(variants, [], createSeedIdFactory("v"));
-    ingest(vg.passed, "angle_variant");
-  }
-
-  if (out.length < canonical && String(opts.intentText || "").trim().length >= 10) {
-    const intentLocal = bootstrapCandidatesFromDimensions({
-      publishedSubjects: [],
-      publishedEvidence: [],
+    const local = bootstrapCandidatesFromDimensions({
+      publishedSubjects: opts.publishedSubjects || [],
+      publishedEvidence: opts.publishedEvidence || [],
       intentText: opts.intentText,
     });
-    const ig = applyLocalGates(intentLocal, [], createSeedIdFactory("i"));
-    ingest(ig.passed, "intent_bootstrap");
+    const gated = applyLocalGates(local, [], createSeedIdFactory(`${opts.id_prefix || "r"}c${cycles}`));
+    const r1 = ingestDistinct(out, seen, gated.passed, "evidence_rebootstrap", sources_used);
+    rejected_as_near_duplicate += r1.rejected_dup;
+    if (computeShortfall(canonical, out.length) <= 0) break;
+
+    if (String(opts.intentText || "").trim().length >= 10) {
+      const intentLocal = bootstrapCandidatesFromDimensions({
+        publishedSubjects: [],
+        publishedEvidence: [],
+        intentText: opts.intentText,
+      });
+      const ig = applyLocalGates(intentLocal, [], createSeedIdFactory(`i${cycles}`));
+      const r2 = ingestDistinct(out, seen, ig.passed, "intent_bootstrap", sources_used);
+      rejected_as_near_duplicate += r2.rejected_dup;
+    }
+    if (computeShortfall(canonical, out.length) <= 0) break;
+
+    const subjects = opts.publishedSubjects || [];
+    if (subjects.length) {
+      const start = ((cycles - 1) * 7) % Math.max(1, subjects.length);
+      const window = subjects.slice(start, start + 12);
+      const shardSeeds = window
+        .map((t) => {
+          const text = String(t || "").trim().slice(0, 100);
+          if (text.length < 12) return null;
+          return {
+            cluster: "OTHER",
+            dimension: "OBSERVATION",
+            concrete_subject: text,
+            subject_signature: subjectSignature(text),
+            primary_source: "EVIDENCE_DERIVED",
+            supporting_sources: ["PUBLISHED_SUBJECT_SHARD"],
+            status: "ELIGIBLE",
+            creator_evidence_available: true,
+            claim_types: ["OBSERVATION"],
+            grounding_status: "GROUNDED",
+          };
+        })
+        .filter(Boolean);
+      const sg = applyLocalGates(shardSeeds as any[], [], createSeedIdFactory(`sh${cycles}`));
+      const r3 = ingestDistinct(out, seen, sg.passed, "published_subject_shard", sources_used);
+      rejected_as_near_duplicate += r3.rejected_dup;
+    }
+
+    if (out.length === before) break;
   }
 
-  const shortfall_after = computeShortfall(canonical, out.length);
+  for (let i = existingCount; i < out.length; i++) {
+    replacements.push({
+      replacement_slot_id: String(out[i].seed_id || out[i].subject_signature || `exp_${i}`),
+      replacement_reason: "EXPAND_SHORTFALL",
+      source_stage: "expand",
+      retry_number: cycles,
+    });
+  }
+
   return {
     candidates: out,
-    recovered: Math.max(0, out.length - (opts.existing?.length || 0)),
+    recovered: Math.max(0, out.length - existingCount),
     shortfall_before,
-    shortfall_after,
+    shortfall_after: computeShortfall(canonical, out.length),
     canonical_target: canonical,
     sources_used,
+    cycles,
+    replacements,
+    target_met: out.length >= canonical,
+    rejected_as_near_duplicate,
   };
 }
 
+/**
+ * Select recovery with live expandRefill. No fixed refill size.
+ */
 export function recoverSelectSlots(opts: {
   days: Array<{ dayOffset: number; posts: any[] }>;
   pool: ConcreteSeed[];
@@ -144,6 +236,8 @@ export function recoverSelectSlots(opts: {
   postsPerDay: number;
   compactSlot: (seed: ConcreteSeed, dayOffset: number, slot: number, mode: string) => any;
   modes: string[];
+  expandRefill?: () => ConcreteSeed[];
+  max_cycles?: number;
 }): SelectRecoveryResult {
   const days = opts.days.map((d) => ({
     dayOffset: d.dayOffset,
@@ -155,25 +249,36 @@ export function recoverSelectSlots(opts: {
   let flat = days.reduce((s, d) => s + d.posts.length, 0);
   const shortfall_before = computeShortfall(canonical, flat);
   let recovered = 0;
-  const maxCycles = canonical + 5;
   let cycles = 0;
+  let expand_request_count = 0;
+  const replacements: ReplacementRecord[] = [];
+  const maxCycles = opts.max_cycles ?? MAX_SELECT_CYCLES;
+  const seenSig = new Set(
+    selected.map((s) => subjectSignature(String(s.concrete_subject || "")))
+  );
 
-  while (flat < canonical && pool.length > 0 && cycles < maxCycles) {
+  while (computeShortfall(canonical, flat) > 0 && cycles < maxCycles) {
     cycles++;
+    if (computeShortfall(canonical, flat) <= 0) break;
+
+    if (pool.length === 0) {
+      if (opts.expandRefill) {
+        expand_request_count++;
+        const more = opts.expandRefill() || [];
+        for (const s of more) {
+          const sig = subjectSignature(String(s.concrete_subject || ""));
+          if (!sig || seenSig.has(sig)) continue;
+          if (!isMeaningfulDistinct(s, selected)) continue;
+          seenSig.add(sig);
+          pool.push({ ...s, status: (s.status as any) || "ELIGIBLE" });
+        }
+      }
+      if (pool.length === 0) break;
+    }
+
     let minD = 0;
     for (let i = 1; i < days.length; i++) {
       if (days[i].posts.length < days[minD].posts.length) minD = i;
-    }
-    if (days[minD].posts.length >= opts.postsPerDay) {
-      let anyRoom = false;
-      for (let i = 0; i < days.length; i++) {
-        if (days[i].posts.length < opts.postsPerDay + 1) {
-          minD = i;
-          anyRoom = true;
-          break;
-        }
-      }
-      if (!anyRoom) break;
     }
 
     let pickedIdx = -1;
@@ -183,7 +288,7 @@ export function recoverSelectSlots(opts: {
         (s) =>
           isSelectableStatus(s.status as any) &&
           canServeEditorialMode(s, mode) &&
-          conceptualRepetitionLevel(s, selected) !== "HIGH" &&
+          isMeaningfulDistinct(s, selected) &&
           ideaAngleGuardAllow(s, selected, { softSecond: true }).allow
       );
       if (idx >= 0) {
@@ -195,25 +300,41 @@ export function recoverSelectSlots(opts: {
     if (pickedIdx < 0) {
       pickedIdx = pool.findIndex(
         (s) =>
-          isSelectableStatus(s.status as any) &&
-          ideaAngleGuardAllow(s, selected, { softSecond: true }).allow
+          (isSelectableStatus(s.status as any) || s.status === "HOLD") &&
+          isMeaningfulDistinct(s, selected)
       );
+      if (pickedIdx >= 0) pool[pickedIdx] = { ...pool[pickedIdx], status: "ELIGIBLE" };
     }
     if (pickedIdx < 0) {
-      pickedIdx = pool.findIndex((s) => isSelectableStatus(s.status as any) || s.status === "HOLD");
-      if (pickedIdx >= 0) {
-        pool[pickedIdx] = { ...pool[pickedIdx], status: "ELIGIBLE" };
+      if (opts.expandRefill && expand_request_count < 5) {
+        expand_request_count++;
+        const more = opts.expandRefill() || [];
+        for (const s of more) {
+          const sig = subjectSignature(String(s.concrete_subject || ""));
+          if (!sig || seenSig.has(sig)) continue;
+          if (!isMeaningfulDistinct(s, selected)) continue;
+          seenSig.add(sig);
+          pool.push({ ...s, status: "ELIGIBLE" as any });
+        }
+        if (pool.length === 0) break;
+        continue;
       }
+      break;
     }
-    if (pickedIdx < 0) break;
 
     const seed = pool.splice(pickedIdx, 1)[0];
     selected.push(seed);
-    days[minD].posts.push(
-      opts.compactSlot(seed, minD, days[minD].posts.length + 1, pickedMode)
-    );
+    const slotNum = days[minD].posts.length + 1;
+    const post = opts.compactSlot(seed, minD, slotNum, pickedMode);
+    days[minD].posts.push(post);
     flat++;
     recovered++;
+    replacements.push({
+      replacement_slot_id: String(post.slotId || `D${minD + 1}P${slotNum}`),
+      replacement_reason: "SELECT_SHORTFALL",
+      source_stage: "select",
+      retry_number: cycles,
+    });
   }
 
   return {
@@ -222,5 +343,15 @@ export function recoverSelectSlots(opts: {
     shortfall_before,
     shortfall_after: computeShortfall(canonical, flat),
     canonical_target: canonical,
+    cycles,
+    need_expand_again: computeShortfall(canonical, flat) > 0 && pool.length === 0,
+    expand_request_count,
+    replacements,
+    target_met: flat >= canonical,
   };
+}
+
+export function strictCountPass(canonical: number, finalCount: number): boolean {
+  if (canonical <= 0) return false;
+  return finalCount >= canonical && finalCount <= canonical + 1;
 }
