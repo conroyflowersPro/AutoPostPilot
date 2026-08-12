@@ -1,0 +1,182 @@
+diff --git a/supabase/functions/weekly-plan/index.ts b/supabase/functions/weekly-plan/index.ts
+index c7c252d..0a8eb61 100644
+--- a/supabase/functions/weekly-plan/index.ts
++++ b/supabase/functions/weekly-plan/index.ts
+@@ -47,12 +47,17 @@ import {
+   topicDistributionReport,
+   softDailyCap,
+ } from "./daily-topic-distribute.ts";
++import {
++  guardCandidateAgainstManualLeakage,
++  type RecentManualPost,
++} from "./manual-leakage-guard.ts";
++import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
+ 
+ const POSTS_MIN = 5;
+ const POSTS_MAX = 8;
+ const POSTS_TARGET = 6;
+-const APP_VERSION = "9.1.2";
+-const WEEKLY_ENGINE_VERSION = "phased_v9.1.2_order34_grounding_hotfix";
++const APP_VERSION = "10.0.0-order0b";
++const WEEKLY_ENGINE_VERSION = "phased_v10_order0b_manual_leakage";
+ const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+ const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+ const corsHeaders = {
+@@ -178,7 +183,41 @@ Deno.serve(async (req) => {
+       });
+       const nextId = createSeedIdFactory("s");
+       const gated = applyLocalGates(local, [], nextId);
+-      const candidates = [...gated.passed];
++      // ORDER 0B — Manual leakage guard on expand candidates
++      const recentManual: RecentManualPost[] = publishedEvidence.map((p) => ({
++        text: p.text,
++        source_id: p.source_id,
++        published_at: p.published_at,
++        post_type: p.post_type,
++      }));
++      let leakage_blocked = 0;
++      const candidates: any[] = [];
++      for (const c of gated.passed) {
++        const role = (c.source_role as SourceRole) || "SEED_SOURCE";
++        const g = guardCandidateAgainstManualLeakage({
++          source_role: role,
++          concrete_subject: String(c.concrete_subject || ""),
++          point_or_tension: c.point_or_tension ? String(c.point_or_tension) : undefined,
++          recent_manual: recentManual,
++          user_explicit: role === "USER_EXPLICIT_SEED",
++        });
++        if (!g.allow_as_seed) {
++          leakage_blocked += 1;
++          continue;
++        }
++        candidates.push({
++          ...c,
++          source_role: role,
++          source_trace: {
++            source_role: role,
++            source_type: (c.source_type as string) || "DIMENSION_REGISTRY",
++            manual_source_used: false,
++            manual_text_exposed_to_generation: false,
++            leakage_guard_result: g.reason === "PASS" ? "PASS" : "BLOCK_SEMANTIC",
++            semantic_recent_post_overlap: g.semantic_recent_post_overlap,
++          },
++        });
++      }
+       const supply_low = candidates.length < Math.min(required_slots, 8);
+       const xai_would = candidates.filter((c: any) => c.xai_would_have_been_required).length;
+       const raw_copy_guard = candidates.every((c: any) => {
+@@ -193,7 +232,7 @@ Deno.serve(async (req) => {
+         engine: WEEKLY_ENGINE_VERSION,
+         xai_api_used: false,
+         xai_error: ORDER2_BLOCK_XAI_EXPAND
+-          ? "v9.1.2: expand uses Evidence/Intent only (xAI content supply blocked)"
++          ? "v10 order0b: expand uses Evidence/Intent only (xAI content supply blocked)"
+           : undefined,
+         seed_count: candidates.length,
+         key_present: !!xaiKey,
+@@ -215,6 +254,8 @@ Deno.serve(async (req) => {
+           published_input: published.length,
+           order2_xai_expand_blocked: true,
+           order3_evidence_packet_reasoning: true,
++          order0b_manual_leakage_separation: true,
++          order0b_leakage_blocked: leakage_blocked,
+           language_policy: "Korean output; location only from Evidence",
+           supply_low,
+           raw_post_copy_guard_ok: raw_copy_guard,
+@@ -230,7 +271,7 @@ Deno.serve(async (req) => {
+             creator_generation: false,
+           },
+         },
+-        note: "v9.1.2 canonical: no location invention from language; no production templates; no xAI expand.",
++        note: "v10 order0b: manual posts are learning signals only; no narrative/wording reuse as SEED_SOURCE.",
+         timing: { total_ms: Date.now() - t0 },
+       });
+     }
+@@ -319,30 +360,76 @@ Deno.serve(async (req) => {
+       const interestMix = blendInterestMix(DEFAULT_INTEREST_MIX, intent);
+       const recentExp = buildRecentExperienceCandidates(acts || []);
+       const expNeed = Math.max(0, Number((mix.allocation as any)?.EXPERIENCE) || 0);
+       const expResolved = resolveExperienceSupply(expNeed, recentExp, []);
+-      let pool: ConcreteSeed[] = seedsIn.filter((s) => isSelectableStatus(s.status as any));
++      const recentManualSelect: RecentManualPost[] = (acts || [])
++        .map((row: any) => ({
++          text: String(row.text_body || "").trim(),
++          source_id: row.x_post_id,
++          published_at: row.published_at,
++          post_type: String(row.post_type || row.action_type || ""),
++        }))
++        .filter((r: RecentManualPost) => r.text.length >= 12);
++      // ORDER 0B leakage filter on incoming seeds
++      let pool: ConcreteSeed[] = [];
++      for (const s of seedsIn) {
++        if (!s?.concrete_subject) continue;
++        if (!isSelectableStatus(s.status as any)) continue;
++        const role = ((s as any).source_role as SourceRole) || "SEED_SOURCE";
++        if (!isSeedEligibleRole(role)) continue;
++        const g = guardCandidateAgainstManualLeakage({
++          source_role: role,
++          concrete_subject: String(s.concrete_subject || ""),
++          point_or_tension: s.point_or_tension ? String(s.point_or_tension) : undefined,
++          recent_manual: recentManualSelect,
++          user_explicit: role === "USER_EXPLICIT_SEED",
++        });
++        if (!g.allow_as_seed) continue;
++        pool.push(s);
++      }
+       if (pool.length < seedsIn.length) {
+         for (const s of seedsIn) {
+           if (!s?.concrete_subject) continue;
+           if (isSelectableStatus(s.status as any)) continue;
+           if (s.status === "HOLD" || s.status === "REJECTED") continue;
+-          pool.push({ ...s, status: "ELIGIBLE" });
++          const role = ((s as any).source_role as SourceRole) || "SEED_SOURCE";
++          if (!isSeedEligibleRole(role)) continue;
++          const g = guardCandidateAgainstManualLeakage({
++            source_role: role,
++            concrete_subject: String(s.concrete_subject || ""),
++            point_or_tension: s.point_or_tension ? String(s.point_or_tension) : undefined,
++            recent_manual: recentManualSelect,
++            user_explicit: role === "USER_EXPLICIT_SEED",
++          });
++          if (!g.allow_as_seed) continue;
++          pool.push({ ...s, status: "ELIGIBLE" });
+         }
+       }
+       const nextId = createSeedIdFactory("e");
+-      for (const c of expResolved.selected) {
++      // ORDER 0B: only seed_eligible (user explicit); no auto-promote recent manuals
++      for (const c of expResolved.selected) {
++        if (!(c as any).seed_eligible) continue;
+         const fields = experienceCandidateToSeedFields(c);
++        const g = guardCandidateAgainstManualLeakage({
++          source_role: "USER_EXPLICIT_SEED",
++          concrete_subject: String(fields.concrete_subject || ""),
++          point_or_tension: fields.point_or_tension ? String(fields.point_or_tension) : undefined,
++          recent_manual: recentManualSelect,
++          user_explicit: true,
++        });
++        if (!g.allow_as_seed) continue;
+         pool.unshift({
+           seed_id: nextId(),
+           cluster: String(fields.cluster || "OTHER"),
+           dimension: String(fields.dimension || "EXPERIENCE"),
+           concrete_subject: String(fields.concrete_subject || ""),
+           subject_signature: subjectSignature(String(fields.concrete_subject || "")),
+           creator_evidence_available: true,
+           status: "HIGH_VALUE",
+-          primary_source: String(fields.provenance || fields.primary_source || "RECENT_MANUAL_14D"),
++          primary_source: String(fields.provenance || fields.primary_source || "USER_EXPLICIT_SEED"),
+           point_or_tension: fields.point_or_tension as string | undefined,
++          source_role: "USER_EXPLICIT_SEED",
+         } as ConcreteSeed);
+       }
+       const usedModes: Record<string, number> = {};
+@@ -495,6 +581,8 @@ Deno.serve(async (req) => {
+           engine: WEEKLY_ENGINE_VERSION,
+           input_seed_count: seedsIn.length,
+           count_integrity: countIntegrityOk(mix.base_required_slots, totalPlanned),
++          order0b_manual_leakage_separation: true,
++          order0b_seed_eligible_only_for_experience: true,
+           xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
+         },
+         timing: { total_ms: Date.now() - t0 },

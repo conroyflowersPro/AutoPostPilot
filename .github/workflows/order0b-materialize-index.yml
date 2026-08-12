@@ -1,0 +1,43 @@
+name: ORDER0B materialize index.ts
+on:
+  workflow_dispatch:
+  push:
+    branches: [order0b-manual-leakage]
+    paths:
+      - "tools/order0b-index.patch"
+      - ".github/workflows/order0b-materialize-index.yml"
+permissions:
+  contents: write
+concurrency:
+  group: order0b-materialize-index
+  cancel-in-progress: true
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: order0b-manual-leakage
+          fetch-depth: 0
+      - name: Apply ORDER 0B index patch
+        run: |
+          set -euo pipefail
+          if grep -q 'order0b_manual_leakage' supabase/functions/weekly-plan/index.ts; then
+            echo "index.ts already has ORDER 0B markers — skip apply"
+          else
+            git apply --verbose tools/order0b-index.patch
+          fi
+          node tools/order0b-manual-leakage-test.mjs
+      - name: Commit and push index.ts
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --staged --quiet; then
+            echo "No index.ts changes to commit"
+            exit 0
+          fi
+          git commit -m "ORDER 0B: materialize weekly-plan/index.ts manual leakage wiring"
+          git push origin HEAD:order0b-manual-leakage
