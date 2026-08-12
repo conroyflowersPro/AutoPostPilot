@@ -1,0 +1,32 @@
+name: ORDER 0A materialize production files
+on:
+  push:
+    branches: [order0a-hotfix3-final]
+    paths:
+      - 'tools/order0a-final-parts/**'
+      - 'tools/order0a-final-assemble.cjs'
+      - '.github/workflows/order0a-materialize.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order0a-hotfix3-final
+      - name: Assemble production page + weekly-plan index
+        run: node tools/order0a-final-assemble.cjs
+      - name: Verify markers
+        run: |
+          grep -q expandRefill supabase/functions/weekly-plan/index.ts
+          grep -q buildCanonicalTarget app/generate/page.tsx
+          grep -q isMeaningfulDistinct supabase/functions/weekly-plan/count-recovery.ts
+          echo MARKERS_OK
+      - name: Commit assembled production files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ORDER 0A FINALIZATION: materialize production page.tsx + weekly-plan/index.ts"
+          file_pattern: "app/generate/page.tsx supabase/functions/weekly-plan/index.ts"
+          branch: order0a-hotfix3-final
