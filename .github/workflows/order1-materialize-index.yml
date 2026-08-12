@@ -1,13 +1,12 @@
-name: ORDER1 materialize index.ts
+name: ORDER1 materialize sources
 on:
   workflow_dispatch:
   push:
     branches: [order1-seed-interpretation]
     paths:
-      - "tools/order1-index.gz.b64.part1"
-      - "tools/order1-index.gz.b64.part2"
+      - "tools/order1-*.b64.part*"
       - "tools/order1-assemble-gz.cjs"
-      - "tools/order1-materialize-index.cjs"
+      - "tools/order1-materialize-*.cjs"
       - ".github/workflows/order1-materialize-index.yml"
 permissions:
   contents: write
@@ -22,24 +21,27 @@ jobs:
         with:
           ref: order1-seed-interpretation
           fetch-depth: 0
-      - name: Assemble and materialize index.ts
+      - name: Materialize SI + test + index
         run: |
           set -euo pipefail
+          node tools/order1-materialize-si.cjs
+          node tools/order1-materialize-test.cjs
           node tools/order1-assemble-gz.cjs
           if grep -q 'order1_seed_interpretation' supabase/functions/weekly-plan/index.ts; then
             echo "index already ORDER 1"
           else
             node tools/order1-materialize-index.cjs
           fi
-          if [ -f tools/order1-seed-interpretation-test.mjs ]; then
-            node tools/order1-seed-interpretation-test.mjs
-          fi
+          node tools/order1-seed-interpretation-test.mjs
       - name: Commit
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add supabase/functions/weekly-plan/index.ts tools/order1-index.gz.b64 || true
+          git add supabase/functions/weekly-plan/seed-interpretation.ts \
+                  supabase/functions/weekly-plan/index.ts \
+                  tools/order1-seed-interpretation-test.mjs \
+                  tools/order1-index.gz.b64 || true
           if git diff --staged --quiet; then echo "no changes"; exit 0; fi
-          git commit -m "ORDER 1: materialize weekly-plan/index.ts seed interpretation wiring"
+          git commit -m "ORDER 1: materialize seed-interpretation + index + tests"
           git push origin HEAD:order1-seed-interpretation
