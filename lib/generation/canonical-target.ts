@@ -30,10 +30,8 @@ export function buildCanonicalTarget(input: {
   const base = Number(input.planner_base_required);
   const planned = Number(input.total_planned);
   const fallback = Math.max(0, Number(input.request_fallback_slots) || 0);
-
   let source: CanonicalTargetSource;
   let minimum: number;
-
   if (Number.isFinite(finalSlots) && finalSlots > 0) {
     minimum = finalSlots;
     source = "planner_final_slots";
@@ -47,11 +45,9 @@ export function buildCanonicalTarget(input: {
     minimum = fallback > 0 ? fallback : 0;
     source = "ui_fallback_request_params_only";
   }
-
   const baseReq = Number.isFinite(base) && base > 0 ? base : minimum;
   const finalAlloc =
     Number.isFinite(finalSlots) && finalSlots > 0 ? finalSlots : minimum;
-
   return {
     planner_base_required_slots: baseReq,
     planner_final_allocated_slots: finalAlloc,
