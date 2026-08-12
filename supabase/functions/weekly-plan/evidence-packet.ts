@@ -2,6 +2,7 @@
  * ORDER 3 — Evidence Packet (Data Contract for Seed Engine)
  * Not a new Business Engine. Structured facts extracted from Evidence.
  * Never stores finished post templates or raw republish bodies as Seeds.
+ * ORDER 0B: ACCOUNT_ACTIVITY uses abstract fact labels only.
  */
 export type TimeSensitivity = "TIMELESS" | "HISTORICAL" | "TIME_SENSITIVE" | "UNKNOWN";
 
@@ -90,17 +91,30 @@ export function extractEvidencePacket(
   const static_facts: string[] = [];
   const current_facts: string[] = [];
   const creator_opinion: string[] = [];
+  // ORDER 0B: ACCOUNT_ACTIVITY → abstract fact labels (no narrative sentence anchors)
+  const isManual = !meta?.source_type || meta.source_type === "ACCOUNT_ACTIVITY";
+  const label = (kind: string) => {
+    if (kind === "exp") {
+      if (/합류|merge/i.test(body)) return "merge_behavior_observed";
+      if (/감시|감독/i.test(body)) return "supervision_load_observed";
+      if (/충전/.test(body)) return "charging_session_observed";
+      return `${topic.toLowerCase()}_lived_observation`;
+    }
+    if (kind === "opinion") return `${topic.toLowerCase()}_tradeoff_judgment`;
+    if (kind === "current") return `${topic.toLowerCase()}_current_context`;
+    return `${topic.toLowerCase()}_structural_observation`;
+  };
   if (EXPERIENCE_RE.test(body)) {
-    experience_facts.push(extractAnchors(body)[0] || body.slice(0, 60));
+    experience_facts.push(isManual ? label("exp") : (extractAnchors(body)[0] || label("exp")));
   }
   if (OPINION_RE.test(body)) {
-    creator_opinion.push(extractAnchors(body)[0] || body.slice(0, 60));
+    creator_opinion.push(isManual ? label("opinion") : (extractAnchors(body)[0] || label("opinion")));
   }
   if (CURRENT_RE.test(body)) {
-    current_facts.push(extractAnchors(body)[0] || body.slice(0, 60));
+    current_facts.push(isManual ? label("current") : (extractAnchors(body)[0] || label("current")));
   }
   if (!experience_facts.length && !creator_opinion.length) {
-    static_facts.push(extractAnchors(body)[0] || body.slice(0, 60));
+    static_facts.push(label("static"));
   }
   let time_sensitivity: TimeSensitivity = "UNKNOWN";
   if (HISTORICAL_RE.test(body)) time_sensitivity = "HISTORICAL";
@@ -122,7 +136,9 @@ export function extractEvidencePacket(
     relationship_edges: [],
     time_sensitivity,
     previous_idea_angles: [],
-    factual_anchors: extractAnchors(body),
+    factual_anchors: isManual
+      ? [...experience_facts, ...static_facts, ...current_facts, ...creator_opinion].slice(0, 6)
+      : extractAnchors(body),
     raw_length: body.length,
     published_at: meta?.published_at,
   };
