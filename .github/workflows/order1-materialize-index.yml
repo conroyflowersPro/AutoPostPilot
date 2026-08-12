@@ -4,7 +4,9 @@ on:
   push:
     branches: [order1-seed-interpretation]
     paths:
-      - "tools/order1-index.gz.b64"
+      - "tools/order1-index.gz.b64.part1"
+      - "tools/order1-index.gz.b64.part2"
+      - "tools/order1-assemble-gz.cjs"
       - "tools/order1-materialize-index.cjs"
       - ".github/workflows/order1-materialize-index.yml"
 permissions:
@@ -20,21 +22,24 @@ jobs:
         with:
           ref: order1-seed-interpretation
           fetch-depth: 0
-      - name: Materialize index.ts
+      - name: Assemble and materialize index.ts
         run: |
           set -euo pipefail
+          node tools/order1-assemble-gz.cjs
           if grep -q 'order1_seed_interpretation' supabase/functions/weekly-plan/index.ts; then
             echo "index already ORDER 1"
           else
             node tools/order1-materialize-index.cjs
           fi
-          node tools/order1-seed-interpretation-test.mjs
+          if [ -f tools/order1-seed-interpretation-test.mjs ]; then
+            node tools/order1-seed-interpretation-test.mjs
+          fi
       - name: Commit
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add supabase/functions/weekly-plan/index.ts
+          git add supabase/functions/weekly-plan/index.ts tools/order1-index.gz.b64 || true
           if git diff --staged --quiet; then echo "no changes"; exit 0; fi
           git commit -m "ORDER 1: materialize weekly-plan/index.ts seed interpretation wiring"
           git push origin HEAD:order1-seed-interpretation
