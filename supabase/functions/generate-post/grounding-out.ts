@@ -1,4 +1,4 @@
-/** ORDER 3+4 hotfix + ORDER 1 stages + ORDER 2 humor/density diagnostics */
+/** ORDER 3+4 + stages + ORDER2 density + v10 reaction mechanism */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -38,11 +38,11 @@ export function buildGroundedPostsOut(
       primaryTopic: slot.primaryTopic || slot.concrete_subject,
       editorial_mode: slot.editorial_mode,
       length_mode: slot.length_mode,
-      // ORDER 1 intermediate stages
       core_thought: p.core_thought ?? null,
       thinking_rail: p.thinking_rail ?? null,
       audience_translation: p.audience_translation ?? null,
-      // ORDER 2 Natural Humor + density diagnostics
+      reaction_mechanism: p.reaction_mechanism ?? null,
+      reaction_reason: p.reaction_reason ?? null,
       natural_humor_present: p.natural_humor_present ?? false,
       natural_humor_fit: p.natural_humor_fit ?? "N/A",
       writing_density: p.writing_density ?? null,
