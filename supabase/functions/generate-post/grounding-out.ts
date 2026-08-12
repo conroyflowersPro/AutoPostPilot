@@ -1,4 +1,4 @@
-/** stages + reaction + everyday + contextual style + density */
+/** stages + reaction + everyday + contextual + reader-story judge */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -53,6 +53,13 @@ export function buildGroundedPostsOut(
       writing_density: p.writing_density ?? null,
       ai_tone_risk: p.ai_tone_risk ?? "UNKNOWN",
       unnecessary_length: p.unnecessary_length ?? false,
+      reader_story_score: p.reader_story_score ?? null,
+      reader_story_pass: p.reader_story_pass ?? null,
+      reader_story_invitation: p.reader_story_invitation ?? null,
+      participation_barrier: p.participation_barrier ?? null,
+      mechanism_repetition_risk: p.mechanism_repetition_risk ?? null,
+      style_repetition_risk: p.style_repetition_risk ?? null,
+      reader_story_notes: p.reader_story_notes ?? null,
       claim_types: slot.claim_types || [],
       grounding_status: slot.grounding_status,
       grounding_reasons: slot.grounding_reasons || [],
