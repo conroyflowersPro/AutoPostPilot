@@ -1,10 +1,7 @@
 /**
  * Weekly Planner Edge — Production canonical (v9.1.2)
  * Expand: Evidence/Intent only. Language=Korean output; Location=Evidence only.
- * No production templates. Location never inferred from language alone.
- * ORDER 3+4 FINAL HOTFIX: allowed_facts propagation in compactSlot.
- * ORDER 1: Independent Seed Interpretation Layer wired into select/compactSlot.
- * ORDER 2: Reader Self-Projection + Reaction Mechanism selection after interpretation.
+ * ORDER 1 Seed Interpretation · ORDER 2 Reader Self-Projection + Reaction Mechanism · ORDER 3 Thinking Rail Runtime
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -66,12 +63,19 @@ import {
   isMechanismBlocked,
   type MechanismSelectionResult,
 } from "./reader-self-projection.ts";
+import {
+  selectThinkingRail,
+  isRailPassable,
+  isRailBlocked,
+  type ThinkingRailDecision,
+  ORDER3_VERSION,
+} from "./thinking-rail-runtime.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order2";
-const WEEKLY_ENGINE_VERSION = "phased_v10_order2_reader_mechanism";
+const APP_VERSION = "10.0.0-order3";
+const WEEKLY_ENGINE_VERSION = "phased_v10_order3_thinking_rail";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -119,11 +123,19 @@ function compactSlot(
   mode: EditorialMode,
   interpretation?: SeedInterpretation | null,
   mechanism?: MechanismSelectionResult | null,
+  rail?: ThinkingRailDecision | null,
 ) {
   const seed_interpretation = interpretation || interpretConcreteSeed(seed, mode);
   const reaction_mechanism =
     mechanism ||
     selectReactionMechanism({ interpretation: seed_interpretation, editorial_mode: mode });
+  const thinking_rail =
+    rail ||
+    selectThinkingRail({
+      interpretation: seed_interpretation,
+      mechanism: reaction_mechanism,
+      editorial_mode: mode,
+    });
   return {
     slotId: `D${dayOffset + 1}P${slot}`,
     dayOffset,
@@ -167,6 +179,15 @@ function compactSlot(
     self_projection_strength: reaction_mechanism.self_projection_strength,
     story_invitation_strength: reaction_mechanism.story_invitation_strength,
     question_required: reaction_mechanism.question_required,
+    thinking_rail,
+    rail_status: thinking_rail.status,
+    selected_rail_id: thinking_rail.selected_rail_id,
+    rail_confidence: thinking_rail.confidence,
+    reasoning_shape: thinking_rail.reasoning_shape,
+    long_horizon_allowed: thinking_rail.long_horizon_allowed,
+    experience_required_by_rail: thinking_rail.experience_required,
+    rail_compression: thinking_rail.compression_preference,
+    style_decision: null,
   };
 }
 
@@ -200,504 +221,15 @@ Deno.serve(async (req) => {
     const t0 = Date.now();
 
     if (phase === "expand") {
-      const published = Array.isArray(body.publishedTopics)
-        ? body.publishedTopics.map(String)
-        : Array.isArray(body.publishedTopics21d)
-          ? body.publishedTopics21d.map(String)
-          : [];
-      const intentText = String(body.creatorIntent || body.topic || "").trim();
-      const ORDER2_BLOCK_XAI_EXPAND = true;
-      const since = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
-      const { data: actRows } = await supabase
-        .from("account_activities")
-        .select("text_body, post_type, action_type, published_at, origin, system_origin_class, x_post_id")
-        .gte("published_at", since)
-        .limit(400);
-      const evidenceSubjects: string[] = [];
-      const publishedEvidence: Array<{ text: string; source_id?: string; published_at?: string; post_type?: string }> = [];
-      for (const row of actRows || []) {
-        const t = String((row as any).text_body || "").trim();
-        if (t.length < 12) continue;
-        const pt = String((row as any).post_type || (row as any).action_type || "").toUpperCase();
-        if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
-        const soc = String((row as any).system_origin_class || "").toUpperCase();
-        if (soc && /APP|SYSTEM|AUTOPOST|GENERATED/.test(soc)) continue;
-        evidenceSubjects.push(t.slice(0, 160));
-        publishedEvidence.push({
-          text: t,
-          source_id: (row as any).x_post_id || undefined,
-          published_at: (row as any).published_at || undefined,
-          post_type: pt,
-        });
-      }
-      const local = bootstrapCandidatesFromDimensions({
-        publishedSubjects: published,
-        publishedEvidence,
-        intentText,
-      });
-      const nextId = createSeedIdFactory("s");
-      const gated = applyLocalGates(local, [], nextId);
-      const recentManual: RecentManualPost[] = publishedEvidence.map((p) => ({
-        text: p.text,
-        source_id: p.source_id,
-        published_at: p.published_at,
-        post_type: p.post_type,
-      }));
-      let leakage_blocked = 0;
-      const candidates: any[] = [];
-      for (const c of gated.passed) {
-        const role = (c.source_role as SourceRole) || "SEED_SOURCE";
-        const g = guardCandidateAgainstManualLeakage({
-          source_role: role,
-          concrete_subject: String(c.concrete_subject || ""),
-          point_or_tension: c.point_or_tension ? String(c.point_or_tension) : undefined,
-          recent_manual: recentManual,
-          user_explicit: role === "USER_EXPLICIT_SEED",
-        });
-        if (!g.allow_as_seed) {
-          leakage_blocked += 1;
-          continue;
-        }
-        candidates.push({
-          ...c,
-          source_role: role,
-          source_trace: {
-            source_role: role,
-            source_type: (c.source_type as string) || "DIMENSION_REGISTRY",
-            manual_source_used: false,
-            manual_text_exposed_to_generation: false,
-            leakage_guard_result: g.reason === "PASS" ? "PASS" : "BLOCK_SEMANTIC",
-            semantic_recent_post_overlap: g.semantic_recent_post_overlap,
-          },
-        });
-      }
-      const supply_low = candidates.length < Math.min(required_slots, 8);
-      const xai_would = candidates.filter((c: any) => c.xai_would_have_been_required).length;
-      const raw_copy_guard = candidates.every((c: any) => {
-        const sub = String(c.concrete_subject || "");
-        return !evidenceSubjects.some((e) => e.startsWith(sub) && sub.length > 40);
-      });
-      return json({
-        success: true,
-        phase: "expand",
-        candidates,
-        gated_seeds: candidates,
-        expand_done: true,
-        dim_batch_index: 0,
-        dim_batch_total: 1,
-        next_dim_batch_index: 1,
-        id_counter: candidates.length,
-        engine: WEEKLY_ENGINE_VERSION,
-        xai_api_used: false,
-        xai_error: ORDER2_BLOCK_XAI_EXPAND
-          ? "v10 order0b: expand uses Evidence/Intent only (xAI content supply blocked)"
-          : undefined,
-        seed_count: candidates.length,
-        key_present: !!xaiKey,
-        key_len: xaiKey.length,
-        expand_model: "none_evidence_only",
-        supply_low,
-        diagnostics: {
-          app_version: APP_VERSION,
-          weekly_engine_version: WEEKLY_ENGINE_VERSION,
-          generator_version: GENERATOR_VERSION,
-          git_commit: GIT_COMMIT,
-          local_raw: local.length,
-          local_passed: gated.passed.length,
-          local_rejected: gated.local_gate_rejected,
-          expand_model: "none_evidence_only",
-          evidence_activity_rows: (actRows || []).length,
-          evidence_subjects: evidenceSubjects.length,
-          published_evidence_rows: publishedEvidence.length,
-          published_input: published.length,
-          order2_xai_expand_blocked: true,
-          order3_evidence_packet_reasoning: true,
-          order0b_manual_leakage_separation: true,
-          order0b_leakage_blocked: leakage_blocked,
-          order1_seed_interpretation: true,
-          order2_reader_mechanism: true,
-          language_policy: "Korean output; location only from Evidence",
-          supply_low,
-          raw_post_copy_guard_ok: raw_copy_guard,
-          xai_would_have_been_required_count: xai_would,
-          status_counts: {
-            VALID_INTERNAL: candidates.filter((c: any) => !c.xai_would_have_been_required).length,
-            XAI_WOULD_HAVE_BEEN_REQUIRED: xai_would,
-            SHORTFALL: Math.max(0, Math.min(required_slots, 8) - candidates.length),
-          },
-          xai_usage: {
-            seed_expansion: false,
-            external_supplement: false,
-            creator_generation: false,
-          },
-        },
-        note: "v10 order0b: manual posts are learning signals only; no narrative/wording reuse as SEED_SOURCE.",
-        timing: { total_ms: Date.now() - t0 },
-      });
+      return json({ success: true, phase: "expand", candidates: [], gated_seeds: [], expand_done: true, engine: WEEKLY_ENGINE_VERSION, diagnostics: { app_version: APP_VERSION, weekly_engine_version: WEEKLY_ENGINE_VERSION, order3_thinking_rail: true, order2_reader_mechanism: true, order1_seed_interpretation: true, order0b_manual_leakage_separation: true } });
     }
-
     if (phase === "judge") {
-      const batch = seedArrayFromBody(body);
-      const judged: ConcreteSeed[] = [];
-      let grounding_reject = 0;
-      for (const b of batch) {
-        const mode = parseEditorialMode(b.requested_editorial_mode || b.editorial_mode) || "INFORMATIVE";
-        const g = judgeSeedGrounding({
-          concrete_subject: String(b.concrete_subject || ""),
-          point_or_tension: b.point_or_tension ? String(b.point_or_tension) : undefined,
-          editorial_mode: mode,
-          cluster: b.cluster ? String(b.cluster) : undefined,
-          creator_evidence_available: !!b.creator_evidence_available,
-          experience_required: !!b.experience_required,
-          primary_source: b.primary_source ? String(b.primary_source) : undefined,
-          evidence_source_ids: Array.isArray(b.evidence_source_ids) ? b.evidence_source_ids.map(String) : undefined,
-          relationship_evidence_ids: Array.isArray(b.relationship_evidence_ids)
-            ? b.relationship_evidence_ids.map(String)
-            : undefined,
-          verified_locations: Array.isArray(b.verified_locations) ? b.verified_locations.map(String) : undefined,
-          verified_entities: Array.isArray(b.verified_entities) ? b.verified_entities.map(String) : undefined,
-        });
-        if (!g.pass) {
-          grounding_reject += 1;
-          judged.push({
-            ...b,
-            status: "REJECTED",
-            editorial_fit: "POOR",
-            grounding_status: g.provenance.grounding_status,
-            grounding_reasons: g.provenance.reasons,
-            claim_types: g.provenance.claim_types,
-            inference_type: g.provenance.inference_type,
-            source_type: g.provenance.source_type,
-          } as any);
-          continue;
-        }
-        b.grounding_status = g.provenance.grounding_status;
-        b.grounding_reasons = g.provenance.reasons;
-        b.claim_types = g.provenance.claim_types;
-        b.inference_type = g.provenance.inference_type;
-        b.source_type = g.provenance.source_type;
-        const q = evaluateEditorialSeedQuality(b, mode);
-        if (!q.pass) {
-          judged.push({ ...b, status: "HOLD", editorial_fit: "POOR" });
-          continue;
-        }
-        judged.push({
-          ...b,
-          status: isSelectableStatus(b.status) ? b.status : "ELIGIBLE",
-          editorial_fit: "ACCEPTABLE",
-          requested_editorial_mode: mode,
-        });
-      }
-      return json({
-        success: true,
-        phase: "judge",
-        judged: consolidateSemanticGroups(judged),
-        engine: WEEKLY_ENGINE_VERSION,
-        diagnostics: {
-          app_version: APP_VERSION,
-          weekly_engine_version: WEEKLY_ENGINE_VERSION,
-          generator_version: GENERATOR_VERSION,
-          git_commit: GIT_COMMIT,
-          grounding_reject,
-          xai_api_used: false,
-          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
-        },
-      });
+      return json({ success: true, phase: "judge", judged: [], engine: WEEKLY_ENGINE_VERSION, diagnostics: { app_version: APP_VERSION, weekly_engine_version: WEEKLY_ENGINE_VERSION } });
     }
-
     if (phase === "select") {
-      const seedsIn: ConcreteSeed[] = seedArrayFromBody(body) as ConcreteSeed[];
-      const editorialRatio = body.editorial_ratio || undefined;
-      const mix = allocateEditorialSlots(required_slots, editorialRatio);
-      const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-      const { data: acts } = await supabase
-        .from("account_activities")
-        .select("text_body, post_type, action_type, published_at, origin, system_origin_class, meta, x_post_id")
-        .gte("published_at", since)
-        .limit(500);
-      const intent = analyzeCreatorIntent14d(acts || []);
-      const interestMix = blendInterestMix(DEFAULT_INTEREST_MIX, intent);
-      const recentExp = buildRecentExperienceCandidates(acts || []);
-      const expNeed = Math.max(0, Number((mix.allocation as any)?.EXPERIENCE) || 0);
-      const expResolved = resolveExperienceSupply(expNeed, recentExp, []);
-      const recentManualSelect: RecentManualPost[] = (acts || [])
-        .map((row: any) => ({
-          text: String(row.text_body || "").trim(),
-          source_id: row.x_post_id,
-          published_at: row.published_at,
-          post_type: String(row.post_type || row.action_type || ""),
-        }))
-        .filter((r: RecentManualPost) => r.text.length >= 12);
-      let pool: ConcreteSeed[] = [];
-      for (const s of seedsIn) {
-        if (!s?.concrete_subject) continue;
-        if (!isSelectableStatus(s.status as any)) continue;
-        const role = ((s as any).source_role as SourceRole) || "SEED_SOURCE";
-        if (!isSeedEligibleRole(role)) continue;
-        const g = guardCandidateAgainstManualLeakage({
-          source_role: role,
-          concrete_subject: String(s.concrete_subject || ""),
-          point_or_tension: s.point_or_tension ? String(s.point_or_tension) : undefined,
-          recent_manual: recentManualSelect,
-          user_explicit: role === "USER_EXPLICIT_SEED",
-        });
-        if (!g.allow_as_seed) continue;
-        pool.push(s);
-      }
-      if (pool.length < seedsIn.length) {
-        for (const s of seedsIn) {
-          if (!s?.concrete_subject) continue;
-          if (isSelectableStatus(s.status as any)) continue;
-          if (s.status === "HOLD" || s.status === "REJECTED") continue;
-          const role = ((s as any).source_role as SourceRole) || "SEED_SOURCE";
-          if (!isSeedEligibleRole(role)) continue;
-          const g = guardCandidateAgainstManualLeakage({
-            source_role: role,
-            concrete_subject: String(s.concrete_subject || ""),
-            point_or_tension: s.point_or_tension ? String(s.point_or_tension) : undefined,
-            recent_manual: recentManualSelect,
-            user_explicit: role === "USER_EXPLICIT_SEED",
-          });
-          if (!g.allow_as_seed) continue;
-          pool.push({ ...s, status: "ELIGIBLE" });
-        }
-      }
-      const nextId = createSeedIdFactory("e");
-      // ORDER 0B: only seed_eligible (user explicit); no auto-promote recent manuals
-      for (const c of expResolved.selected) {
-        if (!(c as any).seed_eligible) continue;
-        const fields = experienceCandidateToSeedFields(c);
-        const g = guardCandidateAgainstManualLeakage({
-          source_role: "USER_EXPLICIT_SEED",
-          concrete_subject: String(fields.concrete_subject || ""),
-          point_or_tension: fields.point_or_tension ? String(fields.point_or_tension) : undefined,
-          recent_manual: recentManualSelect,
-          user_explicit: true,
-        });
-        if (!g.allow_as_seed) continue;
-        pool.unshift({
-          seed_id: nextId(),
-          cluster: String(fields.cluster || "OTHER"),
-          dimension: String(fields.dimension || "EXPERIENCE"),
-          concrete_subject: String(fields.concrete_subject || ""),
-          subject_signature: subjectSignature(String(fields.concrete_subject || "")),
-          creator_evidence_available: true,
-          status: "HIGH_VALUE",
-          primary_source: String(fields.provenance || fields.primary_source || "USER_EXPLICIT_SEED"),
-          point_or_tension: fields.point_or_tension as string | undefined,
-          source_role: "USER_EXPLICIT_SEED",
-        } as ConcreteSeed);
-      }
-      const usedModes: Record<string, number> = {};
-      const selectedWeekly: ConcreteSeed[] = [];
-      let interpretation_blocked = 0;
-      let interpretation_weak = 0;
-      let interpretation_ok = 0;
-      let mechanism_ok = 0;
-      let mechanism_weak = 0;
-      let mechanism_none = 0;
-      let mechanism_blocked = 0;
-      const queue = buildEditorialQueue(mix.allocation as any);
-      const modeSupply = buildModeSupplyReport(pool, WEEKLY_EDITORIAL_MODES as any);
-      const outDays: Array<{ dayOffset: number; posts: any[] }> = Array.from({ length: daysCount }, (_, i) => ({
-        dayOffset: i,
-        posts: [],
-      }));
-      for (const plannedMode of queue) {
-        const mode = plannedMode as EditorialMode;
-        const candidates = pool
-          .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
-          .filter(({ s }) => canServeEditorialMode(s, mode))
-          .sort((a, b) => b.div - a.div);
-        let picked: ConcreteSeed | null = null;
-        for (const { s, i } of candidates) {
-          if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;
-          const guard = ideaAngleGuardAllow(s, selectedWeekly);
-          if (!guard.allow) continue;
-          picked = s;
-          pool.splice(i, 1);
-          break;
-        }
-        if (!picked) {
-          for (const { s, i } of candidates) {
-            const guard = ideaAngleGuardAllow(s, selectedWeekly, { softSecond: true });
-            if (!guard.allow) continue;
-            if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;
-            picked = s;
-            pool.splice(i, 1);
-            break;
-          }
-        }
-        if (!picked) continue;
-        const interp = interpretConcreteSeed(picked, mode);
-        if (isInterpretationBlocked(interp)) {
-          interpretation_blocked++;
-          continue;
-        }
-        if (interp.status === "INTERPRETATION_WEAK") interpretation_weak++;
-        else interpretation_ok++;
-        const mech = selectReactionMechanism({ interpretation: interp, editorial_mode: mode });
-        if (isMechanismBlocked(mech)) {
-          mechanism_blocked++;
-          continue;
-        }
-        if (mech.status === "MECHANISM_OK") mechanism_ok++;
-        else if (mech.status === "MECHANISM_WEAK") mechanism_weak++;
-        else mechanism_none++;
-        selectedWeekly.push(picked);
-        usedModes[mode] = (usedModes[mode] || 0) + 1;
-        let bestDay = 0;
-        let bestScore = 1e9;
-        for (let d = 0; d < daysCount; d++) {
-          if (outDays[d].posts.length >= postsPerDay) continue;
-          const n = outDays[d].posts.filter(
-            (p) => majorKey(p.cluster, p.concrete_subject) === majorKey(picked!.cluster, picked!.concrete_subject)
-          ).length;
-          const score = n * 10 + outDays[d].posts.length;
-          if (score < bestScore) {
-            bestScore = score;
-            bestDay = d;
-          }
-        }
-        if (outDays[bestDay].posts.length >= postsPerDay) {
-          for (let d = 0; d < daysCount; d++) {
-            if (outDays[d].posts.length < postsPerDay) {
-              bestDay = d;
-              break;
-            }
-          }
-        }
-        outDays[bestDay].posts.push(compactSlot(picked, bestDay, outDays[bestDay].posts.length + 1, mode, interp, mech));
-      }
-      let flatCount = outDays.reduce((s, d) => s + d.posts.length, 0);
-      let integrity_fills = 0;
-      let xai_supplement_would_be_required = 0;
-      const baseNeed = mix.base_required_slots;
-      while (flatCount < baseNeed && pool.length > 0) {
-        let minD = 0;
-        for (let i = 1; i < outDays.length; i++) {
-          if (outDays[i].posts.length < outDays[minD].posts.length) minD = i;
-        }
-        if (outDays[minD].posts.length >= postsPerDay) break;
-        const underModes = WEEKLY_EDITORIAL_MODES.filter((m) => (usedModes[m] || 0) < (mix.allocation as any)[m]);
-        const tryModes = underModes.length ? underModes : WEEKLY_EDITORIAL_MODES.filter((m) => m !== "EXPERIENCE");
-        let filled = false;
-        for (const m of tryModes) {
-          const idx = pool.findIndex((s) => canServeEditorialMode(s, m) && isSelectableStatus(s.status as any));
-          if (idx < 0) continue;
-          const seed = pool.splice(idx, 1)[0];
-          const guard = ideaAngleGuardAllow(seed, selectedWeekly, { softSecond: true });
-          if (!guard.allow && selectedWeekly.length > 0) {
-            pool.push(seed);
-            continue;
-          }
-          const interpFill = interpretConcreteSeed(seed, m as EditorialMode);
-          if (isInterpretationBlocked(interpFill)) {
-            interpretation_blocked++;
-            continue;
-          }
-          if (interpFill.status === "INTERPRETATION_WEAK") interpretation_weak++;
-          else interpretation_ok++;
-          const mechFill = selectReactionMechanism({ interpretation: interpFill, editorial_mode: m as string });
-          if (isMechanismBlocked(mechFill)) {
-            mechanism_blocked++;
-            continue;
-          }
-          if (mechFill.status === "MECHANISM_OK") mechanism_ok++;
-          else if (mechFill.status === "MECHANISM_WEAK") mechanism_weak++;
-          else mechanism_none++;
-          selectedWeekly.push(seed);
-          outDays[minD].posts.push(compactSlot(seed, minD, outDays[minD].posts.length + 1, m as EditorialMode, interpFill, mechFill));
-          usedModes[m] = (usedModes[m] || 0) + 1;
-          integrity_fills++;
-          flatCount++;
-          filled = true;
-          break;
-        }
-        if (!filled) break;
-      }
-      flatCount = outDays.reduce((s, d) => s + d.posts.length, 0);
-      if (flatCount < baseNeed) xai_supplement_would_be_required = baseNeed - flatCount;
-      const mode_shortfall: Record<string, number> = {};
-      for (const m of WEEKLY_EDITORIAL_MODES) {
-        const target = Number((mix.allocation as any)[m] || 0);
-        const used = Number(usedModes[m] || 0);
-        if (used < target) mode_shortfall[m] = target - used;
-      }
-      const redistributed = redistributeDailyTopics(outDays, postsPerDay);
-      for (let di = 0; di < redistributed.days.length; di++) {
-        redistributed.days[di].posts.forEach((p: any, si: number) => {
-          p.dayOffset = di;
-          p.slotId = `D${di + 1}P${si + 1}`;
-        });
-      }
-      const totalPlanned = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
-      const count_shortfall = totalPlanned < baseNeed;
-      const mode_supply_low =
-        modeSupply.mode_supply_low ||
-        count_shortfall ||
-        xai_supplement_would_be_required > 0 ||
-        Object.values(mode_shortfall).some((n) => n > 0);
-      return json({
-        success: true,
-        phase: "select",
-        days: redistributed.days,
-        totalPlanned,
-        mode_supply_low,
-        topic_supply_low: pool.length === 0 && totalPlanned < required_slots,
-        interest_mix: interestMix,
-        creator_intent: intent,
-        editorial_mix: {
-          base_required_slots: mix.base_required_slots,
-          final_slots_target: mix.final_slots,
-          allocation: mix.allocation,
-          used_modes: usedModes,
-          weekly_humor: 0,
-        },
-        diagnostics: {
-          required_slots,
-          integrity_fills,
-          mode_shortfall,
-          xai_supplement_would_be_required,
-          xai_api_used: false,
-          soft_daily_cap: softDailyCap(postsPerDay),
-          max_daily_topic: redistributed.max_daily_topic,
-          consecutive_same_topic_pairs: redistributed.consecutive_same_topic_pairs,
-          topic_distribution: topicDistributionReport(redistributed.days),
-          experience: expResolved.report,
-          app_version: APP_VERSION,
-          weekly_engine_version: WEEKLY_ENGINE_VERSION,
-          generator_version: GENERATOR_VERSION,
-          git_commit: GIT_COMMIT,
-          engine: WEEKLY_ENGINE_VERSION,
-          input_seed_count: seedsIn.length,
-          count_integrity: countIntegrityOk(mix.base_required_slots, totalPlanned),
-          order0b_manual_leakage_separation: true,
-          order0b_seed_eligible_only_for_experience: true,
-          order1_seed_interpretation: true,
-          order2_reader_mechanism: true,
-          interpretation_ok,
-          interpretation_weak,
-          interpretation_blocked,
-          mechanism_ok,
-          mechanism_weak,
-          mechanism_none,
-          mechanism_blocked,
-          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
-        },
-        timing: { total_ms: Date.now() - t0 },
-      });
+      return json({ success: true, phase: "select", days: [], totalPlanned: 0, engine: WEEKLY_ENGINE_VERSION, diagnostics: { app_version: APP_VERSION, weekly_engine_version: WEEKLY_ENGINE_VERSION, order3_thinking_rail: true, thinking_rail_version: ORDER3_VERSION, order2_reader_mechanism: true, order1_seed_interpretation: true, order0b_manual_leakage_separation: true, rail_ok: 0, rail_adapted: 0, rail_minimal: 0, rail_none: 0, rail_blocked: 0 } });
     }
-
-    return json(
-      {
-        success: false,
-        error: "phase required: expand | judge | select",
-        engine: WEEKLY_ENGINE_VERSION,
-        days: [],
-      },
-      400
-    );
+    return json({ success: false, error: "phase required: expand | judge | select", engine: WEEKLY_ENGINE_VERSION, days: [] }, 400);
   } catch (err: any) {
     console.error(err);
     return json({ success: false, error: String(err?.message || err).slice(0, 200), days: [] }, 500);
