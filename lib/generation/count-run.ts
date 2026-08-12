@@ -1,6 +1,6 @@
 /**
- * ORDER 0A / HOTFIX — 7-Day Generation Count Integrity
- * Canonical weekly target = Planner final allocation (not UI 7×6).
+ * ORDER 0A HOTFIX 2 — Strict count integrity
+ * PASS only when valid/persisted/visible >= canonical (not recovery_attempted).
  */
 
 export type StageCounts = {
@@ -20,8 +20,11 @@ export type CanonicalTargetSource =
   | "planner_total_planned_if_complete"
   | "ui_fallback";
 
+export type RunStatus = "SUCCESS" | "PARTIAL_FAILURE" | "FAILURE";
+
 export type GenerationRunReport = {
   run_id: string;
+  status: RunStatus;
   canonical_requested_slots: number;
   canonical_source: CanonicalTargetSource;
   planner_base_required_slots: number | null;
@@ -50,10 +53,17 @@ export type GenerationRunReport = {
   persistence_failures: number;
   valid_before_persist: number;
   persisted_success: number;
+  claimed_persisted_count: number;
+  actual_persisted_count: number;
   query_returned_count: number;
+  actual_visible_count: number;
+  hidden_count: number;
+  hidden_reasons: string[];
   unresolved_slots: number;
   final_db_count: number;
   final_visible_count: number;
+  failure_stage?: string;
+  failure_reasons: string[];
   stages: Record<string, Partial<StageCounts>>;
   unresolved_reasons: string[];
   complete: boolean;
@@ -118,19 +128,72 @@ export function shortfall(canonical: number, current: number): number {
   return Math.max(0, canonical - Math.max(0, current));
 }
 
+export function evaluateStrictSuccess(input: {
+  canonical: number;
+  valid: number;
+  actual_persisted: number;
+  actual_visible: number;
+}): {
+  status: RunStatus;
+  count_ok: boolean;
+  complete: boolean;
+  failure_stage?: string;
+  failure_reasons: string[];
+} {
+  const N = input.canonical;
+  const reasons: string[] = [];
+  let failure_stage: string | undefined;
+  if (input.valid < N) {
+    reasons.push(`VALID_BELOW:${input.valid}<${N}`);
+    failure_stage = failure_stage || "generation";
+  }
+  if (input.actual_persisted < N) {
+    reasons.push(`PERSISTED_BELOW:${input.actual_persisted}<${N}`);
+    failure_stage = failure_stage || "persistence";
+  }
+  if (input.actual_visible < N) {
+    reasons.push(`VISIBLE_BELOW:${input.actual_visible}<${N}`);
+    failure_stage = failure_stage || "queue";
+  }
+  if (reasons.length === 0) {
+    return { status: "SUCCESS", count_ok: true, complete: true, failure_reasons: [] };
+  }
+  const anyProgress =
+    input.valid > 0 || input.actual_persisted > 0 || input.actual_visible > 0;
+  return {
+    status: anyProgress ? "PARTIAL_FAILURE" : "FAILURE",
+    count_ok: false,
+    complete: false,
+    failure_stage,
+    failure_reasons: reasons,
+  };
+}
+
 export function finalizeRunReport(
-  partial: Omit<GenerationRunReport, "complete" | "count_ok" | "requested_slots"> & {
+  partial: Omit<
+    GenerationRunReport,
+    "complete" | "count_ok" | "requested_slots" | "status" | "failure_reasons"
+  > & {
     complete?: boolean;
     count_ok?: boolean;
     requested_slots?: number;
+    status?: RunStatus;
+    failure_reasons?: string[];
   }
 ): GenerationRunReport {
-  const requested = partial.canonical_requested_slots;
-  const integrity = countIntegrityOk(requested, partial.valid_drafts);
+  const strict = evaluateStrictSuccess({
+    canonical: partial.canonical_requested_slots,
+    valid: partial.valid_drafts,
+    actual_persisted: partial.actual_persisted_count,
+    actual_visible: partial.actual_visible_count,
+  });
   return {
     ...partial,
-    requested_slots: requested,
-    complete: partial.unresolved_slots === 0 && integrity.ok,
-    count_ok: integrity.ok,
+    requested_slots: partial.canonical_requested_slots,
+    status: strict.status,
+    complete: strict.complete,
+    count_ok: strict.count_ok,
+    failure_stage: strict.failure_stage || partial.failure_stage,
+    failure_reasons: [...(partial.failure_reasons || []), ...strict.failure_reasons],
   };
 }
