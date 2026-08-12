@@ -1,20 +1,14 @@
-name: ORDER1 materialize sources
+name: ORDER1 Materialize weekly-plan index
 on:
   workflow_dispatch:
   push:
     branches: [order1-seed-interpretation]
     paths:
-      - "tools/o1i.*"
-      - "tools/o1s.*"
-      - "tools/o1t.*"
-      - "tools/order1-assemble-gz.cjs"
-      - "tools/order1-materialize-*.cjs"
+      - "tools/order1-index-parts/**"
+      - "tools/order1-materialize-index.cjs"
       - ".github/workflows/order1-materialize-index.yml"
 permissions:
   contents: write
-concurrency:
-  group: order1-materialize-index
-  cancel-in-progress: true
 jobs:
   materialize:
     runs-on: ubuntu-latest
@@ -22,21 +16,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: order1-seed-interpretation
-          fetch-depth: 0
-      - name: Materialize
+      - name: Materialize index.ts from parts
+        run: node tools/order1-materialize-index.cjs
+      - name: Verify size and markers
         run: |
-          set -euo pipefail
-          node tools/order1-materialize-si.cjs
-          node tools/order1-materialize-test.cjs
-          node tools/order1-assemble-gz.cjs
-          node tools/order1-materialize-index.cjs
-          node tools/order1-seed-interpretation-test.mjs
-      - name: Commit
+          test -f supabase/functions/weekly-plan/index.ts
+          SIZE=$(wc -c < supabase/functions/weekly-plan/index.ts)
+          echo "size=$SIZE"
+          test "$SIZE" -eq 28952
+          grep -q "interpretSeed" supabase/functions/weekly-plan/index.ts
+          grep -q "guardCandidateAgainstManualLeakage" supabase/functions/weekly-plan/index.ts
+          grep -q "phased_v10_order1_seed_interpretation" supabase/functions/weekly-plan/index.ts
+          sha256sum supabase/functions/weekly-plan/index.ts
+      - name: Commit if changed
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add supabase/functions/weekly-plan/seed-interpretation.ts supabase/functions/weekly-plan/index.ts tools/order1-seed-interpretation-test.mjs || true
-          if git diff --staged --quiet; then echo "no changes"; exit 0; fi
-          git commit -m "ORDER 1: materialize seed-interpretation + index + tests"
-          git push origin HEAD:order1-seed-interpretation
+          git config user.name "order1-materialize-bot"
+          git config user.email "order1-materialize@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "ORDER1: restore full weekly-plan/index.ts from SOT parts (28952B sha256 c52b891d)"
+            git push origin HEAD:order1-seed-interpretation
+          fi
