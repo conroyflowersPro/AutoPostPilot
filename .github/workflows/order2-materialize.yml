@@ -1,0 +1,25 @@
+name: ORDER2 Materialize
+on:
+  workflow_dispatch:
+  push:
+    branches: [order2-reader-mechanism]
+    paths: ["tools/order2-parts/**","tools/order2-materialize.cjs","tools/order2-manifest.json",".github/workflows/order2-materialize.yml"]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: order2-reader-mechanism, fetch-depth: 0 }
+      - run: node tools/order2-materialize.cjs
+      - run: |
+          grep -q selectReactionMechanism supabase/functions/weekly-plan/index.ts
+          grep -q phased_v10_order2_reader_mechanism supabase/functions/weekly-plan/index.ts
+          grep -q M9_EVERYDAY_BLANK_FILLING supabase/functions/weekly-plan/reaction-mechanisms.ts
+          test "$(wc -c < supabase/functions/weekly-plan/index.ts)" -gt 20000
+      - run: |
+          git config user.name order2-bot
+          git config user.email order2@users.noreply.github.com
+          git add supabase/functions/weekly-plan/index.ts supabase/functions/weekly-plan/reader-self-projection.ts supabase/functions/weekly-plan/reaction-mechanisms.ts tools/order2-reader-mechanism-test.mjs
+          git diff --cached --quiet || (git commit -m "ORDER2: materialize production modules" && git push origin HEAD:order2-reader-mechanism)
