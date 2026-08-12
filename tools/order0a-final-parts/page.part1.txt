@@ -1,0 +1,286 @@
+"use client";
+
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
+import {
+  newRunId,
+  finalizeRunReport,
+  buildCanonicalTarget,
+  type GenerationRunReport,
+} from "@/lib/generation/count-run";
+import { countQueueEligible } from "@/lib/generation/queue-eligibility";
+
+/** Request params for Planner only — NOT the run success target. */
+const GENERATION_DAYS = 7;
+const JUDGE_BATCH = 8;
+
+type LafcMatch = { match_date: string; opponent: string; home_or_away?: string; venue?: string };
+
+async function readJson(res: Response) {
+  const rawText = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(`서버 응답 오류 (${res.status}): ${rawText.slice(0, 120) || "타임아웃/비JSON"}`);
+  }
+  if (!res.ok) {
+    throw new Error(
+      data.detail
+        ? `${data.error || "요청 실패"}: ${String(data.detail).slice(0, 200)}`
+        : data.error || `요청 실패 (${res.status})`
+    );
+  }
+  return data;
+}
+
+function pickSeeds(part: any): any[] {
+  if (Array.isArray(part?.gated_seeds) && part.gated_seeds.length) return part.gated_seeds;
+  if (Array.isArray(part?.candidates) && part.candidates.length) return part.candidates;
+  if (Array.isArray(part?.seeds) && part.seeds.length) return part.seeds;
+  if (Array.isArray(part?.gated_seeds)) return part.gated_seeds;
+  if (Array.isArray(part?.candidates)) return part.candidates;
+  if (Array.isArray(part?.seeds)) return part.seeds;
+  return [];
+}
+
+function GeneratePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const startParam = searchParams.get("start") || "";
+  const [startDate, setStartDate] = useState(startParam || new Date().toISOString().slice(0, 10));
+  const [topic, setTopic] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState("");
+  const [error, setError] = useState("");
+  const [doneCount, setDoneCount] = useState(0);
+  const [planSummary, setPlanSummary] = useState("");
+  const [lafcMatches, setLafcMatches] = useState<LafcMatch[]>([]);
+  const [lafcDate, setLafcDate] = useState("");
+  const [lafcOpponent, setLafcOpponent] = useState("");
+  const [lafcHome, setLafcHome] = useState<"HOME" | "AWAY" | "UNKNOWN">("UNKNOWN");
+  const [lastReport, setLastReport] = useState<GenerationRunReport | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (startParam) setStartDate(startParam);
+  }, [startParam]);
+
+  function addLafcMatch() {
+    if (!lafcDate || !lafcOpponent.trim()) return;
+    setLafcMatches((prev) => [
+      ...prev,
+      {
+        match_date: lafcDate,
+        opponent: lafcOpponent.trim(),
+        home_or_away: lafcHome,
+        venue: lafcHome === "HOME" ? "BMO" : undefined,
+      },
+    ]);
+    setLafcDate("");
+    setLafcOpponent("");
+    setLafcHome("UNKNOWN");
+  }
+
+  async function edgeCall(session: any, body: Record<string, unknown>) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
+    const res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+      },
+      body: JSON.stringify(body),
+    });
+    return readJson(res);
+  }
+
+  async function runPlanAndGenerate() {
+    setBusy(true);
+    setError("");
+    setDoneCount(0);
+    setPlanSummary("");
+    setLastReport(null);
+    const runId = newRunId();
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("로그인이 필요합니다.");
+
+      setPhase("최근 21일 발행·예약 주제 조회…");
+      let publishedTopics21d: string[] = [];
+      let scheduledTopics: string[] = [];
+      try {
+        const since = new Date();
+        since.setDate(since.getDate() - 21);
+        const sinceIso = since.toISOString();
+        let published: any[] | null = null;
+        const q1 = await supabase
+          .from("SeungContent")
+          .select("content, final_text, topic, published_at, created_at")
+          .eq("status", "published")
+          .gte("published_at", sinceIso)
+          .order("published_at", { ascending: false })
+          .limit(80);
+        if (!q1.error && q1.data) published = q1.data;
+        else {
+          const q2 = await supabase
+            .from("SeungContent")
+            .select("content, final_text, topic, created_at")
+            .eq("status", "published")
+            .gte("created_at", sinceIso)
+            .order("created_at", { ascending: false })
+            .limit(80);
+          published = q2.data || [];
+        }
+        publishedTopics21d = (published || [])
+          .map((r: any) => String(r.topic || r.content || r.final_text || "").slice(0, 100))
+          .filter(Boolean);
+        const { data: scheduled } = await supabase
+          .from("SeungContent")
+          .select("content, final_text, topic")
+          .eq("status", "scheduled")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        scheduledTopics = (scheduled || [])
+          .map((r: any) => String(r.topic || r.content || r.final_text || "").slice(0, 100))
+          .filter(Boolean);
+      } catch {}
+
+      const base = {
+        generationDays: GENERATION_DAYS,
+        postsPerDay: 6,
+        startDate,
+        topic: topic.trim() || undefined,
+        creatorIntent: topic.trim() || undefined,
+        publishedTopics21d,
+        publishedTopics: publishedTopics21d,
+        scheduledTopics,
+        lafc_matches: lafcMatches,
+        expand_with_xai: true,
+        allow_xai_enrich: true,
+        run_id: runId,
+      };
+
+      const allGated: any[] = [];
+      let priorSubjects: string[] = [];
+      let idCounter = 0;
+      let dimBatch = 0;
+      let dimTotal = 1;
+      let expandDone = false;
+      let lastExpandDiag: any = null;
+      while (!expandDone) {
+        setPhase(`Seed Expand ${dimBatch + 1}/${dimTotal}…`);
+        const part = await edgeCall(session, {
+          ...base,
+          phase: "expand",
+          dim_batch_index: dimBatch,
+          prior_subjects: priorSubjects,
+          id_counter: idCounter,
+          expand_with_xai: true,
+          allow_xai_enrich: true,
+        });
+        if (!part.success) {
+          throw new Error(part.detail || part.error || `Expand ${dimBatch + 1} 실패`);
+        }
+        lastExpandDiag = part;
+        dimTotal = Number(part.dim_batch_total) || dimTotal;
+        const seeds = pickSeeds(part);
+        allGated.push(...seeds);
+        for (const s of seeds) {
+          if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
+        }
+        priorSubjects = priorSubjects.slice(-40);
+        idCounter = Number(part.id_counter) || idCounter + seeds.length;
+        expandDone = part.expand_done !== false;
+        dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
+        if (dimBatch > 40) break;
+        if (part.expand_done === true && dimTotal <= 1) break;
+      }
+
+      if (allGated.length === 0) {
+        const d = lastExpandDiag || {};
+        const bits = [
+          `Expand 시드 0개`,
+          d.xai_api_used === true ? `xai_api_used=true` : `xai_api_used=${String(d.xai_api_used)}`,
+          d.xai_error ? `xai_error=${String(d.xai_error)}` : null,
+          d.seed_count != null ? `seed_count=${d.seed_count}` : null,
+          d.engine ? `engine=${d.engine}` : null,
+          d.note ? `note=${String(d.note).slice(0, 80)}` : null,
+        ].filter(Boolean);
+        throw new Error(bits.join(" · "));
+      }
+
+      const allJudged: any[] = [];
+      for (let i = 0; i < allGated.length; i += JUDGE_BATCH) {
+        const batch = allGated.slice(i, i + JUDGE_BATCH);
+        const bi = Math.floor(i / JUDGE_BATCH) + 1;
+        const bt = Math.ceil(allGated.length / JUDGE_BATCH) || 1;
+        setPhase(`Semantic Judge ${bi}/${bt}…`);
+        const part = await edgeCall(session, {
+          ...base,
+          phase: "judge",
+          seeds: batch,
+          candidates: batch,
+        });
+        if (!part.success) {
+          throw new Error(part.detail || part.error || `Judge ${bi} 실패`);
+        }
+        const judged = Array.isArray(part.judged) ? part.judged : batch;
+        allJudged.push(...judged);
+      }
+
+      setPhase("Weekly Select…");
+      const planData = await edgeCall(session, {
+        ...base,
+        phase: "select",
+        seeds: allJudged,
+        candidates: allJudged,
+      });
+      if (!planData.success || !Array.isArray(planData.days) || planData.days.length === 0) {
+        throw new Error(planData.detail || planData.error || "Select 결과가 비어 있습니다.");
+      }
+
+      const mergedDays = [...planData.days].sort(
+        (a: any, b: any) => (a.dayOffset ?? 0) - (b.dayOffset ?? 0)
+      );
+      const lines = mergedDays.map((d: any) => {
+        const topics = (d.posts || [])
+          .map((p: any) => p.primaryTopic || p.concrete_subject)
+          .join(", ");
+        return `D${(d.dayOffset ?? 0) + 1}  ${d.posts?.length || 0}개  ${topics}`;
+      });
+      const totalPlanned = mergedDays.reduce((s: number, d: any) => s + (d.posts?.length || 0), 0);
+
+      // ORDER 0A: Planner SOT canonical target (not UI fixed 7×6)
+      const plannerFinal =
+        Number(planData.editorial_mix?.final_slots_target) ||
+        Number(planData.editorial_mix?.base_required_slots) ||
+        totalPlanned;
+      const baseRequired =
+        Number(planData.editorial_mix?.base_required_slots) || plannerFinal;
+      const canonicalTarget = buildCanonicalTarget({
+        planner_final_slots: plannerFinal,
+        base_required: baseRequired,
+        generation_days: GENERATION_DAYS,
+        request_posts_per_day: 6,
+      });
+      const canonical_requested_slots = canonicalTarget.canonical_requested_slots;
+
+      setPlanSummary(
+        [
+          `run_id: ${runId}`,
+          `canonical_min: ${canonicalTarget.canonical_minimum} · requested: ${canonical_requested_slots}`,
+          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned}`,
+          planData.mode_supply_low ? "MODE_SUPPLY_LOW" : "",
+          planData.topic_supply_low ? "TOPIC_SUPPLY_LOW" : "",
+          ...lines,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
