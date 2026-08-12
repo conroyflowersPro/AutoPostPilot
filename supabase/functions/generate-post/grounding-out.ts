@@ -1,4 +1,4 @@
-/** ORDER 3+4 hotfix — post-generation grounding evaluation */
+/** stages + reaction + everyday + contextual + reader-story judge */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -38,6 +38,28 @@ export function buildGroundedPostsOut(
       primaryTopic: slot.primaryTopic || slot.concrete_subject,
       editorial_mode: slot.editorial_mode,
       length_mode: slot.length_mode,
+      core_thought: p.core_thought ?? null,
+      thinking_rail: p.thinking_rail ?? null,
+      audience_translation: p.audience_translation ?? null,
+      reaction_mechanism: p.reaction_mechanism ?? null,
+      reaction_reason: p.reaction_reason ?? null,
+      everyday_language_clear: p.everyday_language_clear ?? null,
+      everyday_rewrite_note: p.everyday_rewrite_note ?? null,
+      style_register: p.style_register ?? null,
+      style_reason: p.style_reason ?? null,
+      self_disclosure_used: p.self_disclosure_used ?? false,
+      natural_humor_present: p.natural_humor_present ?? false,
+      natural_humor_fit: p.natural_humor_fit ?? "N/A",
+      writing_density: p.writing_density ?? null,
+      ai_tone_risk: p.ai_tone_risk ?? "UNKNOWN",
+      unnecessary_length: p.unnecessary_length ?? false,
+      reader_story_score: p.reader_story_score ?? null,
+      reader_story_pass: p.reader_story_pass ?? null,
+      reader_story_invitation: p.reader_story_invitation ?? null,
+      participation_barrier: p.participation_barrier ?? null,
+      mechanism_repetition_risk: p.mechanism_repetition_risk ?? null,
+      style_repetition_risk: p.style_repetition_risk ?? null,
+      reader_story_notes: p.reader_story_notes ?? null,
       claim_types: slot.claim_types || [],
       grounding_status: slot.grounding_status,
       grounding_reasons: slot.grounding_reasons || [],
