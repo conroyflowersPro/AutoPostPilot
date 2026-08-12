@@ -1,4 +1,4 @@
-/** ORDER 3+4 + stages + ORDER2 density + v10 reaction mechanism */
+/** ORDER 3+4 + stages + reaction + everyday language + density */
 import { scoreVocabularyFidelity, detectUnsupportedAdditions } from "./vocabulary-fidelity.ts";
 import { getCreatorStyle } from "./creator-style-data.ts";
 
@@ -43,6 +43,8 @@ export function buildGroundedPostsOut(
       audience_translation: p.audience_translation ?? null,
       reaction_mechanism: p.reaction_mechanism ?? null,
       reaction_reason: p.reaction_reason ?? null,
+      everyday_language_clear: p.everyday_language_clear ?? null,
+      everyday_rewrite_note: p.everyday_rewrite_note ?? null,
       natural_humor_present: p.natural_humor_present ?? false,
       natural_humor_fit: p.natural_humor_fit ?? "N/A",
       writing_density: p.writing_density ?? null,
