@@ -1,10 +1,10 @@
 /**
- * Materialize full weekly-plan/index.ts from gzip+b64 parts.
- * Run in GitHub Actions on order1-seed-interpretation branch.
+ * Materialize full weekly-plan/index.ts from gzip+b64 p*.b64 parts.
  */
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
+const crypto = require("crypto");
 
 const ROOT = path.join(__dirname, "..");
 const PARTS_DIR = path.join(ROOT, "tools", "order1-index-parts");
@@ -19,10 +19,10 @@ function main() {
   }
   const parts = fs
     .readdirSync(PARTS_DIR)
-    .filter((f) => f.endsWith(".b64"))
+    .filter((f) => /^p\d+\.b64$/.test(f))
     .sort();
-  if (parts.length === 0) {
-    console.error("no parts");
+  if (parts.length < 13) {
+    console.error("expected 13 pXX.b64 parts, got", parts.length, parts);
     process.exit(1);
   }
   const b64 = parts.map((f) => fs.readFileSync(path.join(PARTS_DIR, f), "utf8").trim()).join("");
@@ -31,7 +31,6 @@ function main() {
     console.error("size mismatch", buf.length, "expected", EXPECTED_SIZE);
     process.exit(1);
   }
-  const crypto = require("crypto");
   const sha = crypto.createHash("sha256").update(buf).digest("hex");
   if (sha !== EXPECTED_SHA256) {
     console.error("sha256 mismatch", sha, "expected", EXPECTED_SHA256);
@@ -39,7 +38,7 @@ function main() {
   }
   fs.mkdirSync(path.dirname(TARGET), { recursive: true });
   fs.writeFileSync(TARGET, buf);
-  console.log("OK wrote", TARGET, "size", buf.length, "sha256", sha);
+  console.log("OK wrote", TARGET, "size", buf.length, "sha256", sha, "parts", parts.length);
 }
 
 main();
