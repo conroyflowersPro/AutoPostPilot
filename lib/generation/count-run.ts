@@ -1,7 +1,15 @@
 /**
- * ORDER 0A HOTFIX 2 — Strict count integrity
- * PASS only when valid/persisted/visible >= canonical (not recovery_attempted).
+ * ORDER 0A HOTFIX 3 — Strict count integrity + Planner canonical target consumption.
  */
+
+import {
+  buildCanonicalTarget,
+  type CanonicalTarget,
+  type CanonicalTargetSource,
+} from "./canonical-target";
+
+export type { CanonicalTarget, CanonicalTargetSource };
+export { buildCanonicalTarget };
 
 export type StageCounts = {
   expected_count: number;
@@ -14,18 +22,14 @@ export type StageCounts = {
   delta?: number;
 };
 
-export type CanonicalTargetSource =
-  | "planner_final_slots"
-  | "planner_base_required"
-  | "planner_total_planned_if_complete"
-  | "ui_fallback";
-
 export type RunStatus = "SUCCESS" | "PARTIAL_FAILURE" | "FAILURE";
 
 export type GenerationRunReport = {
   run_id: string;
   status: RunStatus;
   canonical_requested_slots: number;
+  canonical_minimum: number;
+  canonical_maximum: number;
   canonical_source: CanonicalTargetSource;
   planner_base_required_slots: number | null;
   planner_final_target: number | null;
@@ -95,6 +99,7 @@ export function countIntegrityOk(requested: number, finalValid: number): {
   return { ok: true, reason: "OK" };
 }
 
+/** @deprecated use buildCanonicalTarget */
 export function resolveCanonicalTarget(input: {
   planner_final_slots?: number | null;
   planner_base_required?: number | null;
@@ -105,23 +110,17 @@ export function resolveCanonicalTarget(input: {
   canonical_requested_slots: number;
   canonical_source: CanonicalTargetSource;
 } {
-  const finalSlots = Number(input.planner_final_slots);
-  if (Number.isFinite(finalSlots) && finalSlots > 0) {
-    return { canonical_requested_slots: finalSlots, canonical_source: "planner_final_slots" };
-  }
-  const base = Number(input.planner_base_required);
-  if (Number.isFinite(base) && base > 0) {
-    return { canonical_requested_slots: base, canonical_source: "planner_base_required" };
-  }
-  const planned = Number(input.total_planned);
-  if (input.count_ok === true && Number.isFinite(planned) && planned > 0) {
-    return {
-      canonical_requested_slots: planned,
-      canonical_source: "planner_total_planned_if_complete",
-    };
-  }
-  const ui = Math.max(1, Number(input.ui_requested_slots) || 1);
-  return { canonical_requested_slots: ui, canonical_source: "ui_fallback" };
+  const t = buildCanonicalTarget({
+    planner_final_slots: input.planner_final_slots,
+    planner_base_required: input.planner_base_required,
+    total_planned: input.total_planned,
+    count_ok: input.count_ok,
+    request_fallback_slots: input.ui_requested_slots,
+  });
+  return {
+    canonical_requested_slots: t.canonical_minimum,
+    canonical_source: t.target_source,
+  };
 }
 
 export function shortfall(canonical: number, current: number): number {
@@ -181,15 +180,19 @@ export function finalizeRunReport(
     failure_reasons?: string[];
   }
 ): GenerationRunReport {
+  const min = partial.canonical_minimum ?? partial.canonical_requested_slots;
   const strict = evaluateStrictSuccess({
-    canonical: partial.canonical_requested_slots,
+    canonical: min,
     valid: partial.valid_drafts,
     actual_persisted: partial.actual_persisted_count,
     actual_visible: partial.actual_visible_count,
   });
   return {
     ...partial,
-    requested_slots: partial.canonical_requested_slots,
+    canonical_requested_slots: min,
+    canonical_minimum: min,
+    canonical_maximum: partial.canonical_maximum ?? min + 1,
+    requested_slots: min,
     status: strict.status,
     complete: strict.complete,
     count_ok: strict.count_ok,
