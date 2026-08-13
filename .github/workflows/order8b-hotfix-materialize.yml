@@ -1,0 +1,35 @@
+name: ORDER8B HOTFIX Materialize
+on:
+  push:
+    branches: [order8b-hotfix-selective-upstream-recompute]
+    paths:
+      - 'tools/order8b-hotfix-selective-recompute-test.mjs'
+      - 'tools/order8b-wire-hotfix-index.mjs'
+      - 'tools/order8b-hotfix-sel.b64'
+      - '.github/workflows/order8b-hotfix-materialize.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8b-hotfix-selective-upstream-recompute
+      - name: Decode selective-regeneration.ts
+        run: |
+          base64 -d tools/order8b-hotfix-sel.b64 | gunzip > supabase/functions/weekly-plan/selective-regeneration.ts
+          wc -c supabase/functions/weekly-plan/selective-regeneration.ts
+          grep -c executeSelectiveRegeneration supabase/functions/weekly-plan/selective-regeneration.ts
+      - name: Wire index
+        run: node tools/order8b-wire-hotfix-index.mjs
+      - name: Commit
+        run: |
+          git config user.name conroyflowersPro
+          git config user.email conroyf12@gmail.com
+          git add supabase/functions/weekly-plan/selective-regeneration.ts supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "ORDER 8B HOTFIX: materialize selective upstream recompute + index wire"
+            git push origin order8b-hotfix-selective-upstream-recompute
+          fi
