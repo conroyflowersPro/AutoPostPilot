@@ -3,7 +3,7 @@ on:
   push:
     branches: [order7c-generation-integration-hardening]
     paths:
-      - 'tools/order7c-index.patch'
+      - 'tools/order7c-wire-index.mjs'
       - '.github/workflows/order7c-materialize.yml'
   workflow_dispatch:
 jobs:
@@ -16,9 +16,9 @@ jobs:
         with:
           ref: order7c-generation-integration-hardening
           fetch-depth: 1
-      - name: Apply ORDER 7C index patch
+      - name: Wire ORDER 7C into index.ts
         run: |
-          patch -p1 < tools/order7c-index.patch
+          node tools/order7c-wire-index.mjs
           grep -q integrateSlotGeneration supabase/functions/weekly-plan/index.ts
           grep -q completion_gate_final supabase/functions/weekly-plan/index.ts
           grep -q ORDER7C_VERSION supabase/functions/weekly-plan/index.ts
