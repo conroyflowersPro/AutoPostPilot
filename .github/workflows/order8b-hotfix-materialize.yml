@@ -1,16 +1,14 @@
-name: ORDER8B HOTFIX Materialize
+name: order8b-hotfix-materialize
 on:
+  workflow_dispatch:
   push:
     branches: [order8b-hotfix-selective-upstream-recompute]
     paths:
-      - 'tools/order8b-hotfix-selts.*'
-      - 'tools/order8b-assemble-sel.mjs'
-      - 'tools/order8b-wire-hotfix-index.mjs'
-      - 'tools/order8b-hotfix-selective-recompute-test.mjs'
-      - '.github/workflows/order8b-hotfix-materialize.yml'
-  workflow_dispatch:
+      - "tools/order8b-wire-hotfix-index.mjs"
+      - "supabase/functions/weekly-plan/selective-regeneration.ts"
+      - "tools/order8b-hotfix-selective-recompute-test.mjs"
 jobs:
-  materialize:
+  wire-and-verify:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,21 +16,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: order8b-hotfix-selective-upstream-recompute
-      - name: Assemble selective-regeneration.ts
-        run: node tools/order8b-assemble-sel.mjs
-      - name: Wire index
+      - name: Wire index (surgical)
         run: node tools/order8b-wire-hotfix-index.mjs
-      - name: Run structural tests
+      - name: Verify selective module
         run: |
-          ROUTER_MOD=supabase/functions/weekly-plan/regeneration-router.ts \
-          SEL_MOD=supabase/functions/weekly-plan/selective-regeneration.ts \
-          node tools/order8b-hotfix-selective-recompute-test.mjs
-      - name: Commit
+          test -f supabase/functions/weekly-plan/selective-regeneration.ts
+          grep -q executeSelectiveRegeneration supabase/functions/weekly-plan/selective-regeneration.ts
+          grep -q ORDER8B_HOTFIX_VERSION supabase/functions/weekly-plan/selective-regeneration.ts
+          grep -q selectReactionMechanism supabase/functions/weekly-plan/selective-regeneration.ts
+          ! grep -q PLACEHOLDER supabase/functions/weekly-plan/selective-regeneration.ts
+          wc -c supabase/functions/weekly-plan/selective-regeneration.ts
+          sha256sum supabase/functions/weekly-plan/selective-regeneration.ts
+      - name: Verify index wire
         run: |
-          git config user.name conroyflowersPro
-          git config user.email conroyf12@gmail.com
-          git add supabase/functions/weekly-plan/selective-regeneration.ts supabase/functions/weekly-plan/index.ts || true
-          if git diff --cached --quiet; then echo No changes; else
-            git commit -m "ORDER 8B HOTFIX: materialize selective upstream recompute + index wire"
-            git push origin order8b-hotfix-selective-upstream-recompute
+          grep -q 'from "./selective-regeneration.ts"' supabase/functions/weekly-plan/index.ts
+          grep -q executeSelectiveRegeneration supabase/functions/weekly-plan/index.ts
+          grep -q snapshotFromSlotParts supabase/functions/weekly-plan/index.ts
+          grep -q '10.0.0-order8b-hotfix-selective-recompute' supabase/functions/weekly-plan/index.ts
+          grep -q 'phased_v10_order8b_hotfix_selective_recompute' supabase/functions/weekly-plan/index.ts
+          grep -q order8b_hotfix_version supabase/functions/weekly-plan/index.ts
+          wc -c supabase/functions/weekly-plan/index.ts
+          sha256sum supabase/functions/weekly-plan/index.ts
+      - name: Run tests
+        run: node tools/order8b-hotfix-selective-recompute-test.mjs
+      - name: Commit wired index if changed
+        run: |
+          git config user.name "order8b-hotfix-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/index.ts supabase/functions/weekly-plan/ORDER8B_HOTFIX_STATUS.md || true
+          if git diff --cached --quiet; then
+            echo "NO_INDEX_CHANGES"
+          else
+            git commit -m "ORDER 8B HOTFIX: wire selective-regeneration into weekly-plan index (canonical)"
+            git push
           fi
