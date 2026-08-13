@@ -1,0 +1,29 @@
+--- a/supabase/functions/weekly-plan/index.ts
++++ b/supabase/functions/weekly-plan/index.ts
+@@ -88,19 +88,25 @@
+   decideCreatorStyle,
+   ORDER6A_VERSION,
+   ORDER6B_STYLE_VERSION,
+   ORDER6C_STYLE_VERSION,
+   type CreatorStyleDecision,
+ } from "./creator-style-decision.ts";
+ import {
+   decideNaturalHumor,
+   ORDER6B_HUMOR_VERSION,
+   ORDER6C_HUMOR_VERSION,
+   type NaturalHumorDecision,
+ } from "./natural-humor-decision.ts";
++import {
++  buildDeepGenerationContext,
++  ORDER7A_VERSION,
++  type DeepGenerationContext,
++} from "./deep-generation-context.ts";
+ 
+ const POSTS_MIN = 5;
+ const POSTS_MAX = 8;
+ const POSTS_TARGET = 6;
+-const APP_VERSION = "10.0.0-order6c";
+-const WEEKLY_ENGINE_VERSION = "phased_v10_order6c_style_humor_hardened";
++const APP_VERSION = "10.0.0-order7a";
++const WEEKLY_ENGINE_VERSION = "phased_v10_order7a_deep_generation";
+ const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";

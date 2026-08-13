@@ -1,0 +1,35 @@
+name: ORDER7A materialize index
+on:
+  push:
+    branches: [order7a-deep-generation-context]
+    paths:
+      - "tools/order7a-index.patch"
+      - ".github/workflows/order7a-materialize.yml"
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order7a-deep-generation-context
+      - name: Apply index patch
+        run: |
+          set -e
+          if grep -q 'order7a_deep_generation' supabase/functions/weekly-plan/index.ts; then
+            echo already
+          else
+            patch -p1 --forward < tools/order7a-index.patch
+          fi
+          grep -n 'order7a\|10.0.0-order7a\|buildDeepGenerationContext' supabase/functions/weekly-plan/index.ts | head
+          wc -c supabase/functions/weekly-plan/index.ts
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo no changes; else
+            git commit -m "ORDER7A: materialize deep generation context wiring"
+            git push
+          fi
