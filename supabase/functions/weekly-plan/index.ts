@@ -6,6 +6,7 @@
  * ORDER 1: Independent Seed Interpretation Layer wired into select/compactSlot.
  * ORDER 2: Reader Self-Projection + Reaction Mechanism selection after interpretation.
  * ORDER 3: Thinking Rail Runtime after Reaction Mechanism (no topic→rail, style null).
+ * ORDER 5B: Everyday Language Decision after Thinking Rail (operational pipeline).
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -74,12 +75,20 @@ import {
   type ThinkingRailDecision,
   ORDER3_VERSION,
 } from "./thinking-rail-runtime.ts";
+import {
+  decideEverydayLanguage,
+  isEverydayLanguagePassable,
+  isPrecisionBlocked,
+  type EverydayLanguageDecision,
+  ORDER5A_VERSION,
+  ORDER5B_VERSION,
+} from "./everyday-language-reasoning.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order3";
-const WEEKLY_ENGINE_VERSION = "phased_v10_order3_thinking_rail";
+const APP_VERSION = "10.0.0-order5b";
+const WEEKLY_ENGINE_VERSION = "phased_v10_order5b_everyday_language";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -128,6 +137,7 @@ function compactSlot(
   interpretation?: SeedInterpretation | null,
   mechanism?: MechanismSelectionResult | null,
   rail?: ThinkingRailDecision | null,
+  language?: EverydayLanguageDecision | null,
 ) {
   const seed_interpretation = interpretation || interpretConcreteSeed(seed, mode);
   const reaction_mechanism =
@@ -139,6 +149,17 @@ function compactSlot(
       interpretation: seed_interpretation,
       mechanism: reaction_mechanism,
       editorial_mode: mode,
+    });
+  const everyday_language =
+    language ||
+    decideEverydayLanguage({
+      interpretation: seed_interpretation,
+      editorial_mode: mode,
+      thinking_rail: {
+        compression_preference: thinking_rail.compression_preference,
+        preserve_reader_entry: true,
+        status: thinking_rail.status,
+      },
     });
   return {
     slotId: `D${dayOffset + 1}P${slot}`,
@@ -191,6 +212,17 @@ function compactSlot(
     long_horizon_allowed: thinking_rail.long_horizon_allowed,
     experience_required_by_rail: thinking_rail.experience_required,
     rail_compression: thinking_rail.compression_preference,
+    everyday_language,
+    language_status: everyday_language.status,
+    reader_entry_strategy: everyday_language.reader_entry_strategy,
+    human_relevance_bridge: everyday_language.human_relevance_bridge,
+    minimal_context_sufficient: everyday_language.minimal_context_sufficient,
+    compression_preference_lang: everyday_language.compression_preference,
+    precision_conflict: everyday_language.precision_conflict,
+    attention_relevance_ok: everyday_language.attention_relevance_ok,
+    sensationalism_blocked: everyday_language.sensationalism_blocked,
+    self_projection_preservation: everyday_language.self_projection_preservation,
+    order5b_version: ORDER5B_VERSION,
     style_decision: null,
   };
 }
@@ -528,6 +560,11 @@ Deno.serve(async (req) => {
       let rail_minimal = 0;
       let rail_none = 0;
       let rail_blocked = 0;
+      let language_ok = 0;
+      let language_translation = 0;
+      let language_precision = 0;
+      let language_other = 0;
+
       const queue = buildEditorialQueue(mix.allocation as any);
       const modeSupply = buildModeSupplyReport(pool, WEEKLY_EDITORIAL_MODES as any);
       const outDays: Array<{ dayOffset: number; posts: any[] }> = Array.from({ length: daysCount }, (_, i) => ({
@@ -588,6 +625,19 @@ Deno.serve(async (req) => {
         else if (rail.status === "RAIL_ADAPTED") rail_adapted++;
         else if (rail.status === "RAIL_MINIMAL" || rail.status === "RAIL_DERIVED") rail_minimal++;
         else if (rail.status === "RAIL_NONE") rail_none++;
+        const lang = decideEverydayLanguage({
+          interpretation: interp,
+          editorial_mode: mode,
+          thinking_rail: {
+            compression_preference: rail.compression_preference,
+            preserve_reader_entry: true,
+            status: rail.status,
+          },
+        });
+        if (lang.status === "LANGUAGE_OK" || lang.status === "NO_TRANSLATION_NEEDED" || lang.status === "LOW_BARRIER_READY") language_ok++;
+        else if (lang.status === "TRANSLATION_NEEDED") language_translation++;
+        else if (lang.status === "PRECISION_CONFLICT") language_precision++;
+        else language_other++;
         selectedWeekly.push(picked);
         usedModes[mode] = (usedModes[mode] || 0) + 1;
         let bestDay = 0;
@@ -611,7 +661,7 @@ Deno.serve(async (req) => {
             }
           }
         }
-        outDays[bestDay].posts.push(compactSlot(picked, bestDay, outDays[bestDay].posts.length + 1, mode, interp, mech, rail));
+        outDays[bestDay].posts.push(compactSlot(picked, bestDay, outDays[bestDay].posts.length + 1, mode, interp, mech, rail, lang));
       }
       let flatCount = outDays.reduce((s, d) => s + d.posts.length, 0);
       let integrity_fills = 0;
@@ -663,8 +713,21 @@ Deno.serve(async (req) => {
           else if (railFill.status === "RAIL_ADAPTED") rail_adapted++;
           else if (railFill.status === "RAIL_MINIMAL" || railFill.status === "RAIL_DERIVED") rail_minimal++;
           else if (railFill.status === "RAIL_NONE") rail_none++;
+          const langFill = decideEverydayLanguage({
+            interpretation: interpFill,
+            editorial_mode: m as string,
+            thinking_rail: {
+              compression_preference: railFill.compression_preference,
+              preserve_reader_entry: true,
+              status: railFill.status,
+            },
+          });
+          if (langFill.status === "LANGUAGE_OK" || langFill.status === "NO_TRANSLATION_NEEDED" || langFill.status === "LOW_BARRIER_READY") language_ok++;
+          else if (langFill.status === "TRANSLATION_NEEDED") language_translation++;
+          else if (langFill.status === "PRECISION_CONFLICT") language_precision++;
+          else language_other++;
           selectedWeekly.push(seed);
-          outDays[minD].posts.push(compactSlot(seed, minD, outDays[minD].posts.length + 1, m as EditorialMode, interpFill, mechFill, railFill));
+          outDays[minD].posts.push(compactSlot(seed, minD, outDays[minD].posts.length + 1, m as EditorialMode, interpFill, mechFill, railFill, langFill));
           usedModes[m] = (usedModes[m] || 0) + 1;
           integrity_fills++;
           flatCount++;
@@ -735,6 +798,9 @@ Deno.serve(async (req) => {
           order2_reader_mechanism: true,
           order3_thinking_rail: true,
           thinking_rail_version: ORDER3_VERSION,
+          order5b_everyday_language: true,
+          everyday_language_version: ORDER5B_VERSION,
+          order5a_foundation_version: ORDER5A_VERSION,
           interpretation_ok,
           interpretation_weak,
           interpretation_blocked,
@@ -747,6 +813,10 @@ Deno.serve(async (req) => {
           rail_minimal,
           rail_none,
           rail_blocked,
+          language_ok,
+          language_translation,
+          language_precision,
+          language_other,
           xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
         },
         timing: { total_ms: Date.now() - t0 },

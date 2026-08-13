@@ -1,12 +1,12 @@
 /**
- * ORDER 5A — Everyday Language Foundation & Word-Choice Intelligence
+ * ORDER 5A Foundation + ORDER 5B Pipeline Integration — Everyday Language Runtime
  *
  * Core: Keep the depth of the thought. Lower the barrier of entry.
  * This is NOT a style layer. style_decision remains null.
  * No humor engine. No final hooks. No fixed vocabulary tables.
  * No topic → entry strategy mapping. No raw manual / audience text.
  *
- * Pipeline position (foundation only):
+ * Pipeline position (ORDER 5B operational):
  * Seed → Interpretation → Reader Self-Projection → Reaction Mechanism
  * → Thinking Rail → Everyday Language Decision → (downstream)
  *
@@ -16,6 +16,8 @@
 import type { SeedInterpretation } from "./seed-interpretation.ts";
 
 export const ORDER5A_VERSION = "everyday_language_reasoning_v1_order5a";
+export const ORDER5B_VERSION = "everyday_language_pipeline_v1_order5b";
+export const ORDER5B_PIPELINE_INTEGRATED = true as const;
 export const ORDER5A_STYLE_ALWAYS_NULL = true as const;
 export const ORDER5A_NO_TOPIC_ENTRY_MAP = true as const;
 export const ORDER5A_NO_FIXED_VOCAB_TABLE = true as const;
@@ -93,6 +95,7 @@ export type EverydayLanguageDecision = {
   fit_signals: string[];
   block_reasons: string[];
   order5a_version: string;
+  order5b_version: string;
 };
 
 export type AudienceBarrierSignals = {
@@ -463,6 +466,7 @@ export function decideEverydayLanguage(input: EverydayLanguageInput): EverydayLa
       fit_signals: [],
       block_reasons: ["interpretation_blocked"],
       order5a_version: ORDER5A_VERSION,
+      order5b_version: ORDER5B_VERSION,
     };
   }
 
@@ -574,6 +578,7 @@ export function decideEverydayLanguage(input: EverydayLanguageInput): EverydayLa
     fit_signals: fit,
     block_reasons: blocks,
     order5a_version: ORDER5A_VERSION,
+    order5b_version: ORDER5B_VERSION,
   };
 }
 
