@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/order7a-index.patch"
       - ".github/workflows/order7a-materialize.yml"
+      - "supabase/functions/weekly-plan/deep-generation-context.ts"
 jobs:
   materialize:
     runs-on: ubuntu-latest
@@ -17,13 +18,14 @@ jobs:
       - name: Apply index patch
         run: |
           set -e
-          if grep -q 'order7a_deep_generation' supabase/functions/weekly-plan/index.ts; then
-            echo already
+          if grep -q 'order7a_deep_generation\|const deep_generation' supabase/functions/weekly-plan/index.ts; then
+            echo already_materialized
           else
             patch -p1 --forward < tools/order7a-index.patch
           fi
-          grep -n 'order7a\|10.0.0-order7a\|buildDeepGenerationContext' supabase/functions/weekly-plan/index.ts | head
-          wc -c supabase/functions/weekly-plan/index.ts
+          grep -n 'order7a\|10.0.0-order7a\|buildDeepGenerationContext\|deep_generation' supabase/functions/weekly-plan/index.ts | head -20
+          test -f supabase/functions/weekly-plan/deep-generation-context.ts
+          wc -c supabase/functions/weekly-plan/index.ts supabase/functions/weekly-plan/deep-generation-context.ts
       - name: Commit
         run: |
           git config user.name github-actions[bot]

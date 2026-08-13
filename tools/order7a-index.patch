@@ -1,15 +1,6 @@
 --- a/supabase/functions/weekly-plan/index.ts
 +++ b/supabase/functions/weekly-plan/index.ts
-@@ -88,19 +88,25 @@
-   decideCreatorStyle,
-   ORDER6A_VERSION,
-   ORDER6B_STYLE_VERSION,
-   ORDER6C_STYLE_VERSION,
-   type CreatorStyleDecision,
- } from "./creator-style-decision.ts";
- import {
-   decideNaturalHumor,
-   ORDER6B_HUMOR_VERSION,
+@@ -97,12 +97,17 @@
    ORDER6C_HUMOR_VERSION,
    type NaturalHumorDecision,
  } from "./natural-humor-decision.ts";
@@ -27,3 +18,49 @@
 +const APP_VERSION = "10.0.0-order7a";
 +const WEEKLY_ENGINE_VERSION = "phased_v10_order7a_deep_generation";
  const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+ const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+ const corsHeaders = {
+@@ -220,6 +225,19 @@
+       has_repeated_behavior_signal: !!(seed as any).has_repeated_behavior_signal,
+       has_absurd_detail_signal: !!(seed as any).has_absurd_detail_signal,
+     },
++  });
++  const deep_generation: DeepGenerationContext = buildDeepGenerationContext({
++    slot_id: `D${dayOffset + 1}P${slot}`,
++    day_offset: dayOffset,
++    slot_index: slot,
++    seed: seed as any,
++    interpretation: seed_interpretation as any,
++    reaction_mechanism: reaction_mechanism as any,
++    thinking_rail: thinking_rail as any,
++    everyday_language: everyday_language as any,
++    creator_style: creator_style as any,
++    natural_humor: natural_humor as any,
++    editorial_mode: mode,
+   });
+   return {
+     slotId: `D${dayOffset + 1}P${slot}`,
+@@ -307,6 +325,14 @@
+     forced_humor_risk: natural_humor.forced_humor_risk,
+     order6c_humor_version: ORDER6C_HUMOR_VERSION,
+     order6b_humor_version: ORDER6B_HUMOR_VERSION,
++    deep_generation,
++    generation_status: deep_generation.generation_status,
++    core_thought: deep_generation.core_thought,
++    core_thought_status: deep_generation.core_thought.status,
++    compression_target: deep_generation.compression_target,
++    stop_condition: deep_generation.stop_condition,
++    context_id: deep_generation.context_id,
++    order7a_version: ORDER7A_VERSION,
+   };
+ }
+ 
+@@ -883,6 +909,8 @@
+           order6c_style_humor_hardened: true,
+           order6c_style_version: ORDER6C_STYLE_VERSION,
+           order6c_humor_version: ORDER6C_HUMOR_VERSION,
++          order7a_deep_generation: true,
++          order7a_version: ORDER7A_VERSION,
+           everyday_language_version: ORDER5B_VERSION,
+           order5c_version: ORDER5C_VERSION,
+           order5a_foundation_version: ORDER5A_VERSION,
