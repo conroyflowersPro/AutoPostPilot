@@ -119,18 +119,26 @@ import {
   ORDER8A_VERSION,
   type SemanticJudgeResult,
 } from "./semantic-judge.ts";
+import {
+  routeSlotWithRegeneration,
+  decideRegenerationRoute,
+  ORDER8B_VERSION,
+  type RoutedSlotResult,
+} from "./regeneration-router.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order8a-semantic-judge";
+const APP_VERSION = "10.0.0-order8b-rejection-routing";
+const APP_VERSION_ORDER8A_COMPAT = "10.0.0-order8a-semantic-judge";
 const APP_VERSION_ORDER7C_COMPAT = "10.0.0-order7c-generation-integration";
 const APP_VERSION_ORDER7B_COMPAT = "10.0.0-order7b-hotfix-live-xai";
 const APP_VERSION_ORDER7A_COMPAT = "10.0.0-order7a";
 // regression marker: 10.0.0-order7b-hotfix-live-xai | 10.0.0-order7a
 // regression engine markers: phased_v10_order7b_independent_generation | phased_v10_order7a_deep_generation
 // await generateIndependentPost — production path routes through integrateSlotGeneration → generateIndependentPost
-const WEEKLY_ENGINE_VERSION = "phased_v10_order8a_semantic_judge";
+const WEEKLY_ENGINE_VERSION = "phased_v10_order8b_rejection_routing";
+// regression: phased_v10_order8a_semantic_judge
 // regression: phased_v10_order7c_generation_integration | phased_v10_order7b_independent_generation
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
@@ -270,7 +278,7 @@ async function compactSlot(
     xai_key: genOpts?.xai_key ?? null,
     seed_id: seed.seed_id,
   });
-  const independent_generation: IndependentPostResult = integrated.independent || {
+  let independent_generation: IndependentPostResult = integrated.independent || {
     slot_id: deep_generation.slot_id,
     context_id: deep_generation.context_id,
     final_text: integrated.final_text,
@@ -337,6 +345,46 @@ async function compactSlot(
       judge_error: "judge_attach_exception",
       judge_mode: "unavailable",
     };
+  }
+
+  // ORDER 8B: Rejection & Regeneration Routing
+  let routed: RoutedSlotResult | null = null;
+  try {
+    routed = await routeSlotWithRegeneration({
+      slot_id: independent_generation.slot_id,
+      context_id: independent_generation.context_id,
+      ctx: deep_generation,
+      initial_independent: independent_generation,
+      initial_judge: semantic_judge_result!,
+      executeRegen: async (decision, _attempt) => {
+        const regen = await generateIndependentPost(deep_generation, {
+          dry_run: genOpts?.dry_run === true,
+          xai_key: genOpts?.xai_key ?? null,
+          allow_one_retry: false,
+        });
+        if (decision.rejection_codes?.length) {
+          regen.block_reasons = [...(regen.block_reasons || []), ...decision.rejection_codes.map((c: string) => "regen:" + c)];
+        }
+        const j2 = judgeIndependentResult(deep_generation, regen, undefined, {
+          xai_key: (genOpts as any)?.xai_key ?? null,
+        });
+        return { independent: regen, judge: j2 };
+      },
+    });
+    if (routed && (routed.slot_final_state === "ACCEPTED_PASS" || routed.slot_final_state === "ACCEPTED_WITH_CONCERNS" || routed.slot_final_state === "REGENERATED_PASS")) {
+      independent_generation = routed.independent || independent_generation;
+      semantic_judge_result = routed.judge || semantic_judge_result;
+    } else if (routed && (routed.slot_final_state === "BLOCKED" || routed.slot_final_state === "JUDGE_UNAVAILABLE")) {
+      independent_generation = {
+        ...independent_generation,
+        final_text: "",
+        generation_status: "GENERATION_BLOCKED" as any,
+        block_reasons: [...(independent_generation.block_reasons || []), "order8b_" + String(routed.slot_final_state).toLowerCase()],
+      };
+      if (routed.judge) semantic_judge_result = routed.judge;
+    }
+  } catch {
+    routed = null;
   }
 
   return {
@@ -449,6 +497,11 @@ async function compactSlot(
     judge_core_thought_preservation: semantic_judge_result?.scores?.core_thought_preservation ?? 0,
     judge_creator_fit: semantic_judge_result?.scores?.creator_fit ?? 0,
     judge_conceptual_repetition: semantic_judge_result?.flags?.conceptual_repetition ?? "LOW",
+    order8b_version: ORDER8B_VERSION,
+    semantic_regen_attempts: routed?.semantic_regen_attempts ?? 0,
+    last_route: routed?.last_route ?? "NO_ACTION",
+    slot_final_state: routed?.slot_final_state ?? "PENDING",
+    regeneration_exhausted: routed?.regeneration_exhausted ?? false,
     seed_fidelity: independent_generation.seed_fidelity,
     core_thought_preserved: independent_generation.core_thought_preserved,
     experience_boundary_preserved: independent_generation.experience_boundary_preserved,
@@ -1106,6 +1159,8 @@ Deno.serve(async (req) => {
           order8a_version: ORDER8A_VERSION,
           order8a_judge_only: true,
           order8a_no_auto_regeneration: true,
+          order8b_rejection_routing: true,
+          order8b_version: ORDER8B_VERSION,
           completion_gate: completion_gate_final,
           order7c_requested_slots: required_slots,
           order7c_returned_slots: completion_gate_final.returned_slots,
