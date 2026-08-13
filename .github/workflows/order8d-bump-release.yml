@@ -1,0 +1,31 @@
+name: ORDER8D Bump Release Version
+on:
+  workflow_dispatch:
+  push:
+    branches: [order8d-production-release]
+    paths:
+      - 'tools/order8d-bump-release-version.mjs'
+      - '.github/workflows/order8d-bump-release.yml'
+permissions:
+  contents: write
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8d-production-release
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump APP/ENGINE to release
+        run: node tools/order8d-bump-release-version.mjs
+      - name: Commit
+        run: |
+          git config user.name "order8d-bot"
+          git config user.email "bot@local"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then
+            echo "NO_CHANGE"
+          else
+            git commit -m "ORDER 8D: production release v10.0.0 — APP/engine release markers"
+            git push origin order8d-production-release
+          fi
