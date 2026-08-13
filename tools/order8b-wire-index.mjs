@@ -4,9 +4,11 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const indexPath = path.join(root, "supabase/functions/weekly-plan/index.ts");
 let src = fs.readFileSync(indexPath, "utf8");
+
 if (src.includes("ORDER8B_VERSION") && src.includes("routeSlotWithRegeneration")) {
   console.log("Already wired ORDER 8B");
   process.exit(0);
@@ -15,6 +17,7 @@ if (!src.includes('from "./semantic-judge.ts"')) {
   console.error("ORDER 8A import missing — abort");
   process.exit(1);
 }
+
 const imp = `} from "./semantic-judge.ts";
 import {
   routeSlotWithRegeneration,
@@ -24,6 +27,7 @@ import {
 } from "./regeneration-router.ts";
 `;
 src = src.replace('} from "./semantic-judge.ts";\n', imp);
+
 src = src.replace(
   'const APP_VERSION = "10.0.0-order8a-semantic-judge";',
   'const APP_VERSION = "10.0.0-order8b-rejection-routing";\nconst APP_VERSION_ORDER8A_COMPAT = "10.0.0-order8a-semantic-judge";',
@@ -36,12 +40,8 @@ src = src.replace(
   "const independent_generation: IndependentPostResult = integrated.independent ||",
   "let independent_generation: IndependentPostResult = integrated.independent ||",
 );
-const marker = "judge_version: ORDER8A_VERSION,";
-if (!src.includes(marker)) {
-  console.error("judge block marker missing");
-  process.exit(1);
-}
-const injectAfterJudge = `
+
+const inject = `
   // ORDER 8B: Rejection & Regeneration Routing
   let routed: RoutedSlotResult | null = null;
   try {
@@ -82,24 +82,23 @@ const injectAfterJudge = `
     routed = null;
   }
 `;
-# Insert before `  return {` that follows judge block - use unique order8a attach line
-idx = src.find("judge_error: \"judge_attach_exception\"")
-if idx < 0:
-  print("attach exception not found")
-  raise SystemExit(1)
-# Find end of catch block after this
-end = src.find("  }\n\n  return {", idx)
-if end < 0:
-  end = src.find("\n  return {", idx)
-src = src[:end+4] + injectAfterJudge + src[end+4:]
+
+const needle = 'judge_error: "judge_attach_exception",\n      judge_mode: "unavailable",\n    };\n  }\n\n  return {';
+const repl = 'judge_error: "judge_attach_exception",\n      judge_mode: "unavailable",\n    };\n  }\n' + inject + '\n  return {';
+if (!src.includes(needle)) {
+  console.error("needle not found for inject");
+  process.exit(1);
+}
+src = src.replace(needle, repl);
 
 src = src.replace(
   'judge_conceptual_repetition: semantic_judge_result?.flags?.conceptual_repetition ?? "LOW",',
   'judge_conceptual_repetition: semantic_judge_result?.flags?.conceptual_repetition ?? "LOW",\n    order8b_version: ORDER8B_VERSION,\n    semantic_regen_attempts: routed?.semantic_regen_attempts ?? 0,\n    last_route: routed?.last_route ?? "NO_ACTION",\n    slot_final_state: routed?.slot_final_state ?? "PENDING",\n    regeneration_exhausted: routed?.regeneration_exhausted ?? false,',
-)
+);
 src = src.replace(
   "order8a_no_auto_regeneration: true,",
   "order8a_no_auto_regeneration: true,\n          order8b_rejection_routing: true,\n          order8b_version: ORDER8B_VERSION,",
-)
+);
+
 fs.writeFileSync(indexPath, src);
 console.log("Wired ORDER 8B", src.length);
