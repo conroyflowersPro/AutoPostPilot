@@ -17,7 +17,7 @@ jobs:
         with:
           ref: order7b-independent-per-post-generation
           fetch-depth: 0
-      - name: Apply index patch
+      - name: Apply index patch and commit
         run: |
           set -euo pipefail
           test -f supabase/functions/weekly-plan/independent-post-generation.ts
@@ -29,16 +29,16 @@ jobs:
             patch -p1 --forward < tools/order7b-index.patch
           fi
           grep -n 'order7b\|generateIndependentPost\|independent_generation\|APP_VERSION' supabase/functions/weekly-plan/index.ts | head -30
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo no_index_changes; else
+            git commit -m "ORDER7B: materialize independent per-post generation wiring in index.ts"
+            git push
+          fi
+      - name: Run ORDER 7B tests
+        run: |
           ORDER7B_MOD=supabase/functions/weekly-plan/independent-post-generation.ts \
           ORDER7A_MOD=supabase/functions/weekly-plan/deep-generation-context.ts \
           ORDER7B_INDEX=supabase/functions/weekly-plan/index.ts \
             node tools/order7b-independent-generation-test.mjs
-      - name: Commit index if changed
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add supabase/functions/weekly-plan/index.ts || true
-          if git diff --cached --quiet; then echo no changes; else
-            git commit -m "ORDER7B: materialize independent per-post generation wiring in index.ts"
-            git push
-          fi
