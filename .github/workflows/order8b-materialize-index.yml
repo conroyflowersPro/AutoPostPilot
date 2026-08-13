@@ -1,0 +1,29 @@
+name: ORDER8B Materialize Index
+on:
+  push:
+    branches: [order8b-rejection-regeneration-routing]
+    paths:
+      - 'tools/order8b-wire-index.mjs'
+      - 'supabase/functions/weekly-plan/regeneration-router.ts'
+      - '.github/workflows/order8b-materialize-index.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8b-rejection-regeneration-routing
+      - name: Wire ORDER 8B into index
+        run: node tools/order8b-wire-index.mjs
+      - name: Commit
+        run: |
+          git config user.name conroyflowersPro
+          git config user.email conroyf12@gmail.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo 'No changes'; else
+            git commit -m "ORDER 8B: materialize regeneration router wiring in index"
+            git push origin order8b-rejection-regeneration-routing
+          fi
