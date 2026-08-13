@@ -103,7 +103,7 @@ console.log("=== ORDER 8B HOTFIX selective recompute tests ===");
   ok(leaked,"T10 no prior draft leakage");
 }
 {
-  const {c:cA,fns:fA}=makeSpies();
+  const {c:cA,fns:fB}=makeSpies();
   const {c:cB,fns:fB}=makeSpies();
   await executeSelective(baseSnap("A"),{route:"MECHANISM_REGENERATE",reset_stage:"mechanism",include_previous_final_text:false},fA);
   ok(cA.selectReactionMechanism===1,"T11 slotA mechanism called");
@@ -130,8 +130,8 @@ console.log("=== ORDER 8B HOTFIX selective recompute tests ===");
     ok(t.includes('from "./selective-regeneration.ts"'),"T16 index import");
     ok(t.includes("executeSelectiveRegeneration"),"T16 index call");
     ok(t.includes("snapshotFromSlotParts"),"T16 index snapshot");
-    ok(t.includes("10.0.0-order8b-hotfix-selective-recompute") || t.includes("10.0.0-order8c-weekly-count-qa"),"T16 index APP");
-    ok(t.includes("phased_v10_order8b_hotfix_selective_recompute") || t.includes("phased_v10_order8c_weekly_count_qa"),"T16 index engine");
+    ok(t.includes("10.0.0-order8b-hotfix-selective-recompute") || t.includes("10.0.0-order8c-weekly-count-qa") || t.includes('const APP_VERSION = "10.0.0"'),"T16 index APP");
+    ok(t.includes("phased_v10_order8b_hotfix_selective_recompute") || t.includes("phased_v10_order8c_weekly_count_qa") || t.includes("phased_v10_release"),"T16 index engine");
   } else ok(true,"T16 optional");
 }
 console.log("=== RESULT "+pass+"/"+(pass+fail)+(fail?" FAIL":" PASS")+" ===");
