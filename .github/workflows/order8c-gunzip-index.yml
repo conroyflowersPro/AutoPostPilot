@@ -9,6 +9,8 @@ on:
       - 'tools/order8c-index.gz.b64.p2'
       - 'tools/order8c-index.gz.b64.p3'
       - 'tools/order8c-gunzip-index.mjs'
+permissions:
+  contents: write
 jobs:
   materialize:
     runs-on: ubuntu-latest
