@@ -1,5 +1,5 @@
 /**
- * ORDER 5A Foundation + ORDER 5B Pipeline Integration — Everyday Language Runtime
+ * ORDER 5A/5B + ORDER 5C Hardening — Everyday Language Runtime
  *
  * Core: Keep the depth of the thought. Lower the barrier of entry.
  * This is NOT a style layer. style_decision remains null.
@@ -18,12 +18,21 @@ import type { SeedInterpretation } from "./seed-interpretation.ts";
 export const ORDER5A_VERSION = "everyday_language_reasoning_v1_order5a";
 export const ORDER5B_VERSION = "everyday_language_pipeline_v1_order5b";
 export const ORDER5B_PIPELINE_INTEGRATED = true as const;
+export const ORDER5C_VERSION = "everyday_language_hardened_v1_order5c";
+export const ORDER5C_HARDENED = true as const;
 export const ORDER5A_STYLE_ALWAYS_NULL = true as const;
 export const ORDER5A_NO_TOPIC_ENTRY_MAP = true as const;
 export const ORDER5A_NO_FIXED_VOCAB_TABLE = true as const;
 export const ORDER5A_NO_HUMOR_ENGINE = true as const;
 export const ORDER5A_RAW_MANUAL_TEXT_BLOCKED = true as const;
 export const ORDER5A_RAW_AUDIENCE_TEXT_BLOCKED = true as const;
+export const ORDER5C_ANTI_COPY = true as const;
+export const ORDER5C_ANTI_TEMPLATE = true as const;
+export const ORDER5C_ANTI_MAPPING = true as const;
+export const ORDER5C_NO_FORCED_ANALOGY = true as const;
+export const ORDER5C_NO_FORCED_CTA = true as const;
+export const ORDER5C_NO_FORCED_QUESTION = true as const;
+export const ORDER5C_NO_EXPLANATORY_TAIL = true as const;
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -96,6 +105,7 @@ export type EverydayLanguageDecision = {
   block_reasons: string[];
   order5a_version: string;
   order5b_version: string;
+  order5c_version: string;
 };
 
 export type AudienceBarrierSignals = {
@@ -420,6 +430,21 @@ function pickEntryStrategy(
   return "DIRECT_CONCRETE";
 }
 
+
+function rejectRawWordingSurfaces(input: EverydayLanguageInput): string[] {
+  const blocks: string[] = [];
+  const any = input as Record<string, unknown>;
+  const bannedKeys = [
+    "raw_text","manual_text","audience_text","comment_text","sample_hook",
+    "sample_punchline","few_shot","example_sentence","finished_post",
+    "creator_phrase","historical_post_text",
+  ];
+  for (const k of bannedKeys) {
+    if (any[k] != null && String(any[k]).trim().length > 0) blocks.push(`raw_surface_rejected:${k}`);
+  }
+  return blocks;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Main decision                                                               */
 /* -------------------------------------------------------------------------- */
@@ -435,6 +460,42 @@ export function decideEverydayLanguage(input: EverydayLanguageInput): EverydayLa
   const creatorPref = input.creator_comm_pref || null;
   const mechanism = input.mechanism || null;
   const rail = input.thinking_rail || null;
+  const rawBlocks = rejectRawWordingSurfaces(input);
+
+  if (rawBlocks.length > 0) {
+    return {
+      status: "BLOCKED",
+      comprehension_barrier: "UNKNOWN",
+      participation_barrier: "UNKNOWN",
+      jargon_risk: "UNKNOWN",
+      abstraction_risk: "UNKNOWN",
+      niche_context_risk: "UNKNOWN",
+      everyday_translation_needed: false,
+      reader_entry_strategy: "NONE",
+      broad_concrete_anchor_needed: false,
+      broad_concrete_anchor_type: "NONE",
+      terminology_simplification_needed: false,
+      context_explanation_needed: false,
+      human_relevance_bridge: false,
+      attention_reengagement_needed: false,
+      self_projection_preservation: true,
+      compression_preference: "high",
+      protected_meaning: [],
+      forbidden_simplifications: rawBlocks,
+      confidence: 0,
+      minimal_context_sufficient: true,
+      style_decision: null,
+      humor_engine_active: false,
+      attention_relevance_ok: false,
+      sensationalism_blocked: true,
+      precision_conflict: false,
+      fit_signals: [],
+      block_reasons: rawBlocks,
+      order5a_version: ORDER5A_VERSION,
+      order5b_version: ORDER5B_VERSION,
+      order5c_version: ORDER5C_VERSION,
+    };
+  }
 
   if (interp.status === "INTERPRETATION_BLOCKED") {
     return {
@@ -467,6 +528,42 @@ export function decideEverydayLanguage(input: EverydayLanguageInput): EverydayLa
       block_reasons: ["interpretation_blocked"],
       order5a_version: ORDER5A_VERSION,
       order5b_version: ORDER5B_VERSION,
+      order5c_version: ORDER5C_VERSION,
+    };
+  }
+
+  if (interp.status === "INTERPRETATION_WEAK" && !hasText(interp.concrete_human_element) && !hasText(interp.possible_reader_connection) && !hasText(interp.what_is_new_or_interesting)) {
+    return {
+      status: "INSUFFICIENT_CONTEXT",
+      comprehension_barrier: "UNKNOWN",
+      participation_barrier: "UNKNOWN",
+      jargon_risk: assessJargonRisk(interp),
+      abstraction_risk: assessAbstractionRisk(interp),
+      niche_context_risk: assessNicheContextRisk(interp),
+      everyday_translation_needed: false,
+      reader_entry_strategy: "PRESERVE_AS_IS",
+      broad_concrete_anchor_needed: false,
+      broad_concrete_anchor_type: "NONE",
+      terminology_simplification_needed: false,
+      context_explanation_needed: false,
+      human_relevance_bridge: false,
+      attention_reengagement_needed: false,
+      self_projection_preservation: true,
+      compression_preference: rail?.compression_preference || "high",
+      protected_meaning: [],
+      forbidden_simplifications: ["insufficient_context_no_forced_simplification"],
+      confidence: 0.2,
+      minimal_context_sufficient: true,
+      style_decision: null,
+      humor_engine_active: false,
+      attention_relevance_ok: false,
+      sensationalism_blocked: true,
+      precision_conflict: false,
+      fit_signals: ["do_not_force_translation_without_context"],
+      block_reasons: ["insufficient_context"],
+      order5a_version: ORDER5A_VERSION,
+      order5b_version: ORDER5B_VERSION,
+      order5c_version: ORDER5C_VERSION,
     };
   }
 
@@ -579,6 +676,7 @@ export function decideEverydayLanguage(input: EverydayLanguageInput): EverydayLa
     block_reasons: blocks,
     order5a_version: ORDER5A_VERSION,
     order5b_version: ORDER5B_VERSION,
+    order5c_version: ORDER5C_VERSION,
   };
 }
 
@@ -599,4 +697,17 @@ export const ORDER5A_GUARDS = {
   raw_manual_blocked: ORDER5A_RAW_MANUAL_TEXT_BLOCKED,
   raw_audience_blocked: ORDER5A_RAW_AUDIENCE_TEXT_BLOCKED,
   version: ORDER5A_VERSION,
+} as const;
+
+export const ORDER5C_GUARDS = {
+  hardened: ORDER5C_HARDENED,
+  anti_copy: ORDER5C_ANTI_COPY,
+  anti_template: ORDER5C_ANTI_TEMPLATE,
+  anti_mapping: ORDER5C_ANTI_MAPPING,
+  no_forced_analogy: ORDER5C_NO_FORCED_ANALOGY,
+  no_forced_cta: ORDER5C_NO_FORCED_CTA,
+  no_forced_question: ORDER5C_NO_FORCED_QUESTION,
+  no_explanatory_tail: ORDER5C_NO_EXPLANATORY_TAIL,
+  version: ORDER5C_VERSION,
+  pipeline_integrated: ORDER5B_PIPELINE_INTEGRATED,
 } as const;
