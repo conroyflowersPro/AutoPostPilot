@@ -52,41 +52,13 @@ function buildSystemPrompt(): string {
   const everyday = buildEverydayLanguageInstructions();
   const contextual = buildContextualStyleInstructions();
   const readerJudge = buildReaderStoryJudgeInstructions();
-  return `You are the content generation engine for AutoPostPilot.
-
-ROLE SPLIT:
-- Seed = WHAT; Creator DNA = HOW outer bound
-- Reaction Mechanism (v10) = reader projection door
-- Everyday Language (ORDER 2) = no jargon dictionary
-- Contextual Style (ORDER 3) = situational register
-- Reader Story Invitation (ORDER 4) = does reader want to open their own story? (NOT CTA)
-
-${stages}
-
-${reaction}
-
-${everyday}
-
-${contextual}
-
-${readerJudge}
-
-${voice}
-
-${vocab}
-
-STYLE CORPUS n=${style.sample_n}, median ${style.median_post_chars} chars. No semantic elevation.
-SEED: rewrite stiff tech phrasing; preserve proper nouns and verified facts.
-GROUNDING: no invented experiences; respect do_not_invent.
-EDITORIAL: INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION (no Weekly HUMOR).
-JSON posts: slotId, core_thought, thinking_rail, audience_translation, reaction_mechanism, reaction_reason, content, score.
-Optional: everyday_language_clear, style_register, reader_story_score, reader_story_pass, participation_barrier.
-Do NOT require questions or CTA.`;
+  return `You are the content generation engine for AutoPostPilot.\n\nROLE SPLIT:\n- Seed = WHAT; Creator DNA = HOW outer bound\n- Reaction Mechanism (v10) = reader projection door\n- Everyday Language (ORDER 2) = no jargon dictionary\n- Contextual Style (ORDER 3) = situational register\n- Reader Story Invitation (ORDER 4) = does reader want to open their own story? (NOT CTA)\n\n${stages}\n\n${reaction}\n\n${everyday}\n\n${contextual}\n\n${readerJudge}\n\n${voice}\n\n${vocab}\n\nSTYLE CORPUS n=${style.sample_n}, median ${style.median_post_chars} chars. No semantic elevation.\nSEED: rewrite stiff tech phrasing; preserve proper nouns and verified facts.\nGROUNDING: no invented experiences; respect do_not_invent.\nEDITORIAL: INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION (no Weekly HUMOR).\nJSON posts: slotId, core_thought, thinking_rail, audience_translation, reaction_mechanism, reaction_reason, content, score.\nOptional: everyday_language_clear, style_register, reader_story_score, reader_story_pass, participation_barrier.\nDo NOT require questions or CTA.`;
 }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 export async function handleGeneratePost(req: Request): Promise<Response> {
@@ -185,28 +157,7 @@ export async function handleGeneratePost(req: Request): Promise<Response> {
       const subsetJson = JSON.stringify(withHints, null, 0);
       const railCatalog = THINKING_RAIL_LIBRARY.map((r) => `${r.id}:${r.label}`).join(" | ");
       const mechCatalog = REACTION_MECHANISM_LIBRARY.map((m) => m.id).join(" | ");
-      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.
-${scheduleMeta}
-
-FLOW: Seed → Reaction Mechanism → Core Thought → Thinking Rail → Audience Translation → Everyday Language → Contextual Style → Writing DNA → content
-
-Rails: ${railCatalog}
-Mechanisms: ${mechCatalog}
-
-SLOTS:
-${subsetJson}
-
-Rules:
-- reaction_mechanism by reasoning (not template)
-- ONE core_thought; everyday language; contextual style; no invented self-disclosure
-- humor only if natural; never invent experiences
-- Do NOT require CTA or questions
-- Return slotId EXACTLY
-
-USED:
-${usedJson}
-
-JSON: {"posts":[{"slotId":"...","core_thought":"...","thinking_rail":"...","audience_translation":"...|null","reaction_mechanism":"...","reaction_reason":"...","style_register":"...","reader_story_score":1-10,"reader_story_pass":true|false,"content":"...","score":1-10}]}`;
+      const userMsg = `Generate exactly ${slotsSubset.length} Korean posts for dayOffset=${offset}.\n${scheduleMeta}\n\nFLOW: Seed → Reaction Mechanism → Core Thought → Thinking Rail → Audience Translation → Everyday Language → Contextual Style → Writing DNA → content\n\nRails: ${railCatalog}\nMechanisms: ${mechCatalog}\n\nSLOTS:\n${subsetJson}\n\nRules:\n- reaction_mechanism by reasoning (not template)\n- ONE core_thought; everyday language; contextual style; no invented self-disclosure\n- humor only if natural; never invent experiences\n- Do NOT require CTA or questions\n- Return slotId EXACTLY\n\nUSED:\n${usedJson}\n\nJSON: {\"posts\":[{\"slotId\":\"...\",\"core_thought\":\"...\",\"thinking_rail\":\"...\",\"audience_translation\":\"...|null\",\"reaction_mechanism\":\"...\",\"reaction_reason\":\"...\",\"style_register\":\"...\",\"reader_story_score\":1-10,\"reader_story_pass\":true|false,\"content\":\"...\",\"score\":1-10}]}`;
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 120000);
