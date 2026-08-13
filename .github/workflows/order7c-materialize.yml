@@ -1,0 +1,33 @@
+name: order7c-materialize
+on:
+  push:
+    branches: [order7c-generation-integration-hardening]
+    paths:
+      - 'tools/order7c-index.patch'
+      - '.github/workflows/order7c-materialize.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order7c-generation-integration-hardening
+          fetch-depth: 1
+      - name: Apply ORDER 7C index patch
+        run: |
+          patch -p1 < tools/order7c-index.patch
+          grep -q integrateSlotGeneration supabase/functions/weekly-plan/index.ts
+          grep -q ORDER7C_VERSION supabase/functions/weekly-plan/index.ts
+          wc -c supabase/functions/weekly-plan/index.ts
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "ORDER7C: materialize generation integration wiring in index.ts"
+            git push
+          fi
