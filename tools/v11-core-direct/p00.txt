@@ -1,0 +1,161 @@
+/**
+ * Weekly Planner Edge — Production canonical (v9.1.2)
+ * Expand: Evidence/Intent only. Language=Korean output; Location=Evidence only.
+ * No production templates. Location never inferred from language alone.
+ * ORDER 3+4 FINAL HOTFIX: allowed_facts propagation in compactSlot.
+ * ORDER 1: Independent Seed Interpretation Layer wired into select/compactSlot.
+ * ORDER 2: Reader Self-Projection + Reaction Mechanism selection after interpretation.
+ * ORDER 3: Thinking Rail Runtime after Reaction Mechanism (no topic→rail, style null).
+ * ORDER 5C: Everyday Language hardened after Thinking Rail (style_decision=null, humor inactive).
+ * ORDER 6C: Creator Style + Natural Humor hardened (authenticity>diversity, NONE normal).
+ * ORDER 7A: Deep Generation Context structured after Style/Humor (Core Thought seed-derived).
+ * ORDER 7B HOTFIX: Independent per-post generation live xAI writer (production default live).
+ * ORDER 7C: Generation integration hardening.
+ * ORDER 8A: Semantic Judge foundation (evaluate only, never rewrite).
+ * ORDER 8B: Rejection regeneration routing (failure-origin, MAX_SEMANTIC_REGEN=2).
+ * ORDER 8C: Weekly count full system QA + ledger.
+ * ORDER 8D APPLY: Full compactSlot engine + DIMENSION_REGISTRY seeds + phased_v11.
+ */
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  applyLocalGates,
+  createSeedIdFactory,
+  bootstrapCandidatesFromDimensions,
+  isSelectableStatus,
+  canServeEditorialMode,
+  evaluateEditorialSeedQuality,
+  ideaAngleKey,
+  conceptualDiversityScore,
+  conceptualRepetitionLevel,
+  type ConcreteSeed,
+  parseEditorialMode,
+  WEEKLY_EDITORIAL_MODES,
+  buildModeSupplyReport,
+} from "./seed-engine.ts";
+import {
+  allocateEditorialSlots,
+  buildEditorialQueue,
+  lengthForEditorial,
+  type EditorialMode,
+} from "./editorial-mix.ts";
+import { judgeSeedGrounding, countIntegrityOk } from "./runtime-grounding.ts";
+import {
+  guardCandidateAgainstManualLeakage,
+  type RecentManualPost,
+} from "./manual-leakage-guard.ts";
+import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
+import {
+  redistributeDailyTopics,
+  topicDistributionReport,
+  softDailyCap,
+} from "./daily-topic-distribute.ts";
+import { interpretConcreteSeed } from "./seed-interpretation.ts";
+import {
+  selectReactionMechanism,
+  isMechanismBlocked,
+} from "./reaction-mechanisms.ts";
+import {
+  decideReaderSelfProjection,
+} from "./reader-self-projection.ts";
+import {
+  decideThinkingRail,
+  ORDER3_THINKING_RAIL_VERSION,
+} from "./thinking-rail-runtime.ts";
+import {
+  decideEverydayLanguage,
+  rejectRawWordingSurfaces,
+  ORDER5C_EVERYDAY_VERSION,
+} from "./everyday-language-reasoning.ts";
+import {
+  decideCreatorStyle,
+  ORDER6C_STYLE_VERSION,
+} from "./creator-style-decision.ts";
+import {
+  decideNaturalHumor,
+  ORDER6C_HUMOR_VERSION,
+  ORDER6B_HUMOR_VERSION,
+} from "./natural-humor-decision.ts";
+import {
+  buildDeepGenerationContext,
+  ORDER7A_VERSION,
+} from "./deep-generation-context.ts";
+import {
+  generateIndependentPost,
+  isIndependentGenerationSuccess,
+  ORDER7B_VERSION,
+} from "./independent-post-generation.ts";
+import {
+  integrateGenerationResult,
+  ORDER7C_VERSION,
+} from "./generation-integration.ts";
+import {
+  judgeSemantic,
+  ORDER8A_VERSION,
+} from "./semantic-judge.ts";
+import {
+  routeSlotWithRegeneration,
+  ORDER8B_VERSION,
+  MAX_SEMANTIC_REGEN,
+} from "./regeneration-router.ts";
+import {
+  evaluateWeeklyCountLedger,
+  ORDER8C_VERSION,
+} from "./weekly-count-ledger.ts";
+import {
+  expandSeedSupplyWithXai,
+  SEED_SUPPLY_HOTFIX_VERSION,
+} from "./seed-supply-expansion.ts";
+
+const POSTS_MIN = 5;
+const POSTS_MAX = 8;
+const POSTS_TARGET = 6;
+const APP_VERSION = "11.0.0";
+const APP_VERSION_ORDER8A_COMPAT = "11.0.0-order8a-semantic-judge";
+const APP_VERSION_ORDER7C_COMPAT = "11.0.0-order7c-generation-integration";
+const APP_VERSION_ORDER7B_COMPAT = "11.0.0-order7b-hotfix-live-xai";
+const APP_VERSION_ORDER7A_COMPAT = "11.0.0-order7a";
+// regression engine markers: phased_v10_order7b_independent_generation | phased_v10_order7a_deep_generation
+const WEEKLY_ENGINE_VERSION = "phased_v11_order8d_apply";
+const GENERATOR_VERSION = "reader_story_v10_order4";
+const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+function majorKey(cluster: string, subject: string): string {
+  const c = (cluster || "").toUpperCase();
+  const s = (subject || "").toLowerCase();
+  if (c.includes("CYBER") || /cybertruck|사이버/.test(s)) return "CYBERTRUCK";
+  if (c === "FSD" || /\bfsd\b/.test(s)) return "FSD";
+  if (/robotaxi|로보택시|curb|주정차|승하차/.test(s) || c === "ROBOTAXI") return "ROBOTAXI";
+  if (/lafc|bmo|직관/.test(s) || c === "LAFC") return "LAFC";
+  if (c === "AI_TECH" || /\bai\b|grok|그록/.test(s)) return "AI_TECH";
+  if (c === "GAMING" || /게임/.test(s)) return "GAMING";
+  return c || "OTHER";
+}
+
+function seedArrayFromBody(body: any): any[] {
+  if (Array.isArray(body?.seeds) && body.seeds.length) return body.seeds;
+  if (Array.isArray(body?.candidates) && body.candidates.length) return body.candidates;
+  if (Array.isArray(body?.gated_seeds) && body.gated_seeds.length) return body.gated_seeds;
+  return [];
+}
+
+async function compactSlot(
+  seed: ConcreteSeed,
+  dayOffset: number,
+  slot: number,
+  mode: EditorialMode,
+  xaiKey: string,
+  opts: { dry_run?: boolean } = {},
+): Promise<any> {
+  const slotId = `D${dayOffset + 1}P${slot}`;
+  const seed_interpretation =
+    (seed as any).seed_interpretation ||
+    interpretConcreteSeed(seed, mode);
+  const reaction_mechanism =
+    (seed as any).reaction_mechanism ||
+    selectReactionMechanism({ interpretation: seed_interpretation, editorial_mode: mode });
