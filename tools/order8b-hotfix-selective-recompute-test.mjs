@@ -103,7 +103,7 @@ console.log("=== ORDER 8B HOTFIX selective recompute tests ===");
   ok(leaked,"T10 no prior draft leakage");
 }
 {
-  const {c:cA,fns:fB}=makeSpies();
+  const {c:cA,fns:fA}=makeSpies();
   const {c:cB,fns:fB}=makeSpies();
   await executeSelective(baseSnap("A"),{route:"MECHANISM_REGENERATE",reset_stage:"mechanism",include_previous_final_text:false},fA);
   ok(cA.selectReactionMechanism===1,"T11 slotA mechanism called");
