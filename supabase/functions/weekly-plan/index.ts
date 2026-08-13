@@ -97,12 +97,17 @@ import {
   ORDER6C_HUMOR_VERSION,
   type NaturalHumorDecision,
 } from "./natural-humor-decision.ts";
+import {
+  buildDeepGenerationContext,
+  ORDER7A_VERSION,
+  type DeepGenerationContext,
+} from "./deep-generation-context.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order6c";
-const WEEKLY_ENGINE_VERSION = "phased_v10_order6c_style_humor_hardened";
+const APP_VERSION = "10.0.0-order7a";
+const WEEKLY_ENGINE_VERSION = "phased_v10_order7a_deep_generation";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -221,6 +226,19 @@ function compactSlot(
       has_absurd_detail_signal: !!(seed as any).has_absurd_detail_signal,
     },
   });
+  const deep_generation: DeepGenerationContext = buildDeepGenerationContext({
+    slot_id: `D${dayOffset + 1}P${slot}`,
+    day_offset: dayOffset,
+    slot_index: slot,
+    seed: seed as any,
+    interpretation: seed_interpretation as any,
+    reaction_mechanism: reaction_mechanism as any,
+    thinking_rail: thinking_rail as any,
+    everyday_language: everyday_language as any,
+    creator_style: creator_style as any,
+    natural_humor: natural_humor as any,
+    editorial_mode: mode,
+  });
   return {
     slotId: `D${dayOffset + 1}P${slot}`,
     dayOffset,
@@ -307,6 +325,14 @@ function compactSlot(
     forced_humor_risk: natural_humor.forced_humor_risk,
     order6c_humor_version: ORDER6C_HUMOR_VERSION,
     order6b_humor_version: ORDER6B_HUMOR_VERSION,
+    deep_generation,
+    generation_status: deep_generation.generation_status,
+    core_thought: deep_generation.core_thought,
+    core_thought_status: deep_generation.core_thought.status,
+    compression_target: deep_generation.compression_target,
+    stop_condition: deep_generation.stop_condition,
+    context_id: deep_generation.context_id,
+    order7a_version: ORDER7A_VERSION,
   };
 }
 
@@ -891,6 +917,8 @@ Deno.serve(async (req) => {
           order6c_style_humor_hardened: true,
           order6c_style_version: ORDER6C_STYLE_VERSION,
           order6c_humor_version: ORDER6C_HUMOR_VERSION,
+          order7a_deep_generation: true,
+          order7a_version: ORDER7A_VERSION,
           everyday_language_version: ORDER5B_VERSION,
           order5c_version: ORDER5C_VERSION,
           order5a_foundation_version: ORDER5A_VERSION,
