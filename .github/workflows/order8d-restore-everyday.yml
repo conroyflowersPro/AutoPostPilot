@@ -1,0 +1,40 @@
+name: ORDER8D Restore Everyday Language
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore from 603742f and apply protectedItems rename
+        run: |
+          git show 603742fb7e919a99f22ec5d2f5c6039b37f5fdaf:supabase/functions/weekly-plan/everyday-language-reasoning.ts > /tmp/el.ts
+          python3 - <<'PY'
+          from pathlib import Path
+          t = Path('/tmp/el.ts').read_text()
+          t2 = t.replace('const protected: string[]', 'const protectedItems: string[]')
+          t2 = t2.replace('protected: string[];', 'protectedItems: string[];')
+          t2 = t2.replace('protected.push(', 'protectedItems.push(')
+          t2 = t2.replace('protected.length', 'protectedItems.length')
+          t2 = t2.replace('return { conflict, protected, forbidden }', 'return { conflict, protectedItems, forbidden }')
+          t2 = t2.replace('precision.protected,', 'precision.protectedItems,')
+          # only replace identifier in function return type block carefully already done
+          assert 'protectedItems' in t2
+          assert 'const protected:' not in t2
+          Path('supabase/functions/weekly-plan/everyday-language-reasoning.ts').write_text(t2)
+          print('OK', len(t2))
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "AutoPostPilot Agent"
+          git config user.email "autopostpilot@x.ai"
+          git add supabase/functions/weekly-plan/everyday-language-reasoning.ts
+          git status
+          git commit -m "ORDER 8D: restore everyday-language-reasoning (protectedItems for Deno parse)" || echo NOCHANGE
+          git push origin HEAD:main
