@@ -4,7 +4,8 @@ on:
     branches: [order7a-deep-generation-context]
     paths:
       - "tools/order7a-index.patch"
-      - "tools/order7a-mod.gz.b64"
+      - "tools/order7a-mod.gz.b64.m1"
+      - "tools/order7a-mod.gz.b64.m2"
       - ".github/workflows/order7a-materialize.yml"
 jobs:
   materialize:
@@ -18,22 +19,19 @@ jobs:
       - name: Expand module + apply index patch
         run: |
           set -e
-          node -e "
-            const {readFileSync,writeFileSync}=require('fs');
-            const {gunzipSync}=require('zlib');
-            const b64=readFileSync('tools/order7a-mod.gz.b64','utf8').trim();
-            const text=gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
-            if(!text.includes('buildDeepGenerationContext')) process.exit(1);
-            writeFileSync('supabase/functions/weekly-plan/deep-generation-context.ts', text);
-            console.log('module', text.length);
-          "
-          if grep -q 'const deep_generation' supabase/functions/weekly-plan/index.ts; then
-            echo index already
-          else
-            patch -p1 --forward < tools/order7a-index.patch
-          fi
+          node <<'NODE'
+          const {readFileSync,writeFileSync,existsSync}=require('fs');
+          const {gunzipSync}=require('zlib');
+          const m1=readFileSync('tools/order7a-mod.gz.b64.m1','utf8').trim();
+          const m2=existsSync('tools/order7a-mod.gz.b64.m2')?readFileSync('tools/order7a-mod.gz.b64.m2','utf8').trim():'';
+          const text=gunzipSync(Buffer.from(m1+m2,'base64')).toString('utf8');
+          if(!text.includes('buildDeepGenerationContext')||!text.includes('ORDER7A_VERSION')) process.exit(1);
+          writeFileSync('supabase/functions/weekly-plan/deep-generation-context.ts', text);
+          console.log('module', text.length);
+          NODE
+          if grep -q 'const deep_generation' supabase/functions/weekly-plan/index.ts; then echo index_ok; else patch -p1 --forward < tools/order7a-index.patch; fi
           grep -n 'order7a\|buildDeepGenerationContext\|deep_generation' supabase/functions/weekly-plan/index.ts | head -20
-          wc -c supabase/functions/weekly-plan/index.ts supabase/functions/weekly-plan/deep-generation-context.ts
+          wc -c supabase/functions/weekly-plan/*.ts | tail -5
       - name: Commit
         run: |
           git config user.name github-actions[bot]
