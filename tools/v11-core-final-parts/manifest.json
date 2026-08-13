@@ -1,0 +1,30 @@
+{
+  "independent-post-generation.ts": {
+    "parts": [
+      "independent-post-generation.ts.00",
+      "independent-post-generation.ts.01",
+      "independent-post-generation.ts.02"
+    ],
+    "sha256": "dec223868b7b7e9a9b653c39c7efdbcac643cabd03fb5d887c63691fae0314cf",
+    "dest": "supabase/functions/weekly-plan/independent-post-generation.ts"
+  },
+  "semantic-judge.ts": {
+    "parts": [
+      "semantic-judge.ts.00",
+      "semantic-judge.ts.01"
+    ],
+    "sha256": "8dde26f5757310928399679cce0e1cc28413dbaf61542539a48942abdbe66a4e",
+    "dest": "supabase/functions/weekly-plan/semantic-judge.ts"
+  },
+  "index.ts": {
+    "parts": [
+      "index.ts.00",
+      "index.ts.01",
+      "index.ts.02",
+      "index.ts.03",
+      "index.ts.04"
+    ],
+    "sha256": "4523c222af5d9eeded091673cbdfd310ca15670903b7bd30e2b99424a6a55dfa",
+    "dest": "supabase/functions/weekly-plan/index.ts"
+  }
+}
