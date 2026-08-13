@@ -1,0 +1,40 @@
+name: ORDER7B materialize
+on:
+  push:
+    branches: [order7b-independent-per-post-generation]
+    paths:
+      - "tools/order7b-index.patch"
+      - ".github/workflows/order7b-materialize.yml"
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order7b-independent-per-post-generation
+      - name: Apply index patch
+        run: |
+          set -e
+          test -f supabase/functions/weekly-plan/independent-post-generation.ts
+          if grep -q 'generateIndependentPost' supabase/functions/weekly-plan/index.ts; then
+            echo index_already_wired
+          else
+            patch -p1 --forward < tools/order7b-index.patch
+          fi
+          grep -n 'order7b\|generateIndependentPost\|independent_generation' supabase/functions/weekly-plan/index.ts | head -25
+          test -f tools/order7b-independent-generation-test.mjs
+          ORDER7B_MOD=supabase/functions/weekly-plan/independent-post-generation.ts \
+          ORDER7A_MOD=supabase/functions/weekly-plan/deep-generation-context.ts \
+          ORDER7B_INDEX=supabase/functions/weekly-plan/index.ts \
+            node tools/order7b-independent-generation-test.mjs
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo no changes; else
+            git commit -m "ORDER7B: materialize independent per-post generation wiring in index.ts"
+            git push
+          fi
