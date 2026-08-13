@@ -1,5 +1,5 @@
 /**
- * ORDER 6A/6B — Contextual Creator Style Decision
+ * ORDER 6A/6B/6C — Contextual Creator Style Decision (hardened)
  *
  * Decides surface writing *tendencies* for this specific post while preserving
  * one coherent creator identity. Style ≠ template, ≠ wording, ≠ humor engine.
@@ -11,16 +11,24 @@
  *   Topic → Style | Editorial Mode → Style | Mechanism → Style | Rail → Style | Everyday status → Style
  *
  * Primary evidence: structured Creator / Writing DNA tendencies only.
- * ORDER 6B: multi-signal contextual scoring (Interpretation, Self-Projection, Mechanism,
- * Rail, Everyday, recent usage) without any direct map.
+ * ORDER 6B: multi-signal contextual scoring without any direct map.
+ * ORDER 6C: profile coherence > diversity; no persona rotation; no style templates;
+ * authenticity over diversity; no AI/report voice surface guidance.
  * Raw manual posts, historical full text, audience comments, few-shot examples: BLOCKED.
  *
  * Humor surface generation is NOT in this module (see natural-humor-decision.ts).
- * This module may still emit a soft humor_decision compatibility hint for downstream.
  */
 
 export const ORDER6A_VERSION = "creator_style_decision_v1_order6a";
 export const ORDER6B_STYLE_VERSION = "creator_style_decision_v1_order6b_contextual";
+export const ORDER6C_STYLE_VERSION = "creator_style_decision_v1_order6c_hardened";
+export const ORDER6C_PROFILE_COHERENCE = true as const;
+export const ORDER6C_NO_PERSONA_ROTATION = true as const;
+export const ORDER6C_NO_STYLE_TEMPLATE = true as const;
+export const ORDER6C_NO_FORCED_ROTATION = true as const;
+export const ORDER6C_AUTHENTICITY_OVER_DIVERSITY = true as const;
+export const ORDER6C_NO_AI_REPORT_VOICE = true as const;
+export const ORDER6C_SURFACE_ONLY_FAMILIES = true as const;
 export const ORDER6A_STYLE_LAYER = true as const;
 export const ORDER6A_NO_TOPIC_STYLE_MAP = true as const;
 export const ORDER6A_NO_EDITORIAL_STYLE_MAP = true as const;
@@ -35,10 +43,6 @@ export const ORDER6A_NO_AUTO_KKK = true as const;
 export const ORDER6A_NO_AUTO_SELF_DEPRECATION = true as const;
 export const ORDER6A_CREATOR_COHERENCE_FIRST = true as const;
 
-/* -------------------------------------------------------------------------- */
-/* Types                                                                       */
-/* -------------------------------------------------------------------------- */
-
 export type StyleStatus =
   | "STYLE_READY"
   | "STYLE_LOW_CONFIDENCE"
@@ -46,7 +50,6 @@ export type StyleStatus =
   | "STYLE_NEUTRAL"
   | "STYLE_BLOCKED";
 
-/** Abstract surface families — not sentence templates */
 export type StyleFamily =
   | "COMPRESSED_CONVERSATIONAL"
   | "REFLECTIVE_CONVERSATIONAL"
@@ -74,10 +77,6 @@ export type HumorDecisionPlaceholder =
 export type DensityLevel = "low" | "medium" | "high";
 export type Level3 = "low" | "medium" | "high";
 
-/**
- * Structured surface-tendency decision only.
- * Never stores finished sentences, hooks, punchlines, or example prose.
- */
 export type CreatorStyleDecision = {
   status: StyleStatus;
   selected_style_id: StyleId;
@@ -102,16 +101,12 @@ export type CreatorStyleDecision = {
   prohibited_surface_behaviors: string[];
   fit_signals: string[];
   block_reasons: string[];
-  /** Explicit: style must not raise ORDER 5 entry barrier */
   preserves_low_barrier: boolean;
-  /** Explicit: short surface form remains available */
   short_post_compatible: boolean;
-  /** Long-form only when context supports — never default */
   selective_longform: boolean;
   order6a_version: string;
 };
 
-/** Structured Creator / Writing DNA tendencies only — no raw post text */
 export type CreatorWritingDnaSignals = {
   prefers_compression?: boolean | null;
   prefers_conversational?: boolean | null;
@@ -124,9 +119,7 @@ export type CreatorWritingDnaSignals = {
 };
 
 export type StyleContextInput = {
-  /** Structured only */
   creator_dna?: CreatorWritingDnaSignals | null;
-  /** Soft context — never a direct map key to a fixed style */
   interpretation_status?: string | null;
   interpretation_confidence?: number | null;
   has_lived_reflection?: boolean | null;
@@ -148,22 +141,12 @@ export type StyleContextInput = {
   prefer_short?: boolean | null;
   has_factual_grounding?: boolean | null;
   has_experience_grounding?: boolean | null;
-  /** Soft recent-usage counts by style_id — never forces rotation */
   recent_style_counts?: Record<string, number> | null;
 };
 
 export type CreatorStyleInput = {
   context?: StyleContextInput | null;
-  /**
-   * ORDER 6A anti-copy: if any of these keys are present with content,
-   * style decision is BLOCKED. Structured DNA only.
-   */
-  // intentionally no raw text fields in the typed API
 };
-
-/* -------------------------------------------------------------------------- */
-/* Guards                                                                      */
-/* -------------------------------------------------------------------------- */
 
 function rejectRawStyleSurfaces(input: Record<string, unknown>): string[] {
   const blocks: string[] = [];
@@ -203,10 +186,6 @@ function repetitionRisk(
   if (n >= 2) return "medium";
   return "low";
 }
-
-/* -------------------------------------------------------------------------- */
-/* Family tendency profiles (abstract dimensions only)                         */
-/* -------------------------------------------------------------------------- */
 
 type FamilyProfile = {
   id: StyleId;
@@ -356,19 +335,14 @@ const FAMILY_PROFILES: FamilyProfile[] = [
   },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Scoring — soft contextual fit, never deterministic Topic/Mode/Mechanism map */
-/* -------------------------------------------------------------------------- */
-
 function scoreFamily(
   profile: FamilyProfile,
   ctx: StyleContextInput,
   dna: CreatorWritingDnaSignals,
 ): { score: number; reasons: string[] } {
-  let score = 0.35; // base identity-compatible prior
+  let score = 0.35;
   const reasons: string[] = ["creator_identity_base"];
 
-  // Creator DNA primary evidence
   if (dna.prefers_compression === true && profile.compression_level === "high") {
     score += 0.12;
     reasons.push("dna_prefers_compression");
@@ -398,7 +372,6 @@ function scoreFamily(
     reasons.push("dna_politeness_default");
   }
 
-  // Short preference / Everyday minimal context
   if (ctx.prefer_short || ctx.everyday_minimal_context_sufficient) {
     if (profile.short_post_compatible) {
       score += 0.12;
@@ -409,7 +382,6 @@ function scoreFamily(
     }
   }
 
-  // Everyday low-barrier: do not reward jargon-heavy surface when translation was needed
   const el = String(ctx.everyday_language_status || "");
   if (
     (el === "TRANSLATION_NEEDED" || el === "LOW_BARRIER_READY") &&
@@ -419,12 +391,10 @@ function scoreFamily(
     reasons.push("everyday_barrier_penalizes_high_tech_surface");
   }
   if (ctx.everyday_precision_conflict && profile.technical_density === "low") {
-    // precision conflict means precise terms must stay — mild tech density ok
     score += 0.02;
     reasons.push("precision_conflict_allows_measured_density");
   }
 
-  // Selective long-form only when structured reflection signals exist
   if (profile.selective_longform) {
     const reflectiveContext =
       !!ctx.has_lived_reflection ||
@@ -439,7 +409,6 @@ function scoreFamily(
     }
   }
 
-  // Rail compression is a soft hint only — never a map
   if (ctx.rail_compression_preference === "high" && profile.compression_level === "high") {
     score += 0.06;
     reasons.push("rail_compression_soft_align");
@@ -449,7 +418,6 @@ function scoreFamily(
     reasons.push("rail_expansion_soft_align");
   }
 
-  // Community-native: contextual, not topic-mapped
   if (
     profile.community_native_level === "high" &&
     dna.community_native_ok === true &&
@@ -459,7 +427,6 @@ function scoreFamily(
     reasons.push("community_native_context_fit");
   }
 
-  // Soft repetition penalty — never forces rotation
   const risk = repetitionRisk(profile.id, ctx.recent_style_counts || null);
   if (risk === "high") {
     score -= 0.08;
@@ -469,7 +436,6 @@ function scoreFamily(
     reasons.push("recent_repetition_soft_penalty_medium");
   }
 
-  // Identity coherence: prefer neutral default when DNA is empty/weak
   const dnaSparse =
     dna.prefers_compression == null &&
     dna.prefers_conversational == null &&
@@ -480,7 +446,6 @@ function scoreFamily(
     reasons.push("sparse_dna_prefers_neutral_identity");
   }
 
-  // Soft multi-signal context (ORDER 6B) — never deterministic maps
   const proj = String(ctx.self_projection_strength || "").toUpperCase();
   if (proj === "HIGH" && profile.reader_inference_space === "high") {
     score += 0.05;
@@ -502,15 +467,12 @@ function scoreFamily(
     score += 0.03;
     reasons.push("factual_grounding_soft_tech");
   }
-  // interpretation confidence soft only
   const ic = typeof ctx.interpretation_confidence === "number" ? ctx.interpretation_confidence : null;
   if (ic != null && ic >= 0.7 && profile.directness === "high") {
     score += 0.03;
     reasons.push("high_interp_confidence_soft_direct");
   }
 
-  // Explicitly do NOT read topic_cluster or editorial_mode as selection keys.
-  // They may exist on context for diagnostics only.
   void ctx.topic_cluster;
   void ctx.editorial_mode;
   void ctx.mechanism_status;
@@ -520,10 +482,6 @@ function scoreFamily(
 
   return { score: clamp01(score), reasons };
 }
-
-/* -------------------------------------------------------------------------- */
-/* Main decision                                                               */
-/* -------------------------------------------------------------------------- */
 
 function blockedDecision(reasons: string[]): CreatorStyleDecision {
   return {
@@ -563,11 +521,6 @@ function blockedDecision(reasons: string[]): CreatorStyleDecision {
   };
 }
 
-/**
- * Runtime Creator Style Decision (ORDER 6A foundation / 6B contextual).
- * Soft contextual scoring over abstract families; Creator DNA primary.
- * No Topic/Mode/Mechanism/Rail → Style maps. No humor generation.
- */
 export function decideCreatorStyle(input: CreatorStyleInput = {}): CreatorStyleDecision {
   const rawBlocks = rejectRawStyleSurfaces(input as Record<string, unknown>);
   if (rawBlocks.length) return blockedDecision(rawBlocks);
@@ -584,7 +537,6 @@ export function decideCreatorStyle(input: CreatorStyleInput = {}): CreatorStyleD
     identity_stable: true,
   };
 
-  // Score all families; pick best fit without forced rotation
   let best = FAMILY_PROFILES[FAMILY_PROFILES.length - 1];
   let bestScore = -1;
   let bestReasons: string[] = [];
@@ -610,10 +562,9 @@ export function decideCreatorStyle(input: CreatorStyleInput = {}): CreatorStyleD
   if (bestScore < 0.25) status = "STYLE_MINIMAL";
   if (best.id === "neutral_creator_default" && bestScore < 0.45) status = "STYLE_NEUTRAL";
 
-  // Humor foundation only — never generate
   let humor: HumorDecisionPlaceholder = "HUMOR_NOT_EVALUATED";
   if (best.punchline_compatible && best.conversational_level === "high") {
-    humor = "HUMOR_COMPATIBLE"; // compatibility signal only
+    humor = "HUMOR_COMPATIBLE";
   } else if (best.selective_longform || best.reflection_level === "high") {
     humor = "HUMOR_UNSUPPORTED";
   } else {
@@ -630,16 +581,20 @@ export function decideCreatorStyle(input: CreatorStyleInput = {}): CreatorStyleD
     "no_mechanism_style_map",
     "no_rail_style_map",
     "no_force_rotation",
+    "no_persona_rotation",
+    "no_style_template",
+    "no_ai_report_voice",
+    "no_academic_surface",
+    "no_corporate_summary_voice",
+    "authenticity_over_diversity",
   ];
 
-  // Low-barrier preservation: if everyday needed translation, block high-tech surface elevation
   let preservesLowBarrier = true;
   const el = String(ctx.everyday_language_status || "");
   if (
     (el === "TRANSLATION_NEEDED" || el === "LOW_BARRIER_READY") &&
     best.technical_density === "high"
   ) {
-    // Re-pick a safer family
     const safer =
       FAMILY_PROFILES.find((p) => p.id === "compressed_conversational") ||
       FAMILY_PROFILES.find((p) => p.id === "neutral_creator_default")!;
@@ -700,4 +655,13 @@ export const ORDER6A_GUARDS = {
   creator_coherence_first: ORDER6A_CREATOR_COHERENCE_FIRST,
   order6b_contextual: true,
   order6b_style_version: ORDER6B_STYLE_VERSION,
+  order6c_hardened: true,
+  order6c_style_version: ORDER6C_STYLE_VERSION,
+  profile_coherence: ORDER6C_PROFILE_COHERENCE,
+  no_persona_rotation: ORDER6C_NO_PERSONA_ROTATION,
+  no_style_template: ORDER6C_NO_STYLE_TEMPLATE,
+  no_forced_rotation: ORDER6C_NO_FORCED_ROTATION,
+  authenticity_over_diversity: ORDER6C_AUTHENTICITY_OVER_DIVERSITY,
+  no_ai_report_voice: ORDER6C_NO_AI_REPORT_VOICE,
+  surface_only_families: ORDER6C_SURFACE_ONLY_FAMILIES,
 } as const;
