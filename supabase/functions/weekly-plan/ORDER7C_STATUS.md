@@ -10,5 +10,6 @@ Status: COMPLETE
 - MAX_GENERATION_ATTEMPTS: 2
 - Completion gate + silent-drop pad BLOCKED
 - Retry: same DeepGenerationContext / upstream decisions
+- Tests: tools/order7c-generation-integration-test.mjs 44/44
 - Netlify: NOT deployed
 - ORDER 8: NOT started
