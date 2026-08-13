@@ -1,0 +1,204 @@
+/**
+ * ORDER 8B HOTFIX — Real Selective Upstream Recompute
+ * Router decides reset_stage; this module EXECUTES real stage recompute.
+ * Never: same DeepGenerationContext + writer-only when route demands upstream.
+ * Never: previous failed final_text as few-shot.
+ * Reuses ORDER 1–7 production decision functions (no duplicate engines).
+ */
+import { interpretSeed, type SeedInterpretation, type InterpretSeedInput } from "./seed-interpretation.ts";
+import {
+  selectReactionMechanism,
+  type MechanismSelectionResult,
+  type SelectMechanismInput,
+} from "./reader-self-projection.ts";
+import {
+  selectThinkingRail,
+  type ThinkingRailDecision,
+  type SelectThinkingRailInput,
+} from "./thinking-rail-runtime.ts";
+import {
+  decideEverydayLanguage,
+  type EverydayLanguageDecision,
+  type EverydayLanguageInput,
+} from "./everyday-language-reasoning.ts";
+import {
+  decideCreatorStyle,
+  type CreatorStyleDecision,
+  type CreatorStyleInput,
+} from "./creator-style-decision.ts";
+import {
+  decideNaturalHumor,
+  type NaturalHumorDecision,
+  type NaturalHumorInput,
+} from "./natural-humor-decision.ts";
+import {
+  buildDeepGenerationContext,
+  type DeepGenerationContext,
+  type BuildDeepGenerationInput,
+} from "./deep-generation-context.ts";
+import {
+  generateIndependentPost,
+  type IndependentPostResult,
+  type GenerateIndependentOptions,
+} from "./independent-post-generation.ts";
+import type {
+  RegenerationDecision,
+  RegenerationRoute,
+  ResetStage,
+  RejectionCode,
+} from "./regeneration-router.ts";
+import { buildRegenConstraintHints } from "./regeneration-router.ts";
+
+export const ORDER8B_HOTFIX_VERSION = "selective_upstream_recompute_v1_order8b_hotfix";
+export const ORDER8B_HOTFIX_REAL_STAGE_RECOMPUTE = true as const;
+export const ORDER8B_HOTFIX_NO_SAME_CONTEXT_WRITER_ONLY = true as const;
+export const ORDER8B_HOTFIX_FREEZE_MATRIX_ENFORCED = true as const;
+export const ORDER8B_HOTFIX_NO_PREVIOUS_DRAFT_FEWSHOT = true as const;
+export const ORDER8B_HOTFIX_REUSE_PRODUCTION_STAGES = true as const;
+
+export type StageName =
+  | "interpretation"
+  | "self_projection"
+  | "mechanism"
+  | "rail"
+  | "everyday"
+  | "style"
+  | "humor"
+  | "core_thought"
+  | "deep_context"
+  | "writer";
+
+/** Dependency order (earliest → latest) */
+export const STAGE_DEPENDENCY_ORDER: StageName[] = [
+  "interpretation",
+  "self_projection",
+  "mechanism",
+  "rail",
+  "everyday",
+  "style",
+  "humor",
+  "core_thought",
+  "deep_context",
+  "writer",
+];
+
+/**
+ * Map ResetStage → earliest StageName that must recompute.
+ * self_projection shares selectReactionMechanism with mechanism.
+ */
+export function resetStageToEarliest(reset: ResetStage): StageName | null {
+  switch (reset) {
+    case "none":
+      return null;
+    case "writer":
+      return "writer";
+    case "style":
+      return "style";
+    case "humor":
+      return "humor";
+    case "everyday":
+      return "everyday";
+    case "rail":
+      return "rail";
+    case "mechanism":
+      return "mechanism";
+    case "self_projection":
+      return "self_projection";
+    case "interpretation":
+      return "interpretation";
+    case "seed":
+      return "interpretation"; // seed itself frozen; interpretation+downstream
+    default:
+      return "writer";
+  }
+}
+
+export function stagesFromEarliest(earliest: StageName | null): Set<StageName> {
+  if (!earliest) return new Set();
+  const idx = STAGE_DEPENDENCY_ORDER.indexOf(earliest);
+  if (idx < 0) return new Set(["writer"]);
+  // Core Thought only when interpretation/mechanism/rail change requires it
+  return new Set(STAGE_DEPENDENCY_ORDER.slice(idx));
+}
+
+export type UpstreamSnapshot = {
+  slot_id: string;
+  day_offset?: number | null;
+  slot_index?: number | null;
+  seed: Record<string, unknown>;
+  interpretation: SeedInterpretation | Record<string, unknown>;
+  mechanism: MechanismSelectionResult | Record<string, unknown>;
+  rail: ThinkingRailDecision | Record<string, unknown>;
+  everyday: EverydayLanguageDecision | Record<string, unknown>;
+  style: CreatorStyleDecision | Record<string, unknown>;
+  humor: NaturalHumorDecision | Record<string, unknown>;
+  editorial_mode?: string | null;
+  deep_context: DeepGenerationContext;
+};
+
+export type SelectiveRegenOptions = GenerateIndependentOptions & {
+  /** Test hooks: count stage invocations */
+  stage_counters?: Partial<Record<StageName, number>>;
+  on_stage?: (name: StageName) => void;
+};
+
+export type SelectiveRegenResult = {
+  order8b_hotfix_version: string;
+  route: RegenerationRoute;
+  reset_stage: ResetStage;
+  stages_recomputed: StageName[];
+  stages_frozen: StageName[];
+  context_rebuilt: boolean;
+  writer_called: boolean;
+  old_context_id: string;
+  new_context_id: string;
+  old_decision_ids: Record<string, string>;
+  new_decision_ids: Record<string, string>;
+  deep_context: DeepGenerationContext;
+  independent: IndependentPostResult;
+  failure_hints: string[];
+  core_thought_recomputed: boolean;
+};
+
+function idOf(obj: unknown, keys: string[]): string {
+  if (!obj || typeof obj !== "object") return "none";
+  const o = obj as Record<string, unknown>;
+  for (const k of keys) {
+    if (o[k] != null && String(o[k]).length > 0) return String(o[k]).slice(0, 80);
+  }
+  return "anon_" + JSON.stringify(o).length;
+}
+
+function bump(opts: SelectiveRegenOptions | undefined, name: StageName) {
+  if (opts?.stage_counters) {
+    opts.stage_counters[name] = (opts.stage_counters[name] || 0) + 1;
+  }
+  opts?.on_stage?.(name);
+}
+
+function asInterp(v: unknown): SeedInterpretation {
+  return v as SeedInterpretation;
+}
+
+function seedToInterpretInput(seed: Record<string, unknown>, mode?: string | null): InterpretSeedInput {
+  return {
+    seed_id: String(seed.seed_id || seed.seedId || "seed_unknown"),
+    concrete_subject: String(seed.concrete_subject || seed.primaryTopic || ""),
+    topic: seed.cluster ? String(seed.cluster) : undefined,
+    cluster: seed.cluster ? String(seed.cluster) : undefined,
+    dimension: seed.dimension ? String(seed.dimension) : undefined,
+    subtopic: seed.subtopic ? String(seed.subtopic) : undefined,
+    editorial_mode: mode || (seed.editorial_mode ? String(seed.editorial_mode) : undefined),
+    allowed_facts: Array.isArray(seed.allowed_facts) ? (seed.allowed_facts as any) : [],
+    factual_anchors: Array.isArray(seed.factual_anchors) ? (seed.factual_anchors as any) : [],
+    experience_facts: Array.isArray(seed.experience_facts) ? (seed.experience_facts as any) : [],
+    source_role: seed.source_role as any,
+    source_type: seed.source_type || seed.primary_source,
+    source_id: Array.isArray(seed.evidence_source_ids)
+      ? String((seed.evidence_source_ids as any)[0] || "")
+      : undefined,
+    point_or_tension: seed.point_or_tension ? String(seed.point_or_tension) : undefined,
+    creator_evidence_available: !!seed.creator_evidence_available,
+    experience_required: String(mode || "").toUpperCase() === "EXPERIENCE",
+  };
+}
