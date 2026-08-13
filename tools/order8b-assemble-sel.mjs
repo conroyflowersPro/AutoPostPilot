@@ -5,9 +5,9 @@ const parts = [
   "tools/order8b-hotfix-selts.cc",
 ];
 const out = "supabase/functions/weekly-plan/selective-regeneration.ts";
-fs.writeFileSync(out, parts.map((p) => fs.readFileSync(p, "utf8")).join(""));
-console.log("assembled", fs.statSync(out).size);
-if (!fs.readFileSync(out, "utf8").includes("executeSelectiveRegeneration")) {
-  console.error("missing executeSelectiveRegeneration");
-  process.exit(1);
-}
+const body = parts.map((p) => fs.readFileSync(p, "utf8")).join("");
+fs.mkdirSync("supabase/functions/weekly-plan", { recursive: true });
+fs.writeFileSync(out, body);
+console.log("assembled", out, body.length);
+if (!body.includes("executeSelectiveRegeneration")) process.exit(1);
+if (body.includes("PLACEHOLDER")) process.exit(2);
