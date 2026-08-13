@@ -2,6 +2,7 @@
  * Dynamic Concrete Seed Engine v9.1.0 — Edge pack (quality gates + idea angle + mode helpers)
  * No production concrete bootstrap templates. ORDER 3 evidence-packet reasoning.
  * ORDER 3+4 FINAL HOTFIX: allowed_facts / factual_anchors propagation.
+ * ORDER 0B: Manual posts never auto SEED_SOURCE; DIMENSION_REGISTRY abstract seeds.
  */
 import {
   extractEvidencePacket,
@@ -43,6 +44,7 @@ export type ConcreteSeed = {
   static_facts?: string[];
   current_facts?: string[];
   creator_opinion?: string[];
+  source_role?: string;
   [key: string]: unknown;
 };
 export type EditorialMode = "INFORMATIVE" | "COMPARE" | "OPINION" | "EXPERIENCE" | "CASUAL_OBSERVATION";
@@ -101,6 +103,7 @@ export function applyLocalGates(raw: any[], _recent: string[], nextId: () => str
       static_facts: Array.isArray(r.static_facts) ? r.static_facts.map(String) : undefined,
       current_facts: Array.isArray(r.current_facts) ? r.current_facts.map(String) : undefined,
       creator_opinion: Array.isArray(r.creator_opinion) ? r.creator_opinion.map(String) : undefined,
+      source_role: r.source_role,
     });
   }
   return { passed, local_gate_rejected: 0, reject_reasons: {} };
@@ -165,138 +168,76 @@ export function scoreCasualEditorialFit(seed: Partial<ConcreteSeed>): {
   reasons: string[];
 } {
   const t = textOf(seed);
-  const analysis = /(원인|구조|판단\s*기준|여러\s*조건|기술[적]?\s*의미|때문에|분석|지표|병목)/i.test(t);
-  if (analysis) return { fit: "POOR", reclassify_to: "INFORMATIVE", reasons: ["CASUAL_TOO_ANALYTICAL"] };
-  if (t.length <= 90) return { fit: "ACCEPTABLE", reasons: ["CASUAL_SHORT"] };
-  return { fit: "POOR", reclassify_to: "INFORMATIVE", reasons: ["CASUAL_NEEDS_EXPLANATION"] };
+  const reasons: string[] = [];
+  if (t.length > 100) reasons.push("LONG");
+  if (/보고서|분석\s*결과|요약하면/.test(t)) reasons.push("REPORTISH");
+  if (reasons.length >= 2) return { fit: "POOR", reclassify_to: "INFORMATIVE", reasons };
+  if (reasons.length === 1) return { fit: "ACCEPTABLE", reasons };
+  return { fit: "STRONG", reasons };
 }
 
-const UNSUPPORTED_TEMPORAL = [/오늘/, /어제/, /이번\s*주/, /퇴근길/, /출근길/, /방금/, /지금\s*막/];
-export function seedTemporalGrounding(seed: Partial<ConcreteSeed>): { ok: boolean; reasons: string[] } {
+export function canServeEditorialMode(seed: Partial<ConcreteSeed>, mode: EditorialMode): boolean {
+  const m = String(mode || "").toUpperCase();
+  if (m === "EXPERIENCE") return !!seed.experience_required || !!seed.creator_evidence_available;
+  if (m === "OPINION") return true;
+  if (m === "COMPARE") return true;
+  if (m === "CASUAL_OBSERVATION") return scoreCasualEditorialFit(seed).fit !== "POOR";
+  return true;
+}
+
+export function buildModeSupplyReport(pool: ConcreteSeed[], modes: EditorialMode[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of modes) out[m] = pool.filter((s) => canServeEditorialMode(s, m)).length;
+  return out;
+}
+
+export function parseEditorialMode(raw: string): EditorialMode {
+  const m = String(raw || "").toUpperCase();
+  if ((WEEKLY_EDITORIAL_MODES as string[]).includes(m)) return m as EditorialMode;
+  return "INFORMATIVE";
+}
+
+export function evaluateEditorialSeedQuality(seed: Partial<ConcreteSeed>, mode: EditorialMode): { pass: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if (!seed.concrete_subject || String(seed.concrete_subject).length < 8) reasons.push("WEAK_SUBJECT");
+  if (mode === "EXPERIENCE" && !seed.creator_evidence_available) reasons.push("NO_CREATOR_EVIDENCE");
+  if (isAiTopicSeed(seed) && scoreAiSpecificity(seed) === "GENERIC") reasons.push("AI_GENERIC");
+  return { pass: reasons.length === 0, reasons };
+}
+
+const UNSUPPORTED_TEMPORAL = [/오늘\s*(충전|주행|직관)/, /어제\s*(갔|했)/, /이번\s*주\s*(처음|첫)/];
+export function temporalSafety(seed: Partial<ConcreteSeed>): { ok: boolean; reasons: string[] } {
   const subject = String(seed.concrete_subject || "");
   if (!UNSUPPORTED_TEMPORAL.some((r) => r.test(subject))) return { ok: true, reasons: [] };
   if (seed.creator_evidence_available) return { ok: true, reasons: ["TEMPORAL_FROM_EVIDENCE"] };
-  return { ok: false, reasons: ["UNSUPPORTED_TEMPORAL_CONTEXT"] };
+  return { ok: false, reasons: ["UNSUPPORTED_TEMPORAL"] };
 }
 
-export function evaluateEditorialSeedQuality(
-  seed: Partial<ConcreteSeed>,
-  requested?: string
-): { pass: boolean; reasons: string[]; ai_specificity?: AiSpecificity; informational_value?: InformationalValue; casual_fit?: string } {
-  const mode = String(requested || seed.requested_editorial_mode || "").toUpperCase();
-  const ground = seedTemporalGrounding(seed);
-  if (!ground.ok) return { pass: false, reasons: ground.reasons };
-  if (isAiTopicSeed(seed)) {
-    const ai = scoreAiSpecificity(seed);
-    if (ai === "GENERIC") return { pass: false, ai_specificity: ai, reasons: ["AI_GENERIC"] };
-  }
-  if (mode === "INFORMATIVE") {
-    const iv = scoreInformationalValue(seed);
-    if (iv === "WEAK") return { pass: false, informational_value: iv, reasons: ["INFO_WEAK"] };
-  }
-  if (mode === "CASUAL_OBSERVATION") {
-    const c = scoreCasualEditorialFit(seed);
-    if (c.fit === "POOR") return { pass: false, casual_fit: c.fit, reasons: c.reasons };
-  }
-  if (mode === "EXPERIENCE" && !seed.creator_evidence_available) {
-    return { pass: false, reasons: ["NEEDS_CREATOR_CONTEXT"] };
-  }
-  return { pass: true, reasons: [] };
-}
-
-export function canServeEditorialMode(seed: Partial<ConcreteSeed>, mode: string): boolean {
-  const m = String(mode || "").toUpperCase();
-  if (m === "HUMOR") return false;
-  return evaluateEditorialSeedQuality(seed, m).pass && (m !== "EXPERIENCE" || !!seed.creator_evidence_available);
-}
-
-export function parseEditorialMode(v: unknown): EditorialMode | undefined {
-  const u = String(v || "").toUpperCase();
-  if (u === "HUMOR") return undefined;
-  return (WEEKLY_EDITORIAL_MODES as string[]).includes(u) ? (u as EditorialMode) : undefined;
-}
-
-export function modeAwareExpandInstructions(mode: string): string {
-  const m = String(mode || "").toUpperCase();
-  if (m === "COMPARE") return "Provide contrast axes only; no forced opinion.";
-  if (m === "EXPERIENCE") return "Only evidence-backed first-person material; never invent.";
-  if (m === "CASUAL_OBSERVATION") return "Short momentary observation; no analysis essay.";
-  if (m === "OPINION") return "Trade-off or stance space; not pure fact dump.";
-  return "Concrete informative subject; reject generic advice.";
-}
-
-export function annotateSeedsWithModeFitness(seeds: ConcreteSeed[], mode: string): ConcreteSeed[] {
-  return (seeds || []).map((s) => {
-    const q = evaluateEditorialSeedQuality(s, mode);
-    return {
-      ...s,
-      requested_editorial_mode: mode,
-      editorial_fit: q.pass ? "ACCEPTABLE" : "POOR",
-      status: q.pass ? (s.status || "ELIGIBLE") : "HOLD",
-    };
-  });
-}
-
-export function buildModeSupplyReport(seeds: ConcreteSeed[], modes: string[] = WEEKLY_EDITORIAL_MODES as any): any {
-  const per_mode: Record<string, { eligible: number; short: number }> = {};
-  let mode_supply_low = false;
-  for (const m of modes) {
-    const eligible = (seeds || []).filter((s) => canServeEditorialMode(s, m) && isSelectableStatus(s.status as any)).length;
-    per_mode[m] = { eligible, short: eligible === 0 ? 1 : 0 };
-    if (eligible === 0) mode_supply_low = true;
-  }
-  return { mode_supply_low, per_mode };
-}
-
-const ANGLE_LOCATION_STRIP = [/공항|airport|경기장|stadium|호텔|hotel|bmo|집\s*근처|목적지|도심|퇴근길|학교\s*앞|공사\s*구간|고속도로|램프|횡단보도|우회전|합류\s*램프/gi];
 export function ideaAngleKey(seed: Partial<ConcreteSeed>): string {
-  let t = `${seed.concrete_subject || ""} ${seed.point_or_tension || ""}`.toLowerCase();
-  for (const r of ANGLE_LOCATION_STRIP) t = t.replace(r, " ");
-  t = t
-    .replace(/로보\s*택시|robotaxi/g, "robotaxi")
-    .replace(/주정차|승하차|curb|픽업|대기열|인프라/g, "curbops")
-    .replace(/회전율|utilization|실패율/g, "turnover")
-    .replace(/병목|용량\s*부족|공간\s*부족|스케일\s*논의/g, "bottleneck")
-    .replace(/감시|감독|집중도|구간\s*유형|단조|합류/g, "supervision_load")
-    .replace(/전제|검증|프롬프트|톤\s*맞|요약\s*도구/g, "ai_generic")
-    .replace(/[^\w가-힣]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const cluster = String(seed.cluster || "").toUpperCase();
-  if (cluster === "FSD" && /supervision_load/.test(t)) return "FSD|thesis_supervision_load_by_segment";
-  if (cluster === "ROBOTAXI" && /curbops/.test(t) && /bottleneck|turnover/.test(t)) return "ROBOTAXI|thesis_curbside_limits_turnover";
-  if (cluster === "AI_TECH" && /ai_generic/.test(t)) return "AI_TECH|thesis_ai_premise_hygiene";
-  const tokens = t.split(" ").filter((w) => w.length >= 2).slice(0, 8);
-  return `${cluster}|${tokens.join("_")}`.slice(0, 120) || `${cluster}|unknown`;
+  return String(seed.idea_angle_family || `${seed.cluster}|${seed.dimension}|${subjectSignature(String(seed.concrete_subject || "")).slice(0, 40)}`).slice(0, 80);
 }
 
-export function angleSimilarity(a: string, b: string): number {
-  if (a === b) return 1;
-  const ta = new Set(a.split(/[|_]/).filter(Boolean));
-  const tb = new Set(b.split(/[|_]/).filter(Boolean));
+function angleSimilarity(a: string, b: string): number {
+  const ta = new Set(a.toLowerCase().split(/[|\s]+/).filter(Boolean));
+  const tb = new Set(b.toLowerCase().split(/[|\s]+/).filter(Boolean));
   if (!ta.size || !tb.size) return 0;
   let inter = 0;
-  for (const x of ta) if (tb.has(x)) inter++;
-  return inter / Math.max(ta.size, tb.size);
+  for (const x of ta) if (tb.has(x)) inter += 1;
+  return inter / (ta.size + tb.size - inter);
 }
 
-export function conceptualDiversityScore(
-  candidate: Partial<ConcreteSeed>,
-  selected: Array<Partial<ConcreteSeed>>
-): number {
+export function conceptualDiversityScore(candidate: Partial<ConcreteSeed>, selected: Array<Partial<ConcreteSeed>>): number {
   if (!selected.length) return 1;
   const ck = ideaAngleKey(candidate);
-  let maxSim = 0;
+  let worst = 1;
   for (const s of selected) {
-    maxSim = Math.max(maxSim, angleSimilarity(ck, ideaAngleKey(s)));
+    const sim = angleSimilarity(ck, ideaAngleKey(s));
+    worst = Math.min(worst, 1 - sim);
   }
-  return 1 - maxSim;
+  return worst;
 }
 
-export function conceptualRepetitionLevel(
-  candidate: Partial<ConcreteSeed>,
-  selected: Array<Partial<ConcreteSeed>>
-): ConceptualRepetition {
+export function conceptualRepetitionLevel(candidate: Partial<ConcreteSeed>, selected: Array<Partial<ConcreteSeed>>): ConceptualRepetition {
   const div = conceptualDiversityScore(candidate, selected);
   if (div >= 0.65) return "LOW";
   if (div >= 0.4) return "MEDIUM";
@@ -332,7 +273,11 @@ export type PublishedEvidenceRow = {
   post_type?: string;
 };
 
-/** ORDER 3 — Evidence-based seed reasoning (NOT raw post copy). ORDER34 HOTFIX: attach allowed_facts. */
+/**
+ * ORDER 3 + ORDER 0B Manual Leakage Separation.
+ * ACCOUNT_ACTIVITY = CREATOR_LEARNING only (topic interest). Never auto SEED from manual body.
+ * SEED_SOURCE = DIMENSION_REGISTRY abstract + CREATOR_INTENT.
+ */
 export function bootstrapCandidatesFromDimensions(opts: {
   publishedSubjects: string[];
   intentText?: string;
@@ -341,11 +286,13 @@ export function bootstrapCandidatesFromDimensions(opts: {
   const out: any[] = [];
   const emitted = new Set<string>();
   const packets: EvidencePacket[] = [];
+  const topicHits = new Map<string, number>();
   const rows: PublishedEvidenceRow[] = Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
     ? opts.publishedEvidence
     : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
 
-  for (const row of rows.slice(0, 24)) {
+  // Learning pass only — do NOT emit seeds from manual ACCOUNT_ACTIVITY rows (ORDER 0B)
+  for (const row of rows.slice(0, 40)) {
     const text = String(row.text || "").trim();
     if (text.length < 12) continue;
     const packet = extractEvidencePacket(text, {
@@ -354,54 +301,58 @@ export function bootstrapCandidatesFromDimensions(opts: {
       published_at: row.published_at,
     });
     if (!packet) continue;
-    if (packet.topic === "OTHER" && packet.entities.length === 0 && packet.experience_facts.length === 0) continue;
+    if (packet.topic === "OTHER" && packet.entities.length === 0) continue;
     packets.push(packet);
-    const reasoned = reasonSeedSubjectFromPacket(packet);
-    const sig = subjectSignature(reasoned.concrete_subject);
+    topicHits.set(packet.topic, (topicHits.get(packet.topic) || 0) + 1);
+  }
+
+  // Abstract SEED_SOURCE from DIMENSION_REGISTRY (weighted by observed interest)
+  const rankedDims = [...DIMENSION_REGISTRY].sort((a, b) => {
+    const ha = topicHits.get(a.cluster) || 0;
+    const hb = topicHits.get(b.cluster) || 0;
+    if (hb !== ha) return hb - ha;
+    return (b.core ? 1 : 0) - (a.core ? 1 : 0);
+  });
+  for (const dim of rankedDims) {
+    const abstractSubject = `${dim.cluster} ${dim.dimension} 관찰·판단 축`.slice(0, 90);
+    const sig = subjectSignature(`${dim.cluster}|${dim.dimension}|abstract`);
     if (emitted.has(sig)) continue;
     emitted.add(sig);
+    const hit = topicHits.get(dim.cluster) || 0;
     out.push({
-      cluster: packet.topic,
-      dimension: packet.subtopic,
-      concrete_subject: reasoned.concrete_subject,
+      cluster: dim.cluster,
+      dimension: dim.dimension,
+      concrete_subject: abstractSubject,
       subject_signature: sig,
-      point_or_tension: reasoned.point_or_tension,
-      primary_source: "EVIDENCE_DERIVED",
-      supporting_sources: ["EVIDENCE_PACKET", packet.source_type],
-      evidence_source_ids: packet.source_ids.length ? packet.source_ids : ["PUB"],
-      creator_evidence_available: true,
-      experience_required: packet.experience_facts.length > 0,
-      source_type: packet.source_type,
-      claim_types: packet.experience_facts.length
-        ? ["PERSONAL_EXPERIENCE"]
-        : packet.creator_opinion.length
-          ? ["OPINION"]
-          : ["OBSERVATION"],
-      inference_type: "EVIDENCE_DERIVED",
-      grounding_status: reasoned.needs_xai ? "XAI_WOULD_HAVE_BEEN_REQUIRED" : "GROUNDED",
-      grounding_reasons: reasoned.needs_xai ? ["THIN_ANCHORS"] : ["PACKET_REASONED"],
-      idea_angle_family: reasoned.idea_angle_family,
-      verified_locations: packet.verified_locations,
-      verified_entities: packet.entities,
+      point_or_tension: "차원 기반 신규 각도 — 수제글 원문·결론 재사용 금지",
+      primary_source: "DIMENSION_REGISTRY",
+      supporting_sources: hit > 0 ? ["DIMENSION_REGISTRY", "CREATOR_LEARNING_SIGNAL"] : ["DIMENSION_REGISTRY"],
+      evidence_source_ids: [],
+      creator_evidence_available: hit > 0,
+      experience_required: false,
+      source_type: "DIMENSION_REGISTRY",
+      claim_types: ["OBSERVATION"],
+      inference_type: "DIMENSION_ABSTRACT",
+      grounding_status: "GROUNDED",
+      grounding_reasons: ["REGISTRY_ABSTRACT"],
+      idea_angle_family: `${dim.cluster}|${dim.dimension}|abstract`,
+      verified_locations: [],
+      verified_entities: [],
       relationship_evidence_ids: [],
-      xai_would_have_been_required: reasoned.needs_xai,
-      factual_anchors: packet.factual_anchors,
-      experience_facts: packet.experience_facts,
-      static_facts: packet.static_facts,
-      current_facts: packet.current_facts,
-      creator_opinion: packet.creator_opinion,
-      allowed_facts: [
-        ...packet.factual_anchors,
-        ...packet.experience_facts,
-        ...packet.static_facts,
-        ...packet.current_facts,
-        ...packet.creator_opinion,
-      ].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 12),
-      do_not_invent: [],
+      xai_would_have_been_required: false,
+      factual_anchors: [],
+      experience_facts: [],
+      static_facts: [],
+      current_facts: [],
+      creator_opinion: [],
+      allowed_facts: [],
+      do_not_invent: ["manual_body_narrative", "manual_punchline", "manual_conclusion"],
       status: "ELIGIBLE",
+      source_role: "SEED_SOURCE",
     });
   }
 
+  // CREATOR_INTENT may still become SEED_SOURCE (not manual body)
   const intent = String(opts.intentText || "").trim();
   if (intent.length >= 10) {
     const packet = extractEvidencePacket(intent, { source_id: "INTENT", source_type: "CREATOR_INTENT" });
@@ -430,26 +381,20 @@ export function bootstrapCandidatesFromDimensions(opts: {
           verified_locations: packet.verified_locations,
           verified_entities: packet.entities,
           xai_would_have_been_required: false,
-          factual_anchors: packet.factual_anchors,
-          experience_facts: packet.experience_facts,
-          static_facts: packet.static_facts,
-          current_facts: packet.current_facts,
-          creator_opinion: packet.creator_opinion,
-          allowed_facts: [
-            ...packet.factual_anchors,
-            ...packet.experience_facts,
-            ...packet.static_facts,
-            ...packet.current_facts,
-            ...packet.creator_opinion,
-          ].filter((x, i, a) => x && a.indexOf(x) === i).slice(0, 12),
-          do_not_invent: [],
+          factual_anchors: (packet.factual_anchors || []).map((a) => String(a).slice(0, 48)).slice(0, 4),
+          experience_facts: [],
+          static_facts: [],
+          current_facts: [],
+          creator_opinion: [],
+          allowed_facts: (packet.factual_anchors || []).map((a) => String(a).slice(0, 48)).slice(0, 6),
+          do_not_invent: ["manual_body_narrative"],
           status: "ELIGIBLE",
+          source_role: "SEED_SOURCE",
         });
       }
     }
   }
 
-  void DIMENSION_REGISTRY.length;
   void packets.length;
   return out;
 }

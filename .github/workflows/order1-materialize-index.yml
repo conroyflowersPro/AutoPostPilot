@@ -1,0 +1,43 @@
+name: ORDER1 Materialize weekly-plan index
+on:
+  workflow_dispatch:
+  push:
+    branches: [order1-seed-interpretation]
+    paths:
+      - "tools/order1-index-parts/**"
+      - "tools/order1-materialize-index.cjs"
+      - ".github/workflows/order1-materialize-index.yml"
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order1-seed-interpretation
+          fetch-depth: 0
+      - name: Materialize index.ts from parts
+        run: node tools/order1-materialize-index.cjs
+      - name: Verify size and markers
+        run: |
+          test -f supabase/functions/weekly-plan/index.ts
+          SIZE=$(wc -c < supabase/functions/weekly-plan/index.ts)
+          echo "size=$SIZE"
+          test "$SIZE" -eq 28952
+          grep -q "interpretSeed" supabase/functions/weekly-plan/index.ts
+          grep -q "guardCandidateAgainstManualLeakage" supabase/functions/weekly-plan/index.ts
+          grep -q "phased_v10_order1_seed_interpretation" supabase/functions/weekly-plan/index.ts
+          sha256sum supabase/functions/weekly-plan/index.ts
+          test "$(sha256sum supabase/functions/weekly-plan/index.ts | awk '{print $1}')" = "c52b891d3fc9cd49c7d0bcc1cd6211b990334980c14f07521ee0ba25f2bec0a8"
+      - name: Commit if changed
+        run: |
+          git config user.name "order1-materialize-bot"
+          git config user.email "order1-materialize@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "ORDER1: restore full weekly-plan/index.ts from SOT parts (28952B sha256 c52b891d)"
+            git push origin HEAD:order1-seed-interpretation
+          fi

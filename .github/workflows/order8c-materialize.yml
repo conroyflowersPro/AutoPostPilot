@@ -1,0 +1,32 @@
+name: ORDER8C Materialize Index Wire
+on:
+  workflow_dispatch:
+  push:
+    branches: [order8c-weekly-count-full-system-qa]
+    paths:
+      - 'tools/order8c-wire-index.mjs'
+      - 'supabase/functions/weekly-plan/weekly-count-ledger.ts'
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8c-weekly-count-full-system-qa
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Wire index if needed
+        run: |
+          node tools/order8c-wire-index.mjs || true
+          grep -n ORDER8C_VERSION supabase/functions/weekly-plan/index.ts | head -5 || true
+          grep -n "10.0.0-order8c" supabase/functions/weekly-plan/index.ts | head -3 || true
+      - name: Commit if changed
+        run: |
+          git config user.name "order8c-bot"
+          git config user.email "bot@local"
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then
+            echo "NO_INDEX_CHANGE"
+          else
+            git commit -m "ORDER 8C: materialize weekly-count-ledger wire into index.ts"
+            git push origin order8c-weekly-count-full-system-qa
+          fi

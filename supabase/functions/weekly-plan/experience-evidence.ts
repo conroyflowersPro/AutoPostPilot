@@ -1,7 +1,6 @@
 /**
- * EXPERIENCE evidence pipeline — Production canonical (v9.1.2)
- * Priority: (1) recent 14d handmade X only in production default
- * Static catalog REMOVED — never invent 1st-person experience.
+ * EXPERIENCE evidence pipeline — Production + ORDER 0B
+ * Manual posts = learning/grounding only; never body.slice as seed subject.
  */
 
 export type ExperienceProvenance =
@@ -24,6 +23,8 @@ export type ExperienceCandidate = {
   source_ref?: string;
   published_at?: string;
   idea_angle_hint?: string;
+  source_role?: string;
+  seed_eligible?: boolean;
 };
 
 export type ExperienceSupplyReport = {
@@ -76,31 +77,35 @@ function clusterFromText(text: string): string {
   return "DAILY";
 }
 
+/** ORDER 0B — Abstract subject only. Manual body must never become concrete_subject. */
 export function extractExperienceMaterial(
   text: string,
-  meta?: { published_at?: string; post_type?: string; source_ref?: string }
+  meta?: { published_at?: string; post_type?: string; source_ref?: string; user_explicit?: boolean }
 ): ExperienceCandidate | null {
   const body = String(text || "").trim();
   if (body.length < 12) return null;
   if (!isExperientialText(body)) return null;
   const expClass = classifyExperienceTime(body, meta?.published_at);
   const cluster = clusterFromText(body);
-  let subject = body
-    .replace(/https?:\/\/\S+/g, "")
-    .replace(/@\w+/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 90);
-  if (/충전/.test(body)) subject = subject.includes("충전") ? subject : `실제 충전 세션에서 본 ${subject.slice(0, 40)}`;
-  if (/직관|bmo|lafc/i.test(body)) subject = `직관 동선·현장에서 본 ${subject.slice(0, 50)}`;
   const historical = expClass === "HISTORICAL";
+  let subject: string;
+  if (cluster === "FSD") {
+    if (/합류|merge/i.test(body)) subject = historical ? "과거 FSD 합류 장면 관찰 (시점 프레임 필수)" : "FSD 합류 장면 실사용 관찰 축";
+    else if (/감시|감독|supervision/i.test(body)) subject = "FSD 감시 부하·개입 타이밍 관찰 축";
+    else subject = historical ? "과거 FSD 실사용에서 본 합류·감시 패턴" : "FSD 실사용 관찰 — 합류/감시 부하 축";
+  } else if (cluster === "CYBERTRUCK") {
+    subject = /충전/.test(body) ? "실제 충전 세션에서 본 대기·속도 트레이드오프" : "Cybertruck 실사용 충전/동선 관찰 축";
+  } else if (cluster === "LAFC") subject = "LAFC 직관 동선·현장 관찰 축";
+  else if (cluster === "ROBOTAXI") subject = "Robotaxi 현장 동선·승하차 관찰 축";
+  else subject = `${cluster} 실사용·현장 관찰 축`;
+  const userExplicit = !!meta?.user_explicit;
   return {
     cluster,
     dimension: historical ? "HISTORICAL_EXPERIENCE" : "RECENT_EXPERIENCE",
-    concrete_subject: subject,
+    concrete_subject: subject.slice(0, 90),
     point_or_tension: historical
-      ? "과거 시점 프레임 필수 — 현재 사실처럼 쓰지 말 것"
-      : "경험 사실·관찰·패턴만 사용, 원문 재게시 금지",
+      ? "과거 시점 프레임 필수 — 현재 사실처럼 쓰지 말 것; 원문 재게시 금지"
+      : "경험 사실·관찰·패턴만 사용, 원문·결론·punchline 재사용 금지",
     experience_class: expClass,
     provenance: "RECENT_MANUAL_14D",
     creator_evidence_available: true,
@@ -109,6 +114,8 @@ export function extractExperienceMaterial(
     source_ref: meta?.source_ref || meta?.published_at,
     published_at: meta?.published_at,
     idea_angle_hint: historical ? "THEN_VS_NOW_SAFE" : "LIVED_OBSERVATION",
+    source_role: userExplicit ? "USER_EXPLICIT_SEED" : "CREATOR_LEARNING_SIGNAL",
+    seed_eligible: userExplicit,
   };
 }
 
@@ -140,7 +147,7 @@ export function buildRecentExperienceCandidates(
     });
     if (!cand) continue;
     cand.provenance = "RECENT_MANUAL_14D";
-    const key = cand.concrete_subject.slice(0, 60);
+    const key = `${cand.cluster}|${cand.concrete_subject}`.slice(0, 80);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(cand);
@@ -148,7 +155,6 @@ export function buildRecentExperienceCandidates(
   return out;
 }
 
-/** Production static catalog REMOVED — empty by design */
 export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = [];
 
 const EXAMPLE_CONTAMINATION = [
@@ -177,11 +183,17 @@ export function resolveExperienceSupply(
   let archive_fallback_used = 0;
   let experience_supply_low = 0;
   const provenance_counts: Record<string, number> = {};
-  const take = (list: ExperienceCandidate[], max: number) => {
+  let recent_blocked_as_seed = 0;
+  const take = (list: ExperienceCandidate[], max: number, requireSeedEligible: boolean) => {
     for (const c of list) {
       if (selected.length >= max) break;
       if (isExampleContamination(c.concrete_subject)) {
         notes.push("EXAMPLE_CONTAMINATION_SKIPPED");
+        continue;
+      }
+      if (requireSeedEligible && !c.seed_eligible) {
+        recent_blocked_as_seed += 1;
+        notes.push("ORDER0B_BLOCK_MANUAL_AUTO_SEED");
         continue;
       }
       if (selected.some((s) => s.concrete_subject === c.concrete_subject)) continue;
@@ -190,15 +202,15 @@ export function resolveExperienceSupply(
       if (c.provenance !== "RECENT_MANUAL_14D") archive_fallback_used += 1;
     }
   };
-  take(recent, need);
+  take(recent, need, true);
   const recent_adopted = selected.length;
   if (selected.length < need) {
     archive_explored = true;
     notes.push("RECENT_SUPPLY_SHORT → archive empty or short");
     const timeless = archive.filter((a) => a.experience_class === "TIMELESS");
     const historical = archive.filter((a) => a.experience_class === "HISTORICAL");
-    take(timeless, need);
-    if (selected.length < need) take(historical, need);
+    take(timeless, need, false);
+    if (selected.length < need) take(historical, need, false);
   } else {
     notes.push("RECENT_SUFFICIENT → archive not explored");
   }
@@ -206,6 +218,7 @@ export function resolveExperienceSupply(
     experience_supply_low = need - selected.length;
     notes.push("EXPERIENCE_SUPPLY_LOW after recent+archive");
   }
+  notes.push(`ORDER0B_RECENT_BLOCKED=${recent_blocked_as_seed}`);
   return {
     selected,
     report: {
@@ -246,9 +259,14 @@ export function experienceCandidateToSeedFields(c: ExperienceCandidate): Record<
     historical_framing_required: c.historical_framing_required,
     status: "ELIGIBLE",
     claim_types: ["PERSONAL_EXPERIENCE"],
-    allowed_facts: subject ? [subject.slice(0, 120)] : [],
-    factual_anchors: subject ? [subject.slice(0, 120)] : [],
+    allowed_facts: [],
+    factual_anchors: [],
+    source_role: c.source_role || "CREATOR_LEARNING_SIGNAL",
+    seed_eligible: !!c.seed_eligible,
     do_not_invent: [
+      "manual_body_narrative",
+      "manual_punchline",
+      "manual_conclusion",
       "오늘/어제/이번 주 시점 발명",
       "출퇴근 경로 발명",
       "방문 장소 발명",

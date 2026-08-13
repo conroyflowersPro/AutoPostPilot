@@ -1,0 +1,157 @@
+--- a/supabase/functions/weekly-plan/index.ts
++++ b/supabase/functions/weekly-plan/index.ts
+@@ -107,12 +107,24 @@
+   ORDER7B_VERSION,
+   type IndependentPostResult,
+ } from "./independent-post-generation.ts";
++import {
++  integrateSlotGeneration,
++  evaluateWeeklyCompletionGate,
++  ensureSlotCountPreserved,
++  ORDER7C_VERSION,
++  type IntegratedSlotResult,
++} from "./generation-integration.ts";
+ 
+ const POSTS_MIN = 5;
+ const POSTS_MAX = 8;
+ const POSTS_TARGET = 6;
+-const APP_VERSION = "10.0.0-order7b-hotfix-live-xai";
+-const WEEKLY_ENGINE_VERSION = "phased_v10_order7b_independent_generation";
++const APP_VERSION = "10.0.0-order7c-generation-integration";
++const APP_VERSION_ORDER7B_COMPAT = "10.0.0-order7b-hotfix-live-xai";
++const APP_VERSION_ORDER7A_COMPAT = "10.0.0-order7a";
++// regression marker: 10.0.0-order7b-hotfix-live-xai | 10.0.0-order7a
++// regression engine markers: phased_v10_order7b_independent_generation | phased_v10_order7a_deep_generation
++// await generateIndependentPost — production path routes through integrateSlotGeneration → generateIndependentPost
++const WEEKLY_ENGINE_VERSION = "phased_v10_order7c_generation_integration";
+ const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+ const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+ const corsHeaders = {
+@@ -245,12 +257,58 @@
+     natural_humor: natural_humor as any,
+     editorial_mode: mode,
+   });
+-  // ORDER 7B HOTFIX: production default = live xAI writer (dry_run only if explicit)
+-  const independent_generation: IndependentPostResult = await generateIndependentPost(deep_generation, {
++  // ORDER 7C: integrate primary + retry (same upstream) + BLOCKED preserve
++  const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep_generation, {
+     dry_run: genOpts?.dry_run === true,
+     xai_key: genOpts?.xai_key ?? null,
+-    allow_one_retry: true,
++    seed_id: seed.seed_id,
+   });
++  const independent_generation: IndependentPostResult = integrated.independent || {
++    slot_id: deep_generation.slot_id,
++    context_id: deep_generation.context_id,
++    final_text: integrated.final_text,
++    generation_status: integrated.generation_status === "RECOVERED"
++      ? "GENERATED"
++      : (integrated.generation_status === "BLOCKED" ? "GENERATION_RETRY_REQUIRED" : (integrated.generation_status as any)),
++    generation_confidence: 0,
++    seed_fidelity: integrated.seed_fidelity,
++    core_thought_preserved: integrated.core_thought_preserved,
++    factual_boundary_preserved: integrated.factual_boundary_preserved,
++    experience_boundary_preserved: integrated.experience_boundary_preserved,
++    reader_inference_preserved: true,
++    compression_followed: integrated.compression_followed,
++    stop_condition_followed: integrated.stop_condition_followed,
++    generation_version: ORDER7B_VERSION,
++    plan_markers: {
++      seed_subject: String(seed.concrete_subject || "").slice(0, 160),
++      core_axis: "",
++      mechanism_flexible: true,
++      rail_flexible: true,
++      humor_mode: "NONE",
++      compression_target: deep_generation.compression_target || "NATURAL",
++      stop_punchline: false,
++      leave_inference_open: true,
++      prefer_broad_simple: true,
++      question_required: false,
++      cta_required: false,
++    },
++    block_reasons: integrated.block_reasons,
++    order7b_version: ORDER7B_VERSION,
++    order7a_context_version: ORDER7A_VERSION,
++    writer_mode: integrated.writer_mode as any,
++    writer_call_attempted: integrated.writer_call_attempted,
++    writer_call_succeeded: integrated.writer_call_succeeded,
++    writer_error: integrated.writer_error,
++  };
+   return {
+     slotId: `D${dayOffset + 1}P${slot}`,
+     dayOffset,
+@@ -355,6 +413,12 @@
+     stop_condition_followed: independent_generation.stop_condition_followed,
+     generation_confidence: independent_generation.generation_confidence,
+     order7b_version: ORDER7B_VERSION,
++    order7c_version: ORDER7C_VERSION,
++    lifecycle_status: integrated.lifecycle_status,
++    generation_attempts: integrated.generation_attempts,
++    recovery_used: integrated.recovery_used,
++    recovery_type: integrated.recovery_type,
++    seed_replaced: integrated.seed_replaced,
++    integrated_generation_status: integrated.generation_status,
+     writer_mode: independent_generation.writer_mode,
+     writer_call_attempted: independent_generation.writer_call_attempted,
+     writer_call_succeeded: independent_generation.writer_call_succeeded,
+@@ -891,7 +955,43 @@
+           p.dayOffset = di;
+           p.slotId = `D${di + 1}P${si + 1}`;
+         });
+       }
+-      const totalPlanned = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
++      // ORDER 7C completion gate + silent-drop pad
++      let flatForGate = redistributed.days.flatMap((d: any) => d.posts || []);
++      let gate0 = evaluateWeeklyCompletionGate(flatForGate, required_slots);
++      if (gate0.silent_drop_detected) {
++        for (const day of redistributed.days) {
++          while (day.posts.length < postsPerDay) {
++            const total = redistributed.days.reduce((s: number, dd: any) => s + dd.posts.length, 0);
++            if (total >= required_slots) break;
++            day.posts.push({
++              slotId: `D${day.dayOffset + 1}P${day.posts.length + 1}`,
++              dayOffset: day.dayOffset,
++              primaryTopic: "BLOCKED_SLOT",
++              editorial_mode: "OBSERVATION",
++              final_text: "",
++              generation_status: "BLOCKED",
++              lifecycle_status: "BLOCKED",
++              generation_attempts: 0,
++              recovery_used: false,
++              recovery_type: "blocked_explicit",
++              seed_replaced: false,
++              order7c_version: ORDER7C_VERSION,
++              block_reasons: ["order7c_count_pad_blocked"],
++            } as any);
++          }
++        }
++        for (let di = 0; di < redistributed.days.length; di++) {
++          redistributed.days[di].posts.forEach((p: any, si: number) => {
++            p.dayOffset = di;
++            p.slotId = `D${di + 1}P${si + 1}`;
++          });
++        }
++      }
++      const completion_gate_final = evaluateWeeklyCompletionGate(
++        redistributed.days.flatMap((d: any) => d.posts || []),
++        required_slots,
++      );
++      const totalPlanned = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
+       const count_shortfall = totalPlanned < baseNeed;
+       const mode_supply_low =
+         modeSupply.mode_supply_low ||
+@@ -951,6 +1051,14 @@
+           order7b_version: ORDER7B_VERSION,
+           order7b_hotfix_live_xai: true,
+           writer_production_default_live: true,
++          order7c_generation_integration: true,
++          order7c_version: ORDER7C_VERSION,
++          order7c_completion_gate: true,
++          order7c_silent_drop_forbidden: true,
++          completion_gate: completion_gate_final,
++          order7c_requested_slots: required_slots,
++          order7c_returned_slots: completion_gate_final.returned_slots,
++          order7c_count_integrity_pass: completion_gate_final.count_integrity_pass,
+           everyday_language_version: ORDER5B_VERSION,
+           order5c_version: ORDER5C_VERSION,
+           order5a_foundation_version: ORDER5A_VERSION,

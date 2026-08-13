@@ -1,0 +1,30 @@
+[
+  {
+    "path": "supabase/functions/weekly-plan/reaction-mechanisms.ts",
+    "sha256": "5abdeaecadb87114d5d3e521936099e4eabae976c0fd60d25f882150b2f69ce2",
+    "size": 6302,
+    "parts": 4,
+    "prefix": "supabase__functions__weekly-plan__reaction-mechanisms.ts"
+  },
+  {
+    "path": "supabase/functions/weekly-plan/reader-self-projection.ts",
+    "sha256": "33e0691c087c8b6a4c52d742025ffa9380a53d9f20a879a0c9a12f2249d9d99d",
+    "size": 14566,
+    "parts": 6,
+    "prefix": "supabase__functions__weekly-plan__reader-self-projection.ts"
+  },
+  {
+    "path": "supabase/functions/weekly-plan/index.ts",
+    "sha256": "ce80371f234c0ae95a01d8546bd8b8be283fef0f13a98a7c18c0ea8c44f67af0",
+    "size": 30804,
+    "parts": 12,
+    "prefix": "supabase__functions__weekly-plan__index.ts"
+  },
+  {
+    "path": "tools/order2-reader-mechanism-test.mjs",
+    "sha256": "e53218464d855612f340d387dcfa113a894d524fa3f8d039ef3434d033259f4a",
+    "size": 2475,
+    "parts": 2,
+    "prefix": "tools__order2-reader-mechanism-test.mjs"
+  }
+]

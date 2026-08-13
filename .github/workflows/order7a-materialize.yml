@@ -1,0 +1,42 @@
+name: ORDER7A materialize
+on:
+  push:
+    branches: [order7a-deep-generation-context]
+    paths:
+      - "tools/order7a-index.patch"
+      - ".github/workflows/order7a-materialize.yml"
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order7a-deep-generation-context
+      - name: Apply index patch if needed
+        run: |
+          set -e
+          if grep -q 'const deep_generation' supabase/functions/weekly-plan/index.ts; then
+            echo "index already wired"
+          else
+            echo "applying tools/order7a-index.patch"
+            patch -p1 --forward < tools/order7a-index.patch
+          fi
+          test -f supabase/functions/weekly-plan/deep-generation-context.ts
+          grep -q 'buildDeepGenerationContext' supabase/functions/weekly-plan/deep-generation-context.ts
+          grep -q 'buildDeepGenerationContext' supabase/functions/weekly-plan/index.ts
+          grep -q '10.0.0-order7a' supabase/functions/weekly-plan/index.ts
+          grep -q 'phased_v10_order7a_deep_generation' supabase/functions/weekly-plan/index.ts
+          grep -n 'order7a\|buildDeepGenerationContext\|deep_generation' supabase/functions/weekly-plan/index.ts | head -20
+          wc -c supabase/functions/weekly-plan/deep-generation-context.ts supabase/functions/weekly-plan/index.ts
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then echo no changes; else
+            git commit -m "ORDER7A: materialize index.ts Deep Generation Context wiring"
+            git push
+          fi

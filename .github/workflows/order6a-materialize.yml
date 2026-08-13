@@ -1,0 +1,33 @@
+name: ORDER6A materialize
+on:
+  push:
+    branches: [order6a-creator-style-decision]
+    paths:
+      - 'tools/order6a-*.gz.b64*'
+      - 'tools/order6a-index.patch'
+      - 'tools/order6a-materialize.mjs'
+      - '.github/workflows/order6a-materialize.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order6a-creator-style-decision
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Materialize
+        run: node tools/order6a-materialize.mjs
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/creator-style-decision.ts supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then echo "No changes"; else
+            git commit -m "ORDER6A: materialize creator-style-decision + index wiring"
+            git push
+          fi

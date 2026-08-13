@@ -1,0 +1,37 @@
+--- a/supabase/functions/weekly-plan/index.ts
++++ b/supabase/functions/weekly-plan/index.ts
+@@ -82,13 +82,14 @@
+   type EverydayLanguageDecision,
+   ORDER5A_VERSION,
+   ORDER5B_VERSION,
++  ORDER5C_VERSION,
+ } from "./everyday-language-reasoning.ts";
+ 
+ const POSTS_MIN = 5;
+ const POSTS_MAX = 8;
+ const POSTS_TARGET = 6;
+-const APP_VERSION = "10.0.0-order5b";
+-const WEEKLY_ENGINE_VERSION = "phased_v10_order5b_everyday_language";
++const APP_VERSION = "10.0.0-order5c";
++const WEEKLY_ENGINE_VERSION = "phased_v10_order5c_everyday_hardened";
+ const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+ const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+ const corsHeaders = {
+@@ -223,6 +224,7 @@
+     sensationalism_blocked: everyday_language.sensationalism_blocked,
+     self_projection_preservation: everyday_language.self_projection_preservation,
+     order5b_version: ORDER5B_VERSION,
++    order5c_version: ORDER5C_VERSION,
+     style_decision: null,
+   };
+ }
+@@ -799,7 +801,9 @@
+           order3_thinking_rail: true,
+           thinking_rail_version: ORDER3_VERSION,
+           order5b_everyday_language: true,
++          order5c_everyday_hardened: true,
+           everyday_language_version: ORDER5B_VERSION,
++          order5c_version: ORDER5C_VERSION,
+           order5a_foundation_version: ORDER5A_VERSION,
+           interpretation_ok,
+           interpretation_weak,

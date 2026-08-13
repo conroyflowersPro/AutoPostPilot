@@ -1,0 +1,34 @@
+name: order5a-materialize
+on:
+  push:
+    branches:
+      - order5a-everyday-language-foundation
+    paths:
+      - "tools/order5a-parts/**"
+      - "tools/order5a-materialize.mjs"
+      - ".github/workflows/order5a-materialize.yml"
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order5a-everyday-language-foundation
+      - name: Materialize full production files
+        run: node tools/order5a-materialize.mjs
+      - name: Run ORDER5A tests
+        run: ORDER5A_ROOT=$PWD node tools/order5a-everyday-language-test.mjs
+      - name: Commit materialized files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/weekly-plan/everyday-language-reasoning.ts tools/order5a-everyday-language-test.mjs
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ORDER5A: materialize everyday-language-reasoning + tests (45/45)"
+            git push origin order5a-everyday-language-foundation
+          fi
