@@ -28,6 +28,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 type ActivityRow = {
@@ -145,8 +146,7 @@ Deno.serve(async (req: Request) => {
     // 1) Prefer real user JWT
     if (authHeader) {
       const userClient = createClient(supabaseUrl, supabaseAnon, {
-        global: { headers: { Authorization: authHeader } },
-      });
+        global: { headers: { Authorization: authHeader } });
       const {
         data: { user },
         error: userErr,
