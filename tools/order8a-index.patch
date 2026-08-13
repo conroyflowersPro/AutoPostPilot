@@ -1,0 +1,99 @@
+--- a/supabase/functions/weekly-plan/index.ts
++++ b/supabase/functions/weekly-plan/index.ts
+@@ -114,17 +114,24 @@
+   ORDER7C_VERSION,
+   type IntegratedSlotResult,
+ } from "./generation-integration.ts";
++import {
++  judgeIndependentResult,
++  ORDER8A_VERSION,
++  type SemanticJudgeResult,
++} from "./semantic-judge.ts";
+ 
+ const POSTS_MIN = 5;
+ const POSTS_MAX = 8;
+ const POSTS_TARGET = 6;
+-const APP_VERSION = "10.0.0-order7c-generation-integration";
++const APP_VERSION = "10.0.0-order8a-semantic-judge";
++const APP_VERSION_ORDER7C_COMPAT = "10.0.0-order7c-generation-integration";
+ const APP_VERSION_ORDER7B_COMPAT = "10.0.0-order7b-hotfix-live-xai";
+ const APP_VERSION_ORDER7A_COMPAT = "10.0.0-order7a";
+ // regression marker: 10.0.0-order7b-hotfix-live-xai | 10.0.0-order7a
+ // regression engine markers: phased_v10_order7b_independent_generation | phased_v10_order7a_deep_generation
+ // await generateIndependentPost — production path routes through integrateSlotGeneration → generateIndependentPost
+-const WEEKLY_ENGINE_VERSION = "phased_v10_order7c_generation_integration";
++const WEEKLY_ENGINE_VERSION = "phased_v10_order8a_semantic_judge";
++// regression: phased_v10_order7c_generation_integration | phased_v10_order7b_independent_generation
+ const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+ const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
+ const corsHeaders = {
+@@ -300,6 +307,38 @@
+     writer_call_succeeded: integrated.writer_call_succeeded,
+     writer_error: integrated.writer_error,
+   };
++  // ORDER 8A: Semantic Judge (evaluate only — no rewrite / no auto-regeneration)
++  let semantic_judge_result: SemanticJudgeResult | null = null;
++  try {
++    semantic_judge_result = judgeIndependentResult(deep_generation, independent_generation, undefined, {
++      xai_key: (genOpts as any)?.xai_key ?? null,
++    });
++  } catch {
++    semantic_judge_result = {
++      slot_id: independent_generation.slot_id,
++      context_id: independent_generation.context_id,
++      overall_status: "JUDGE_UNAVAILABLE",
++      hard_fail_reasons: [],
++      soft_concerns: [],
++      scores: {
++        seed_fidelity: 0, core_thought_preservation: 0, creator_fit: 0, factual_grounding: 0,
++        experience_grounding: 0, reader_self_projection: 0, mechanism_fit: 0, rail_fit: 0,
++        everyday_language_fit: 0, style_fit: 0, humor_fit: 0, inference_space_fit: 0,
++        compression_fit: 0, stop_condition_fit: 0, anti_ai_voice_fit: 0, novelty_fit: 0,
++      },
++      flags: {
++        fabricated_fact: false, fabricated_experience: false, manual_text_leakage: false,
++        forced_cta: false, forced_question: false, ai_report_voice: false, over_explained: false,
++        over_connected: false, template_like: false, conceptual_repetition: "LOW",
++      },
++      judge_version: ORDER8A_VERSION,
++      judge_call_attempted: true,
++      judge_call_succeeded: false,
++      judge_error: "judge_attach_exception",
++      judge_mode: "unavailable",
++    };
++  }
++
+   return {
+     slotId: `D${dayOffset + 1}P${slot}`,
+     dayOffset,
+@@ -397,6 +436,19 @@
+     independent_generation,
+     independent_generation_status: independent_generation.generation_status,
+     final_text: independent_generation.final_text,
++    // ORDER 8A judge attach (generation_status remains separate from judge_status)
++    semantic_judge: semantic_judge_result,
++    judge_status: semantic_judge_result?.overall_status ?? "JUDGE_UNAVAILABLE",
++    order8a_version: ORDER8A_VERSION,
++    judge_call_attempted: semantic_judge_result?.judge_call_attempted ?? false,
++    judge_call_succeeded: semantic_judge_result?.judge_call_succeeded ?? false,
++    judge_error: semantic_judge_result?.judge_error ?? null,
++    hard_fail_count: semantic_judge_result?.hard_fail_reasons?.length ?? 0,
++    soft_concern_count: semantic_judge_result?.soft_concerns?.length ?? 0,
++    judge_seed_fidelity: semantic_judge_result?.scores?.seed_fidelity ?? 0,
++    judge_core_thought_preservation: semantic_judge_result?.scores?.core_thought_preservation ?? 0,
++    judge_creator_fit: semantic_judge_result?.scores?.creator_fit ?? 0,
++    judge_conceptual_repetition: semantic_judge_result?.flags?.conceptual_repetition ?? "LOW",
+     seed_fidelity: independent_generation.seed_fidelity,
+     core_thought_preserved: independent_generation.core_thought_preserved,
+     experience_boundary_preserved: independent_generation.experience_boundary_preserved,
+@@ -1050,6 +1102,10 @@
+           order7c_version: ORDER7C_VERSION,
+           order7c_completion_gate: true,
+           order7c_silent_drop_forbidden: true,
++          order8a_semantic_judge: true,
++          order8a_version: ORDER8A_VERSION,
++          order8a_judge_only: true,
++          order8a_no_auto_regeneration: true,
+           completion_gate: completion_gate_final,
+           order7c_requested_slots: required_slots,
+           order7c_returned_slots: completion_gate_final.returned_slots,
