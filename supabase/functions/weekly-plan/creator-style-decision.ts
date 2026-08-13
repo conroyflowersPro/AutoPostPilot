@@ -1,23 +1,26 @@
 /**
- * ORDER 6A — Contextual Creator Style Decision Foundation
+ * ORDER 6A/6B — Contextual Creator Style Decision
  *
  * Decides surface writing *tendencies* for this specific post while preserving
  * one coherent creator identity. Style ≠ template, ≠ wording, ≠ humor engine.
  *
  * Pipeline position (conceptual):
- *   … → Thinking Rail → Everyday Language → Creator Style Decision → downstream
+ *   … → Thinking Rail → Everyday Language → Creator Style Decision → Natural Humor → downstream
  *
  * Forbidden deterministic shortcuts:
  *   Topic → Style | Editorial Mode → Style | Mechanism → Style | Rail → Style | Everyday status → Style
  *
  * Primary evidence: structured Creator / Writing DNA tendencies only.
+ * ORDER 6B: multi-signal contextual scoring (Interpretation, Self-Projection, Mechanism,
+ * Rail, Everyday, recent usage) without any direct map.
  * Raw manual posts, historical full text, audience comments, few-shot examples: BLOCKED.
  *
- * Humor: foundation placeholder only (HUMOR_NOT_EVALUATED / COMPATIBLE / UNSUPPORTED / UNKNOWN).
- * No joke / ㅋㅋ / punchline generation in ORDER 6A.
+ * Humor surface generation is NOT in this module (see natural-humor-decision.ts).
+ * This module may still emit a soft humor_decision compatibility hint for downstream.
  */
 
 export const ORDER6A_VERSION = "creator_style_decision_v1_order6a";
+export const ORDER6B_STYLE_VERSION = "creator_style_decision_v1_order6b_contextual";
 export const ORDER6A_STYLE_LAYER = true as const;
 export const ORDER6A_NO_TOPIC_STYLE_MAP = true as const;
 export const ORDER6A_NO_EDITORIAL_STYLE_MAP = true as const;
@@ -125,18 +128,26 @@ export type StyleContextInput = {
   creator_dna?: CreatorWritingDnaSignals | null;
   /** Soft context — never a direct map key to a fixed style */
   interpretation_status?: string | null;
+  interpretation_confidence?: number | null;
   has_lived_reflection?: boolean | null;
   has_personal_history_signal?: boolean | null;
+  has_relationship_context?: boolean | null;
   mechanism_status?: string | null;
+  mechanism_id?: string | null;
   story_invitation_strength?: string | null;
+  self_projection_strength?: string | null;
+  reader_inference_preference?: "high" | "medium" | "low" | null;
   rail_status?: string | null;
   rail_compression_preference?: "high" | "medium" | "low" | null;
+  rail_reasoning_shape?: string | null;
   everyday_language_status?: string | null;
   everyday_minimal_context_sufficient?: boolean | null;
   everyday_precision_conflict?: boolean | null;
   editorial_mode?: string | null;
   topic_cluster?: string | null;
   prefer_short?: boolean | null;
+  has_factual_grounding?: boolean | null;
+  has_experience_grounding?: boolean | null;
   /** Soft recent-usage counts by style_id — never forces rotation */
   recent_style_counts?: Record<string, number> | null;
 };
@@ -469,12 +480,43 @@ function scoreFamily(
     reasons.push("sparse_dna_prefers_neutral_identity");
   }
 
+  // Soft multi-signal context (ORDER 6B) — never deterministic maps
+  const proj = String(ctx.self_projection_strength || "").toUpperCase();
+  if (proj === "HIGH" && profile.reader_inference_space === "high") {
+    score += 0.05;
+    reasons.push("self_projection_soft_align");
+  }
+  if (ctx.reader_inference_preference === "high" && profile.reader_inference_space === "high") {
+    score += 0.04;
+    reasons.push("reader_inference_soft_align");
+  }
+  if (ctx.has_relationship_context && profile.reflection_level === "high") {
+    score += 0.05;
+    reasons.push("relationship_context_soft_reflective");
+  }
+  if (ctx.has_experience_grounding && profile.storytelling_level !== "low") {
+    score += 0.04;
+    reasons.push("experience_grounding_soft_story");
+  }
+  if (ctx.has_factual_grounding && profile.technical_density === "high") {
+    score += 0.03;
+    reasons.push("factual_grounding_soft_tech");
+  }
+  // interpretation confidence soft only
+  const ic = typeof ctx.interpretation_confidence === "number" ? ctx.interpretation_confidence : null;
+  if (ic != null && ic >= 0.7 && profile.directness === "high") {
+    score += 0.03;
+    reasons.push("high_interp_confidence_soft_direct");
+  }
+
   // Explicitly do NOT read topic_cluster or editorial_mode as selection keys.
   // They may exist on context for diagnostics only.
   void ctx.topic_cluster;
   void ctx.editorial_mode;
   void ctx.mechanism_status;
+  void ctx.mechanism_id;
   void ctx.rail_status;
+  void ctx.rail_reasoning_shape;
 
   return { score: clamp01(score), reasons };
 }
@@ -522,7 +564,7 @@ function blockedDecision(reasons: string[]): CreatorStyleDecision {
 }
 
 /**
- * Runtime Creator Style Decision (ORDER 6A foundation).
+ * Runtime Creator Style Decision (ORDER 6A foundation / 6B contextual).
  * Soft contextual scoring over abstract families; Creator DNA primary.
  * No Topic/Mode/Mechanism/Rail → Style maps. No humor generation.
  */
@@ -656,4 +698,6 @@ export const ORDER6A_GUARDS = {
   no_auto_kkk: ORDER6A_NO_AUTO_KKK,
   no_auto_self_deprecation: ORDER6A_NO_AUTO_SELF_DEPRECATION,
   creator_coherence_first: ORDER6A_CREATOR_COHERENCE_FIRST,
+  order6b_contextual: true,
+  order6b_style_version: ORDER6B_STYLE_VERSION,
 } as const;
