@@ -1,0 +1,29 @@
+name: ORDER8C Gunzip Materialize Index
+on:
+  workflow_dispatch:
+  push:
+    branches: [order8c-weekly-count-full-system-qa]
+    paths:
+      - 'tools/order8c-index.gz.b64'
+      - 'tools/order8c-gunzip-index.mjs'
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8c-weekly-count-full-system-qa
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gunzip index
+        run: node tools/order8c-gunzip-index.mjs
+      - name: Commit
+        run: |
+          git config user.name "order8c-bot"
+          git config user.email "bot@local"
+          git add supabase/functions/weekly-plan/index.ts
+          if git diff --cached --quiet; then
+            echo "NO_CHANGE"
+          else
+            git commit -m "ORDER 8C: materialize wired canonical index.ts from gzip (SOT)"
+            git push origin order8c-weekly-count-full-system-qa
+          fi
