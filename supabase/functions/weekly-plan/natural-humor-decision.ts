@@ -1,5 +1,5 @@
 /**
- * ORDER 6B — Natural Humor Intelligence
+ * ORDER 6B/6C — Natural Humor Intelligence (hardened)
  *
  * Structured permission/compatibility decision only.
  * Answers: is there a naturally available humorous beat in this Seed/context,
@@ -7,12 +7,19 @@
  * Does NOT answer: how can we make this post funny?
  *
  * No jokes, punchlines, ㅋㅋ, or finished prose are stored or generated.
- * No Topic/Mode/Mechanism/Rail → Humor maps.
+ * No Topic/Mode/Mechanism/Rail/Style-family → Humor maps.
  * No CASUAL → Humor. No EXPERIENCE → self-deprecation.
  * No humor quota. Humor must be earned from grounded context signals.
+ * ORDER 6C: NONE is normal; no humor formula; no explanatory-tail force.
  */
 
 export const ORDER6B_HUMOR_VERSION = "natural_humor_decision_v1_order6b";
+export const ORDER6C_HUMOR_VERSION = "natural_humor_decision_v1_order6c_hardened";
+export const ORDER6C_HUMOR_OPTIONAL = true as const;
+export const ORDER6C_NO_STYLE_FAMILY_HUMOR_MAP = true as const;
+export const ORDER6C_NO_EXPLANATORY_TAIL_FORCE = true as const;
+export const ORDER6C_NO_HUMOR_FORMULA = true as const;
+export const ORDER6C_NONE_IS_NORMAL = true as const;
 export const ORDER6B_NO_HUMOR_QUOTA = true as const;
 export const ORDER6B_NO_CASUAL_HUMOR_MAP = true as const;
 export const ORDER6B_NO_EXPERIENCE_SELF_DEPRECATION_MAP = true as const;
@@ -72,10 +79,10 @@ export type NaturalHumorDecision = {
   preserves_self_projection: boolean;
   recent_humor_repetition_risk: HumorRisk;
   order6b_humor_version: string;
+  order6c_humor_version?: string;
 };
 
 export type HumorContextInput = {
-  /** Soft structured signals only — never map keys */
   interpretation_status?: string | null;
   has_irony_signal?: boolean | null;
   has_contradiction_signal?: boolean | null;
@@ -100,7 +107,6 @@ export type HumorContextInput = {
   style_family?: string | null;
   prefer_short?: boolean | null;
   story_invitation_strength?: string | null;
-  /** Soft recent usage — never forces rotation */
   recent_humor_counts?: Record<string, number> | null;
   recent_self_deprecation_count?: number | null;
   recent_punchline_count?: number | null;
@@ -215,13 +221,10 @@ function blockedHumor(reasons: string[]): NaturalHumorDecision {
     preserves_self_projection: true,
     recent_humor_repetition_risk: "low",
     order6b_humor_version: ORDER6B_HUMOR_VERSION,
+    order6c_humor_version: ORDER6C_HUMOR_VERSION,
   };
 }
 
-/**
- * Runtime Natural Humor Decision (ORDER 6B).
- * Earned from grounded context signals only. No maps, no quota, no fabrication.
- */
 export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorDecision {
   const rawBlocks = rejectRawHumorSurfaces(input as Record<string, unknown>);
   if (rawBlocks.length) return blockedHumor(rawBlocks);
@@ -229,19 +232,17 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
   const ctx: HumorContextInput = input.context || {};
   const { types, score: sourceScore, reasons } = detectNaturalSources(ctx);
 
-  // Explicit non-maps: editorial mode / mechanism / rail never force humor
   void ctx.editorial_mode;
   void ctx.mechanism_status;
   void ctx.mechanism_id;
   void ctx.rail_status;
+  void ctx.style_family;
 
-  // CASUAL must not imply humor
   const mode = String(ctx.editorial_mode || "").toUpperCase();
   if (mode === "CASUAL" && types.length === 0) {
     reasons.push("casual_does_not_imply_humor");
   }
 
-  // EXPERIENCE does not imply self-deprecation
   let selfDepAllowed = false;
   if (ctx.has_self_observed_imperfection === true && ctx.has_lived_experience_grounding === true) {
     selfDepAllowed = true;
@@ -250,7 +251,6 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
     reasons.push("experience_does_not_imply_self_deprecation");
   }
 
-  // Soft repetition
   const humorUses = Object.values(ctx.recent_humor_counts || {}).reduce((a, b) => a + (b || 0), 0);
   let recentRisk: HumorRisk = "low";
   if (humorUses >= 4 || (ctx.recent_punchline_count || 0) >= 3) recentRisk = "high";
@@ -263,7 +263,6 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
   }
 
   const grounded = types.length > 0 && sourceScore >= 0.14;
-  // Without grounded source → unsupported (not forced)
   if (!grounded) {
     return {
       humor_status: "HUMOR_UNSUPPORTED",
@@ -286,19 +285,18 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
       preserves_self_projection: true,
       recent_humor_repetition_risk: recentRisk,
       order6b_humor_version: ORDER6B_HUMOR_VERSION,
+      order6c_humor_version: ORDER6C_HUMOR_VERSION,
     };
   }
 
-  // Soft style alignment (never map)
   let fit = sourceScore;
   if (ctx.style_punchline_compatible === true) fit += 0.08;
   if (ctx.style_dialogue_compatible === true) fit += 0.04;
   if (String(ctx.style_conversational_level || "") === "high") fit += 0.05;
-  if (ctx.prefer_short === true) fit += 0.04; // compressed humor ok
+  if (ctx.prefer_short === true) fit += 0.04;
   if (recentRisk === "high") fit -= 0.12;
   else if (recentRisk === "medium") fit -= 0.05;
 
-  // Barrier: obscure humor not preferred when minimal context
   let preservesBarrier = true;
   if (ctx.everyday_minimal_context_sufficient && types.includes("shared_recognition") === false && sourceScore < 0.3) {
     reasons.push("minimal_context_prefers_light_humor");
@@ -314,7 +312,6 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
   const compatible = fit >= 0.22 && grounded;
   const natural = fit >= 0.4 && grounded;
 
-  // Punchline optional — never required
   const punchlineCompatible =
     compatible &&
     (ctx.style_punchline_compatible !== false) &&
@@ -324,10 +321,8 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
       types.includes("absurd_detail"));
   const punchlineRequired = false;
   const stopAfterOk = punchlineCompatible && (ctx.prefer_short === true || strength !== "none");
-  // Do not auto-require explanation after punchline
   const explainAfter = !stopAfterOk;
 
-  // Laughter marker (ㅋㅋ) permission only — never auto-insert
   let laughterOk = false;
   if (
     compatible &&
@@ -339,14 +334,12 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
     reasons.push("laughter_marker_permission_only");
   }
 
-  // Forced humor risk stays low when grounded and no quota path
   const forcedRisk: HumorRisk = grounded ? "low" : "high";
 
   let status: HumorStatus = "HUMOR_COMPATIBLE";
   if (natural) status = "HUMOR_NATURAL_AVAILABLE";
   if (!compatible) status = "HUMOR_UNSUPPORTED";
 
-  // Fact/experience boundary: cannot claim fabrication path
   if (ctx.has_factual_grounding === false && types.includes("absurd_detail")) {
     reasons.push("absurd_detail_must_not_invent_facts");
   }
@@ -372,6 +365,7 @@ export function decideNaturalHumor(input: NaturalHumorInput = {}): NaturalHumorD
     preserves_self_projection: true,
     recent_humor_repetition_risk: recentRisk,
     order6b_humor_version: ORDER6B_HUMOR_VERSION,
+    order6c_humor_version: ORDER6C_HUMOR_VERSION,
   };
 }
 
@@ -389,4 +383,11 @@ export const ORDER6B_HUMOR_GUARDS = {
   no_fabricate_facts: ORDER6B_NO_FABRICATE_FACTS,
   no_forced_joke: ORDER6B_NO_FORCED_JOKE,
   raw_text_blocked: ORDER6B_RAW_TEXT_BLOCKED,
+  order6c_hardened: true,
+  order6c_humor_version: ORDER6C_HUMOR_VERSION,
+  humor_optional: ORDER6C_HUMOR_OPTIONAL,
+  no_style_family_humor_map: ORDER6C_NO_STYLE_FAMILY_HUMOR_MAP,
+  no_explanatory_tail_force: ORDER6C_NO_EXPLANATORY_TAIL_FORCE,
+  no_humor_formula: ORDER6C_NO_HUMOR_FORMULA,
+  none_is_normal: ORDER6C_NONE_IS_NORMAL,
 } as const;
