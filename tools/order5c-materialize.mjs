@@ -42,4 +42,4 @@ console.log("after index", idx.length, gi);
 console.log("after module", mod.length, gm);
 if (gi !== wantIdx) throw new Error("index SHA mismatch");
 if (gm !== wantMod) throw new Error("module SHA mismatch");
-console.log("ORDER5C materialize complete");
+console.log("ORDER5C materialize complete v1");
