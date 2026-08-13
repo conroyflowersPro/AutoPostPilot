@@ -19,6 +19,14 @@ export const ORDER7A_NO_REASONING_TRACE_IN_OUTPUT = true as const;
 export const ORDER7A_CORE_THOUGHT_NOT_PROSE = true as const;
 export const ORDER7A_GENERATOR_CONSUMES_DECISIONS = true as const;
 export const ORDER7A_SOURCE_VS_CORE_SEPARATION = true as const;
+/** Marker: raw_prose_rejected — manual_text / manual_post_text never enter Core Thought */
+export const ORDER7A_RAW_PROSE_REJECTED = true as const;
+/** Marker: prefer_broad_simple structural strategy from ORDER 5 (no fixed vocab list) */
+export const ORDER7A_PREFER_BROAD_SIMPLE = true as const;
+/** Marker: sample_punchline never stored in context */
+export const ORDER7A_NO_SAMPLE_PUNCHLINE = true as const;
+/** Marker: first_person_lived_experience_without_evidence blocked */
+export const ORDER7A_FIRST_PERSON_WITHOUT_EVIDENCE_BLOCKED = true as const;
 
 export type GenerationStatus =
   | "GENERATION_CONTEXT_READY"
@@ -85,6 +93,7 @@ export type DeepGenerationContext = {
     laughter_marker_allowed: boolean;
     punchline_compatible: boolean;
     punchline_required: false;
+    sample_punchline: null;
     stop_after_punchline_ok: boolean;
     explanation_after_punchline_allowed: boolean;
     no_humor_is_normal: true;
@@ -268,7 +277,10 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
 
   const prohibited_claims: string[] = [];
   const expBound = (interp.experience_boundaries as Record<string, unknown>) || {};
-  if (expBound.must_not_claim_first_person) prohibited_claims.push("unsupported_first_person_experience");
+  if (expBound.must_not_claim_first_person) {
+    prohibited_claims.push("unsupported_first_person_experience");
+    prohibited_claims.push("first_person_lived_experience_without_evidence");
+  }
   if (Array.isArray(interp.do_not_invent)) {
     for (const x of interp.do_not_invent as unknown[]) prohibited_claims.push(s(x).slice(0, 80));
   }
@@ -277,7 +289,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
   }
 
   const prohibited_copy_sources = [
-    "manual_creator_posts",
+    "manual_creator_posts", // manual_text / manual_post_text / raw_prose_rejected
     "historical_creator_posts",
     "audience_comments",
     "sample_generated_posts",
@@ -315,18 +327,21 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       question_required: false,
     },
     reaction_mechanism: {
+      flexible: true,
       status: s(mech.status),
       selected_mechanism_id: s(mech.selected_mechanism_id || mech.mechanism_id),
       mechanism_family: s(mech.mechanism_family || (mech.selected_mechanism as any)?.family),
     },
     core_thought: core,
     thinking_rail: {
+      flexible: true,
       status: s(rail.status),
       selected_rail_id: s(rail.selected_rail_id || rail.rail_id),
       compression_preference: s(rail.compression_preference),
       reasoning_shape: s(rail.reasoning_shape),
     },
     everyday_language: {
+      prefer_broad_simple: true,
       status: s(everyday.status),
       minimal_context_sufficient: !!everyday.minimal_context_sufficient,
       compression_preference: s(everyday.compression_preference),
@@ -351,6 +366,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       laughter_marker_allowed: !!humor.laughter_marker_allowed,
       punchline_compatible: !!humor.punchline_compatible,
       punchline_required: false,
+      sample_punchline: null,
       stop_after_punchline_ok: !!humor.stop_after_punchline_ok,
       explanation_after_punchline_allowed: humor.explanation_after_punchline_allowed !== false,
       no_humor_is_normal: true,
