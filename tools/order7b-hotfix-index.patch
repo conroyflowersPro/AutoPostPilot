@@ -9,34 +9,39 @@
  const WEEKLY_ENGINE_VERSION = "phased_v10_order7b_independent_generation";
  const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
  const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
-@@ -153,7 +153,8 @@
+@@ -153,7 +153,7 @@
+   });
+ }
+ 
+-function compactSlot(
++async function compactSlot(
+   seed: ConcreteSeed,
+   dayOffset: number,
+   slot: number,
+@@ -162,6 +162,7 @@
    mechanism?: MechanismSelectionResult | null,
    rail?: ThinkingRailDecision | null,
    language?: EverydayLanguageDecision | null,
--) {
 +  genOpts?: { dry_run?: boolean; xai_key?: string | null },
-+) {
+ ) {
    const seed_interpretation = interpretation || interpretConcreteSeed(seed, mode);
    const reaction_mechanism =
-     mechanism ||
-@@ -244,10 +245,10 @@
+@@ -244,9 +245,11 @@
      natural_humor: natural_humor as any,
      editorial_mode: mode,
    });
 -  // ORDER 7B: per-slot independent generation (dry_run in plan phase — no batch shared reasoning)
 -  const independent_generation: IndependentPostResult = generateIndependentPost(deep_generation, {
 -    dry_run: true,
--  });
 +  // ORDER 7B HOTFIX: production default = live xAI writer (dry_run only if explicit)
 +  const independent_generation: IndependentPostResult = await generateIndependentPost(deep_generation, {
 +    dry_run: genOpts?.dry_run === true,
 +    xai_key: genOpts?.xai_key ?? null,
 +    allow_one_retry: true,
-+  });
+   });
    return {
      slotId: `D${dayOffset + 1}P${slot}`,
-     dayOffset,
-@@ -352,6 +353,9 @@
+@@ -353,6 +356,9 @@
      stop_condition_followed: independent_generation.stop_condition_followed,
      generation_confidence: independent_generation.generation_confidence,
      order7b_version: ORDER7B_VERSION,
@@ -46,7 +51,7 @@
    };
  }
  
-@@ -590,6 +594,11 @@
+@@ -593,6 +599,11 @@
      }
  
      if (phase === "select") {
@@ -58,16 +63,17 @@
        const seedsIn: ConcreteSeed[] = seedArrayFromBody(body) as ConcreteSeed[];
        const editorialRatio = body.editorial_ratio || undefined;
        const mix = allocateEditorialSlots(required_slots, editorialRatio);
-@@ -790,7 +799,7 @@
-               break;
+@@ -790,7 +801,7 @@
              }
            }
+         }
 -        outDays[bestDay].posts.push(compactSlot(picked, bestDay, outDays[bestDay].posts.length + 1, mode, interp, mech, rail, lang));
 +        outDays[bestDay].posts.push(await compactSlot(picked, bestDay, outDays[bestDay].posts.length + 1, mode, interp, mech, rail, lang, selectGenOpts));
        }
        let flatCount = outDays.reduce((s, d) => s + d.posts.length, 0);
        let integrity_fills = 0;
-@@ -856,7 +865,7 @@
+@@ -856,7 +867,7 @@
+           else if (langFill.status === "PRECISION_CONFLICT") language_precision++;
            else language_other++;
            selectedWeekly.push(seed);
 -          outDays[minD].posts.push(compactSlot(seed, minD, outDays[minD].posts.length + 1, m as EditorialMode, interpFill, mechFill, railFill, langFill));
@@ -75,7 +81,7 @@
            usedModes[m] = (usedModes[m] || 0) + 1;
            integrity_fills++;
            flatCount++;
-@@ -940,6 +949,8 @@
+@@ -941,6 +952,8 @@
            order7a_version: ORDER7A_VERSION,
            order7b_independent_generation: true,
            order7b_version: ORDER7B_VERSION,
