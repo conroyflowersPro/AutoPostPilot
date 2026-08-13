@@ -1,8 +1,10 @@
 import { readFileSync, writeFileSync, readdirSync } from "fs";
 import { gunzipSync } from "zlib";
-const dir = "tools/order7c-index-parts";
+const dir = "tools/order7c-ix-parts";
 const files = readdirSync(dir).filter(f => f.endsWith(".b64")).sort();
-const b64 = files.map(f => readFileSync(dir + "/" + f, "utf8")).join("");
+const b64 = files.map(f => readFileSync(dir + "/" + f, "utf8").trim()).join("");
 const buf = gunzipSync(Buffer.from(b64, "base64"));
 writeFileSync("supabase/functions/weekly-plan/index.ts", buf);
 console.log("assembled", buf.length);
+if (!buf.toString().includes("integrateSlotGeneration")) process.exit(1);
+if (!buf.toString().includes("completion_gate_final")) process.exit(1);
