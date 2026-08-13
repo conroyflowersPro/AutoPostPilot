@@ -2,18 +2,18 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import zlib from "zlib";
 import { execSync } from "child_process";
 
 const ROOT = process.cwd();
 const tools = path.join(ROOT, "tools");
 
-// join split patches if present
 for (const base of ["order5c-mod.patch", "order5c-index.patch"]) {
-  const p0 = path.join(tools, base + ".part0");
-  const p1 = path.join(tools, base + ".part1");
-  if (fs.existsSync(p0) && fs.existsSync(p1)) {
-    fs.writeFileSync(path.join(tools, base), fs.readFileSync(p0, "utf8") + fs.readFileSync(p1, "utf8"));
-    console.log("joined", base);
+  const gz = path.join(tools, base + ".gz.b64");
+  if (fs.existsSync(gz)) {
+    const data = zlib.gunzipSync(Buffer.from(fs.readFileSync(gz, "utf8").trim(), "base64"));
+    fs.writeFileSync(path.join(tools, base), data);
+    console.log("expanded", base, data.length);
   }
 }
 
@@ -26,14 +26,15 @@ function sha256(buf) {
 
 function applyPatch(name) {
   const p = path.join(tools, name);
+  if (!fs.existsSync(p)) throw new Error("missing " + name);
   execSync(`patch -p1 --forward --batch -i "${p}"`, { cwd: ROOT, stdio: "inherit" });
 }
 
 const idxPath = "supabase/functions/weekly-plan/index.ts";
 const modPath = "supabase/functions/weekly-plan/everyday-language-reasoning.ts";
 console.log("before", fs.readFileSync(idxPath).length, fs.readFileSync(modPath).length);
-try { applyPatch("order5c-mod.patch"); } catch (e) { console.log("mod:", e.message); }
-try { applyPatch("order5c-index.patch"); } catch (e) { console.log("idx:", e.message); }
+applyPatch("order5c-mod.patch");
+applyPatch("order5c-index.patch");
 const idx = fs.readFileSync(idxPath);
 const mod = fs.readFileSync(modPath);
 const gi = sha256(idx), gm = sha256(mod);
