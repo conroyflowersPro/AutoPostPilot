@@ -20,11 +20,10 @@
  const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
  const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
  const corsHeaders = {
-@@ -220,6 +225,19 @@
-       has_repeated_behavior_signal: !!(seed as any).has_repeated_behavior_signal,
+@@ -221,6 +226,19 @@
        has_absurd_detail_signal: !!(seed as any).has_absurd_detail_signal,
      },
-+  });
+   });
 +  const deep_generation: DeepGenerationContext = buildDeepGenerationContext({
 +    slot_id: `D${dayOffset + 1}P${slot}`,
 +    day_offset: dayOffset,
@@ -37,9 +36,10 @@
 +    creator_style: creator_style as any,
 +    natural_humor: natural_humor as any,
 +    editorial_mode: mode,
-   });
++  });
    return {
      slotId: `D${dayOffset + 1}P${slot}`,
+     dayOffset,
 @@ -307,6 +325,14 @@
      forced_humor_risk: natural_humor.forced_humor_risk,
      order6c_humor_version: ORDER6C_HUMOR_VERSION,
@@ -55,7 +55,7 @@
    };
  }
  
-@@ -883,6 +909,8 @@
+@@ -891,6 +917,8 @@
            order6c_style_humor_hardened: true,
            order6c_style_version: ORDER6C_STYLE_VERSION,
            order6c_humor_version: ORDER6C_HUMOR_VERSION,
