@@ -140,7 +140,7 @@ import {
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order8c-weekly-count-qa";
+const APP_VERSION = "10.0.0";
 const APP_VERSION_ORDER8A_COMPAT = "10.0.0-order8a-semantic-judge";
 const APP_VERSION_ORDER7C_COMPAT = "10.0.0-order7c-generation-integration";
 const APP_VERSION_ORDER7B_COMPAT = "10.0.0-order7b-hotfix-live-xai";
@@ -148,7 +148,7 @@ const APP_VERSION_ORDER7A_COMPAT = "10.0.0-order7a";
 // regression marker: 10.0.0-order7b-hotfix-live-xai | 10.0.0-order7a
 // regression engine markers: phased_v10_order7b_independent_generation | phased_v10_order7a_deep_generation
 // await generateIndependentPost — production path routes through integrateSlotGeneration → generateIndependentPost
-const WEEKLY_ENGINE_VERSION = "phased_v10_order8c_weekly_count_qa";
+const WEEKLY_ENGINE_VERSION = "phased_v10_release";
 // regression: phased_v10_order8a_semantic_judge
 // regression: phased_v10_order7c_generation_integration | phased_v10_order7b_independent_generation
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
