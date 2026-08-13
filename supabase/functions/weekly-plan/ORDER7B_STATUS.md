@@ -4,7 +4,8 @@ Status: COMPLETE (HOTFIX CLOSED)
 
 ## HOTFIX — Actual xAI Writer Wiring
 - Branch: order7b-hotfix-live-xai-writer
-- Module: independent-post-generation.ts (~27KB)
+- Final tip: f55e928c1f90333e916a14ffd04fb0088d8498bc (module) / subsequent status commit
+- Module: independent-post-generation.ts (25504 bytes, not PLACEHOLDER)
 - ORDER7B_VERSION: independent_post_generation_v1_order7b_hotfix_live_xai
 - APP: 10.0.0-order7b-hotfix-live-xai
 - Engine: phased_v10_order7b_independent_generation
@@ -23,7 +24,7 @@ DeepGenerationContext → generateIndependentPost (async)
 - experience/factual boundary validation after writer
 - silent slot drop forbidden
 
-### Tests
+### Tests (remote clone verification)
 - tools/order7b-hotfix-live-xai-test.mjs — 30/30 PASS
 - tools/order7b-independent-generation-test.mjs — 52/52 PASS
 
