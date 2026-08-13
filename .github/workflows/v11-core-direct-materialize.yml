@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/v11-core-direct/**'
-      - 'tools/v11-core-direct-materialize.mjs'
+      - 'tools/v11-core-direct-materialize.cjs'
       - '.github/workflows/v11-core-direct-materialize.yml'
 jobs:
   materialize:
@@ -17,7 +17,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Assemble CORE index + modules
-        run: node tools/v11-core-direct-materialize.mjs
+        run: node tools/v11-core-direct-materialize.cjs
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
