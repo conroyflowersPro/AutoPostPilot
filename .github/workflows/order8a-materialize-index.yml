@@ -1,0 +1,36 @@
+name: ORDER8A Materialize Index
+on:
+  push:
+    branches: [order8a-semantic-judge-foundation]
+    paths:
+      - 'tools/order8a-index.patch'
+      - '.github/workflows/order8a-materialize-index.yml'
+  workflow_dispatch:
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: order8a-semantic-judge-foundation
+      - name: Apply patch if needed
+        run: |
+          if grep -q 'ORDER8A_VERSION' supabase/functions/weekly-plan/index.ts; then
+            echo 'Already materialized'
+          else
+            patch -p1 < tools/order8a-index.patch
+            grep -n 'ORDER8A_VERSION\|judge_status' supabase/functions/weekly-plan/index.ts | head
+          fi
+      - name: Commit
+        run: |
+          git config user.name conroyflowersPro
+          git config user.email conroyf12@gmail.com
+          git add supabase/functions/weekly-plan/index.ts || true
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m "ORDER 8A: materialize index semantic judge wiring"
+            git push origin order8a-semantic-judge-foundation
+          fi
