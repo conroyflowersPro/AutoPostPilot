@@ -4,7 +4,10 @@ on:
   push:
     branches: [order8c-weekly-count-full-system-qa]
     paths:
-      - 'tools/order8c-index.gz.b64'
+      - 'tools/order8c-index.gz.b64.p0'
+      - 'tools/order8c-index.gz.b64.p1'
+      - 'tools/order8c-index.gz.b64.p2'
+      - 'tools/order8c-index.gz.b64.p3'
       - 'tools/order8c-gunzip-index.mjs'
 jobs:
   materialize:

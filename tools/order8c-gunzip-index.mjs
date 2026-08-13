@@ -2,7 +2,11 @@
 import fs from "fs";
 import zlib from "zlib";
 import crypto from "crypto";
-const b64 = fs.readFileSync("tools/order8c-index.gz.b64", "utf8").trim();
+const p0 = fs.readFileSync("tools/order8c-index.gz.b64.p0", "utf8").trim();
+const p1 = fs.readFileSync("tools/order8c-index.gz.b64.p1", "utf8").trim();
+const p2 = fs.readFileSync("tools/order8c-index.gz.b64.p2", "utf8").trim();
+const p3 = fs.readFileSync("tools/order8c-index.gz.b64.p3", "utf8").trim();
+const b64 = p0 + p1 + p2 + p3;
 const gz = Buffer.from(b64, "base64");
 const buf = zlib.gunzipSync(gz);
 const out = "supabase/functions/weekly-plan/index.ts";
