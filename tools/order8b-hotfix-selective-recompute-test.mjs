@@ -130,8 +130,8 @@ console.log("=== ORDER 8B HOTFIX selective recompute tests ===");
     ok(t.includes('from "./selective-regeneration.ts"'),"T16 index import");
     ok(t.includes("executeSelectiveRegeneration"),"T16 index call");
     ok(t.includes("snapshotFromSlotParts"),"T16 index snapshot");
-    ok(t.includes("10.0.0-order8b-hotfix-selective-recompute"),"T16 index APP");
-    ok(t.includes("phased_v10_order8b_hotfix_selective_recompute"),"T16 index engine");
+    ok(t.includes("10.0.0-order8b-hotfix-selective-recompute") || t.includes("10.0.0-order8c-weekly-count-qa"),"T16 index APP");
+    ok(t.includes("phased_v10_order8b_hotfix_selective_recompute") || t.includes("phased_v10_order8c_weekly_count_qa"),"T16 index engine");
   } else ok(true,"T16 optional");
 }
 console.log("=== RESULT "+pass+"/"+(pass+fail)+(fail?" FAIL":" PASS")+" ===");
