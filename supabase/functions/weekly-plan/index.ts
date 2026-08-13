@@ -88,19 +88,21 @@ import {
   decideCreatorStyle,
   ORDER6A_VERSION,
   ORDER6B_STYLE_VERSION,
+  ORDER6C_STYLE_VERSION,
   type CreatorStyleDecision,
 } from "./creator-style-decision.ts";
 import {
   decideNaturalHumor,
   ORDER6B_HUMOR_VERSION,
+  ORDER6C_HUMOR_VERSION,
   type NaturalHumorDecision,
 } from "./natural-humor-decision.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0-order6b";
-const WEEKLY_ENGINE_VERSION = "phased_v10_order6b_style_humor";
+const APP_VERSION = "10.0.0-order6c";
+const WEEKLY_ENGINE_VERSION = "phased_v10_order6c_style_humor_hardened";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -288,6 +290,7 @@ function compactSlot(
     style_family: creator_style.style_family,
     humor_decision: creator_style.humor_decision,
     order6a_version: ORDER6A_VERSION,
+    order6c_style_version: ORDER6C_STYLE_VERSION,
     order6b_style_version: ORDER6B_STYLE_VERSION,
     natural_humor: natural_humor,
     humor_status: natural_humor.humor_status,
@@ -302,6 +305,7 @@ function compactSlot(
     stop_after_punchline_ok: natural_humor.stop_after_punchline_ok,
     explanation_after_punchline_allowed: natural_humor.explanation_after_punchline_allowed,
     forced_humor_risk: natural_humor.forced_humor_risk,
+    order6c_humor_version: ORDER6C_HUMOR_VERSION,
     order6b_humor_version: ORDER6B_HUMOR_VERSION,
   };
 }
@@ -884,6 +888,9 @@ Deno.serve(async (req) => {
           order6b_contextual_style_humor: true,
           order6b_style_version: ORDER6B_STYLE_VERSION,
           order6b_humor_version: ORDER6B_HUMOR_VERSION,
+          order6c_style_humor_hardened: true,
+          order6c_style_version: ORDER6C_STYLE_VERSION,
+          order6c_humor_version: ORDER6C_HUMOR_VERSION,
           everyday_language_version: ORDER5B_VERSION,
           order5c_version: ORDER5C_VERSION,
           order5a_foundation_version: ORDER5A_VERSION,
