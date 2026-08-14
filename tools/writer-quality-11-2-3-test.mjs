@@ -53,7 +53,7 @@ ok("W4. hyphenated ent stutter", isTokenStutter("ent 시트-ent 미러가 ent en
 ok("W5. Korean 엔트 filler twice", isTokenStutter("엔트 등이 막 바뀌었는데 시스템이 엔트를 얼마나 붙잡고 있는지."));
 ok("W6. normal Supercharger sentence is not stutter", !isTokenStutter("슈퍼차저 줄에서 앞차가 안 움직이면 충전 예상이 통째로 밀린다. 대기 화면에 남는 건 그 밀린 숫자뿐이다."));
 ok("W7. one-liner is too short", isTooShortOriginal("충전 중에 알림이 겹친다."));
-ok("W8. two-clause 80+ is not too short", !isTooShortOriginal("충전 중에 알림이 겹치면 어느 레이어를 먼저 봐야 할지 손이 멈춘다. 화면은 한 장인데 메시지는 충전과 내비게이션 두 갈래로 들어온다."));
+ok("W8. two-clause 80+ is not too short", !isTooShortOriginal("충전 중에 알림이 겹치면 어느 레이어를 먼저 봐야 할지 손이 잠깐 멈춘다. 화면은 한 장인데 메시지는 충전과 내비게이션 두 갈래로 한꺼번에 들어온다."));
 ok("W9. 140+ observation is not too short", !isTooShortOriginal("충전 중 알림이 겹쳐 보이면 어느 레이어가 위인지 손으로 확인하게 된다. ".repeat(3)));
 ok("W10. writer prompt forbids stutter", /token stutter/.test(wr) && /At least two sentences/.test(wr));
 ok("W11. validateOutput hard-fails stutter/short", /reasons\.includes\("token_stutter"\)/.test(wr) && /reasons\.includes\("too_short_original"\)/.test(wr));
