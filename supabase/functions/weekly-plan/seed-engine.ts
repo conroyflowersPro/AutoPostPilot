@@ -130,12 +130,19 @@ export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string; cor
 ];
 
 export type ClusterWeight = { cluster: string; n: number };
+export type CadenceSignal = {
+  days_with_originals: number;
+  avg_originals_on_active_days: number;
+  originals_last_14d: number;
+  window_days: number;
+};
 export type LearnedSeedSignals = {
   user_direct_n: number;
   cluster_weights: ClusterWeight[];
   recent_angle_labels: string[];
   registry_interest_hints: Array<{ cluster: string; dimension: string }>;
   performance_pattern_hints: string[];
+  cadence: CadenceSignal;
 };
 
 function metricsFromMeta(meta: unknown): Record<string, number> {
@@ -177,6 +184,10 @@ export function collectLearnedSeedSignals(opts: {
       : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
 
   let user_direct_n = 0;
+  const dayHits = new Map<string, number>();
+  let originals_last_14d = 0;
+  const now = Date.now();
+  const d14 = 14 * 24 * 3600 * 1000;
   for (const row of rows.slice(0, 80)) {
     const text = String(row.text || "").trim();
     if (text.length < 12) continue;
@@ -185,6 +196,12 @@ export function collectLearnedSeedSignals(opts: {
     const pt = String(row.post_type || "").toUpperCase();
     if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
     user_direct_n += 1;
+    const publishedAt = row.published_at ? Date.parse(String(row.published_at)) : NaN;
+    if (Number.isFinite(publishedAt)) {
+      const dayKey = new Date(publishedAt).toISOString().slice(0, 10);
+      dayHits.set(dayKey, (dayHits.get(dayKey) || 0) + 1);
+      if (now - publishedAt <= d14) originals_last_14d += 1;
+    }
     const packet = extractEvidencePacket(text, {
       source_id: row.source_id || row.published_at,
       source_type: "ACCOUNT_ACTIVITY",
@@ -224,12 +241,23 @@ export function collectLearnedSeedSignals(opts: {
     performance_pattern_hints.push("Operator explicit intent this run outranks default mix");
   }
 
+  const days_with_originals = dayHits.size;
+  const avg_originals_on_active_days = days_with_originals
+    ? Math.round((user_direct_n / days_with_originals) * 10) / 10
+    : 0;
+
   return {
     user_direct_n,
     cluster_weights,
     recent_angle_labels,
     registry_interest_hints: DIMENSION_REGISTRY.map((d) => ({ cluster: d.cluster, dimension: d.dimension })),
     performance_pattern_hints: performance_pattern_hints.slice(0, 10),
+    cadence: {
+      days_with_originals,
+      avg_originals_on_active_days,
+      originals_last_14d,
+      window_days: 30,
+    },
   };
 }
 export const QUALITY_REFERENCE: any[] = [];

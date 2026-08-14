@@ -225,7 +225,7 @@ export async function reasonCreatorSeeds(
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
     weekly_goal_note:
-      "Planner targets ~6 posts/day × 7 days. Each seed is a distinct inferred direction from learned data for account growth — not a repeating bot of fixed axes.",
+      "The inferred weekly quota MUST be filled. Each seed is a distinct inferred direction from learned data + operator will (account growth). Not a repeating bot of fixed axes. Return exactly requested_seed_count seeds.",
     requirement:
       "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });

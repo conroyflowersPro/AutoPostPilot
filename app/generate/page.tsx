@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
-const POSTS_PER_DAY = 6;
-const REQUIRED_SLOTS = GENERATION_DAYS * POSTS_PER_DAY;
 const JUDGE_BATCH = 8;
+const WRITE_CHUNK = 3;
+const COLLISION_DAYS = 30;
+const MAX_EXPAND_ROUNDS = 12;
+const MAX_TOPUP_ROUNDS = 4;
 const WRITE_CHUNK = 3;
 const COLLISION_DAYS = 30;
 
@@ -145,9 +147,26 @@ function GeneratePageInner() {
           .filter(Boolean);
       } catch {}
 
-      const base = {
+      setPhase("주간 할당량 추론…");
+      const quotaPart = await edgeCall(session, {
         generationDays: GENERATION_DAYS,
-        postsPerDay: POSTS_PER_DAY,
+        startDate,
+        topic: topic.trim() || undefined,
+        creatorIntent: topic.trim() || undefined,
+        phase: "quota",
+      });
+      if (!quotaPart.success || !quotaPart.quota) {
+        throw new Error(quotaPart.detail || quotaPart.error || "할당량 추론 실패");
+      }
+      const requiredSlots = Number(quotaPart.required_slots || quotaPart.quota.required_slots);
+      const postsPerDay = Number(quotaPart.postsPerDay || quotaPart.quota.posts_per_day);
+      const quotaNote = String(quotaPart.quota.rationale || "");
+      setPlanSummary(`quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}\n${quotaNote}`);
+
+      const base: Record<string, unknown> = {
+        generationDays: GENERATION_DAYS,
+        postsPerDay,
+        required_slots: requiredSlots,
         startDate,
         topic: topic.trim() || undefined,
         creatorIntent: topic.trim() || undefined,
@@ -163,11 +182,10 @@ function GeneratePageInner() {
       let priorSubjects: string[] = [];
       let idCounter = 0;
       let dimBatch = 0;
-      let dimTotal = 1;
-      let expandDone = false;
-      let lastExpandDiag: any = null;
-      while (!expandDone) {
-        setPhase(`Seed Expand ${dimBatch + 1}/${dimTotal}…`);
+      let emptyStreak = 0;
+
+      async function expandOnce() {
+        setPhase(`시드 추론 ${allGated.length}/${requiredSlots}…`);
         const part = await edgeCall(session, {
           ...base,
           phase: "expand",
@@ -180,8 +198,6 @@ function GeneratePageInner() {
         if (!part.success) {
           throw new Error(part.detail || part.error || `Expand ${dimBatch + 1} 실패`);
         }
-        lastExpandDiag = part;
-        dimTotal = Number(part.dim_batch_total) || dimTotal;
         const seeds = pickSeeds(part);
         allGated.push(...seeds);
         for (const s of seeds) {
@@ -189,63 +205,91 @@ function GeneratePageInner() {
         }
         priorSubjects = priorSubjects.slice(-80);
         idCounter = Number(part.id_counter) || idCounter + seeds.length;
-        expandDone = part.expand_done !== false;
         dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
-        if (dimBatch > 8) break;
-        if (part.expand_done === true && dimTotal <= 1 && allGated.length >= REQUIRED_SLOTS) break;
+        return seeds.length;
       }
 
-      if (allGated.length < REQUIRED_SLOTS) {
-        const d = lastExpandDiag || {};
-        const xai = d.diagnostics?.xai_seed_expansion || d.xai_seed_expansion || {};
-        throw new Error(
-          [
-            `시드 추론 부족: ${allGated.length}/${REQUIRED_SLOTS}. 고정 템플릿으로 채우지 않습니다.`,
-            d.error ? `error=${d.error}` : null,
-            xai.error ? `xai_error=${xai.error}` : null,
-            xai.returned != null ? `xai_returned=${xai.returned}` : null,
-            d.seed_count != null ? `seed_count=${d.seed_count}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")
-        );
+      while (allGated.length < requiredSlots && dimBatch < MAX_EXPAND_ROUNDS) {
+        const added = await expandOnce();
+        if (added <= 0) {
+          emptyStreak += 1;
+          if (emptyStreak >= 4) {
+            throw new Error(
+              `Grok 시드 추론이 반복 실패했습니다 (${allGated.length}/${requiredSlots}). 템플릿으로 채우지 않습니다.`
+            );
+          }
+          continue;
+        }
+        emptyStreak = 0;
+      }
+      if (allGated.length < requiredSlots) {
+        throw new Error(`시드 ${allGated.length}/${requiredSlots}. 할당량을 채우지 못해 중단합니다.`);
       }
 
       const allJudged: any[] = [];
-      for (let i = 0; i < allGated.length; i += JUDGE_BATCH) {
-        const batch = allGated.slice(i, i + JUDGE_BATCH);
-        const bi = Math.floor(i / JUDGE_BATCH) + 1;
-        const bt = Math.ceil(allGated.length / JUDGE_BATCH) || 1;
-        setPhase(`Semantic Judge ${bi}/${bt}…`);
-        const part = await edgeCall(session, {
-          ...base,
-          phase: "judge",
-          seeds: batch,
-          candidates: batch,
-        });
-        if (!part.success) {
-          throw new Error(part.detail || part.error || `Judge ${bi} 실패`);
+      async function judgeBatch(seeds: any[]) {
+        for (let i = 0; i < seeds.length; i += JUDGE_BATCH) {
+          const batch = seeds.slice(i, i + JUDGE_BATCH);
+          const bi = Math.floor(i / JUDGE_BATCH) + 1;
+          const bt = Math.ceil(seeds.length / JUDGE_BATCH) || 1;
+          setPhase(`Semantic Judge ${bi}/${bt}…`);
+          const part = await edgeCall(session, {
+            ...base,
+            phase: "judge",
+            seeds: batch,
+            candidates: batch,
+          });
+          if (!part.success) {
+            throw new Error(part.detail || part.error || `Judge ${bi} 실패`);
+          }
+          const judged = Array.isArray(part.judged) ? part.judged : batch;
+          allJudged.push(...judged);
         }
-        const judged = Array.isArray(part.judged) ? part.judged : batch;
-        allJudged.push(...judged);
       }
+      await judgeBatch(allGated);
 
-      const judgedEligible = allJudged.filter((s: any) =>
-        s?.status === "ELIGIBLE" || s?.status === "HIGH_VALUE"
-      );
-      if (judgedEligible.length < REQUIRED_SLOTS) {
+      const eligibleOf = (rows: any[]) =>
+        rows.filter((s: any) => s?.status === "ELIGIBLE" || s?.status === "HIGH_VALUE");
+
+      let topup = 0;
+      while (eligibleOf(allJudged).length < requiredSlots && topup < MAX_TOPUP_ROUNDS) {
+        topup += 1;
+        setPhase(`할당량 보충 ${eligibleOf(allJudged).length}/${requiredSlots}…`);
+        const before = allGated.length;
+        const added = await expandOnce();
+        if (added <= 0) break;
+        await judgeBatch(allGated.slice(before));
+      }
+      if (eligibleOf(allJudged).length < requiredSlots) {
         throw new Error(
-          `판정 통과 시드 ${judgedEligible.length}/${REQUIRED_SLOTS}. 부족한 주를 저장하지 않습니다.`
+          `판정 통과 ${eligibleOf(allJudged).length}/${requiredSlots}. Grok이 할당량을 채우지 못했습니다.`
         );
       }
 
       setPhase("Weekly Select…");
-      const planData = await edgeCall(session, {
+      let planData = await edgeCall(session, {
         ...base,
         phase: "select",
         seeds: allJudged,
         candidates: allJudged,
       });
+      let selectTries = 0;
+      while (
+        (!planData.success || planData.need_more_seeds || Number(planData.totalPlanned || 0) < requiredSlots) &&
+        selectTries < MAX_TOPUP_ROUNDS
+      ) {
+        selectTries += 1;
+        setPhase(`계획 부족 → 시드 추가 ${selectTries}…`);
+        const before = allGated.length;
+        const added = await expandOnce();
+        if (added > 0) await judgeBatch(allGated.slice(before));
+        planData = await edgeCall(session, {
+          ...base,
+          phase: "select",
+          seeds: allJudged,
+          candidates: allJudged,
+        });
+      }
       if (!planData.success || !Array.isArray(planData.days) || planData.days.length === 0) {
         throw new Error(planData.detail || planData.error || "Select 결과가 비어 있습니다.");
       }
@@ -262,9 +306,10 @@ function GeneratePageInner() {
       const totalPlanned = mergedDays.reduce((s: number, d: any) => s + (d.posts?.length || 0), 0);
       setPlanSummary(
         [
-          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned} · required: ${REQUIRED_SLOTS}`,
+          `quota: ${postsPerDay}/day × 7 = ${requiredSlots} (${quotaPart.quota.source || ""})`,
+          quotaNote,
+          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned}`,
           planData.mode_supply_low ? "MODE_SUPPLY_LOW" : "",
-          planData.topic_supply_low ? "TOPIC_SUPPLY_LOW" : "",
           planData.diagnostics ? `diag: ${JSON.stringify(planData.diagnostics)}` : "",
           ...lines,
         ]
@@ -272,9 +317,9 @@ function GeneratePageInner() {
           .join("\n")
       );
 
-      if (totalPlanned < REQUIRED_SLOTS) {
+      if (totalPlanned < requiredSlots) {
         throw new Error(
-          `주간 계획이 ${totalPlanned}개뿐입니다 (목표 ${REQUIRED_SLOTS}). 고정 축/부족한 주로 초안을 저장하지 않습니다.`
+          `주간 계획이 ${totalPlanned}/${requiredSlots}입니다. 할당량을 채운 뒤에만 저장합니다.`
         );
       }
 
@@ -309,7 +354,7 @@ function GeneratePageInner() {
                   system_origin_class: "AP_PIPELINE",
                   slotId: p.slotId || null,
                   writer_model: "grok-4.6",
-                  engine: "v11_order08_wired_grok46",
+                  engine: "v11_inferred_quota_fill",
                 },
               })
             ).error;

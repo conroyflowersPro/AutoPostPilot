@@ -1,6 +1,7 @@
 /**
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
- * Seed supply: USER_DIRECT + performance signals → Grok infers directions. Fail closed if short of required_slots.
+ * Seed supply: USER_DIRECT + performance + operator will → Grok infers quota AND fills it.
+ * Registry templates are never a fallback. Shortfall → keep inferring until quota is filled.
  * Target volume: postsPerDay 5–8 × days (≈35–56 / week).
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
@@ -44,12 +45,19 @@ import {
 } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
+import {
+  inferWeeklyQuota,
+  quotaFromCadence,
+  QUOTA_DAYS,
+  QUOTA_PER_DAY_MIN,
+  QUOTA_PER_DAY_MAX,
+} from "./quota-inference.ts";
 
-const POSTS_MIN = 5;
-const POSTS_MAX = 8;
+const POSTS_MIN = QUOTA_PER_DAY_MIN;
+const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 6;
 const APP_VERSION = "11.0.0";
-const WEEKLY_ENGINE_VERSION = "v11_inferred_seeds_not_registry";
+const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
 const EXPAND_BATCH = 18;
@@ -124,11 +132,83 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const phase = String(body.phase || "").toLowerCase() || "expand";
-    const postsPerDay = Math.min(POSTS_MAX, Math.max(POSTS_MIN, Number(body.postsPerDay) || POSTS_TARGET));
-    const daysCount = Math.min(Math.max(Number(body.generationDays) || 7, 1), 7);
-    const required_slots = postsPerDay * daysCount;
+    const daysCount = QUOTA_DAYS;
+    const rawPpd = Number(body.postsPerDay);
+    const postsPerDay = Number.isFinite(rawPpd)
+      ? Math.min(POSTS_MAX, Math.max(POSTS_MIN, Math.round(rawPpd)))
+      : POSTS_TARGET;
+    const required_slots = Number(body.required_slots) > 0
+      ? Math.round(Number(body.required_slots))
+      : postsPerDay * daysCount;
     const xaiKey = (Deno.env.get("XAI_API_KEY") || "").trim();
     const t0 = Date.now();
+
+    if (phase === "quota") {
+      const intentText = String(body.creatorIntent || body.topic || "").trim();
+      const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
+      const { data: actRows } = await supabase
+        .from("account_activities")
+        .select("text_body, post_type, action_type, published_at, system_origin_class, x_post_id, meta")
+        .gte("published_at", since)
+        .limit(400);
+      const publishedEvidence: Array<{
+        text: string;
+        source_id?: string;
+        published_at?: string;
+        post_type?: string;
+        meta?: unknown;
+        system_origin_class?: string;
+      }> = [];
+      for (const row of actRows || []) {
+        const t = String((row as any).text_body || "").trim();
+        if (t.length < 12) continue;
+        const pt = String((row as any).post_type || (row as any).action_type || "").toUpperCase();
+        if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
+        const soc = String((row as any).system_origin_class || "").toUpperCase();
+        if (soc && /AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED/.test(soc)) continue;
+        publishedEvidence.push({
+          text: t,
+          source_id: (row as any).x_post_id || undefined,
+          published_at: (row as any).published_at || undefined,
+          post_type: pt,
+          meta: (row as any).meta,
+          system_origin_class: soc,
+        });
+      }
+      const learned = collectLearnedSeedSignals({
+        publishedEvidence,
+        intentText,
+      });
+      const quota = xaiKey
+        ? await inferWeeklyQuota({
+          xaiKey,
+          cadence: learned.cadence,
+          clusterWeights: learned.cluster_weights,
+          userDirectN: learned.user_direct_n,
+          performanceHints: learned.performance_pattern_hints,
+          explicitCreatorIntent: intentText || undefined,
+          model: V11_WRITER_MODEL,
+          timeoutMs: 18000,
+        })
+        : quotaFromCadence(learned.cadence, intentText);
+      return json({
+        success: true,
+        phase: "quota",
+        quota,
+        postsPerDay: quota.posts_per_day,
+        generationDays: quota.days,
+        required_slots: quota.required_slots,
+        diagnostics: {
+          app_version: APP_VERSION,
+          weekly_engine_version: WEEKLY_ENGINE_VERSION,
+          learned_user_direct_n: learned.user_direct_n,
+          cadence: learned.cadence,
+          cluster_weights: learned.cluster_weights,
+          quota_source: quota.source,
+        },
+        timing: { total_ms: Date.now() - t0 },
+      });
+    }
 
     if (phase === "expand") {
       const published = Array.isArray(body.publishedTopics)
@@ -239,8 +319,8 @@ Deno.serve(async (req) => {
         : Array.isArray(body.x_viral_candidates)
           ? body.x_viral_candidates
           : [];
-      const thisNeed = Math.min(EXPAND_BATCH, remaining);
-      const failClosed = (error: string, extra?: Record<string, unknown>) =>
+      const thisNeed = Math.min(EXPAND_BATCH, Math.max(remaining, remaining > 0 ? remaining : 0));
+      const cannotInfer = (error: string, extra?: Record<string, unknown>) =>
         json({
           success: false,
           error,
@@ -254,11 +334,11 @@ Deno.serve(async (req) => {
         }, 422);
 
       if (remaining > 0 && !allowPaid) {
-        return failClosed("SEED_INFERENCE_REQUIRES_XAI", { note: "fixed registry templates are not a valid fallback" });
+        return cannotInfer("SEED_INFERENCE_REQUIRES_XAI", { note: "fixed registry templates are not a valid fallback" });
       }
       if (remaining > 0 && !xaiKey) {
         xai_seed_expansion.error = "missing_xai_key";
-        return failClosed("SEED_INFERENCE_REQUIRES_XAI", { xai_seed_expansion });
+        return cannotInfer("SEED_INFERENCE_REQUIRES_XAI", { xai_seed_expansion });
       }
       if (remaining > 0 && xaiKey) {
         const existingHeld: ConcreteSeed[] = priorSubjects.map((s, i) => ({
@@ -268,20 +348,25 @@ Deno.serve(async (req) => {
           concrete_subject: String(s).slice(0, 100),
           subject_signature: String(s).toLowerCase().slice(0, 80),
         }));
-        const xaiRes = await expandSeedSupplyWithXai({
-          xaiKey,
-          needed: thisNeed,
-          existing: [...candidates, ...existingHeld] as ConcreteSeed[],
-          explicitCreatorIntent: intentText || undefined,
-          recentPublishedAngles: [...learned.recent_angle_labels, ...published].slice(0, 30),
-          viralCandidates: viralIn.slice(0, 12),
-          performancePatternHints: learned.performance_pattern_hints,
-          clusterInterestWeights: learned.cluster_weights,
-          registryInterestHints: learned.registry_interest_hints,
-          userDirectN: learned.user_direct_n,
-          model: V11_WRITER_MODEL,
-          timeoutMs: 28000,
-        });
+        const runExpand = () =>
+          expandSeedSupplyWithXai({
+            xaiKey,
+            needed: Math.max(thisNeed, 1),
+            existing: [...candidates, ...existingHeld] as ConcreteSeed[],
+            explicitCreatorIntent: intentText || undefined,
+            recentPublishedAngles: [...learned.recent_angle_labels, ...published].slice(0, 30),
+            viralCandidates: viralIn.slice(0, 12),
+            performancePatternHints: learned.performance_pattern_hints,
+            clusterInterestWeights: learned.cluster_weights,
+            registryInterestHints: learned.registry_interest_hints,
+            userDirectN: learned.user_direct_n,
+            model: V11_WRITER_MODEL,
+            timeoutMs: 28000,
+          });
+        let xaiRes = await runExpand();
+        if (!xaiRes.succeeded || xaiRes.returned <= 0) {
+          xaiRes = await runExpand();
+        }
         xai_seed_expansion = {
           attempted: xaiRes.attempted,
           succeeded: xaiRes.succeeded,
@@ -292,13 +377,6 @@ Deno.serve(async (req) => {
           used_creator_dna: !!(xaiRes as any).used_creator_dna,
           used_dimension_registry_as_seed_body: !!(xaiRes as any).used_dimension_registry_as_seed_body,
         };
-        if (!xaiRes.succeeded || xaiRes.returned <= 0) {
-          return failClosed("SEED_INFERENCE_FAILED", {
-            xai_seed_expansion,
-            required_slots,
-            remaining,
-          });
-        }
         for (const s of xaiRes.seeds) {
           if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
           candidates.push({
@@ -316,17 +394,7 @@ Deno.serve(async (req) => {
       }
 
       const cumulative = priorSubjects.length + candidates.length;
-      const expand_done = batchIndex + 1 >= totalBatches || cumulative >= targetSupply;
-      const supply_low = cumulative < required_slots;
-      if (expand_done && supply_low) {
-        return failClosed("SEED_SUPPLY_INSUFFICIENT", {
-          xai_seed_expansion,
-          cumulative,
-          required_slots,
-          learned_user_direct_n: learned.user_direct_n,
-          cluster_weights: learned.cluster_weights,
-        });
-      }
+      const expand_done = cumulative >= required_slots;
       return json({
         success: true,
         phase: "expand",
@@ -344,7 +412,7 @@ Deno.serve(async (req) => {
         key_present: !!xaiKey,
         key_len: xaiKey.length,
         expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none",
-        supply_low: false,
+        supply_low: cumulative < required_slots,
         diagnostics: {
           app_version: APP_VERSION,
           weekly_engine_version: WEEKLY_ENGINE_VERSION,
@@ -367,7 +435,7 @@ Deno.serve(async (req) => {
           order8d_cors_methods: true,
           xai_seed_expansion,
           language_policy: "Korean output; location only from Evidence",
-          supply_low: false,
+          supply_low: cumulative < required_slots,
           required_slots,
           cumulative,
           target_supply: targetSupply,
@@ -558,19 +626,19 @@ Deno.serve(async (req) => {
       if (totalPlanned < required_slots) {
         return json({
           success: false,
-          error: "SEED_SELECT_SHORTFALL",
-          detail: `planned ${totalPlanned} < required ${required_slots}. Not saving a short template week.`,
+          error: "NEED_MORE_SEEDS",
+          need_more_seeds: true,
+          detail: `planned ${totalPlanned} < inferred quota ${required_slots}. Client must keep inferring until filled.`,
           phase: "select",
-          days: [],
+          days: redistributed.days,
           totalPlanned,
           required_slots,
           diagnostics: {
             required_slots,
             input_seed_count: seedsIn.length,
             pool_after_gates: pool.length + totalPlanned,
-            xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
           },
-        }, 422);
+        });
       }
       return json({
         success: true,
