@@ -1,6 +1,6 @@
 /**
- * Weekly Planner Edge — ORDER 8D functional restore
- * Full ORDER8C compactSlot path pending; expand uses real seed-engine.
+ * Weekly Planner Edge — ORDER 8D functional restore + xAI seed supply hotfix
+ * Full ORDER8C compactSlot path pending; expand uses real seed-engine + xAI when needed.
  * CORS: Access-Control-Allow-Methods included.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -39,12 +39,13 @@ import {
   topicDistributionReport,
   softDailyCap,
 } from "./daily-topic-distribute.ts";
+import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
-const APP_VERSION = "10.0.0";
-const WEEKLY_ENGINE_VERSION = "phased_v10_order8d_functional_restore";
+const APP_VERSION = "11.0.0";
+const WEEKLY_ENGINE_VERSION = "phased_v11_order8d_xai_supply_hotfix";
 const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
@@ -167,7 +168,7 @@ Deno.serve(async (req) => {
         post_type: p.post_type,
       }));
       let leakage_blocked = 0;
-      const candidates: any[] = [];
+      let candidates: any[] = [];
       for (const c of gated.passed) {
         const role = (c.source_role as SourceRole) || "SEED_SOURCE";
         const g = guardCandidateAgainstManualLeakage({
@@ -194,7 +195,42 @@ Deno.serve(async (req) => {
           },
         });
       }
-      const supply_low = candidates.length < Math.min(required_slots, 8);
+
+      // xAI seed supply: fill shortfall beyond DIMENSION_REGISTRY (8)
+      let xai_seed_expansion: any = { attempted: false, succeeded: false, error: null, returned: 0 };
+      const allowPaid = body.expand_with_xai !== false && body.allow_xai_enrich !== false;
+      const shortfall = Math.max(0, required_slots - candidates.length);
+      if (allowPaid && shortfall > 0 && xaiKey) {
+        const xaiRes = await expandSeedSupplyWithXai({
+          xaiKey,
+          needed: Math.min(48, shortfall + 8),
+          existing: candidates as ConcreteSeed[],
+          explicitCreatorIntent: intentText || undefined,
+          timeoutMs: 28000,
+        });
+        xai_seed_expansion = {
+          attempted: xaiRes.attempted,
+          succeeded: xaiRes.succeeded,
+          error: xaiRes.error,
+          returned: xaiRes.returned,
+          requested: xaiRes.requested,
+        };
+        for (const s of xaiRes.seeds) {
+          candidates.push({
+            ...s,
+            source_role: "SEED_SOURCE",
+            source_trace: {
+              source_role: "SEED_SOURCE",
+              source_type: "XAI_SEED_EXPANSION",
+              manual_source_used: false,
+              manual_text_exposed_to_generation: false,
+              leakage_guard_result: "PASS",
+            },
+          });
+        }
+      }
+
+      const supply_low = candidates.length < Math.min(required_slots, 12);
       return json({
         success: true,
         phase: "expand",
@@ -206,11 +242,11 @@ Deno.serve(async (req) => {
         next_dim_batch_index: 1,
         id_counter: candidates.length,
         engine: WEEKLY_ENGINE_VERSION,
-        xai_api_used: false,
+        xai_api_used: !!xai_seed_expansion.attempted,
         seed_count: candidates.length,
         key_present: !!xaiKey,
         key_len: xaiKey.length,
-        expand_model: "none_evidence_only",
+        expand_model: xai_seed_expansion.attempted ? "xai_seed_supply" : "none_evidence_only",
         supply_low,
         diagnostics: {
           app_version: APP_VERSION,
@@ -220,7 +256,7 @@ Deno.serve(async (req) => {
           local_raw: local.length,
           local_passed: gated.passed.length,
           local_rejected: gated.local_gate_rejected,
-          expand_model: "none_evidence_only",
+          expand_model: xai_seed_expansion.attempted ? "xai_seed_supply" : "none_evidence_only",
           evidence_activity_rows: (actRows || []).length,
           evidence_subjects: evidenceSubjects.length,
           published_evidence_rows: publishedEvidence.length,
@@ -229,9 +265,14 @@ Deno.serve(async (req) => {
           order0b_leakage_blocked: leakage_blocked,
           order8d_functional_restore: true,
           order8d_cors_methods: true,
+          xai_seed_expansion,
           language_policy: "Korean output; location only from Evidence",
           supply_low,
-          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
+          xai_usage: {
+            seed_expansion: !!xai_seed_expansion.attempted,
+            external_supplement: false,
+            creator_generation: false,
+          },
         },
         timing: { total_ms: Date.now() - t0 },
       });
@@ -436,11 +477,11 @@ Deno.serve(async (req) => {
           count_integrity: countIntegrityOk(mix.base_required_slots, totalPlanned),
           order8d_functional_restore: true,
           order8d_cors_methods: true,
-          order8d_note: "full compactSlot/ORDER7-8 path re-materializing; slots planned with lite compact",
+          order8d_note: "xai_supply_hotfix active; full compactSlot still pending",
           soft_daily_cap: softDailyCap(postsPerDay),
           max_daily_topic: redistributed.max_daily_topic,
           topic_distribution: topicDistributionReport(redistributed.days),
-          xai_usage: { seed_expansion: false, external_supplement: false, creator_generation: false },
+          xai_usage: { seed_expansion: true, external_supplement: false, creator_generation: false },
         },
         timing: { total_ms: Date.now() - t0 },
       });
