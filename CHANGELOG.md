@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.1.4 — 2026-08-14
+
+- 원인: Grok 4.6 기본 추론이 high라서 18초 안에 JSON이 안 나옴. 할당량은 cadence fallback, 시드는 0/28
+- 시드·할당량·작성에 `reasoning_effort: low`. 실패 원인을 화면에 보여 줌. 템플릿으로 채우지는 않음
+
 ## 11.1.3 — 2026-08-14
 
 - 포스트·시드가 늘어나도 한 요청을 키우지 않습니다 (시드 10개, 작성 2개).

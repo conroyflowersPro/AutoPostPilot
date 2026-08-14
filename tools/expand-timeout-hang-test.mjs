@@ -27,7 +27,7 @@ function ok(name, cond) {
 
 console.log("Expand hang after inferred quota (v11.1.2)");
 ok("H1. EXPAND_BATCH is 10 (was 18)", /const EXPAND_BATCH = 10/.test(ix));
-ok("H2. expand Grok timeout 18s (was 28s)", /timeoutMs:\s*18000/.test(ix));
+ok("H2. expand Grok timeout 22s (one call, under 60s)", /timeoutMs:\s*22000/.test(ix));
 ok("H3. no same-request expand retry", (ix.match(/await runExpand\(\)/g) || []).length === 1);
 ok("H4. client aborts expand/quota ~45s", /phase === "expand" \|\| phase === "quota" \? 45000/.test(gen));
 ok("H5. client aborts write ~50s", /phase === "write" \? 50000/.test(gen));

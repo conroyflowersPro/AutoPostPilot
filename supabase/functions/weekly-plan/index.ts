@@ -56,7 +56,7 @@ import {
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 6;
-const APP_VERSION = "11.1.3";
+const APP_VERSION = "11.1.4";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -205,6 +205,7 @@ Deno.serve(async (req) => {
           cadence: learned.cadence,
           cluster_weights: learned.cluster_weights,
           quota_source: quota.source,
+          quota_grok_error: quota.grok_error || null,
         },
         timing: { total_ms: Date.now() - t0 },
       });
@@ -361,7 +362,7 @@ Deno.serve(async (req) => {
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
             model: V11_WRITER_MODEL,
-            timeoutMs: 18000,
+            timeoutMs: 22000,
           });
         let xaiRes = await runExpand();
         xai_seed_expansion = {

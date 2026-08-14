@@ -329,6 +329,7 @@ export async function callXaiWriter(
         ],
         temperature: 0.65,
         max_tokens: 420,
+        reasoning_effort: "low",
       }),
       signal: controller.signal,
     });

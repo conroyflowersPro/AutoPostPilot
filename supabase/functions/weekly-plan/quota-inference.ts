@@ -19,6 +19,7 @@ export type WeeklyQuota = {
   rationale: string;
   source: "GROK_INFERRED" | "CADENCE_FALLBACK";
   version: string;
+  grok_error?: string;
 };
 
 function clampPostsPerDay(n: number): number {
@@ -114,6 +115,7 @@ export async function inferWeeklyQuota(args: {
         model: args.model || "grok-4.6",
         temperature: 0.3,
         max_tokens: 250,
+        reasoning_effort: "low",
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
@@ -123,10 +125,18 @@ export async function inferWeeklyQuota(args: {
     });
     clearTimeout(timer);
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) return fallback;
+    if (!res.ok) {
+      return {
+        ...fallback,
+        grok_error: String(body?.error?.message || `xai_http_${res.status}`).slice(0, 180),
+      };
+    }
     const content = body?.choices?.[0]?.message?.content || "";
     const parsed = extractJson(typeof content === "string" ? content : JSON.stringify(content));
-    const ppd = clampPostsPerDay(Number(parsed?.posts_per_day));
+    if (!parsed || parsed.posts_per_day == null) {
+      return { ...fallback, grok_error: "quota_json_unusable" };
+    }
+    const ppd = clampPostsPerDay(Number(parsed.posts_per_day));
     const rationale = String(parsed?.rationale || "").replace(/\s+/g, " ").trim().slice(0, 240)
       || `Grok inferred ${ppd}/day × ${QUOTA_DAYS}`;
     return {
@@ -137,7 +147,10 @@ export async function inferWeeklyQuota(args: {
       source: "GROK_INFERRED",
       version: QUOTA_INFERENCE_VERSION,
     };
-  } catch {
-    return fallback;
+  } catch (e: any) {
+    return {
+      ...fallback,
+      grok_error: e?.name === "AbortError" ? "xai_timeout" : String(e?.message || "quota_grok_failed").slice(0, 180),
+    };
   }
 }

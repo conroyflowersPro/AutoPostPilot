@@ -179,10 +179,19 @@ function GeneratePageInner() {
       const requiredSlots = Number(quotaPart.required_slots || quotaPart.quota.required_slots);
       const postsPerDay = Number(quotaPart.postsPerDay || quotaPart.quota.posts_per_day);
       const quotaNote = String(quotaPart.quota.rationale || "");
+      const quotaGrokErr = String(quotaPart.quota.grok_error || quotaPart.diagnostics?.quota_grok_error || "");
       const maxExpandRounds = expandRoundBudget(requiredSlots);
       const maxTopupRounds = topupRoundBudget(requiredSlots);
       const subjectCap = priorSubjectCap(requiredSlots);
-      setPlanSummary(`quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}\n${quotaNote}`);
+      setPlanSummary(
+        [
+          `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
+          quotaNote,
+          quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
 
       const base: Record<string, unknown> = {
         generationDays: GENERATION_DAYS,
@@ -204,6 +213,17 @@ function GeneratePageInner() {
       let idCounter = 0;
       let dimBatch = 0;
       let emptyStreak = 0;
+      let lastExpandError = "";
+
+      function expandFailReason(part: any): string {
+        return String(
+          part?.xai_seed_expansion?.error ||
+            part?.diagnostics?.xai_seed_expansion?.error ||
+            part?.detail ||
+            part?.error ||
+            ""
+        ).slice(0, 180);
+      }
 
       async function expandOnce() {
         setPhase(`시드 추론 ${allGated.length}/${requiredSlots}…`);
@@ -220,6 +240,7 @@ function GeneratePageInner() {
           });
           dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
           advanced = true;
+          lastExpandError = expandFailReason(part);
           if (!part.success) {
             if (String(part.error || "") === "SEED_INFERENCE_REQUIRES_XAI") {
               throw new Error(part.detail || part.error || "SEED_INFERENCE_REQUIRES_XAI");
@@ -237,6 +258,7 @@ function GeneratePageInner() {
         } catch (e: any) {
           if (!advanced) dimBatch += 1;
           const msg = String(e?.message || e);
+          lastExpandError = msg.slice(0, 180);
           if (/SEED_INFERENCE_REQUIRES_XAI|로그인이 필요합니다/.test(msg)) throw e;
           return 0;
         }
@@ -248,7 +270,8 @@ function GeneratePageInner() {
           emptyStreak += 1;
           if (emptyStreak >= 4) {
             throw new Error(
-              `Grok 시드 추론이 반복 실패했습니다 (${allGated.length}/${requiredSlots}). 템플릿으로 채우지 않습니다.`
+              `Grok 시드 추론이 반복 실패했습니다 (${allGated.length}/${requiredSlots}). 템플릿으로 채우지 않습니다.` +
+                (lastExpandError ? ` 원인: ${lastExpandError}` : "")
             );
           }
           continue;

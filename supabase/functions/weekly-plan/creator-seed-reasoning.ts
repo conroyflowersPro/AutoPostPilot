@@ -234,6 +234,7 @@ export async function reasonCreatorSeeds(
         model: args.model || "grok-4.6",
         temperature: 0.85,
         max_tokens: 2200,
+        reasoning_effort: "low",
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
@@ -276,7 +277,7 @@ export async function reasonCreatorSeeds(
     return {
       ...base,
       attempted: true,
-      error: clean(e?.message || "creator_seed_reason_exception", 180),
+      error: e?.name === "AbortError" ? "xai_timeout" : clean(e?.message || "creator_seed_reason_exception", 180),
     };
   }
 }
