@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: press 7-day generate → Grok 4.6 infers in-rule posts → Fedica auto-schedules on X-algorithm gaps → grow the X account. X policy always wins.
+One line: see posts and comment status; press 7-day generate → ORDER 0–8 infers as `@Seung4680` → Fedica auto-schedules on-policy posts → grow the account via reader participation.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
