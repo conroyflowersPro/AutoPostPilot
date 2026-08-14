@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply generation_jobs migration via Management API SQL
+      - name: Apply generation_jobs migration via Management API
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ihhiyecifxrqxfpyylpt
@@ -22,23 +22,41 @@ jobs:
           SQL_FILE=supabase/migrations/20260814_generation_jobs_v1.sql
           test -f "$SQL_FILE"
           python3 - <<'PY'
-          import json, os, urllib.request
+          import json, os, urllib.request, ssl
           sql = open("supabase/migrations/20260814_generation_jobs_v1.sql").read()
           token = os.environ["SUPABASE_ACCESS_TOKEN"]
           ref = os.environ["PROJECT_REF"]
-          url = f"https://api.supabase.com/v1/projects/{ref}/database/query"
-          body = json.dumps({"query": sql}).encode()
-          req = urllib.request.Request(url, data=body, method="POST", headers={
+          headers = {
               "Authorization": f"Bearer {token}",
               "Content-Type": "application/json",
-          })
-          try:
-              with urllib.request.urlopen(req, timeout=120) as r:
-                  print("APPLY_STATUS", r.status)
-                  print(r.read()[:2000].decode())
-          except urllib.error.HTTPError as e:
-              print("HTTP", e.code, e.read()[:2000].decode())
-              raise
+              "User-Agent": "Mozilla/5.0 (compatible; AutoPostPilot/11.2.0; GitHubActions)",
+              "Accept": "application/json",
+          }
+
+          def post(path, payload):
+              url = f"https://api.supabase.com/v1/projects/{ref}{path}"
+              body = json.dumps(payload).encode()
+              req = urllib.request.Request(url, data=body, method="POST", headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      return r.status, r.read().decode()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode()
+
+          status, text = post("/database/migrations", {"name": "generation_jobs_v1", "query": sql})
+          print("MIGRATIONS_STATUS", status)
+          print(text[:2000])
+          if status in (200, 201, 204):
+              print("APPLY_OK_MIGRATIONS")
+          elif status in (400, 409) and ("already exists" in text.lower() or "duplicate" in text.lower()):
+              print("APPLY_ALREADY")
+          else:
+              status2, text2 = post("/database/query", {"query": sql})
+              print("QUERY_STATUS", status2)
+              print(text2[:2000])
+              if status2 not in (200, 201, 204):
+                  raise SystemExit(f"apply failed migrations={status} query={status2}")
+              print("APPLY_OK_QUERY")
           PY
       - name: Verify generation_jobs exists
         env:
@@ -61,6 +79,8 @@ jobs:
           req = urllib.request.Request(url, data=body, method="POST", headers={
               "Authorization": f"Bearer {token}",
               "Content-Type": "application/json",
+              "User-Agent": "Mozilla/5.0 (compatible; AutoPostPilot/11.2.0; GitHubActions)",
+              "Accept": "application/json",
           })
           with urllib.request.urlopen(req, timeout=60) as r:
               data = r.read().decode()
