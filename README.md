@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: 7-day generate writes as `@Seung4680`; after review + original media, AI auto-publishes and decides gaps. Buildup learning = 1 reply/repost/bookmark. Chat screenshots apply only with consent.
+One line: 7-day generate → review + original media → xAI publishes and decides gaps. Learn from X Analytics + sync (1 reply/repost/bookmark). Files and Fedica screenshots are fallbacks. xAI tools only.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
