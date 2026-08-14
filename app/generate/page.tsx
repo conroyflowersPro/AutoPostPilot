@@ -121,7 +121,7 @@ function GeneratePageInner() {
         const job = await edgeCall(session, { phase: "job_tick", job_id: jobId });
         applyJob(job);
         if (job.status === "done") {
-          setPhase(`완료: ${job.saved_count || 0}개 draft 저장`);
+          setPhase(job.label_ko || `완료: ${job.saved_count || 0}개 draft 저장 · 리뷰하세요`);
           return;
         }
         if (job.status === "error") {
@@ -134,7 +134,7 @@ function GeneratePageInner() {
         const st = await edgeCall(session, { phase: "job_status", job_id: jobId });
         applyJob(st);
         if (st.status === "done") {
-          setPhase(`완료: ${st.saved_count || 0}개 draft 저장`);
+          setPhase(st.label_ko || `완료: ${st.saved_count || 0}개 draft 저장 · 리뷰하세요`);
           return;
         }
         if (st.status === "error") {
@@ -343,7 +343,7 @@ function GeneratePageInner() {
       {phase && <p className="mb-2 text-sm text-violet-300">{phase}</p>}
       {doneCount > 0 && (
         <p className="mb-4 text-sm text-emerald-400">
-          {doneCount}개 draft 저장됨 ·{" "}
+          {doneCount}개 저장됨 · 리뷰하세요 ·{" "}
           <a href="/" className="underline text-violet-300">
             홈 콘텐츠 큐에서 보기
           </a>

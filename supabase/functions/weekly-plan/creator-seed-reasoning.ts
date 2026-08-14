@@ -6,6 +6,7 @@
  */
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 
 export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
 
@@ -37,6 +38,8 @@ export type CreatorSeedReasoningInput = {
   };
   model?: string;
   timeoutMs?: number;
+  /** One ring outside core interest (EV / semiconductor / space). Quota-hole fill. */
+  adjacentRing?: boolean;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -202,7 +205,7 @@ export async function reasonCreatorSeeds(
       text: clean(v.text, 140),
       engagement_hint: clean(v.engagement_hint, 40),
     }))
-    .filter((v) => v.text.length >= 12 && interestDomainGate(v.text))
+    .filter((v) => v.text.length >= 12 && (args.adjacentRing ? adjacentDomainGate(v.text) : interestDomainGate(v.text)))
     .slice(0, 12);
   const perf = (args.performancePatternHints?.length
     ? args.performancePatternHints
@@ -225,6 +228,7 @@ export async function reasonCreatorSeeds(
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
+    ...(args.adjacentRing ? adjacentRingPromptLines() : []),
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
@@ -252,8 +256,9 @@ export async function reasonCreatorSeeds(
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
-    weekly_goal_note:
-      "Fill the inferred quota. Distinct directions from DNA + engine + learned data. No frozen axes. Return requested_seed_count seeds.",
+    weekly_goal_note: args.adjacentRing
+      ? "Fill quota holes with adjacent-ring directions (EV / semiconductor / space). Not Tesla lived. Return requested_seed_count seeds."
+      : "Fill the inferred quota. Distinct directions from DNA + engine + learned data. No frozen axes. Return requested_seed_count seeds.",
     requirement:
       "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });

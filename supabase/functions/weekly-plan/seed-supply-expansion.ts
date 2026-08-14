@@ -40,6 +40,7 @@ export async function expandSeedSupplyWithXai(args: {
   clusterInterestWeights?: Array<{ cluster: string; n: number }>;
   registryInterestHints?: Array<{ cluster: string; dimension: string }>;
   userDirectN?: number;
+  adjacentRing?: boolean;
   learning?: {
     stage?: string;
     note_ko?: string;
@@ -60,6 +61,7 @@ export async function expandSeedSupplyWithXai(args: {
     clusterInterestWeights: args.clusterInterestWeights,
     registryInterestHints: args.registryInterestHints,
     userDirectN: args.userDirectN,
+    adjacentRing: args.adjacentRing,
     learning: args.learning,
     model: args.model,
     timeoutMs: args.timeoutMs,

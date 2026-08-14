@@ -25,6 +25,15 @@ import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
 import {
+  ADJACENT_PER_DAY_MAX,
+  ADJACENT_SOURCE_TYPE,
+  isAdjacentExpansionSeed,
+  isCoreInterestSubject,
+  markAdjacentSeed,
+  pickDayForAdjacent,
+  enforceAdjacentPerDay,
+} from "./adjacent-expansion.ts";
+import {
   ARCHIVE_EXPERIENCE_FALLBACK,
   buildRecentExperienceCandidates,
   experienceCandidateToSeedFields,
@@ -97,6 +106,8 @@ function compactSlotLite(seed: ConcreteSeed, dayOffset: number, slot: number, mo
     source_type: seed.source_type || seed.primary_source,
     evidence_source_ids: seed.evidence_source_ids || [],
     cite_episode_hint: (seed as any).cite_episode_hint || "",
+    source_kind: (seed as any).source_kind || "",
+    adjacent_expansion: isAdjacentExpansionSeed(seed as any),
     claim_types: seed.claim_types || [],
     inference_type: seed.inference_type || "UNKNOWN",
     grounding_status: seed.grounding_status || "UNKNOWN",
@@ -171,6 +182,8 @@ export async function startWeeklyJob(args: {
     max_topup: 6,
     topup: 0,
     select_tries: 0,
+    adjacent_fill: false,
+    adjacent_rounds: 0,
     posts_per_day: 4,
     quota: null as any,
     learning: null as any,
@@ -382,6 +395,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     row.summary = [row.summary, `경험시드: ${experienceSeeds.length} · 인용 후속 · 동일 내용 금지`].filter(Boolean).join("\n");
   }
   const candidates: any[] = [...experienceSeeds, ...(gated.passed || [])];
+  const adjacentFill = !!st.adjacent_fill;
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
     needed: Math.max(Math.min(EXPAND_BATCH, remaining), 1),
@@ -393,6 +407,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     registryInterestHints: learned.registry_interest_hints,
     userDirectN: learned.user_direct_n,
     learning: learned.learning,
+    adjacentRing: adjacentFill,
     model: V11_WRITER_MODEL,
     timeoutMs: 32000,
   });
@@ -400,12 +415,21 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const added: any[] = [...experienceSeeds];
   for (const s of xaiRes.seeds || []) {
     if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
-    added.push({
-      ...s,
-      source_role: "SEED_SOURCE",
-      source_trace: { source_role: "SEED_SOURCE", source_type: "CREATOR_SEED_REASONING", leakage_guard_result: "PASS" },
-    });
+    if (adjacentFill && isCoreInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))) continue;
+    const rowSeed = adjacentFill
+      ? markAdjacentSeed({
+        ...s,
+        source_role: "SEED_SOURCE",
+        source_trace: { source_role: "SEED_SOURCE", source_type: ADJACENT_SOURCE_TYPE, leakage_guard_result: "PASS" },
+      })
+      : {
+        ...s,
+        source_role: "SEED_SOURCE",
+        source_trace: { source_role: "SEED_SOURCE", source_type: "CREATOR_SEED_REASONING", leakage_guard_result: "PASS" },
+      };
+    added.push(rowSeed);
   }
+  if (adjacentFill) st.adjacent_fill = false;
   st.gated = [...(st.gated || []), ...added];
   for (const s of added) {
     if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
@@ -414,7 +438,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   st.last_expand_error = xaiRes.error || "";
   if (added.length <= 0) {
     st.empty_streak = Number(st.empty_streak || 0) + 1;
-    if (st.empty_streak >= 4) {
+    if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
       row.status = "error";
       row.error = `Grok 시드 추론이 반복 실패했습니다 (${st.gated.length}/${required}). 템플릿으로 채우지 않습니다.` +
         (st.last_expand_error ? ` 원인: ${st.last_expand_error}` : "");
@@ -422,12 +446,19 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.summary = [row.summary, st.last_expand_error ? `expand: ${st.last_expand_error}` : ""].filter(Boolean).join("\n");
       return;
     }
+    if (adjacentFill && (st.gated || []).length > 0) {
+      row.step = "select";
+      row.label_ko = "주간 배치…";
+      return;
+    }
   } else {
     st.empty_streak = 0;
   }
-  row.label_ko = `시드 추론 ${st.gated.length}/${required}…`;
-  if (st.gated.length >= required || st.dim_batch >= st.max_expand) {
-    if (st.gated.length < required) {
+  row.label_ko = adjacentFill
+    ? `인접 확장 ${st.gated.length}/${required}…`
+    : `시드 추론 ${st.gated.length}/${required}…`;
+  if (st.gated.length >= required || st.dim_batch >= st.max_expand || adjacentFill) {
+    if (st.gated.length < 1) {
       row.status = "error";
       row.error = `시드 ${st.gated.length}/${required}. 할당량을 채우지 못해 중단합니다.`;
       return;
@@ -476,15 +507,16 @@ async function stepJudge(row: any) {
     row.label_ko = `시드 판정 ${judged.length}/${st.gated.length}…`;
     return;
   }
-  if (eligibleOf(judged).length < required && st.topup < st.max_topup) {
+  const eligibleN = eligibleOf(judged).length;
+  if (eligibleN < required && st.topup < st.max_topup && Number(st.adjacent_rounds || 0) < 1) {
     st.topup = Number(st.topup || 0) + 1;
     row.step = "expand";
-    row.label_ko = `할당량 보충 ${eligibleOf(judged).length}/${required}…`;
+    row.label_ko = `할당량 보충 ${eligibleN}/${required}…`;
     return;
   }
-  if (eligibleOf(judged).length < required) {
+  if (eligibleN < 1) {
     row.status = "error";
-    row.error = `판정 통과 ${eligibleOf(judged).length}/${required}. Grok이 할당량을 채우지 못했습니다.`;
+    row.error = `판정 통과 ${eligibleN}/${required}. Grok이 할당량을 채우지 못했습니다.`;
     return;
   }
   row.step = "select";
@@ -495,7 +527,6 @@ async function stepSelect(supabase: any, row: any) {
   const st = row.state;
   const required = Number(row.required_slots) || 0;
   const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 4));
-  const mix = allocateEditorialSlots(required, undefined);
   const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
   const { data: acts } = await supabase
     .from("account_activities")
@@ -526,6 +557,14 @@ async function stepSelect(supabase: any, row: any) {
     if (!g.allow_as_seed) continue;
     pool.push(s);
   }
+  const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s)).length;
+  const mix = allocateEditorialSlots(required, {
+    INFORMATIVE: 30,
+    COMPARE: 15,
+    OPINION: 25,
+    EXPERIENCE: expSupply > 0 ? Math.round((expSupply / Math.max(required, 1)) * 100) : 0,
+    CASUAL_OBSERVATION: 10,
+  });
   const selectedWeekly: ConcreteSeed[] = [];
   const queue = buildEditorialQueue(mix.allocation as any);
   const outDays: Array<{ dayOffset: number; posts: any[] }> = Array.from({ length: QUOTA_DAYS }, (_, i) => ({
@@ -536,7 +575,7 @@ async function stepSelect(supabase: any, row: any) {
     const mode = plannedMode as EditorialMode;
     const cands = pool
       .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
-      .filter(({ s }) => canServeEditorialMode(s, mode))
+      .filter(({ s }) => canServeEditorialMode(s, mode) && !isAdjacentExpansionSeed(s))
       .sort((a, b) => b.div - a.div);
     let picked: ConcreteSeed | null = null;
     for (const { s, i } of cands) {
@@ -570,34 +609,61 @@ async function stepSelect(supabase: any, row: any) {
     }
     outDays[bestDay].posts.push(compactSlotLite(picked, bestDay, outDays[bestDay].posts.length + 1, mode));
   }
+  let totalPlanned = outDays.reduce((s, d) => s + d.posts.length, 0);
+  while (totalPlanned < required) {
+    const idx = pool.findIndex((s) => isAdjacentExpansionSeed(s) && isSelectableStatus(s.status as any));
+    if (idx < 0) break;
+    const day = pickDayForAdjacent(outDays, postsPerDay, ADJACENT_PER_DAY_MAX);
+    if (day < 0) break;
+    const seed = pool.splice(idx, 1)[0];
+    if (conceptualRepetitionLevel(seed, selectedWeekly) === "HIGH") continue;
+    selectedWeekly.push(seed);
+    const mode = (parseEditorialMode(String(seed.requested_editorial_mode || "")) === "EXPERIENCE"
+      ? "INFORMATIVE"
+      : parseEditorialMode(String(seed.requested_editorial_mode || "INFORMATIVE"))) as EditorialMode;
+    outDays[day].posts.push(compactSlotLite(seed, day, outDays[day].posts.length + 1, mode === "EXPERIENCE" ? "INFORMATIVE" : mode));
+    totalPlanned += 1;
+  }
   const redistributed = redistributeDailyTopics(outDays, postsPerDay);
+  enforceAdjacentPerDay(redistributed.days, postsPerDay, ADJACENT_PER_DAY_MAX);
   for (let di = 0; di < redistributed.days.length; di++) {
     redistributed.days[di].posts.forEach((p: any, si: number) => {
       p.dayOffset = di;
       p.slotId = `D${di + 1}P${si + 1}`;
     });
   }
-  const totalPlanned = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
-  if (totalPlanned < required && st.select_tries < st.max_topup) {
-    st.select_tries = Number(st.select_tries || 0) + 1;
+  const totalAfter = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
+  const adjacentPlanned = redistributed.days.reduce(
+    (s, d) => s + (d.posts || []).filter((p: any) => isAdjacentExpansionSeed(p)).length,
+    0,
+  );
+  if (totalAfter < required && Number(st.adjacent_rounds || 0) < 3) {
+    st.adjacent_rounds = Number(st.adjacent_rounds || 0) + 1;
+    st.adjacent_fill = true;
     row.step = "expand";
-    row.label_ko = `계획 부족 → 시드 추가 ${st.select_tries}…`;
+    row.label_ko = `인접 확장으로 할당량 보충 ${totalAfter}/${required}…`;
+    row.summary = [row.summary, `계획 ${totalAfter}/${required} → 관심사 한 칸 밖 바이럴 시드`].filter(Boolean).join("\n");
     return;
   }
-  if (totalPlanned < required) {
+  if (totalAfter < 1) {
     row.status = "error";
-    row.error = `주간 계획이 ${totalPlanned}/${required}입니다. 할당량을 채운 뒤에만 저장합니다.`;
+    row.error = `주간 계획이 0/${required}입니다.`;
     return;
   }
   st.days = redistributed.days;
   st.write_flat = redistributed.days.flatMap((d) => d.posts || []);
   st.write_index = 0;
+  const short = totalAfter < required;
   row.summary = [
     row.summary,
-    `expand_seeds: ${(st.gated || []).length} · judged: ${(st.judged || []).length} · planned: ${totalPlanned}`,
+    `expand_seeds: ${(st.gated || []).length} · judged: ${(st.judged || []).length} · planned: ${totalAfter}/${required}` +
+      (adjacentPlanned ? ` · 인접확장 ${adjacentPlanned}(하루 최대 ${ADJACENT_PER_DAY_MAX})` : "") +
+      (short ? " · 빈 칸은 작성하지 않음 · 리뷰로" : ""),
   ].filter(Boolean).join("\n");
   row.step = "write";
-  row.label_ko = `초안 생성 0/${totalPlanned}…`;
+  row.label_ko = short
+    ? `초안 생성 0/${totalAfter}… (할당 ${totalAfter}/${required} · 나머지는 리뷰)`
+    : `초안 생성 0/${totalAfter}…`;
 }
 
 async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
@@ -661,12 +727,18 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     const required = Number(row.required_slots) || 0;
     row.step = "done";
     if (row.saved_count < required) {
-      row.status = "error";
-      row.error = `초안 ${row.saved_count}/${required}만 저장됨. ${(st.write_errors || []).slice(0, 3).join(" · ")}`;
-      row.label_ko = row.error;
+      if (row.saved_count > 0) {
+        row.status = "done";
+        row.error = null;
+        row.label_ko = `리뷰: ${row.saved_count}개 저장 · 빈 칸 ${Math.max(0, required - row.saved_count)}는 작성하지 않음`;
+      } else {
+        row.status = "error";
+        row.error = `초안 ${row.saved_count}/${required}만 저장됨. ${(st.write_errors || []).slice(0, 3).join(" · ")}`;
+        row.label_ko = row.error;
+      }
     } else {
       row.status = "done";
-      row.label_ko = `완료: ${row.saved_count}개 draft 저장`;
+      row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
     }
   }
 }
