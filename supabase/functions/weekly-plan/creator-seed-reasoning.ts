@@ -29,6 +29,12 @@ export type CreatorSeedReasoningInput = {
   /** Registry labels as HINTS only — never copy as concrete_subject */
   registryInterestHints?: Array<{ cluster: string; dimension: string }>;
   userDirectN?: number;
+  learning?: {
+    stage?: string;
+    note_ko?: string;
+    seed_rule?: string;
+    validated_performance_patterns?: number;
+  };
   model?: string;
   timeoutMs?: number;
 };
@@ -211,6 +217,7 @@ export async function reasonCreatorSeeds(
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
     "Each concrete_subject must name a specific observable tension or situation, distinct from every other seed this week.",
+    "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
     "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",
     "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
@@ -229,6 +236,14 @@ export async function reasonCreatorSeeds(
     user_direct_n: args.userDirectN ?? null,
     cluster_weights_from_user_direct: args.clusterInterestWeights?.length
       ? args.clusterInterestWeights
+      : null,
+    learning: args.learning
+      ? {
+          stage: args.learning.stage || null,
+          note_ko: args.learning.note_ko || null,
+          seed_rule: args.learning.seed_rule || null,
+          validated_performance_patterns: args.learning.validated_performance_patterns ?? 0,
+        }
       : null,
     registry_interest_hints_not_seed_bodies: (args.registryInterestHints || []).slice(0, 12),
     this_run_note_overlay_only: intent || null,

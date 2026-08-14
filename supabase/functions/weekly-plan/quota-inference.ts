@@ -2,7 +2,7 @@
  * Infer the week's post quota from Creator DNA + engine rules + learned cadence.
  * Will is not a generate-box sentence. Bounds exist only as X anti-dump safety.
  */
-import type { CadenceSignal, ClusterWeight } from "./seed-engine.ts";
+import type { CadenceSignal, ClusterWeight, LearningState } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
 export const QUOTA_DAYS = 7;
@@ -67,6 +67,7 @@ export async function inferWeeklyQuota(args: {
   clusterWeights: ClusterWeight[];
   userDirectN: number;
   performanceHints?: string[];
+  learning?: LearningState;
   explicitCreatorIntent?: string;
   model?: string;
   timeoutMs?: number;
@@ -82,7 +83,7 @@ export async function inferWeeklyQuota(args: {
     "The algorithm does not write posts and does not pick the last sentence.",
     "Days are 7 because 7-day generate is the engine action.",
     `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Do not freeze 6 as a default.`,
-    "Use DNA (two-speed publishing, authenticity, plural interests) + cadence + Performance DNA candidates.",
+    "Thin or missing learned evidence is expected (cold start). Still infer posts_per_day from DNA + cadence within bounds. Do not refuse. Do not wait for validated performance patterns.",
     "If handmade cadence is healthy and growth evidence supports it, go higher within max. If dumping likely hurt reach, go lower within min.",
     "Korean rationale, one or two sentences.",
     'Output strict JSON: {"posts_per_day":6,"rationale":"..."}',
@@ -97,6 +98,7 @@ export async function inferWeeklyQuota(args: {
     cadence: args.cadence,
     cluster_weights: args.clusterWeights,
     performance_pattern_hints: (args.performanceHints || []).slice(0, 8),
+    learning: args.learning || null,
     week_days: QUOTA_DAYS,
     bounds: { min_per_day: QUOTA_PER_DAY_MIN, max_per_day: QUOTA_PER_DAY_MAX },
   });

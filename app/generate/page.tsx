@@ -180,6 +180,12 @@ function GeneratePageInner() {
       const postsPerDay = Number(quotaPart.postsPerDay || quotaPart.quota.posts_per_day);
       const quotaNote = String(quotaPart.quota.rationale || "");
       const quotaGrokErr = String(quotaPart.quota.grok_error || quotaPart.diagnostics?.quota_grok_error || "");
+      const learningNote = String(
+        quotaPart.learning?.note_ko || quotaPart.diagnostics?.learning?.note_ko || ""
+      );
+      const learningStage = String(
+        quotaPart.learning?.stage || quotaPart.diagnostics?.learning?.stage || ""
+      );
       const maxExpandRounds = expandRoundBudget(requiredSlots);
       const maxTopupRounds = topupRoundBudget(requiredSlots);
       const subjectCap = priorSubjectCap(requiredSlots);
@@ -187,6 +193,7 @@ function GeneratePageInner() {
         [
           `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
           quotaNote,
+          learningNote ? `학습: ${learningStage || "SPARSE"} · ${learningNote}` : "",
           quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
         ]
           .filter(Boolean)
@@ -247,6 +254,7 @@ function GeneratePageInner() {
               [
                 `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
                 quotaNote,
+                learningNote ? `학습: ${learningStage || "SPARSE"} · ${learningNote}` : "",
                 quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
                 `expand: ${allGated.length}/${requiredSlots} · ${lastExpandError}`,
               ]

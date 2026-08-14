@@ -143,7 +143,47 @@ export type LearnedSeedSignals = {
   registry_interest_hints: Array<{ cluster: string; dimension: string }>;
   performance_pattern_hints: string[];
   cadence: CadenceSignal;
+  learning: LearningState;
 };
+
+/** Early weeks have thin evidence. That is expected — not a reason to emit 0 seeds or registry templates. */
+export type LearningStage = "COLD" | "SPARSE" | "ACCUMULATING";
+export type LearningState = {
+  stage: LearningStage;
+  user_direct_n: number;
+  originals_last_14d: number;
+  validated_performance_patterns: number;
+  note_ko: string;
+  seed_rule: string;
+};
+
+export function inferLearningState(args: {
+  user_direct_n: number;
+  cadence: CadenceSignal;
+}): LearningState {
+  const user_direct_n = Math.max(0, Number(args.user_direct_n) || 0);
+  const originals_last_14d = Math.max(0, Number(args.cadence?.originals_last_14d) || 0);
+  const validated_performance_patterns = 0;
+  let stage: LearningStage;
+  if (user_direct_n < 8 && originals_last_14d < 5) stage = "COLD";
+  else if (user_direct_n >= 30 && originals_last_14d >= 20) stage = "ACCUMULATING";
+  else stage = "SPARSE";
+  const note_ko =
+    stage === "COLD"
+      ? "초기입니다. 학습 데이터가 거의 없습니다. DNA로 이번 주를 추론합니다. 쌓이면 각도가 정확해집니다."
+      : stage === "SPARSE"
+        ? "학습이 아직 얕습니다. DNA와 있는 원글로 추론합니다. 성과 패턴은 아직 후보입니다."
+        : "원글은 쌓이는 중입니다. 성과 DNA는 아직 후보라 DNA·원글 위주로 추론합니다.";
+  return {
+    stage,
+    user_direct_n,
+    originals_last_14d,
+    validated_performance_patterns,
+    note_ko,
+    seed_rule:
+      "Thin or missing learned evidence is expected at this stage. Still return requested_seed_count direction seeds from Creator DNA + engine rules + whatever USER_DIRECT exists. Do not return an empty seeds array because evidence is incomplete. Do not invent lived episodes. Do not emit DIMENSION_REGISTRY labels as seed bodies. As USER_DIRECT and published outcomes accumulate, follow that data more closely.",
+  };
+}
 
 function metricsFromMeta(meta: unknown): Record<string, number> {
   const bag = (meta && typeof meta === "object" ? meta : {}) as Record<string, unknown>;
@@ -246,18 +286,20 @@ export function collectLearnedSeedSignals(opts: {
     ? Math.round((user_direct_n / days_with_originals) * 10) / 10
     : 0;
 
+  const cadence = {
+    days_with_originals,
+    avg_originals_on_active_days,
+    originals_last_14d,
+    window_days: 30,
+  };
   return {
     user_direct_n,
     cluster_weights,
     recent_angle_labels,
     registry_interest_hints: DIMENSION_REGISTRY.map((d) => ({ cluster: d.cluster, dimension: d.dimension })),
     performance_pattern_hints: performance_pattern_hints.slice(0, 10),
-    cadence: {
-      days_with_originals,
-      avg_originals_on_active_days,
-      originals_last_14d,
-      window_days: 30,
-    },
+    cadence,
+    learning: inferLearningState({ user_direct_n, cadence }),
   };
 }
 export const QUALITY_REFERENCE: any[] = [];

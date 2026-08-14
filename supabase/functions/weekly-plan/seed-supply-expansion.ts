@@ -40,6 +40,12 @@ export async function expandSeedSupplyWithXai(args: {
   clusterInterestWeights?: Array<{ cluster: string; n: number }>;
   registryInterestHints?: Array<{ cluster: string; dimension: string }>;
   userDirectN?: number;
+  learning?: {
+    stage?: string;
+    note_ko?: string;
+    seed_rule?: string;
+    validated_performance_patterns?: number;
+  };
   model?: string;
   timeoutMs?: number;
 }): Promise<XaiSeedExpansionResult> {
@@ -54,6 +60,7 @@ export async function expandSeedSupplyWithXai(args: {
     clusterInterestWeights: args.clusterInterestWeights,
     registryInterestHints: args.registryInterestHints,
     userDirectN: args.userDirectN,
+    learning: args.learning,
     model: args.model,
     timeoutMs: args.timeoutMs,
   });

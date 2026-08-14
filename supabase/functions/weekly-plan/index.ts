@@ -56,7 +56,7 @@ import {
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 6;
-const APP_VERSION = "11.1.5";
+const APP_VERSION = "11.1.6";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -186,6 +186,7 @@ Deno.serve(async (req) => {
           clusterWeights: learned.cluster_weights,
           userDirectN: learned.user_direct_n,
           performanceHints: learned.performance_pattern_hints,
+          learning: learned.learning,
           explicitCreatorIntent: intentText || undefined,
           model: V11_WRITER_MODEL,
           timeoutMs: 18000,
@@ -198,6 +199,7 @@ Deno.serve(async (req) => {
         postsPerDay: quota.posts_per_day,
         generationDays: quota.days,
         required_slots: quota.required_slots,
+        learning: learned.learning,
         diagnostics: {
           app_version: APP_VERSION,
           weekly_engine_version: WEEKLY_ENGINE_VERSION,
@@ -206,6 +208,7 @@ Deno.serve(async (req) => {
           cluster_weights: learned.cluster_weights,
           quota_source: quota.source,
           quota_grok_error: quota.grok_error || null,
+          learning: learned.learning,
         },
         timing: { total_ms: Date.now() - t0 },
       });
@@ -361,6 +364,7 @@ Deno.serve(async (req) => {
             clusterInterestWeights: learned.cluster_weights,
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
+            learning: learned.learning,
             model: V11_WRITER_MODEL,
             timeoutMs: 32000,
           });

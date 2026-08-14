@@ -29,6 +29,7 @@ export function performanceDnaBlock(): string {
   return [
     `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
     "STATUS: INITIAL BASELINE v1 — candidates only; VALIDATED patterns = 0",
+    "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
     "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > reposts > quotes > likes > impressions",
     "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity",
