@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: 7-day generate → review + original media → xAI publishes and decides gaps. Learn from X Analytics + sync (1 reply/repost/bookmark). Files and Fedica screenshots are fallbacks. xAI tools only.
+One line: Sync snapshots old and new posts; Grok fetches via API; files only if unknown (named ask + remind until 무시). Chat screenshots need a final `반영해` — `진행` does not apply.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
