@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: 7-day generate writes as `@Seung4680`; after review + original media, AI auto-publishes via Fedica and decides gaps. Handmade vs AP stay separate. No 30-day collisions except 2–3 experiments.
+One line: 7-day generate writes as `@Seung4680`; after review + original media, AI auto-publishes and decides gaps. Buildup learning = 1 reply/repost/bookmark. Chat screenshots apply only with consent.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
