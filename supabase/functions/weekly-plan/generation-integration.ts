@@ -125,6 +125,7 @@ export async function integrateSlotGeneration(
     model: options.model,
     allow_one_retry: false,
     timeout_ms: options.timeout_ms,
+    retry_hint: options.retry_hint,
   });
 
   if (last.generation_status === "GENERATED" && last.final_text) {
@@ -133,6 +134,7 @@ export async function integrateSlotGeneration(
 
   // Same-request retry doubles Grok wall time. writeOneSlot allows one retry
   // (2 parallel slots × 16s × 2 attempts ≈ 32s, under the Edge ~60s budget).
+  // Second attempt gets a quality rewrite hint from the first failure.
   if (attempts < ORDER7C_MAX_GENERATION_ATTEMPTS && options.allow_one_retry !== false) {
     attempts = 2;
     recoveryUsed = true;
@@ -143,6 +145,7 @@ export async function integrateSlotGeneration(
       model: options.model,
       allow_one_retry: false,
       timeout_ms: options.timeout_ms,
+      retry_hint: (last.block_reasons || []).filter(Boolean).join(",") || "quality_rewrite",
     });
     if (last.generation_status === "GENERATED" && last.final_text) {
       return packageResult(ctx, seedId, last, attempts, true, "same_seed_retry");

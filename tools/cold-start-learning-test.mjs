@@ -46,7 +46,7 @@ ok("L8. quota phase returns learning", /learning: learned\.learning/.test(ix));
 ok("L9. generate job shows 학습 line", /학습:/.test(job));
 ok("L10. direction: cold start + job runtime", /Cold start \(learning maturity\)/.test(dir) && /Generation runtime/.test(dir));
 ok("L11. video must not keep Edge loop", /Do not keep the current browser-orchestrated Edge loop for video/.test(dir));
-ok("L12. shipping 11.2.3", /const APP_VERSION = "11.2.3"/.test(ix));
+ok("L12. shipping 11.2.4", /const APP_VERSION = "11.2.4"/.test(ix));
 
 console.log("========================================");
 console.log(`LEARNING: ${pass} PASS / ${fail} FAIL`);

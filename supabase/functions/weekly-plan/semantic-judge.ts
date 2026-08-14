@@ -445,8 +445,11 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     hard.push("token_stutter");
   }
   const trimmedLen = text.replace(/\s+/g, " ").trim().length;
-  if (trimmedLen > 0 && trimmedLen < 80) {
+  if (trimmedLen > 0 && trimmedLen < 28) {
     hard.push("too_short_original");
+  }
+  if (/중요한\s*이슈|관심이\s*쏠|주목할\s*만|향후\s*전망|의미가\s*크다/.test(text)) {
+    hard.push("generic_thesis");
   }
 
   const comp = s(input.compression_target, "NATURAL");

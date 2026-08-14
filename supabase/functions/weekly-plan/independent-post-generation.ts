@@ -91,6 +91,7 @@ export type GenerateIndependentOptions = {
   model?: string;
   allow_one_retry?: boolean;
   timeout_ms?: number;
+  retry_hint?: string;
 };
 
 export const ORDER7B_GUARDS = {
@@ -226,9 +227,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "6) Prefer broad/simple everyday language without sacrificing accuracy.",
     "7) Apply Creator Style as surface register — not a fixed template.",
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
-    "9) Length: this is an ORIGINAL post, not a memo. At least two sentences. Typical 120–280 Korean characters. Do not stop after one clause.",
-    "10) Stop after the observation is actually delivered — not after a fragment. No grand thesis tail.",
-    "FORBIDDEN: finished examples, one-line notes, token stutter (ent ent ent / 같은 음절 반복), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    "9) QUALITY: write a finished observation. The reader should feel the snag, mismatch, or small human beat in the seed — not a topic label and not a memo fragment.",
+    "10) One complete sentence is enough if that observation is delivered. Do not add a dummy second sentence to look longer. Do not stop mid-token. No grand thesis tail.",
+    "FORBIDDEN: finished examples, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     "SEED SUBJECT: " + subject.slice(0, 200),
@@ -305,15 +306,21 @@ export type XaiWriterCallResult = {
 export async function callXaiWriter(
   ctx: DeepGenerationContext,
   xaiKey: string,
-  options: { model?: string; timeout_ms?: number } = {},
+  options: { model?: string; timeout_ms?: number; retry_hint?: string; temperature?: number } = {},
 ): Promise<XaiWriterCallResult> {
   const system = buildConstraintOnlyWriterInstructions(ctx);
   const subject = subjectFromCtx(ctx);
+  const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
   const userMsg = [
     "Write the final Korean X post now.",
-    "Subject focus: " + subject.slice(0, 160),
+    "Situation: " + subject.slice(0, 160),
+    tension ? "Tension to make visible: " + tension.slice(0, 140) : "Tension: find the snag inside the situation. Do not just name the topic.",
+    "The reader should picture the moment or the mismatch. One finished sentence is OK. Do not pad.",
+    s(options.retry_hint)
+      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as a finished observation. One sentence is enough. Do not stutter. Do not restate the subject as the whole post."
+      : "",
     "Respond with post text only.",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   const controller = new AbortController();
   const timeoutMs = options.timeout_ms ?? 25000;
@@ -332,7 +339,7 @@ export async function callXaiWriter(
           { role: "system", content: system },
           { role: "user", content: userMsg },
         ],
-        temperature: 0.65,
+        temperature: options.temperature ?? 0.7,
         max_tokens: 1400,
         reasoning_effort: "low",
       }),
@@ -412,8 +419,10 @@ function validateOutput(
   const factualOk = !/\b\d{4,}원\b/.test(text) || subject.includes("원");
   if (!factualOk) reasons.push("possible_factual_invention");
 
-  const coreOk = !isTooShortOriginal(text);
-  if (!coreOk) reasons.push("too_short_original");
+  const coreOk = !isFragmentOriginal(text) && !isSubjectRestate(text, subject) && !isGenericThesis(text);
+  if (isFragmentOriginal(text)) reasons.push("too_short_original");
+  if (isSubjectRestate(text, subject)) reasons.push("subject_restate");
+  if (isGenericThesis(text)) reasons.push("generic_thesis");
   if (isTokenStutter(text)) reasons.push("token_stutter");
 
   for (const re of FORCED_CTA_PATTERNS) {
@@ -454,7 +463,9 @@ function validateOutput(
     reasons.includes("forced_cta_or_question") ||
     reasons.includes("ai_report_voice") ||
     reasons.includes("token_stutter") ||
-    reasons.includes("too_short_original");
+    reasons.includes("too_short_original") ||
+    reasons.includes("subject_restate") ||
+    reasons.includes("generic_thesis");
 
   return {
     ok: !hardFail && seedOk && coreOk,
@@ -469,8 +480,10 @@ function validateOutput(
   };
 }
 
-export const MIN_ORIGINAL_CHARS = 80;
+export const MIN_ORIGINAL_CHARS = 28;
 const STUTTER_RE = /([A-Za-z가-힣]{1,8})(?:\s+\1){2,}/;
+const GENERIC_THESIS_RE =
+  /중요한\s*이슈|관심이\s*쏠|주목할\s*만|향후\s*전망|변화가\s*있|의미가\s*크다|생각해볼\s*필요/;
 
 export function isTokenStutter(text: string): boolean {
   const t = String(text || "");
@@ -480,12 +493,38 @@ export function isTokenStutter(text: string): boolean {
   return entEn + entKo >= 2;
 }
 
-export function isTooShortOriginal(text: string): boolean {
+function normForCompare(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^0-9A-Za-z가-힣]+/g, "")
+    .trim();
+}
+
+export function isFragmentOriginal(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (t.length < MIN_ORIGINAL_CHARS) return true;
-  if (t.length >= 140) return false;
-  const clauses = t.split(/[.!?。\n]|다\s|요\s|죠\s/).map((s) => s.trim()).filter((s) => s.length >= 8);
-  return clauses.length < 2;
+  if (/([A-Za-z가-힣])\1{4,}/.test(t)) return true;
+  const ended = /[다요죠네음임]\s*[.!?…]*$/.test(t) || /[.!?]$/.test(t);
+  if (!ended && t.length < 72) return true;
+  return false;
+}
+
+export function isTooShortOriginal(text: string): boolean {
+  return isFragmentOriginal(text);
+}
+
+export function isSubjectRestate(text: string, subject: string): boolean {
+  const body = normForCompare(text);
+  const sub = normForCompare(subject);
+  if (!body || !sub || sub.length < 6) return false;
+  if (body === sub) return true;
+  if (body.startsWith(sub) && body.length - sub.length < 10) return true;
+  if (sub.startsWith(body) && sub.length - body.length < 8) return true;
+  return false;
+}
+
+export function isGenericThesis(text: string): boolean {
+  return GENERIC_THESIS_RE.test(String(text || ""));
 }
 
 function blockedResult(
@@ -626,13 +665,17 @@ export async function generateIndependentPost(
   let call = await callXaiWriter(ctx, key, {
     model: options.model,
     timeout_ms: options.timeout_ms,
+    retry_hint: options.retry_hint,
   });
 
   let v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
   if ((!call.ok || !call.text || (v && !v.ok)) && options.allow_one_retry !== false) {
+    const why = (v?.reasons || [call.error || "empty"]).filter(Boolean).join(",");
     call = await callXaiWriter(ctx, key, {
       model: options.model,
       timeout_ms: options.timeout_ms,
+      retry_hint: why,
+      temperature: 0.85,
     });
     v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
   }

@@ -220,6 +220,8 @@ export async function reasonCreatorSeeds(
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
     "Each concrete_subject must name a specific observable tension or situation, distinct from every other seed this week.",
+    "point_or_tension is the felt snag (expectation vs what actually happens). It must not restate concrete_subject as a topic label.",
+    "A reader should understand why this seed is a post, not a keyword.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
     "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",

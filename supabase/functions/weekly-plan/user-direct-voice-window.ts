@@ -184,5 +184,6 @@ export function voiceRegisterConstraintLine(reg: VoiceRegister | null | undefine
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,
     "Do not copy handmade wording. Do not install a question because X rewards participation.",
+    "Length follows median_chars. One finished sentence is allowed. Do not inflate with a dummy second sentence.",
   ].join("\n");
 }
