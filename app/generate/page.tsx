@@ -4,13 +4,6 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
-import {
-  JUDGE_BATCH,
-  WRITE_CHUNK,
-  expandRoundBudget,
-  priorSubjectCap,
-  topupRoundBudget,
-} from "@/lib/weekly-generate-scale";
 
 const GENERATION_DAYS = 7;
 const COLLISION_DAYS = 30;
@@ -35,14 +28,8 @@ async function readJson(res: Response) {
   return data;
 }
 
-function pickSeeds(part: any): any[] {
-  if (Array.isArray(part?.gated_seeds) && part.gated_seeds.length) return part.gated_seeds;
-  if (Array.isArray(part?.candidates) && part.candidates.length) return part.candidates;
-  if (Array.isArray(part?.seeds) && part.seeds.length) return part.seeds;
-  if (Array.isArray(part?.gated_seeds)) return part.gated_seeds;
-  if (Array.isArray(part?.candidates)) return part.candidates;
-  if (Array.isArray(part?.seeds)) return part.seeds;
-  return [];
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function GeneratePageInner() {
@@ -85,8 +72,15 @@ function GeneratePageInner() {
   async function edgeCall(session: any, body: Record<string, unknown>) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
-    const phase = String(body.phase || "");
-    const ms = phase === "write" ? 50000 : phase === "expand" ? 55000 : phase === "quota" ? 45000 : 30000;
+    const phaseName = String(body.phase || "");
+    const ms =
+      phaseName === "job_tick" || phaseName === "expand"
+        ? 55000
+        : phaseName === "write"
+          ? 50000
+          : phaseName === "quota"
+            ? 45000
+            : 30000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), ms);
     let res: Response;
@@ -104,7 +98,7 @@ function GeneratePageInner() {
     } catch (e: any) {
       if (e?.name === "AbortError") {
         throw new Error(
-          `${phase || "요청"}이 ${Math.round(ms / 1000)}초 안에 끝나지 않았습니다. 시드는 이어서 채우고, 초안은 저장된 것만 남습니다.`
+          `${phaseName || "요청"}이 ${Math.round(ms / 1000)}초 안에 끝나지 않았습니다. 시드는 이어서 채우고, 초안은 저장된 것만 남습니다.`
         );
       }
       throw e;
@@ -113,6 +107,71 @@ function GeneratePageInner() {
     }
     return readJson(res);
   }
+
+  function applyJob(job: any) {
+    if (job?.label_ko) setPhase(String(job.label_ko));
+    if (job?.summary) setPlanSummary(String(job.summary));
+    if (typeof job?.saved_count === "number") setDoneCount(job.saved_count);
+  }
+
+  async function followJob(session: any, jobId: string) {
+    for (let i = 0; i < 80; i++) {
+      const started = Date.now();
+      try {
+        const job = await edgeCall(session, { phase: "job_tick", job_id: jobId });
+        applyJob(job);
+        if (job.status === "done") {
+          setPhase(`완료: ${job.saved_count || 0}개 draft 저장`);
+          return;
+        }
+        if (job.status === "error") {
+          throw new Error(job.error || job.label_ko || "주간 생성 실패");
+        }
+      } catch (e: any) {
+        const msg = String(e?.message || e);
+        const timedOut = /초 안에 끝나지 않았습니다/.test(msg);
+        if (!timedOut) throw e;
+        const st = await edgeCall(session, { phase: "job_status", job_id: jobId });
+        applyJob(st);
+        if (st.status === "done") {
+          setPhase(`완료: ${st.saved_count || 0}개 draft 저장`);
+          return;
+        }
+        if (st.status === "error") {
+          throw new Error(st.error || st.label_ko || "주간 생성 실패");
+        }
+      }
+      if (Date.now() - started < 2000) await sleep(3000);
+      else await sleep(400);
+    }
+    throw new Error("작업이 너무 깁니다. 새로고침하면 이어서 진행합니다.");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token || cancelled) return;
+      try {
+        const st = await edgeCall(session, { phase: "job_status" });
+        if (cancelled || !st?.success || !st.job_id || st.status !== "running") return;
+        setBusy(true);
+        applyJob(st);
+        await followJob(session, String(st.job_id));
+      } catch {
+        /* operator can press generate */
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Resume a running weekly job once on mount. Video is out of scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function runPlanAndGenerate() {
     setBusy(true);
@@ -165,45 +224,9 @@ function GeneratePageInner() {
           .filter(Boolean);
       } catch {}
 
-      setPhase("주간 할당량 추론…");
-      const quotaPart = await edgeCall(session, {
+      setPhase("주간 작업 시작…");
+      const started = await edgeCall(session, {
         generationDays: GENERATION_DAYS,
-        startDate,
-        topic: topic.trim() || undefined,
-        creatorIntent: topic.trim() || undefined,
-        phase: "quota",
-      });
-      if (!quotaPart.success || !quotaPart.quota) {
-        throw new Error(quotaPart.detail || quotaPart.error || "할당량 추론 실패");
-      }
-      const requiredSlots = Number(quotaPart.required_slots || quotaPart.quota.required_slots);
-      const postsPerDay = Number(quotaPart.postsPerDay || quotaPart.quota.posts_per_day);
-      const quotaNote = String(quotaPart.quota.rationale || "");
-      const quotaGrokErr = String(quotaPart.quota.grok_error || quotaPart.diagnostics?.quota_grok_error || "");
-      const learningNote = String(
-        quotaPart.learning?.note_ko || quotaPart.diagnostics?.learning?.note_ko || ""
-      );
-      const learningStage = String(
-        quotaPart.learning?.stage || quotaPart.diagnostics?.learning?.stage || ""
-      );
-      const maxExpandRounds = expandRoundBudget(requiredSlots);
-      const maxTopupRounds = topupRoundBudget(requiredSlots);
-      const subjectCap = priorSubjectCap(requiredSlots);
-      setPlanSummary(
-        [
-          `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
-          quotaNote,
-          learningNote ? `학습: ${learningStage || "SPARSE"} · ${learningNote}` : "",
-          quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
-
-      const base: Record<string, unknown> = {
-        generationDays: GENERATION_DAYS,
-        postsPerDay,
-        required_slots: requiredSlots,
         startDate,
         topic: topic.trim() || undefined,
         creatorIntent: topic.trim() || undefined,
@@ -211,271 +234,13 @@ function GeneratePageInner() {
         publishedTopics: publishedTopics21d,
         scheduledTopics,
         lafc_matches: lafcMatches,
-        expand_with_xai: true,
-        allow_xai_enrich: true,
-      };
-
-      const allGated: any[] = [];
-      let priorSubjects: string[] = [];
-      let idCounter = 0;
-      let dimBatch = 0;
-      let emptyStreak = 0;
-      let lastExpandError = "";
-
-      function expandFailReason(part: any): string {
-        return String(
-          part?.expand_error ||
-            part?.xai_seed_expansion?.error ||
-            part?.diagnostics?.xai_seed_expansion?.error ||
-            part?.detail ||
-            part?.error ||
-            ""
-        ).slice(0, 180);
-      }
-
-      async function expandOnce() {
-        setPhase(`시드 추론 ${allGated.length}/${requiredSlots}…`);
-        let advanced = false;
-        try {
-          const part = await edgeCall(session, {
-            ...base,
-            phase: "expand",
-            dim_batch_index: dimBatch,
-            prior_subjects: priorSubjects,
-            id_counter: idCounter,
-            expand_with_xai: true,
-            allow_xai_enrich: true,
-          });
-          dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
-          advanced = true;
-          lastExpandError = expandFailReason(part);
-          if (lastExpandError && !pickSeeds(part).length) {
-            setPlanSummary(
-              [
-                `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
-                quotaNote,
-                learningNote ? `학습: ${learningStage || "SPARSE"} · ${learningNote}` : "",
-                quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
-                `expand: ${allGated.length}/${requiredSlots} · ${lastExpandError}`,
-              ]
-                .filter(Boolean)
-                .join("\n")
-            );
-          }
-          if (!part.success) {
-            if (String(part.error || "") === "SEED_INFERENCE_REQUIRES_XAI") {
-              throw new Error(part.detail || part.error || "SEED_INFERENCE_REQUIRES_XAI");
-            }
-            return 0;
-          }
-          const seeds = pickSeeds(part);
-          allGated.push(...seeds);
-          for (const s of seeds) {
-            if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
-          }
-          priorSubjects = priorSubjects.slice(-subjectCap);
-          idCounter = Number(part.id_counter) || idCounter + seeds.length;
-          return seeds.length;
-        } catch (e: any) {
-          if (!advanced) dimBatch += 1;
-          const msg = String(e?.message || e);
-          lastExpandError = msg.slice(0, 180);
-          if (/SEED_INFERENCE_REQUIRES_XAI|로그인이 필요합니다/.test(msg)) throw e;
-          return 0;
-        }
-      }
-
-      while (allGated.length < requiredSlots && dimBatch < maxExpandRounds) {
-        const added = await expandOnce();
-        if (added <= 0) {
-          emptyStreak += 1;
-          if (emptyStreak >= 4) {
-            throw new Error(
-              `Grok 시드 추론이 반복 실패했습니다 (${allGated.length}/${requiredSlots}). 템플릿으로 채우지 않습니다.` +
-                (lastExpandError ? ` 원인: ${lastExpandError}` : "")
-            );
-          }
-          continue;
-        }
-        emptyStreak = 0;
-      }
-      if (allGated.length < requiredSlots) {
-        throw new Error(`시드 ${allGated.length}/${requiredSlots}. 할당량을 채우지 못해 중단합니다.`);
-      }
-
-      const allJudged: any[] = [];
-      async function judgeBatch(seeds: any[]) {
-        for (let i = 0; i < seeds.length; i += JUDGE_BATCH) {
-          const batch = seeds.slice(i, i + JUDGE_BATCH);
-          const bi = Math.floor(i / JUDGE_BATCH) + 1;
-          const bt = Math.ceil(seeds.length / JUDGE_BATCH) || 1;
-          setPhase(`Semantic Judge ${bi}/${bt}…`);
-          const part = await edgeCall(session, {
-            ...base,
-            phase: "judge",
-            seeds: batch,
-            candidates: batch,
-          });
-          if (!part.success) {
-            throw new Error(part.detail || part.error || `Judge ${bi} 실패`);
-          }
-          const judged = Array.isArray(part.judged) ? part.judged : batch;
-          allJudged.push(...judged);
-        }
-      }
-      await judgeBatch(allGated);
-
-      const eligibleOf = (rows: any[]) =>
-        rows.filter((s: any) => s?.status === "ELIGIBLE" || s?.status === "HIGH_VALUE");
-
-      let topup = 0;
-      let topupEmpty = 0;
-      while (eligibleOf(allJudged).length < requiredSlots && topup < maxTopupRounds) {
-        topup += 1;
-        setPhase(`할당량 보충 ${eligibleOf(allJudged).length}/${requiredSlots}…`);
-        const before = allGated.length;
-        const added = await expandOnce();
-        if (added <= 0) {
-          topupEmpty += 1;
-          if (topupEmpty >= 3) break;
-          continue;
-        }
-        topupEmpty = 0;
-        await judgeBatch(allGated.slice(before));
-      }
-      if (eligibleOf(allJudged).length < requiredSlots) {
-        throw new Error(
-          `판정 통과 ${eligibleOf(allJudged).length}/${requiredSlots}. Grok이 할당량을 채우지 못했습니다.`
-        );
-      }
-
-      setPhase("Weekly Select…");
-      let planData = await edgeCall(session, {
-        ...base,
-        phase: "select",
-        seeds: allJudged,
-        candidates: allJudged,
+        phase: "job_start",
       });
-      let selectTries = 0;
-      while (
-        (!planData.success || planData.need_more_seeds || Number(planData.totalPlanned || 0) < requiredSlots) &&
-        selectTries < maxTopupRounds
-      ) {
-        selectTries += 1;
-        setPhase(`계획 부족 → 시드 추가 ${selectTries}…`);
-        const before = allGated.length;
-        const added = await expandOnce();
-        if (added > 0) await judgeBatch(allGated.slice(before));
-        planData = await edgeCall(session, {
-          ...base,
-          phase: "select",
-          seeds: allJudged,
-          candidates: allJudged,
-        });
+      if (!started.success || !started.job_id) {
+        throw new Error(started.detail || started.error || "주간 작업을 시작하지 못했습니다.");
       }
-      if (!planData.success || !Array.isArray(planData.days) || planData.days.length === 0) {
-        throw new Error(planData.detail || planData.error || "Select 결과가 비어 있습니다.");
-      }
-
-      const mergedDays = [...planData.days].sort(
-        (a: any, b: any) => (a.dayOffset ?? 0) - (b.dayOffset ?? 0)
-      );
-      const lines = mergedDays.map((d: any) => {
-        const topics = (d.posts || [])
-          .map((p: any) => p.primaryTopic || p.concrete_subject)
-          .join(", ");
-        return `D${(d.dayOffset ?? 0) + 1}  ${d.posts?.length || 0}개  ${topics}`;
-      });
-      const totalPlanned = mergedDays.reduce((s: number, d: any) => s + (d.posts?.length || 0), 0);
-      setPlanSummary(
-        [
-          `quota: ${postsPerDay}/day × 7 = ${requiredSlots} (${quotaPart.quota.source || ""})`,
-          quotaNote,
-          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned}`,
-          planData.mode_supply_low ? "MODE_SUPPLY_LOW" : "",
-          planData.diagnostics ? `diag: ${JSON.stringify(planData.diagnostics)}` : "",
-          ...lines,
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
-
-      if (totalPlanned < requiredSlots) {
-        throw new Error(
-          `주간 계획이 ${totalPlanned}/${requiredSlots}입니다. 할당량을 채운 뒤에만 저장합니다.`
-        );
-      }
-
-      let totalSaved = 0;
-      const writeErrors: string[] = [];
-      for (let dayOffset = 0; dayOffset < mergedDays.length; dayOffset++) {
-        const day = mergedDays[dayOffset];
-        if (!day?.posts?.length) continue;
-        setPhase(`Day ${dayOffset + 1}/${mergedDays.length} 초안 생성… (${totalSaved} 저장됨)`);
-        const daySlots = Array.isArray(day.posts) ? day.posts : [];
-        for (let si = 0; si < daySlots.length; si += WRITE_CHUNK) {
-          const chunk = daySlots.slice(si, si + WRITE_CHUNK);
-          let genData: any;
-          try {
-            genData = await edgeCall(session, {
-              ...base,
-              phase: "write",
-              slots: chunk,
-            });
-          } catch (e: any) {
-            writeErrors.push(`D${dayOffset + 1}: ${e?.message || e}`);
-            continue;
-          }
-          if (!genData.success) {
-            writeErrors.push(`D${dayOffset + 1}: ${genData.detail || genData.error || "write 실패"}`);
-            continue;
-          }
-          const written = Array.isArray(genData.posts) ? genData.posts : [];
-          for (const p of written) {
-            const text = String(p.final_text || p.content || p.text || "").trim();
-            if (!text) {
-              writeErrors.push(
-                `${p.slotId || "slot"} 빈 초안${p.block_reasons?.length ? ` (${p.block_reasons.join(",")})` : ""}`
-              );
-              continue;
-            }
-            let insErr = (
-              await supabase.from("SeungContent").insert({
-                content: text,
-                status: "draft",
-                pipeline_id: "42303",
-                user_id: session.user.id,
-                topic: String(p.primaryTopic || p.concrete_subject || ""),
-                strategy_json: {
-                  system_origin_class: "AP_PIPELINE",
-                  slotId: p.slotId || null,
-                  writer_model: "grok-4.6",
-                  engine: "v11_inferred_quota_fill",
-                },
-              })
-            ).error;
-            if (insErr) {
-              insErr = (
-                await supabase.from("SeungContent").insert({
-                  content: text,
-                  status: "draft",
-                  pipeline_id: "42303",
-                  user_id: session.user.id,
-                })
-              ).error;
-            }
-            if (!insErr) totalSaved += 1;
-          }
-          setDoneCount(totalSaved);
-        }
-      }
-      if (totalSaved < requiredSlots) {
-        throw new Error(
-          `초안 ${totalSaved}/${requiredSlots}만 저장됨. ${writeErrors.slice(0, 4).join(" · ") || "시드 추론 후 작성이 끊겼습니다."}`
-        );
-      }
-      setPhase(`완료: ${totalSaved}개 draft 저장`);
-      setDoneCount(totalSaved);
+      applyJob(started);
+      await followJob(session, String(started.job_id));
     } catch (e: any) {
       setError(e?.message || String(e));
       setPhase("");

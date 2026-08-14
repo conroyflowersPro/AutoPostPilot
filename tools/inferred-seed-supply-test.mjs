@@ -38,8 +38,8 @@ ok("S7. select asks for more seeds instead of aborting the week", /NEED_MORE_SEE
 ok("S8. select does not lie seed_expansion true", !/xai_usage: \{ seed_expansion: true/.test(ix));
 ok("S9. Grok rejects registry-label bodies", /관찰·판단 축/.test(cr) && /Do NOT copy DIMENSION labels/.test(cr));
 ok("S10. mix follows cluster_weights", /cluster_weights_from_user_direct/.test(cr));
-ok("S11. generate infers quota first", /phase: "quota"/.test(gen) && /requiredSlots/.test(gen));
-ok("S12. generate keeps expanding until quota filled", /allGated.length < requiredSlots/.test(gen) && /할당량 보충/.test(gen));
+ok("S11. generate starts a persisted job", /phase: "job_start"/.test(gen) && /job_id/.test(gen));
+ok("S12. generate follows ticks until quota filled", /phase: "job_tick"/.test(gen) && /followJob/.test(gen));
 ok("S13. direction: quota inferred then filled", /weekly quota itself is inferred/.test(dir) && /must fill it/.test(dir));
 ok("S14. expand batched from learned data", /EXPAND_BATCH/.test(ix) && /collectLearnedSeedSignals/.test(ix));
 ok("S15. engine version quota fill", /v11_inferred_quota_fill/.test(ix));

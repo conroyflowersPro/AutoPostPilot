@@ -10,7 +10,7 @@ const se = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-eng
 const cr = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/creator-seed-reasoning.ts"), "utf8");
 const qu = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8");
 const ix = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/index.ts"), "utf8");
-const gen = readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8");
+const job = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/generation-job.ts"), "utf8");
 const dir = readFileSync(path.join(ROOT, "architecture/v11.0.0_PRODUCT_DIRECTION.md"), "utf8");
 const dna = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8");
 
@@ -43,10 +43,10 @@ ok("L5. seed prompt forbids empty list on thin data", /Do not return an empty se
 ok("L6. quota prompt allows cold start", /Thin or missing learned evidence is expected/.test(qu));
 ok("L7. performance DNA names cold start", /COLD START/.test(dna));
 ok("L8. quota phase returns learning", /learning: learned\.learning/.test(ix));
-ok("L9. generate shows 학습 line", /학습:/.test(gen));
+ok("L9. generate job shows 학습 line", /학습:/.test(job));
 ok("L10. direction: cold start + job runtime", /Cold start \(learning maturity\)/.test(dir) && /Generation runtime/.test(dir));
 ok("L11. video must not keep Edge loop", /Do not keep the current browser-orchestrated Edge loop for video/.test(dir));
-ok("L12. shipping 11.1.6", /const APP_VERSION = "11.1.6"/.test(ix));
+ok("L12. shipping 11.2.0", /const APP_VERSION = "11.2.0"/.test(ix));
 
 console.log("========================================");
 console.log(`LEARNING: ${pass} PASS / ${fail} FAIL`);

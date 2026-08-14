@@ -1,0 +1,71 @@
+name: apply-generation-jobs-migration
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/20260814_generation_jobs_v1.sql"
+      - ".github/workflows/apply-generation-jobs-migration.yml"
+  workflow_dispatch:
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply generation_jobs migration via Management API SQL
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ihhiyecifxrqxfpyylpt
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo "SUPABASE_ACCESS_TOKEN missing"; exit 1; }
+          SQL_FILE=supabase/migrations/20260814_generation_jobs_v1.sql
+          test -f "$SQL_FILE"
+          python3 - <<'PY'
+          import json, os, urllib.request
+          sql = open("supabase/migrations/20260814_generation_jobs_v1.sql").read()
+          token = os.environ["SUPABASE_ACCESS_TOKEN"]
+          ref = os.environ["PROJECT_REF"]
+          url = f"https://api.supabase.com/v1/projects/{ref}/database/query"
+          body = json.dumps({"query": sql}).encode()
+          req = urllib.request.Request(url, data=body, method="POST", headers={
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+          })
+          try:
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  print("APPLY_STATUS", r.status)
+                  print(r.read()[:2000].decode())
+          except urllib.error.HTTPError as e:
+              print("HTTP", e.code, e.read()[:2000].decode())
+              raise
+          PY
+      - name: Verify generation_jobs exists
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ihhiyecifxrqxfpyylpt
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token = os.environ["SUPABASE_ACCESS_TOKEN"]
+          ref = os.environ["PROJECT_REF"]
+          q = """
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='generation_jobs'
+          ORDER BY ordinal_position;
+          """
+          url = f"https://api.supabase.com/v1/projects/{ref}/database/query"
+          body = json.dumps({"query": q}).encode()
+          req = urllib.request.Request(url, data=body, method="POST", headers={
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+          })
+          with urllib.request.urlopen(req, timeout=60) as r:
+              data = r.read().decode()
+              print(data)
+              for need in ["id", "user_id", "status", "step", "state", "locked_at", "saved_count"]:
+                  assert need in data, need
+              print("TABLE_OK")
+          PY
