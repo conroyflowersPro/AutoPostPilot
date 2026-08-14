@@ -1,5 +1,7 @@
 /**
  * Runtime Creator DNA for Planner — from existing Historical/Archive learning artifacts.
+ * Weekly-plan generate path uses supabase/functions/weekly-plan/engine-dna.ts (Edge cannot import lib/).
+ * Keep WHO/WHY/NOT THIS in sync with that file. That block is the operator's will.
  * Does NOT invent new DNA. Does NOT mix REPLY/REPOST into Publishing voice.
  * Source of truth offline: creator_intelligence/Creator_DNA_Historical_v1.1.json (v1.3.1)
  */

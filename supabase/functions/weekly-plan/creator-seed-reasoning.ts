@@ -1,11 +1,12 @@
 /**
  * Creator-driven Seed Reasoning (philosophy-aligned)
- * Uses Creator DNA + recent published angles + optional X viral (interest-filtered)
- * + soft performance PATTERN hints (never seed clone).
+ * Will = Creator DNA + engine rules (not a generate-box sentence).
+
  * Does NOT emit DIMENSION_REGISTRY as production seed bodies.
  * Output = direction seeds only (no finished post prose).
  */
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
 export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
 
@@ -62,18 +63,6 @@ function extractJson(raw: string): any {
     } catch {}
   }
   return null;
-}
-
-/** Compact Creator DNA — from Historical/Archive learning (runtime snapshot) */
-function creatorDnaBlock(): string {
-  return [
-    "WHO: Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC).",
-    "WHY WRITE: inform/explain · share experience · light opinion · social observation",
-    "PUBLISHING: two-speed; media often; informational → polite intentional; light-opinion 음슴체 emerging.",
-    "NOT THIS: stock daytrade primary · single global tone · invent firsthand drives · REPOST text as writing voice",
-    "STANCE: long-term Tesla investor / product progress; not short-term price chatter",
-    "SAFETY: never invent lived experience or current news facts without evidence; authenticity first",
-  ].join("\n");
 }
 
 /** Soft performance patterns — advisory only, never seed clone */
@@ -196,14 +185,14 @@ export async function reasonCreatorSeeds(
   const system = [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs.",
-    "Each seed must be something @Seung4680 would plausibly hold and write from — inferred from learned USER_DIRECT interest + growth patterns.",
+    "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
     "Each concrete_subject must name a specific observable tension or situation, distinct from every other seed this week.",
     "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
     "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",
-    "Account growth: prefer directions a non-insider can enter; do not clone last week's winning subject; do not install one repeating punchline across the week.",
+    "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
@@ -214,18 +203,20 @@ export async function reasonCreatorSeeds(
   const user = JSON.stringify({
     requested_seed_count: requested,
     creator_dna: creatorDnaBlock(),
+    engine_rules_are_the_will: engineRulesAsWill(),
+    performance_dna: performanceDnaBlock(),
     user_direct_n: args.userDirectN ?? null,
     cluster_weights_from_user_direct: args.clusterInterestWeights?.length
       ? args.clusterInterestWeights
       : null,
     registry_interest_hints_not_seed_bodies: (args.registryInterestHints || []).slice(0, 12),
-    explicit_intent_if_any: intent || null,
+    this_run_note_overlay_only: intent || null,
     recent_published_angles_avoid_repeat: recent,
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
     weekly_goal_note:
-      "The inferred weekly quota MUST be filled. Each seed is a distinct inferred direction from learned data + operator will (account growth). Not a repeating bot of fixed axes. Return exactly requested_seed_count seeds.",
+      "Fill the inferred quota. Distinct directions from DNA + engine + learned data. No frozen axes. Return requested_seed_count seeds.",
     requirement:
       "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });

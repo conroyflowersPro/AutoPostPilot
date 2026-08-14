@@ -1,8 +1,9 @@
 /**
- * Infer the week's post quota from learned data + operator will + X-algorithm strategy.
- * Not a frozen 6×7=42. Bounds exist only as anti-dump / weekly-generate safety.
+ * Infer the week's post quota from Creator DNA + engine rules + learned cadence.
+ * Will is not a generate-box sentence. Bounds exist only as X anti-dump safety.
  */
 import type { CadenceSignal, ClusterWeight } from "./seed-engine.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
 export const QUOTA_DAYS = 7;
 /** X anti-dump ceiling — strategy reference, not a content template. */
@@ -74,19 +75,23 @@ export async function inferWeeklyQuota(args: {
 
   const system = [
     "You infer the weekly ORIGINAL post quota for X account @Seung4680.",
-    "Operator will: grow the account; 7-day generate must be filled; seeds inferred from learned data, not a repeating template bot.",
-    "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise), mix, whether higher volume actually linked to growth.",
+    "Will is already in Creator DNA + engine rules. Do not wait for a typed slogan.",
+    "this_run_note is an optional overlay, not the will.",
+    "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise), mix, whether higher volume linked to growth.",
     "The algorithm does not write posts and does not pick the last sentence.",
-    "Days are 7 because the operator pressed 7-day generate.",
-    `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Do not freeze 6 just because it was an old default.`,
-    "If recent handmade cadence is healthy and growth evidence supports it, you may go higher within the max. If dumping likely hurt reach, go lower within the min.",
+    "Days are 7 because 7-day generate is the engine action.",
+    `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Do not freeze 6 as a default.`,
+    "Use DNA (two-speed publishing, authenticity, plural interests) + cadence + Performance DNA candidates.",
+    "If handmade cadence is healthy and growth evidence supports it, go higher within max. If dumping likely hurt reach, go lower within min.",
     "Korean rationale, one or two sentences.",
     'Output strict JSON: {"posts_per_day":6,"rationale":"..."}',
   ].join("\n");
 
   const user = JSON.stringify({
-    operator_will: "Fill the inferred weekly quota. Grow the X account. Infer seeds from learned data + this will. Never rotate 8 frozen axes.",
-    explicit_intent_if_any: args.explicitCreatorIntent || null,
+    creator_dna: creatorDnaBlock(),
+    engine_rules_are_the_will: engineRulesAsWill(),
+    performance_dna: performanceDnaBlock(),
+    this_run_note_overlay_only: args.explicitCreatorIntent || null,
     user_direct_n: args.userDirectN,
     cadence: args.cadence,
     cluster_weights: args.clusterWeights,

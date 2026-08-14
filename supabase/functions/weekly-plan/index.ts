@@ -1,7 +1,7 @@
 /**
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
- * Seed supply: USER_DIRECT + performance + operator will → Grok infers quota AND fills it.
- * Registry templates are never a fallback. Shortfall → keep inferring until quota is filled.
+ * Seed supply: Creator DNA + engine rules + learned USER_DIRECT/performance → Grok infers quota AND fills it.
+ * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
  * Target volume: postsPerDay 5–8 × days (≈35–56 / week).
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.

@@ -46,7 +46,9 @@ ok("S15. engine version quota fill", /v11_inferred_quota_fill/.test(ix));
 ok("S16. quota-inference module", /export async function inferWeeklyQuota/.test(qu) && /quotaFromCadence/.test(qu));
 ok("S17. cadence on learned signals", /cadence: CadenceSignal/.test(se) || /avg_originals_on_active_days/.test(se));
 ok("S18. quota phase on edge", /phase === "quota"/.test(ix) && /inferWeeklyQuota/.test(ix));
-ok("S19. Grok must return requested count", /quota MUST be filled/.test(cr));
+ok("S19. fill inferred quota from DNA", /Fill the inferred quota/.test(cr) && /engine_rules_are_the_will/.test(cr));
+ok("S20. will is DNA+engine not a slogan", /Will lives in the engine and DNA/.test(dir) && !/operator_will/.test(qu) && /engineRulesAsWill/.test(qu));
+ok("S21. engine-dna module is will source", /Do not wait for a typed restatement of will/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8")));
 
 console.log("========================================");
 console.log(`INFERRED SEEDS: ${pass} PASS / ${fail} FAIL`);
