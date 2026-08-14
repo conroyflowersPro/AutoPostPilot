@@ -1,0 +1,27 @@
+{
+  "status": "CANDIDATE",
+  "validated_patterns": 0,
+  "window": { "from": "2026-08-01", "to": "2026-08-14" },
+  "payout": {
+    "period": "2026-08-01/2026-08-15",
+    "amount_usd": 42.29,
+    "note": "One 2-week RSP slice. Faster than the prior multi-month slice. Do not tweet the number. Do not raise daily quota from this one window."
+  },
+  "volume": {
+    "originals": 87,
+    "replies": 315,
+    "note": "Reach sits on originals plus original media. Replies keep relationships and are not original seeds."
+  },
+  "patterns": [
+    "Lived FSD moment plus original clip → reader entry. Cite the episode; never clone that drive.",
+    "In-car or in-shop product friction the creator actually hit → related follow-up, not a recap.",
+    "Korea/US lived comparison from travel → related angle, not the same essay.",
+    "Household/daily lived beat can be CASUAL. Do not turn every day into FSD."
+  ],
+  "forbidden": [
+    "reuse winning post wording or punchline",
+    "raise quota because revenue jumped once",
+    "promote replies into original seeds",
+    "impressions-only optimization"
+  ]
+}

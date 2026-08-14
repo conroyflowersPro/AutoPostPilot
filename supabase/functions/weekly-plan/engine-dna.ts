@@ -7,7 +7,54 @@
  * (Edge cannot import lib/).
  */
 export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.3.1-snapshot";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-baseline-v1-candidates";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.1-aug2026-window-candidates";
+
+type PerformanceWindow = {
+  status?: string;
+  validated_patterns?: number;
+  window?: { from?: string; to?: string };
+  payout?: { period?: string; amount_usd?: number; note?: string };
+  patterns?: string[];
+  forbidden?: string[];
+  volume?: { originals?: number; replies?: number; note?: string };
+};
+
+function loadPerformanceWindow(): PerformanceWindow | null {
+  try {
+    const raw = Deno.readTextFileSync(new URL("./performance-window-candidates.json", import.meta.url));
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as PerformanceWindow) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function performanceDnaBlock(): string {
+  const w = loadPerformanceWindow();
+  const lines = [
+    `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
+    "STATUS: CANDIDATE window only; VALIDATED patterns = 0",
+    "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
+    "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > reposts > quotes > likes > impressions",
+    "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
+    "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
+    "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
+  ];
+  if (w?.window?.from && w.window.to) {
+    lines.push(
+      `OPERATOR WINDOW ${w.window.from}..${w.window.to} (${w.status || "CANDIDATE"}): transfer patterns only, never reuse a post body.`,
+    );
+    if (w.payout?.amount_usd != null) {
+      lines.push(
+        `Revenue candidate: ${w.payout.amount_usd} USD in ${w.payout.period || "window"}. ${w.payout.note || ""}`.trim(),
+      );
+    }
+    if (w.volume?.note) lines.push(`Volume: originals ${w.volume.originals ?? "?"} / replies ${w.volume.replies ?? "?"}. ${w.volume.note}`);
+    for (const p of (w.patterns || []).slice(0, 6)) lines.push(`CANDIDATE PATTERN: ${p}`);
+    for (const f of (w.forbidden || []).slice(0, 6)) lines.push(`WINDOW FORBIDDEN: ${f}`);
+  }
+  return lines.join("\n");
+}
 
 export function creatorDnaBlock(): string {
   return [
@@ -22,18 +69,6 @@ export function creatorDnaBlock(): string {
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
     "CONTENT STANCE: long-term Tesla investor / product progress; not short-term stock price chatter",
     "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
-  ].join("\n");
-}
-
-export function performanceDnaBlock(): string {
-  return [
-    `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
-    "STATUS: INITIAL BASELINE v1 — candidates only; VALIDATED patterns = 0",
-    "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
-    "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > reposts > quotes > likes > impressions",
-    "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
-    "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity",
-    "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
   ].join("\n");
 }
 
