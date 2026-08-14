@@ -54,6 +54,7 @@ ok("E10. night FSD pedestrian is experiential", isExp(night));
 ok("E11. intersection scare is experiential", isExp(scare));
 ok("E12. in-car Grok is experiential", isExp(grokCar));
 ok("E13. third-party news recap is not experience", !isExp(news));
+ok("E14. night subject is cite-follow-up", /야간 FSD 보행자 대기 장면 인용/.test(exp));
 ok("E15. performance window stored as candidates not post bodies", /performance-window-candidates\.json/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8")));
 ok("E16. window json has no clone of night pedestrian prose", !/보행자는 아직 길에/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/performance-window-candidates.json"), "utf8")));
 
