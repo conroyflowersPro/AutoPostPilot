@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: see posts and comment status; press 7-day generate → ORDER 0–8 infers as `@Seung4680` → Fedica auto-schedules on-policy posts → grow the account via reader participation.
+One line: see posts and comment status; 7-day generate writes as `@Seung4680`; operator attaches original media and publishes; AI suggests gaps only. Handmade vs AP stay separate. No 30-day collisions except 2–3 experiments.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
