@@ -112,6 +112,13 @@ export type DeepGenerationContext = {
   prohibited_copy_sources: string[];
   recent_repetition_risk: string;
   generation_status: GenerationStatus;
+  voice_register?: {
+    n: number;
+    window_days: number;
+    median_chars: number;
+    question_ending_allowed: boolean;
+    constraint_line: string;
+  } | null;
   invariants: {
     question_required: false;
     cta_required: false;
@@ -137,6 +144,13 @@ export type BuildDeepGenerationInput = {
   creator_style?: Record<string, unknown> | null;
   natural_humor?: Record<string, unknown> | null;
   editorial_mode?: string | null;
+  voice_register?: {
+    n: number;
+    window_days: number;
+    median_chars: number;
+    question_ending_allowed: boolean;
+    constraint_line: string;
+  } | null;
 };
 
 function s(v: unknown, d = ""): string {
@@ -385,6 +399,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
     prohibited_copy_sources,
     recent_repetition_risk: s(style.recent_style_repetition_risk || humor.recent_humor_repetition_risk, "low"),
     generation_status,
+    voice_register: input.voice_register || null,
     invariants: {
       question_required: false,
       cta_required: false,

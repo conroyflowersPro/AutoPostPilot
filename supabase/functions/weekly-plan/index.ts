@@ -519,10 +519,17 @@ Deno.serve(async (req) => {
         return json({ success: false, error: "write phase requires slots", posts: [] }, 400);
       }
       const dryRun = body.dry_run_generation === true;
+      const voiceSince = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+      const { data: voiceActs } = await supabase
+        .from("account_activities")
+        .select("text_body, post_type, action_type, published_at, system_origin_class, meta")
+        .gte("published_at", voiceSince)
+        .limit(400);
       const posts = await writeSlotBatch({
         slots,
         xaiKey: xaiKey || null,
         dryRun,
+        voiceRows: (voiceActs || []) as any,
       });
       return json({
         success: true,

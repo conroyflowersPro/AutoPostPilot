@@ -16,6 +16,12 @@ import {
 import { judgeIndependentResult, isJudgeReject } from "./semantic-judge.ts";
 import type { ConcreteSeed } from "./seed-engine.ts";
 import type { EditorialMode } from "./editorial-mix.ts";
+import {
+  inferSlotVoice,
+  voiceRegisterConstraintLine,
+  type VoiceActivityRow,
+  type VoiceRegister,
+} from "./user-direct-voice-window.ts";
 
 export const V11_WRITER_MODEL = "grok-4.6";
 export const V11_WRITE_CONCURRENCY = 3;
@@ -46,6 +52,7 @@ export async function writeOneSlot(args: {
   seed: Record<string, unknown>;
   xaiKey: string | null;
   dryRun?: boolean;
+  voiceRows?: VoiceActivityRow[];
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -63,6 +70,18 @@ export async function writeOneSlot(args: {
   const dayOffset = Number(seed.dayOffset ?? 0);
   const slot = Number(String(seed.slotId || "").replace(/^D\d+P/, "") || 1) || 1;
   const slotId = String(seed.slotId || `D${dayOffset + 1}P${slot}`);
+  const voice: VoiceRegister = inferSlotVoice({
+    rows: args.voiceRows || [],
+    cluster: String(seed.cluster || seed.topic_cluster || ""),
+    editorial_mode: mode,
+  });
+  const voicePayload = {
+    n: voice.n,
+    window_days: voice.window_days,
+    median_chars: voice.median_chars,
+    question_ending_allowed: voice.question_ending_allowed,
+    constraint_line: voiceRegisterConstraintLine(voice),
+  };
 
   const seed_interpretation = interpretConcreteSeed(seed, mode);
   const reaction_mechanism = selectReactionMechanism({
@@ -89,7 +108,10 @@ export async function writeOneSlot(args: {
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
       everyday_precision_conflict: everyday_language.precision_conflict,
       rail_compression_preference: thinking_rail?.compression_preference || everyday_language.compression_preference,
-      prefer_short: everyday_language.minimal_context_sufficient === true,
+      prefer_short:
+        voice.median_chars > 0 && voice.median_chars < 90
+          ? true
+          : everyday_language.minimal_context_sufficient === true,
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
       mechanism_id: (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
@@ -99,6 +121,7 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
       editorial_mode: mode,
       topic_cluster: seed.cluster,
+      prefer_short: voice.median_chars > 0 && voice.median_chars < 90 ? true : everyday_language.minimal_context_sufficient === true,
     },
   });
   const natural_humor = decideNaturalHumor({
@@ -131,6 +154,7 @@ export async function writeOneSlot(args: {
     creator_style: creator_style as any,
     natural_humor: natural_humor as any,
     editorial_mode: mode,
+    voice_register: voicePayload,
   });
 
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
@@ -183,6 +207,7 @@ export async function writeSlotBatch(args: {
   slots: Record<string, unknown>[];
   xaiKey: string | null;
   dryRun?: boolean;
+  voiceRows?: VoiceActivityRow[];
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
@@ -190,7 +215,12 @@ export async function writeSlotBatch(args: {
     const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
     const part = await Promise.all(
       chunk.map((seed) =>
-        writeOneSlot({ seed, xaiKey: args.xaiKey, dryRun: args.dryRun })
+        writeOneSlot({
+          seed,
+          xaiKey: args.xaiKey,
+          dryRun: args.dryRun,
+          voiceRows: args.voiceRows,
+        })
       )
     );
     out.push(...part);

@@ -230,6 +230,8 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "10) Stop condition: if meaning is delivered, stop. No grand conclusion.",
     "Do not over-connect every sentence. Preserve useful ambiguity and reader inference when context already carries meaning.",
     "FORBIDDEN: finished examples, copy of manual/historical posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    s((ctx as any).voice_register?.constraint_line) ||
+      "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     "SEED SUBJECT: " + subject.slice(0, 200),
     "CORE AXIS (not literal sentence): " + s(core?.primary_claim).slice(0, 120),
     "TENSION HINT: " + s(core?.tension).slice(0, 100),
