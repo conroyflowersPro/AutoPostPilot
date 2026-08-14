@@ -82,6 +82,8 @@ ok("A12. Grok adjacent prompt has EV/semiconductor/space", /electric-vehicle ind
 ok("A13. writer forbids lived Tesla on adjacent", /ADJACENT RING/.test(wr) && /FORBIDDEN: first-person Tesla/.test(wr));
 ok("A14. generate page keeps review copy", /리뷰하세요/.test(gen));
 ok("A15. mix EXPERIENCE capped to supply", /expSupply/.test(job));
+ok("A16. leftover pool fill after adjacent", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
+ok("A17. experience without evidence stays selectable as INFORMATIVE", /onlyMissingLived/.test(job));
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);

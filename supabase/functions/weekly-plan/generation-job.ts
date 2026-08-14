@@ -491,6 +491,18 @@ async function stepJudge(row: any) {
     }
     const q = evaluateEditorialSeedQuality(b, mode);
     if (!q.pass) {
+      const onlyMissingLived = q.reasons.length === 1 && q.reasons[0] === "NO_CREATOR_EVIDENCE";
+      if (onlyMissingLived) {
+        judged.push({
+          ...b,
+          status: isSelectableStatus(b.status) ? b.status : "ELIGIBLE",
+          editorial_fit: "ACCEPTABLE",
+          requested_editorial_mode: "INFORMATIVE",
+          editorial_mode: "INFORMATIVE",
+          experience_required: false,
+        });
+        continue;
+      }
       judged.push({ ...b, status: "HOLD", editorial_fit: "POOR" });
       continue;
     }
@@ -508,7 +520,7 @@ async function stepJudge(row: any) {
     return;
   }
   const eligibleN = eligibleOf(judged).length;
-  if (eligibleN < required && st.topup < st.max_topup && Number(st.adjacent_rounds || 0) < 1) {
+  if (eligibleN < required && st.topup < st.max_topup) {
     st.topup = Number(st.topup || 0) + 1;
     row.step = "expand";
     row.label_ko = `할당량 보충 ${eligibleN}/${required}…`;
@@ -624,6 +636,30 @@ async function stepSelect(supabase: any, row: any) {
     outDays[day].posts.push(compactSlotLite(seed, day, outDays[day].posts.length + 1, mode === "EXPERIENCE" ? "INFORMATIVE" : mode));
     totalPlanned += 1;
   }
+  while (totalPlanned < required && pool.length > 0) {
+    const idx = pool.findIndex((s) => {
+      if (!isSelectableStatus(s.status as any)) return false;
+      if (isAdjacentExpansionSeed(s)) return false;
+      const mode = parseEditorialMode(String(s.requested_editorial_mode || s.editorial_mode || "INFORMATIVE"));
+      if (mode === "EXPERIENCE" && !canServeEditorialMode(s, "EXPERIENCE")) return false;
+      return true;
+    });
+    if (idx < 0) break;
+    let day = -1;
+    for (let d = 0; d < outDays.length; d++) {
+      if (outDays[d].posts.length >= postsPerDay) continue;
+      day = d;
+      break;
+    }
+    if (day < 0) break;
+    const seed = pool.splice(idx, 1)[0];
+    if (conceptualRepetitionLevel(seed, selectedWeekly) === "HIGH") continue;
+    selectedWeekly.push(seed);
+    let mode = parseEditorialMode(String(seed.requested_editorial_mode || seed.editorial_mode || "INFORMATIVE"));
+    if (mode === "EXPERIENCE" && !canServeEditorialMode(seed, "EXPERIENCE")) mode = "INFORMATIVE";
+    outDays[day].posts.push(compactSlotLite(seed, day, outDays[day].posts.length + 1, mode));
+    totalPlanned += 1;
+  }
   const redistributed = redistributeDailyTopics(outDays, postsPerDay);
   enforceAdjacentPerDay(redistributed.days, postsPerDay, ADJACENT_PER_DAY_MAX);
   for (let di = 0; di < redistributed.days.length; di++) {
@@ -642,7 +678,7 @@ async function stepSelect(supabase: any, row: any) {
     st.adjacent_fill = true;
     row.step = "expand";
     row.label_ko = `인접 확장으로 할당량 보충 ${totalAfter}/${required}…`;
-    row.summary = [row.summary, `계획 ${totalAfter}/${required} → 관심사 한 칸 밖 바이럴 시드`].filter(Boolean).join("\n");
+    row.summary = [row.summary, `계획 ${totalAfter}/${required} → 남은 시드·인접 확장으로 채움`].filter(Boolean).join("\n");
     return;
   }
   if (totalAfter < 1) {

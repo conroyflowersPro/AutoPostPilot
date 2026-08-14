@@ -237,14 +237,21 @@ function resolveCompressionTarget(
   rail: Record<string, unknown>,
   everyday: Record<string, unknown>,
   humor: Record<string, unknown>,
+  editorialMode?: string,
 ): CompressionTarget {
   if (style.selective_longform === true) return "SELECTIVE_LONGFORM";
+  const mode = s(editorialMode).toUpperCase();
+  if (mode && mode !== "CASUAL_OBSERVATION") {
+    const railComp = s(rail.compression_preference || everyday.compression_preference);
+    if (railComp === "low" || s(style.paragraph_density) === "expanded") return "EXPANDED";
+    return "NATURAL";
+  }
   const preferShort =
     everyday.minimal_context_sufficient === true ||
     style.short_post_compatible === true ||
     s(style.compression_level) === "high";
   const railComp = s(rail.compression_preference || everyday.compression_preference);
-  if (preferShort && (railComp === "high" || humor.stop_after_punchline_ok === true)) return "VERY_COMPRESSED";
+  if (preferShort && (railComp === "high" || humor.stop_after_punchline_ok === true)) return "COMPRESSED";
   if (preferShort || railComp === "high") return "COMPRESSED";
   if (railComp === "low" || s(style.paragraph_density) === "expanded") return "EXPANDED";
   return "NATURAL";
@@ -279,7 +286,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
   const context_id = `dgctx-${slot_id}-${seed_id}`;
 
   const core = buildCoreThought(interp, seed, mech);
-  const compression_target = resolveCompressionTarget(style, rail, everyday, humor);
+  const compression_target = resolveCompressionTarget(style, rail, everyday, humor, mode);
   const inference = resolveInferenceSpace(mech, style, everyday);
   const punchlineStop = !!humor.stop_after_punchline_ok && !!humor.punchline_compatible;
 

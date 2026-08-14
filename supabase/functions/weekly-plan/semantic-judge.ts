@@ -439,6 +439,16 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     flags.forced_cta || flags.forced_question ? 0.4 : flags.over_explained ? 0.45 : 0.8,
   );
 
+  const stutterRe = /([A-Za-z가-힣]{1,8})(?:\s+\1){2,}/;
+  const entHits = (text.match(/\bent\b/gi) || []).length + (text.match(/엔트/g) || []).length;
+  if (stutterRe.test(text) || entHits >= 2) {
+    hard.push("token_stutter");
+  }
+  const trimmedLen = text.replace(/\s+/g, " ").trim().length;
+  if (trimmedLen > 0 && trimmedLen < 80) {
+    hard.push("too_short_original");
+  }
+
   const comp = s(input.compression_target, "NATURAL");
   const len = text.length;
   let compScore = 0.8;

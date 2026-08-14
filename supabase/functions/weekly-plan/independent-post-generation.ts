@@ -226,10 +226,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "6) Prefer broad/simple everyday language without sacrificing accuracy.",
     "7) Apply Creator Style as surface register — not a fixed template.",
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
-    "9) Compression target: " + comp + " — write only as much as needed from the start.",
-    "10) Stop condition: if meaning is delivered, stop. No grand conclusion.",
-    "Do not over-connect every sentence. Preserve useful ambiguity and reader inference when context already carries meaning.",
-    "FORBIDDEN: finished examples, copy of manual/historical posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    "9) Length: this is an ORIGINAL post, not a memo. At least two sentences. Typical 120–280 Korean characters. Do not stop after one clause.",
+    "10) Stop after the observation is actually delivered — not after a fragment. No grand thesis tail.",
+    "FORBIDDEN: one-line notes, token stutter (ent ent ent / 같은 음절 반복), finished examples, copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     "SEED SUBJECT: " + subject.slice(0, 200),
@@ -334,7 +333,7 @@ export async function callXaiWriter(
           { role: "user", content: userMsg },
         ],
         temperature: 0.65,
-        max_tokens: 800,
+        max_tokens: 1400,
         reasoning_effort: "low",
       }),
       signal: controller.signal,
@@ -413,8 +412,9 @@ function validateOutput(
   const factualOk = !/\b\d{4,}원\b/.test(text) || subject.includes("원");
   if (!factualOk) reasons.push("possible_factual_invention");
 
-  const coreOk = text.length >= 4;
-  if (!coreOk) reasons.push("core_thought_not_expressed");
+  const coreOk = !isTooShortOriginal(text);
+  if (!coreOk) reasons.push("too_short_original");
+  if (isTokenStutter(text)) reasons.push("token_stutter");
 
   for (const re of FORCED_CTA_PATTERNS) {
     if (re.test(text)) {
@@ -452,7 +452,9 @@ function validateOutput(
   const hardFail =
     reasons.includes("experience_fabrication") ||
     reasons.includes("forced_cta_or_question") ||
-    reasons.includes("ai_report_voice");
+    reasons.includes("ai_report_voice") ||
+    reasons.includes("token_stutter") ||
+    reasons.includes("too_short_original");
 
   return {
     ok: !hardFail && seedOk && coreOk,
@@ -465,6 +467,25 @@ function validateOutput(
     stop_condition_followed: stopOk,
     reasons,
   };
+}
+
+export const MIN_ORIGINAL_CHARS = 80;
+const STUTTER_RE = /([A-Za-z가-힣]{1,8})(?:\s+\1){2,}/;
+
+export function isTokenStutter(text: string): boolean {
+  const t = String(text || "");
+  if (STUTTER_RE.test(t)) return true;
+  const entEn = (t.match(/\bent\b/gi) || []).length;
+  const entKo = (t.match(/엔트/g) || []).length;
+  return entEn + entKo >= 2;
+}
+
+export function isTooShortOriginal(text: string): boolean {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (t.length < MIN_ORIGINAL_CHARS) return true;
+  if (t.length >= 140) return false;
+  const clauses = t.split(/[.!?。\n]|다\s|요\s|죠\s/).map((s) => s.trim()).filter((s) => s.length >= 8);
+  return clauses.length < 2;
 }
 
 function blockedResult(
@@ -607,14 +628,13 @@ export async function generateIndependentPost(
     timeout_ms: options.timeout_ms,
   });
 
-  if (!call.ok && options.allow_one_retry !== false) {
-    const retryable = /timeout|fetch|5\d\d|429/.test(call.error || "");
-    if (retryable) {
-      call = await callXaiWriter(ctx, key, {
-        model: options.model,
-        timeout_ms: options.timeout_ms,
-      });
-    }
+  let v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
+  if ((!call.ok || !call.text || (v && !v.ok)) && options.allow_one_retry !== false) {
+    call = await callXaiWriter(ctx, key, {
+      model: options.model,
+      timeout_ms: options.timeout_ms,
+    });
+    v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
   }
 
   if (!call.ok || !call.text) {
@@ -629,26 +649,25 @@ export async function generateIndependentPost(
     });
   }
 
-  const v = validateOutput(call.text, ctx, markers);
-  if (!v.ok) {
+  if (!call.ok || !call.text || !v || !v.ok) {
     return {
       slot_id: ctx.slot_id,
       context_id: ctx.context_id,
       final_text: "",
-      generation_status: v.reasons.includes("experience_fabrication")
+      generation_status: v?.reasons.includes("experience_fabrication")
         ? "GENERATION_BOUNDARY_VIOLATION"
         : "GENERATION_RETRY_REQUIRED",
       generation_confidence: 0.25,
-      seed_fidelity: v.seed_fidelity,
-      core_thought_preserved: v.core_thought_preserved,
-      factual_boundary_preserved: v.factual_boundary_preserved,
-      experience_boundary_preserved: v.experience_boundary_preserved,
-      reader_inference_preserved: v.reader_inference_preserved,
-      compression_followed: v.compression_followed,
-      stop_condition_followed: v.stop_condition_followed,
+      seed_fidelity: v?.seed_fidelity ?? false,
+      core_thought_preserved: v?.core_thought_preserved ?? false,
+      factual_boundary_preserved: v?.factual_boundary_preserved ?? true,
+      experience_boundary_preserved: v?.experience_boundary_preserved ?? true,
+      reader_inference_preserved: v?.reader_inference_preserved ?? true,
+      compression_followed: v?.compression_followed ?? false,
+      stop_condition_followed: v?.stop_condition_followed ?? false,
       generation_version: ORDER7B_VERSION,
       plan_markers: markers,
-      block_reasons: v.reasons,
+      block_reasons: v?.reasons || ["writer_call_failed"],
       order7b_version: ORDER7B_VERSION,
       order7a_context_version: ORDER7A_VERSION,
       writer_mode: "live_xai",

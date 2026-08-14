@@ -108,10 +108,7 @@ export async function writeOneSlot(args: {
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
       everyday_precision_conflict: everyday_language.precision_conflict,
       rail_compression_preference: thinking_rail?.compression_preference || everyday_language.compression_preference,
-      prefer_short:
-        voice.median_chars > 0 && voice.median_chars < 90
-          ? true
-          : everyday_language.minimal_context_sufficient === true,
+      prefer_short: mode === "CASUAL_OBSERVATION",
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
       mechanism_id: (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
@@ -135,7 +132,7 @@ export async function writeOneSlot(args: {
       style_dialogue_compatible: creator_style.dialogue_compatible,
       style_conversational_level: creator_style.conversational_level,
       style_family: creator_style.style_family,
-      prefer_short: everyday_language.minimal_context_sufficient === true,
+      prefer_short: mode === "CASUAL_OBSERVATION",
       has_lived_experience_grounding: !!seed.creator_evidence_available,
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
     },
@@ -162,7 +159,7 @@ export async function writeOneSlot(args: {
     model: V11_WRITER_MODEL,
     timeout_ms: V11_WRITER_TIMEOUT_MS,
     seed_id: seed.seed_id,
-    allow_one_retry: false,
+    allow_one_retry: true,
   });
 
   let finalText = String(integrated.final_text || "").trim();
