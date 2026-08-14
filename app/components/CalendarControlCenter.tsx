@@ -281,12 +281,6 @@ export default function CalendarControlCenter({ initialActivities = [], syncStat
           >
             이 날 직접 쓰기
           </Link>
-          <Link
-            href={`/today/reply`}
-            className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
-          >
-            답글 작성
-          </Link>
         </div>
       )}
       <p className="text-center text-[11px] text-zinc-600">

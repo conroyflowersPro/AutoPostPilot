@@ -41,13 +41,15 @@ import {
   softDailyCap,
 } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
+import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
 
 const POSTS_MIN = 5;
 const POSTS_MAX = 8;
 const POSTS_TARGET = 6;
 const APP_VERSION = "11.0.0";
-const WEEKLY_ENGINE_VERSION = "phased_v11_creator_seed_reasoning_v1";
-const GENERATOR_VERSION = "creator_dna_publishing_v1.3.2_vocab_fidelity";
+const WEEKLY_ENGINE_VERSION = "v11_order08_wired_grok46";
+const GENERATOR_VERSION = "order7b_independent_writer_v11";
+const COLLISION_DAYS = 30;
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,7 +134,7 @@ Deno.serve(async (req) => {
           ? body.publishedTopics21d.map(String)
           : [];
       const intentText = String(body.creatorIntent || body.topic || "").trim();
-      const since = new Date(Date.now() - 21 * 24 * 3600 * 1000).toISOString();
+      const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
       const { data: actRows } = await supabase
         .from("account_activities")
         .select("text_body, post_type, action_type, published_at, origin, system_origin_class, x_post_id")
@@ -225,6 +227,7 @@ Deno.serve(async (req) => {
           explicitCreatorIntent: intentText || undefined,
           recentPublishedAngles: [...published, ...evidenceSubjects].slice(0, 30),
           viralCandidates: viralIn.slice(0, 12),
+          model: V11_WRITER_MODEL,
           timeoutMs: 28000,
         });
         xai_seed_expansion = {
@@ -269,7 +272,7 @@ Deno.serve(async (req) => {
         seed_count: candidates.length,
         key_present: !!xaiKey,
         key_len: xaiKey.length,
-        expand_model: xai_seed_expansion.attempted ? "creator_seed_reasoning" : "none_evidence_only",
+        expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none_evidence_only",
         supply_low,
         diagnostics: {
           app_version: APP_VERSION,
@@ -279,7 +282,7 @@ Deno.serve(async (req) => {
           local_raw: local.length,
           local_passed: gated.passed.length,
           local_rejected: gated.local_gate_rejected,
-          expand_model: xai_seed_expansion.attempted ? "creator_seed_reasoning" : "none_evidence_only",
+          expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none_evidence_only",
           evidence_activity_rows: (actRows || []).length,
           evidence_subjects: evidenceSubjects.length,
           published_evidence_rows: publishedEvidence.length,
@@ -374,7 +377,7 @@ Deno.serve(async (req) => {
     if (phase === "select") {
       const seedsIn: ConcreteSeed[] = seedArrayFromBody(body) as ConcreteSeed[];
       const mix = allocateEditorialSlots(required_slots, body.editorial_ratio || undefined);
-      const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
       const { data: acts } = await supabase
         .from("account_activities")
         .select("text_body, post_type, action_type, published_at, origin, system_origin_class, meta, x_post_id")
@@ -500,7 +503,7 @@ Deno.serve(async (req) => {
           count_integrity: countIntegrityOk(mix.base_required_slots, totalPlanned),
           order8d_functional_restore: true,
           order8d_cors_methods: true,
-          order8d_note: "creator_seed_reasoning_v1; full compactSlot still pending",
+          order8d_note: "v11 write phase uses ORDER 7B independent writer; generate-post is fallback only",
           soft_daily_cap: softDailyCap(postsPerDay),
           max_daily_topic: redistributed.max_daily_topic,
           topic_distribution: topicDistributionReport(redistributed.days),
@@ -510,8 +513,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (phase === "write") {
+      const slots = Array.isArray(body.slots) ? body.slots : seedArrayFromBody(body);
+      if (!slots.length) {
+        return json({ success: false, error: "write phase requires slots", posts: [] }, 400);
+      }
+      const dryRun = body.dry_run_generation === true;
+      const posts = await writeSlotBatch({
+        slots,
+        xaiKey: xaiKey || null,
+        dryRun,
+      });
+      return json({
+        success: true,
+        phase: "write",
+        posts,
+        engine: WEEKLY_ENGINE_VERSION,
+        writer_model: V11_WRITER_MODEL,
+        system_origin_class: "AP_PIPELINE",
+        xai_usage: {
+          seed_expansion: false,
+          external_supplement: false,
+          creator_generation: posts.some((p) => p.writer_call_attempted),
+        },
+        timing: { total_ms: Date.now() - t0 },
+      });
+    }
+
     return json(
-      { success: false, error: "phase required: expand | judge | select", engine: WEEKLY_ENGINE_VERSION, days: [] },
+      { success: false, error: "phase required: expand | judge | select | write", engine: WEEKLY_ENGINE_VERSION, days: [] },
       400
     );
   } catch (err: any) {

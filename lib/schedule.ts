@@ -7,7 +7,7 @@
  */
 
 const TZ = "America/Los_Angeles";
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 const ANCHOR_HOUR = 17;
 const MIN_GAP_MS = 3 * 60 * 60 * 1000;
 

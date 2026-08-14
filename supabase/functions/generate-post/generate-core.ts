@@ -40,7 +40,7 @@ import {
   softReaderStoryJudge,
 } from "./reader-story-judge.ts";
 
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 const GENERATOR_VERSION = "reader_story_v10_order4";
 
 function buildSystemPrompt(): string {

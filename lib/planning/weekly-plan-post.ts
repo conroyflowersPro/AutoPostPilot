@@ -15,7 +15,7 @@ import {
   buildPerformanceDnaPlannerBlock,
 } from "@/lib/intelligence/performance-dna-runtime";
 
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 const SYSTEM = `You are the weekly account-operating strategist for @Seung4680 — an AI account manager, not a post generator.
 

@@ -13,11 +13,17 @@ import {
 } from "@/lib/api-consent";
 
 export const maxDuration = 26;
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
+  return NextResponse.json(
+    {
+      error: "Reply polish is frozen in v11. Comment status stays on the dashboard.",
+      frozen: true,
+      paid_api_called: false,
+    },
+    { status: 410 }
+  );
     const {
       data: { user },
     } = await supabase.auth.getUser();

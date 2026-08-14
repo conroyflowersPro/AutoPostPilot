@@ -155,7 +155,18 @@ export function buildRecentExperienceCandidates(
   return out;
 }
 
-export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = [];
+function loadArchiveExperienceLedger(): ExperienceCandidate[] {
+  try {
+    const raw = Deno.readTextFileSync(new URL("./experience-ledger.json", import.meta.url));
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as ExperienceCandidate[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Empty until operator drops archive-derived ledger JSON. EXPERIENCE seeds fail closed while empty. */
+export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = loadArchiveExperienceLedger();
 
 const EXAMPLE_CONTAMINATION = [
   /fsd\s*v10/i,

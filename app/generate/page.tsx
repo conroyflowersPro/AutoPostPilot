@@ -7,6 +7,8 @@ import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
 const JUDGE_BATCH = 8;
+const WRITE_CHUNK = 3;
+const COLLISION_DAYS = 30;
 
 type LafcMatch = { match_date: string; opponent: string; home_or_away?: string; venue?: string };
 
@@ -101,12 +103,12 @@ function GeneratePageInner() {
       } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("로그인이 필요합니다.");
 
-      setPhase("최근 21일 발행·예약 주제 조회…");
+      setPhase(`최근 ${COLLISION_DAYS}일 발행·예약 주제 조회…`);
       let publishedTopics21d: string[] = [];
       let scheduledTopics: string[] = [];
       try {
         const since = new Date();
-        since.setDate(since.getDate() - 21);
+        since.setDate(since.getDate() - COLLISION_DAYS);
         const sinceIso = since.toISOString();
         let published: any[] | null = null;
         const q1 = await supabase
@@ -262,28 +264,24 @@ function GeneratePageInner() {
         );
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       let totalSaved = 0;
       for (let dayOffset = 0; dayOffset < mergedDays.length; dayOffset++) {
         const day = mergedDays[dayOffset];
         if (!day?.posts?.length) continue;
         setPhase(`Day ${dayOffset + 1}/${mergedDays.length} 초안 생성…`);
-        const genRes = await fetch(`${supabaseUrl}/functions/v1/generate-post`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-          },
-          body: JSON.stringify({
-            startDate,
-            dayOffset: day.dayOffset ?? dayOffset,
-            slots: day.posts,
-          }),
-        });
-        const genData = await readJson(genRes);
-        if (Array.isArray(genData.posts)) {
-          for (const p of genData.posts) {
+        const daySlots = Array.isArray(day.posts) ? day.posts : [];
+        for (let si = 0; si < daySlots.length; si += WRITE_CHUNK) {
+          const chunk = daySlots.slice(si, si + WRITE_CHUNK);
+          const genData = await edgeCall(session, {
+            ...base,
+            phase: "write",
+            slots: chunk,
+          });
+          if (!genData.success) {
+            throw new Error(genData.detail || genData.error || `Write D${dayOffset + 1} 실패`);
+          }
+          const written = Array.isArray(genData.posts) ? genData.posts : [];
+          for (const p of written) {
             const text = String(p.final_text || p.content || p.text || "").trim();
             if (!text) continue;
             let insErr = (
@@ -292,7 +290,13 @@ function GeneratePageInner() {
                 status: "draft",
                 pipeline_id: "42303",
                 user_id: session.user.id,
-                topic: String(p.primaryTopic || ""),
+                topic: String(p.primaryTopic || p.concrete_subject || ""),
+                strategy_json: {
+                  system_origin_class: "AP_PIPELINE",
+                  slotId: p.slotId || null,
+                  writer_model: "grok-4.6",
+                  engine: "v11_order08_wired_grok46",
+                },
               })
             ).error;
             if (insErr) {
@@ -307,8 +311,8 @@ function GeneratePageInner() {
             }
             if (!insErr) totalSaved += 1;
           }
+          setDoneCount(totalSaved);
         }
-        setDoneCount(totalSaved);
       }
       setPhase(`완료: ${totalSaved}개 draft 저장`);
       setDoneCount(totalSaved);
@@ -329,7 +333,7 @@ function GeneratePageInner() {
         </span>
       </div>
       <p className="text-sm text-zinc-400 mb-4">
-        v9.1.1: Expand는 dimension→구체 시드 xAI 기본 경로. 템플릿 bootstrap 없음. 7일 목표 약 35–42 draft.
+        v11: Expand → Judge → Select → ORDER 7B 독립 작성. 리뷰·원본 미디어 후에만 발행.
       </p>
       <label className="block text-sm mb-1 text-zinc-300">시작일</label>
       <input

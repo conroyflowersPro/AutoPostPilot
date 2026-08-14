@@ -91,12 +91,6 @@ export default async function HomePage() {
               지금 쓰기
             </Link>
             <Link
-              href="/today/reply"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm hover:bg-zinc-600"
-            >
-              답글 작성
-            </Link>
-            <Link
               href="/calendar"
               className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
             >

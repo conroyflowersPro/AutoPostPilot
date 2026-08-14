@@ -39,6 +39,16 @@ Folder `output` contains:
 Zip **that output folder only** and share it.
 **Do not upload the original 25GB archive.**
 
+## After extract: experience ledger (v11)
+
+Archive is **not** 말투 training. Convert lived episodes only:
+
+```bat
+node to-experience-ledger.mjs --input ".\output" --out ".\experience-ledger.json"
+```
+
+Zip `experience-ledger.json` (small) and give it to the agent. It replaces `supabase/functions/weekly-plan/experience-ledger.json`. Until that file is non-empty, EXPERIENCE seeds fail closed.
+
 ## After analysis
 
 This tool is done. No scheduled re-run. No long-term Archive system.

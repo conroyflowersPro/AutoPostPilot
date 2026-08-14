@@ -16,7 +16,7 @@ import {
 
 export const maxDuration = 26;
 
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 const POLISH_SYSTEM = `You are an editor for a Korean X creator (@Seung4680 voice).
 Your job is POLISH only — improve readability for X without changing substance.

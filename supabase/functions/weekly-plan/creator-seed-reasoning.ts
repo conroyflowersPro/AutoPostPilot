@@ -226,7 +226,7 @@ export async function reasonCreatorSeeds(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: args.model || "grok-4",
+        model: args.model || "grok-4.6",
         temperature: 0.85,
         messages: [
           { role: "system", content: system },

@@ -297,7 +297,7 @@ function ManualReplyInner() {
 
       <main className="mx-auto max-w-3xl space-y-5 px-4 py-6">
         <p className="text-xs text-zinc-500">
-          일반 포스트는 Fedica · 답글은 X 직접 게시. 링크만 붙여도 비용 없음.
+          v11: AI 답글 제안/다듬기는 멈춤. 댓글 상태만 홈·오늘에서 본다.
         </p>
         {topicHint && (
           <div className="rounded-lg border border-sky-900/50 bg-sky-950/30 px-3 py-2 text-xs text-sky-200">

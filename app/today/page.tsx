@@ -48,12 +48,6 @@ export default async function TodayPage() {
             지금 쓰기
           </Link>
           <Link
-            href="/today/reply"
-            className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium hover:bg-sky-600"
-          >
-            답글 작성
-          </Link>
-          <Link
             href="/generate"
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
           >

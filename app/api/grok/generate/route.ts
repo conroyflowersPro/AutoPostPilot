@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 26;
 
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 const SYSTEM_PROMPT = `You are the content generation engine for AutoPostPilot.
 Your only job is to write X posts that the creator would actually publish.

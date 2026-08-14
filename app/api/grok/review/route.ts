@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 const SYSTEM_PROMPT = `You are a specialized Growth & Content Agent for @Seung4680.
 Manually review one draft post. Do NOT force banmal, do NOT force one fixed Korean tone, do NOT force reply questions, do NOT insert engagement bait questions, and do NOT rewrite every post into the same Growth template. Mixed 해요체/반말/음슴체 is allowed; if uncertain prefer natural 해요체. The account must not sound banmal-only.

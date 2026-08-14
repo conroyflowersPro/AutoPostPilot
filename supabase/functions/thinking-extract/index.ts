@@ -22,7 +22,7 @@ const EXTRACTOR_VERSION = "thinking_feature_v1_pilot";
 const DEFAULT_BATCH = 8;
 const DEFAULT_BUDGET_MS = 14000;
 const DEFAULT_PILOT_MAX = 40;
-const MODEL = "grok-4.5";
+const MODEL = "grok-4.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

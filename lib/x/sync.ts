@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createXClient, XClientNotConfiguredError } from "@/lib/x/client";
+import { persistXPostEvidence } from "@/lib/x/evidence";
 
 export type SyncResult = {
   ok: boolean;
@@ -25,10 +26,6 @@ function classifyAction(
   if (types.includes("quoted")) return "QUOTE";
   if (types.includes("replied_to")) return "REPLY";
   return "ORIGINAL";
-}
-
-function activityDateFromIso(iso: string): string {
-  return iso.slice(0, 10);
 }
 
 export async function runXAccountSync(opts?: {
@@ -109,45 +106,20 @@ export async function runXAccountSync(opts?: {
 
       for (const p of posts) {
         const action = classifyAction(p.referencedTweets);
-        const row = {
-          account_id: conn.id,
-          activity_date: activityDateFromIso(p.createdAt),
+        const persisted = await persistXPostEvidence(supabase, {
+          accountId: conn.id,
+          xUserId: me.id,
+          handle: me.username,
+          post: p,
           origin: "X_ACTUAL",
-          action_type: action,
+          actionType: action,
           status: "PUBLISHED",
-          x_post_id: p.id,
-          text_body: p.text,
-          source_post_url: `https://x.com/${me.username}/status/${p.id}`,
-          published_at: p.createdAt,
-          meta: {
-            public_metrics: p.publicMetrics || {},
-            referenced_tweets: p.referencedTweets || [],
-          },
-        };
-
-        const { data: existing } = await supabase
-          .from("account_activities")
-          .select("id")
-          .eq("account_id", conn.id)
-          .eq("x_post_id", p.id)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase
-            .from("account_activities")
-            .update({
-              text_body: row.text_body,
-              meta: row.meta,
-              action_type: row.action_type,
-            })
-            .eq("id", existing.id);
-          updated += 1;
-        } else {
-          const { error: insErr } = await supabase
-            .from("account_activities")
-            .insert(row);
-          if (!insErr) created += 1;
-        }
+          collectionSource: source === "scheduled" ? "x_sync_scheduled" : "x_sync_manual",
+          collectionRunId: runId || null,
+          systemOriginClass: "USER_DIRECT" as any,
+        });
+        if (persisted.postStatus === "NEW") created += 1;
+        else updated += 1;
 
         if (!newestId || BigInt(p.id) > BigInt(newestId)) {
           newestId = p.id;

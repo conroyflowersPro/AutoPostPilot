@@ -8,7 +8,7 @@ import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MetricBag, XTimelinePost, XMentionPost } from "@/lib/x/client";
 
-export type SystemOriginClass = "SYSTEM_ASSISTED" | "MANUAL" | "UNKNOWN";
+export type SystemOriginClass = "USER_DIRECT" | "AP_PIPELINE" | "SYSTEM_ASSISTED" | "MANUAL" | "UNKNOWN";
 
 export type PersistPostInput = {
   accountId: string;
@@ -94,7 +94,7 @@ export async function persistXPostEvidence(
 
   const { data: existing } = await supabase
     .from("account_activities")
-    .select("id, first_collected_at, meta")
+    .select("id, first_collected_at, meta, system_origin_class")
     .eq("account_id", input.accountId)
     .eq("x_post_id", p.id)
     .maybeSingle();
@@ -105,10 +105,16 @@ export async function persistXPostEvidence(
   if (existing?.id) {
     activityId = existing.id;
     postStatus = "UPDATED";
+    const keptOrigin =
+      existing.system_origin_class &&
+      existing.system_origin_class !== "UNKNOWN"
+        ? existing.system_origin_class
+        : baseRow.system_origin_class;
     await supabase
       .from("account_activities")
       .update({
         ...baseRow,
+        system_origin_class: keptOrigin,
         first_collected_at: existing.first_collected_at || nowIso,
       })
       .eq("id", existing.id);

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { EngagementOpportunity } from "@/lib/reply/types";
 
 type ApiAction = { label: string; action: string; purpose: string };
@@ -60,25 +59,13 @@ export default function TodayEngagementClient({
     }
   }
 
-  function replyHref(o: EngagementOpportunity): string {
-    if (o.reply_href) return o.reply_href;
-    const params = new URLSearchParams();
-    if (o.x_url || o.tweet_url) params.set("url", o.x_url || o.tweet_url || "");
-    const topic = o.topic || o.title || "";
-    if (topic) params.set("topic", topic);
-    if (o.suggested_intent) params.set("intent", o.suggested_intent);
-    return `/today/reply?${params.toString()}`;
-  }
-
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
           오늘의 대화 기회
         </h2>
-        <Link href="/today/reply" className="text-xs text-sky-400 hover:underline">
-          답글 작성 →
-        </Link>
+        <span className="text-xs text-zinc-500">댓글 상태만 · AI 답글 작성은 v11에서 멈춤</span>
       </div>
 
       <p className="text-sm text-zinc-500">
@@ -132,13 +119,8 @@ export default function TodayEngagementClient({
                   이벤트 단계: {String(o.event_context.phase)}
                 </p>
               )}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  href={replyHref(o)}
-                  className="rounded bg-emerald-800/80 px-2.5 py-1 text-[11px] font-medium text-emerald-100 hover:bg-emerald-700"
-                >
-                  답글 작성
-                </Link>
+              <div className="mt-2 text-[11px] text-zinc-500">
+                댓글 상태 확인용. AI 답글 작성은 v11에서 멈춤.
               </div>
             </li>
           ))}
