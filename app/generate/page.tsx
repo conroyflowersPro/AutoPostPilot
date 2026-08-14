@@ -11,8 +11,6 @@ const WRITE_CHUNK = 3;
 const COLLISION_DAYS = 30;
 const MAX_EXPAND_ROUNDS = 12;
 const MAX_TOPUP_ROUNDS = 4;
-const WRITE_CHUNK = 3;
-const COLLISION_DAYS = 30;
 
 type LafcMatch = { match_date: string; opponent: string; home_or_away?: string; venue?: string };
 
