@@ -259,6 +259,23 @@ function loadArchiveExperienceLedger(): ExperienceCandidate[] {
 /** Empty until operator drops archive-derived ledger JSON. EXPERIENCE seeds fail closed while empty. */
 export const ARCHIVE_EXPERIENCE_FALLBACK: ExperienceCandidate[] = loadArchiveExperienceLedger();
 
+/** Previous plan-week originals are consumed for the upcoming generate. Same week may still cite related. */
+export const EXPERIENCE_PREVIOUS_WEEK_DAYS = 7;
+
+export function isExperienceConsumedForUpcomingWeek(
+  c: { published_at?: string; source_ref?: string },
+  args: { weekStart: string; alreadyCitedIds?: string[] },
+): boolean {
+  const id = String(c.source_ref || "").trim();
+  const cited = (args.alreadyCitedIds || []).map(String);
+  if (id && cited.includes(id)) return true;
+  const pub = c.published_at ? Date.parse(String(c.published_at)) : NaN;
+  const week = Date.parse(`${String(args.weekStart || "").slice(0, 10)}T00:00:00.000Z`);
+  if (!Number.isFinite(pub) || !Number.isFinite(week)) return false;
+  const prevStart = week - EXPERIENCE_PREVIOUS_WEEK_DAYS * 24 * 60 * 60 * 1000;
+  return pub >= prevStart && pub < week;
+}
+
 const EXAMPLE_CONTAMINATION = [
   /fsd\s*v10/i,
   /v10대/,

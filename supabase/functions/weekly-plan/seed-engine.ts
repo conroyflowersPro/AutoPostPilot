@@ -206,6 +206,17 @@ function rowHasReaderEntry(meta: unknown): boolean {
   );
 }
 
+/** Exceptional reader activation — learn always. Not a reason to regenerate the same episode. */
+export function isExceptionalReaderActivation(meta: unknown): boolean {
+  const m = metricsFromMeta(meta);
+  const replies = m.reply_count || 0;
+  const rts = m.retweet_count || 0;
+  const quotes = m.quote_count || 0;
+  const bms = m.bookmark_count || 0;
+  const likes = m.like_count || 0;
+  return replies >= 4 || replies + rts + quotes + bms >= 6 || likes >= 40;
+}
+
 /**
  * Learning signals from USER_DIRECT activity + optional performance.
  * Never a seed list. Registry appears only as cluster hints.
@@ -226,6 +237,7 @@ export function collectLearnedSeedSignals(opts: {
   let user_direct_n = 0;
   const dayHits = new Map<string, number>();
   let originals_last_14d = 0;
+  const mustLearnHints: string[] = [];
   const now = Date.now();
   const d14 = 14 * 24 * 3600 * 1000;
   for (const row of rows.slice(0, 80)) {
@@ -252,6 +264,11 @@ export function collectLearnedSeedSignals(opts: {
     if (rowHasReaderEntry(row.meta)) {
       entryHits.set(cluster, (entryHits.get(cluster) || 0) + 1);
     }
+    if (isExceptionalReaderActivation(row.meta)) {
+      mustLearnHints.push(
+        `MUST_LEARN activation in ${cluster}: reader entry was exceptional — learn the pattern, do not regenerate that episode next week`,
+      );
+    }
     const label = packet
       ? `${packet.topic}/${packet.subtopic}`
       : "DAILY/GENERAL";
@@ -268,6 +285,8 @@ export function collectLearnedSeedSignals(opts: {
     "Transfer entry/flow quality only — never reuse a past winning subject as this week's seed",
     "Likes are algorithm-layer for mix/spacing, not a sentence recipe",
     "Do not install a repeating punchline (e.g. 논란이 자산) across the week",
+    "Lived episodes consumed last week are LEARN-only for the next generate. Exceptional activation must still be learned.",
+    ...mustLearnHints.slice(0, 8),
   ];
   for (const { cluster, n } of cluster_weights) {
     const entry = entryHits.get(cluster) || 0;

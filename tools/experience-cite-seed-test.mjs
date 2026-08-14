@@ -48,6 +48,7 @@ ok("E4. 동일 내용 금지 on extract", /동일 내용 금지/.test(exp));
 ok("E5. originals are SEED_SOURCE cite-seeds", /SEED_SOURCE/.test(exp) && /seed_eligible: userExplicit \|\| !isReply/.test(exp));
 ok("E6. job injects experience candidates", /buildRecentExperienceCandidates/.test(job) && /resolveExperienceSupply/.test(job));
 ok("E7. job summary shows 경험시드", /경험시드:/.test(job) && /동일 내용 금지/.test(job));
+ok("E7b. last-week consumed excluded from next generate", /지난주 소모 제외/.test(job) && /isExperienceConsumedForUpcomingWeek/.test(job));
 ok("E8. writer may cite related, not clone", /CITE RELATED/.test(wr) && /동일 내용/.test(wr));
 ok("E9. Grok expand told not to clone lived", /CITE\+RELATED/.test(cr) || /Never clone the same content/.test(cr));
 ok("E10. night FSD pedestrian is experiential", isExp(night));

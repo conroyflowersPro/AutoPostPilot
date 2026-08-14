@@ -225,6 +225,7 @@ export async function reasonCreatorSeeds(
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
+    "Episodes already posted in the 7 days before this plan weekStart are LEARN-only for the upcoming generate. Do not include them as this week's EXPERIENCE seeds. Exceptional reader activation must still be learned.",
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");

@@ -28,6 +28,7 @@ import {
   ARCHIVE_EXPERIENCE_FALLBACK,
   buildRecentExperienceCandidates,
   experienceCandidateToSeedFields,
+  isExperienceConsumedForUpcomingWeek,
   resolveExperienceSupply,
 } from "./experience-evidence.ts";
 
@@ -359,10 +360,20 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const experienceSeeds: any[] = [];
   if (!st.experience_injected) {
     const needExp = Math.max(4, Math.ceil(required * 0.2));
-    const resolved = resolveExperienceSupply(needExp, experience || [], ARCHIVE_EXPERIENCE_FALLBACK);
+    const weekStart = String(st.startDate || "").trim();
+    const alreadyCitedIds = Array.isArray(st.alreadyCited) ? st.alreadyCited.map(String) : [];
+    const consumedExperience = (experience || []).filter((c: any) =>
+      isExperienceConsumedForUpcomingWeek(c, { weekStart, alreadyCitedIds })
+    );
+    const availableExperience = (experience || []).filter(
+      (c: any) => !isExperienceConsumedForUpcomingWeek(c, { weekStart, alreadyCitedIds })
+    );
+    const resolved = resolveExperienceSupply(needExp, availableExperience, ARCHIVE_EXPERIENCE_FALLBACK);
     let n = 0;
+    const citedIds: string[] = [];
     for (const c of resolved.selected) {
       if (!c.seed_eligible && c.source_role !== "SEED_SOURCE" && c.source_role !== "USER_EXPLICIT_SEED") continue;
+      if (isExperienceConsumedForUpcomingWeek(c, { weekStart, alreadyCitedIds })) continue;
       n += 1;
       const fields = experienceCandidateToSeedFields(c);
       experienceSeeds.push({
@@ -376,10 +387,19 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         },
       });
       if (c.concrete_subject) priorSubjects.push(String(c.concrete_subject));
+      if (c.source_ref) citedIds.push(String(c.source_ref));
     }
     st.experience_injected = true;
     st.experience_n = experienceSeeds.length;
-    row.summary = [row.summary, `경험시드: ${experienceSeeds.length} · 인용 후속 · 동일 내용 금지`].filter(Boolean).join("\n");
+    st.experience_consumed_n = consumedExperience.length;
+    st.alreadyCited = [...alreadyCitedIds, ...citedIds];
+    st.consumed_experience_subjects = consumedExperience
+      .map((c: any) => String(c.concrete_subject || "").trim())
+      .filter(Boolean);
+    row.summary = [
+      row.summary,
+      `경험시드: ${experienceSeeds.length} · 지난주 소모 제외 ${consumedExperience.length} · 고참여는 학습 · 인용 후속 · 동일 내용 금지`,
+    ].filter(Boolean).join("\n");
   }
   const candidates: any[] = [...experienceSeeds, ...(gated.passed || [])];
   const xaiRes = await expandSeedSupplyWithXai({
@@ -387,7 +407,11 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     needed: Math.max(Math.min(EXPAND_BATCH, remaining), 1),
     existing: [...candidates, ...existingHeld] as ConcreteSeed[],
     explicitCreatorIntent: intentText || undefined,
-    recentPublishedAngles: [...learned.recent_angle_labels, ...published].slice(0, 30),
+    recentPublishedAngles: [
+      ...learned.recent_angle_labels,
+      ...published,
+      ...(st.consumed_experience_subjects || []),
+    ].slice(0, 40),
     performancePatternHints: learned.performance_pattern_hints,
     clusterInterestWeights: learned.cluster_weights,
     registryInterestHints: learned.registry_interest_hints,
