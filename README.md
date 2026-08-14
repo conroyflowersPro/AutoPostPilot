@@ -6,7 +6,7 @@ Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
 
 **Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
-One line: Sync snapshots old and new posts; Grok fetches via API; files only if unknown (named ask + remind until 무시). Chat screenshots need a final `반영해` — `진행` does not apply.
+One line: Infer from data, never examples. No falsehood vs experience. Assist posting and scheduling after review + original media.
 
 Reply suggest / polish is **out of the v11 product surface** (frozen).
 
