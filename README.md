@@ -1,22 +1,26 @@
-# AutoPostPilot v5.5.3
+# AutoPostPilot v11.0.0
 
-Specialized content management PWA for **@Seung4680**.
+Specialized Growth OS for **@Seung4680**.
 
-## v5.5.3 — Auth password-reset callback
+Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
+
+**Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
+
+One line: infer in-interest seeds, write posts `@Seung4680` would actually send, schedule via Fedica using X-algorithm dates and gaps, learn from published outcomes.
+
+Reply suggest / polish is **out of the v11 product surface** (frozen).
+
+## Auth (operational)
 
 - `GET /auth/callback` — exchanges Supabase PKCE `code` for session (reset / confirm)
 - `/auth/update-password` — set new password after recovery link
 - Login: **비밀번호를 잊으셨나요?** → `resetPasswordForEmail` with redirect to callback
 
-### Supabase Dashboard 설정 (필수)
+### Supabase Dashboard
+
 Authentication → URL Configuration
+
 - **Site URL**: `https://YOUR_DEPLOYED_DOMAIN`
-- **Redirect URLs**에 추가:
+- **Redirect URLs**:
   - `https://YOUR_DEPLOYED_DOMAIN/auth/callback`
   - `https://YOUR_DEPLOYED_DOMAIN/auth/update-password`
-
-## v5.5.2
-- Priority 1: Analytics Coverage / Deduplication API + import dedup
-
-## v5.5.1 / v5.5.0
-- Quality Engagement Evaluation Layer, X Algorithm Intelligence, Reply Strategy
