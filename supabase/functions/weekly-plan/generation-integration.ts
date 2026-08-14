@@ -131,7 +131,9 @@ export async function integrateSlotGeneration(
     return packageResult(ctx, seedId, last, attempts, false, "none");
   }
 
-  if (attempts < ORDER7C_MAX_GENERATION_ATTEMPTS) {
+  // Same-request retry can double Grok wall time and kill the Edge 60s budget.
+  // writeOneSlot passes allow_one_retry: false; other callers keep the retry.
+  if (attempts < ORDER7C_MAX_GENERATION_ATTEMPTS && options.allow_one_retry !== false) {
     attempts = 2;
     recoveryUsed = true;
     recoveryType = "same_seed_retry";

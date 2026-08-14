@@ -7,7 +7,7 @@ import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
 const JUDGE_BATCH = 8;
-const WRITE_CHUNK = 3;
+const WRITE_CHUNK = 2;
 const COLLISION_DAYS = 30;
 const MAX_EXPAND_ROUNDS = 12;
 const MAX_TOPUP_ROUNDS = 4;
@@ -82,15 +82,32 @@ function GeneratePageInner() {
   async function edgeCall(session: any, body: Record<string, unknown>) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
-    const res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-      },
-      body: JSON.stringify(body),
-    });
+    const phase = String(body.phase || "");
+    const ms = phase === "write" ? 50000 : phase === "expand" || phase === "quota" ? 45000 : 30000;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), ms);
+    let res: Response;
+    try {
+      res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+        },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        throw new Error(
+          `${phase || "요청"}이 ${Math.round(ms / 1000)}초 안에 끝나지 않았습니다. 시드는 이어서 채우고, 초안은 저장된 것만 남습니다.`
+        );
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
     return readJson(res);
   }
 
@@ -322,25 +339,38 @@ function GeneratePageInner() {
       }
 
       let totalSaved = 0;
+      const writeErrors: string[] = [];
       for (let dayOffset = 0; dayOffset < mergedDays.length; dayOffset++) {
         const day = mergedDays[dayOffset];
         if (!day?.posts?.length) continue;
-        setPhase(`Day ${dayOffset + 1}/${mergedDays.length} 초안 생성…`);
+        setPhase(`Day ${dayOffset + 1}/${mergedDays.length} 초안 생성… (${totalSaved} 저장됨)`);
         const daySlots = Array.isArray(day.posts) ? day.posts : [];
         for (let si = 0; si < daySlots.length; si += WRITE_CHUNK) {
           const chunk = daySlots.slice(si, si + WRITE_CHUNK);
-          const genData = await edgeCall(session, {
-            ...base,
-            phase: "write",
-            slots: chunk,
-          });
+          let genData: any;
+          try {
+            genData = await edgeCall(session, {
+              ...base,
+              phase: "write",
+              slots: chunk,
+            });
+          } catch (e: any) {
+            writeErrors.push(`D${dayOffset + 1}: ${e?.message || e}`);
+            continue;
+          }
           if (!genData.success) {
-            throw new Error(genData.detail || genData.error || `Write D${dayOffset + 1} 실패`);
+            writeErrors.push(`D${dayOffset + 1}: ${genData.detail || genData.error || "write 실패"}`);
+            continue;
           }
           const written = Array.isArray(genData.posts) ? genData.posts : [];
           for (const p of written) {
             const text = String(p.final_text || p.content || p.text || "").trim();
-            if (!text) continue;
+            if (!text) {
+              writeErrors.push(
+                `${p.slotId || "slot"} 빈 초안${p.block_reasons?.length ? ` (${p.block_reasons.join(",")})` : ""}`
+              );
+              continue;
+            }
             let insErr = (
               await supabase.from("SeungContent").insert({
                 content: text,
@@ -370,6 +400,11 @@ function GeneratePageInner() {
           }
           setDoneCount(totalSaved);
         }
+      }
+      if (totalSaved < requiredSlots) {
+        throw new Error(
+          `초안 ${totalSaved}/${requiredSlots}만 저장됨. ${writeErrors.slice(0, 4).join(" · ") || "시드 추론 후 작성이 끊겼습니다."}`
+        );
       }
       setPhase(`완료: ${totalSaved}개 draft 저장`);
       setDoneCount(totalSaved);
