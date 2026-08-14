@@ -1,7 +1,6 @@
 /**
- * Creator-driven Seed Reasoning (philosophy-aligned)
+ * Creator-driven Seed Reasoning.
  * Will = Creator DNA + engine rules (not a generate-box sentence).
-
  * Does NOT emit DIMENSION_REGISTRY as production seed bodies.
  * Output = direction seeds only (no finished post prose).
  */

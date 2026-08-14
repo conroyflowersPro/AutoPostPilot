@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { APP_VERSION_LABEL } from "@/lib/version";
+import VersionBadge from "../components/VersionBadge";
 
 type MemoryRow = {
   id: string;
@@ -99,9 +99,7 @@ export default function LearningPage() {
             ←
           </Link>
           <h1 className="text-lg font-semibold">성장 인사이트 · 학습</h1>
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-            {APP_VERSION_LABEL}
-          </span>
+          <VersionBadge />
         </div>
       </header>
 

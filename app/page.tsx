@@ -6,7 +6,7 @@ import CollectMaxButton from "./components/CollectMaxButton";
 import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
 import EvidenceExportButton from "./components/EvidenceExportButton";
 import { getHomeDashboardData } from "@/lib/calendar/activity-provider";
-import { APP_VERSION_LABEL } from "@/lib/version";
+import VersionBadge from "./components/VersionBadge";
 
 function syncLabel(status: string) {
   switch (status) {
@@ -45,9 +45,7 @@ export default async function HomePage() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              {APP_VERSION_LABEL}
-            </span>
+            <VersionBadge />
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-zinc-400">{user.email}</span>

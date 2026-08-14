@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { APP_VERSION_LABEL } from "@/lib/version";
+import VersionBadge from "./VersionBadge";
 
 const NAV = [
   { href: "/today", label: "오늘", match: (p: string) => p === "/today" || p.startsWith("/today/") },
@@ -37,9 +37,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <Link href="/" className="truncate text-sm font-semibold tracking-tight hover:text-zinc-300">
               AutoPostPilot
             </Link>
-            <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
-              {APP_VERSION_LABEL}
-            </span>
+            <VersionBadge />
           </div>
           <nav className="hidden items-center gap-1 sm:flex">
             {NAV.map((item) => {

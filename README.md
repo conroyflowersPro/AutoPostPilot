@@ -1,10 +1,10 @@
-# AutoPostPilot v11.0.0
+# AutoPostPilot
 
 Specialized Growth OS for **@Seung4680**.
 
-Version source of truth: `package.json` / `lib/version.ts` (`11.0.0`).
+Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.1.0**). Shown in the app header as `v11.1.0`. See [CHANGELOG.md](CHANGELOG.md).
 
-**Product direction:** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
+**Product direction (v11 lock):** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 
 One line: Infer from data, never examples. No falsehood vs experience. Assist posting and scheduling after review + original media.
 

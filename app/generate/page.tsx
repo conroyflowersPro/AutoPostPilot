@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
+import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
 const JUDGE_BATCH = 8;
@@ -387,13 +387,9 @@ function GeneratePageInner() {
     <main className="min-h-screen bg-black text-white p-4 md:p-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold">이번 주 계획 · 작성</h1>
-        <span className="text-xs text-zinc-500">
-          {APP_VERSION_LABEL} · {BUILD_STAMP}
-        </span>
+        <span className="text-xs font-semibold tabular-nums text-emerald-300">{APP_VERSION_LABEL}</span>
       </div>
-      <p className="text-sm text-zinc-400 mb-4">
-        v11: Expand → Judge → Select → ORDER 7B 독립 작성. 리뷰·원본 미디어 후에만 발행.
-      </p>
+      <p className="text-sm text-zinc-400 mb-4">{VERSION_SUMMARY_KO}</p>
       <label className="block text-sm mb-1 text-zinc-300">시작일</label>
       <input
         type="date"
@@ -401,12 +397,12 @@ function GeneratePageInner() {
         onChange={(e) => setStartDate(e.target.value)}
         className="w-full mb-4 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2"
       />
-      <label className="block text-sm mb-1 text-zinc-300">Creator Intent (선택)</label>
+      <label className="block text-sm mb-1 text-zinc-300">이번 주 메모 (선택)</label>
       <textarea
         value={topic}
         onChange={(e) => setTopic(e.target.value)}
         rows={2}
-        placeholder="이번 주 직접 말하고 싶은 구체 주제"
+        placeholder="이번만 넣고 싶은 주제. 의지는 엔진·DNA에 있습니다."
         className="w-full mb-4 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2"
       />
       <div className="mb-4 rounded-xl border border-zinc-700 p-3">
