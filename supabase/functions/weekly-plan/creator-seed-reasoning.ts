@@ -224,6 +224,7 @@ export async function reasonCreatorSeeds(
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
+    "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");

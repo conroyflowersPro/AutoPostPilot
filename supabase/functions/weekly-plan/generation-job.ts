@@ -24,6 +24,12 @@ import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
+import {
+  ARCHIVE_EXPERIENCE_FALLBACK,
+  buildRecentExperienceCandidates,
+  experienceCandidateToSeedFields,
+  resolveExperienceSupply,
+} from "./experience-evidence.ts";
 
 const EXPAND_BATCH = 6;
 const JUDGE_BATCH = 16;
@@ -90,6 +96,7 @@ function compactSlotLite(seed: ConcreteSeed, dayOffset: number, slot: number, mo
     primary_source: seed.primary_source,
     source_type: seed.source_type || seed.primary_source,
     evidence_source_ids: seed.evidence_source_ids || [],
+    cite_episode_hint: (seed as any).cite_episode_hint || "",
     claim_types: seed.claim_types || [],
     inference_type: seed.inference_type || "UNKNOWN",
     grounding_status: seed.grounding_status || "UNKNOWN",
@@ -283,7 +290,13 @@ async function loadEvidence(supabase: any, extraSubjects: string[], intentText: 
     publishedEvidence,
     intentText,
   });
-  return { publishedEvidence, learned };
+  const experience = buildRecentExperienceCandidates(
+    (actRows || []).map((r: any) => ({
+      ...r,
+      post_type: r.post_type || r.action_type,
+    })),
+  );
+  return { publishedEvidence, learned, experience };
 }
 
 async function stepQuota(supabase: any, xaiKey: string, row: any) {
@@ -323,7 +336,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const required = Number(row.required_slots) || 0;
   const intentText = String(st.topic || "").trim();
   const published = (st.publishedTopics || []).map(String);
-  const { publishedEvidence, learned } = await loadEvidence(supabase, published, intentText);
+  const { publishedEvidence, learned, experience } = await loadEvidence(supabase, published, intentText);
   if (!xaiKey) {
     row.status = "error";
     row.error = "SEED_INFERENCE_REQUIRES_XAI";
@@ -343,7 +356,32 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     ? bootstrapCandidatesFromDimensions({ publishedSubjects: published, publishedEvidence, intentText })
     : [];
   const gated = applyLocalGates(local, [], createSeedIdFactory("s"));
-  const candidates: any[] = [...(gated.passed || [])];
+  const experienceSeeds: any[] = [];
+  if (!st.experience_injected) {
+    const needExp = Math.max(4, Math.ceil(required * 0.2));
+    const resolved = resolveExperienceSupply(needExp, experience || [], ARCHIVE_EXPERIENCE_FALLBACK);
+    let n = 0;
+    for (const c of resolved.selected) {
+      if (!c.seed_eligible && c.source_role !== "SEED_SOURCE" && c.source_role !== "USER_EXPLICIT_SEED") continue;
+      n += 1;
+      const fields = experienceCandidateToSeedFields(c);
+      experienceSeeds.push({
+        seed_id: `exp-cite-${n}`,
+        ...fields,
+        source_role: fields.source_role || "SEED_SOURCE",
+        source_trace: {
+          source_role: fields.source_role || "SEED_SOURCE",
+          source_type: "EXPERIENCE_CITE_RELATED",
+          leakage_guard_result: "PASS",
+        },
+      });
+      if (c.concrete_subject) priorSubjects.push(String(c.concrete_subject));
+    }
+    st.experience_injected = true;
+    st.experience_n = experienceSeeds.length;
+    row.summary = [row.summary, `경험시드: ${experienceSeeds.length} · 인용 후속 · 동일 내용 금지`].filter(Boolean).join("\n");
+  }
+  const candidates: any[] = [...experienceSeeds, ...(gated.passed || [])];
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
     needed: Math.max(Math.min(EXPAND_BATCH, remaining), 1),
@@ -359,7 +397,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     timeoutMs: 32000,
   });
   st.dim_batch = Number(st.dim_batch || 0) + 1;
-  const added: any[] = [];
+  const added: any[] = [...experienceSeeds];
   for (const s of xaiRes.seeds || []) {
     if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
     added.push({

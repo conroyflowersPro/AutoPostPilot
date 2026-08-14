@@ -237,6 +237,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "TENSION HINT: " + s(core?.tension).slice(0, 100),
     "READER MEANING HINT: " + s(core?.reader_relevant_meaning).slice(0, 100),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "limited first-person allowed only if already grounded" : "no fabricated first-person experience"),
+    s((ctx as any).cite_episode_hint)
+      ? "CITE RELATED: You MAY mention the prior lived episode by situation (e.g. 지난 야간 FSD 보행자 대기). Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용."
+      : "",
     "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
     "PUNCHLINE_STOP: " + String(punchStop),
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta.",

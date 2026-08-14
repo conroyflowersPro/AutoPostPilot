@@ -257,11 +257,12 @@ for (const f of requiredFiles) {
 }
 
 const exp = readFileSync(join(wp, "experience-evidence.ts"), "utf8");
-check("experience never body.slice subject", !/concrete_subject:\s*[^\n]*body\.slice/.test(exp));
 check(
-  "experience seed_eligible default false path",
-  /seed_eligible:\s*userExplicit/.test(exp) || /seed_eligible:\s*!!c\.seed_eligible/.test(exp)
+  "experience abstract originals can be cite-seeds",
+  /source_role: userExplicit \? "USER_EXPLICIT_SEED" : isReply \? "CREATOR_LEARNING_SIGNAL" : "SEED_SOURCE"/.test(exp)
 );
+check("experience forbids cloning same content", /동일 내용 금지/.test(exp));
+check("experience never body.slice subject", !/concrete_subject:\s*[^\n]*body\.slice/.test(exp));
 
 const se = readFileSync(join(wp, "seed-engine.ts"), "utf8");
 check(
