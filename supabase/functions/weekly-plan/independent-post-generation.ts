@@ -228,7 +228,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
     "9) Length: this is an ORIGINAL post, not a memo. At least two sentences. Typical 120–280 Korean characters. Do not stop after one clause.",
     "10) Stop after the observation is actually delivered — not after a fragment. No grand thesis tail.",
-    "FORBIDDEN: one-line notes, token stutter (ent ent ent / 같은 음절 반복), finished examples, copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    "FORBIDDEN: finished examples, one-line notes, token stutter (ent ent ent / 같은 음절 반복), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     "SEED SUBJECT: " + subject.slice(0, 200),
