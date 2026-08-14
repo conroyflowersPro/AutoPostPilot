@@ -80,6 +80,8 @@ export type DeepGenerationContext = {
   factual_boundaries: unknown[];
   experience_boundaries: Record<string, unknown>;
   cite_episode_hint?: string;
+  source_type?: string;
+  source_kind?: string;
   reader_self_projection: Record<string, unknown>;
   reaction_mechanism: Record<string, unknown>;
   core_thought: CoreThought;
@@ -338,6 +340,8 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
         : [],
     experience_boundaries: expBound,
     cite_episode_hint: s((seed as any).cite_episode_hint || (seed as any).point_or_tension),
+    source_type: s((seed as any).source_type || (seed as any).source_kind || seed.primary_source),
+    source_kind: s((seed as any).source_kind),
     reader_self_projection: {
       self_projection_strength: s(mech.self_projection_strength),
       story_invitation_strength: s(mech.story_invitation_strength),

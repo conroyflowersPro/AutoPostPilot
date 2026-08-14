@@ -240,6 +240,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     s((ctx as any).cite_episode_hint)
       ? "CITE RELATED: You MAY mention the prior lived episode by situation (e.g. 지난 야간 FSD 보행자 대기). Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용."
       : "",
+    String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
+      ? "ADJACENT RING: one step outside core Tesla/FSD. EV industry, semiconductors, or space. Observation/opinion only. FORBIDDEN: first-person Tesla driving, same FSD episode, viral clone."
+      : "",
     "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
     "PUNCHLINE_STOP: " + String(punchStop),
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta.",
