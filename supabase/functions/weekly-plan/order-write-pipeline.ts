@@ -24,8 +24,8 @@ import {
 } from "./user-direct-voice-window.ts";
 
 export const V11_WRITER_MODEL = "grok-4.6";
-export const V11_WRITE_CONCURRENCY = 3;
-export const V11_WRITER_TIMEOUT_MS = 22000;
+export const V11_WRITE_CONCURRENCY = 2;
+export const V11_WRITER_TIMEOUT_MS = 16000;
 
 export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode): SeedInterpretation {
   return interpretSeed({
@@ -121,7 +121,6 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
       editorial_mode: mode,
       topic_cluster: seed.cluster,
-      prefer_short: voice.median_chars > 0 && voice.median_chars < 90 ? true : everyday_language.minimal_context_sufficient === true,
     },
   });
   const natural_humor = decideNaturalHumor({
@@ -163,6 +162,7 @@ export async function writeOneSlot(args: {
     model: V11_WRITER_MODEL,
     timeout_ms: V11_WRITER_TIMEOUT_MS,
     seed_id: seed.seed_id,
+    allow_one_retry: false,
   });
 
   let finalText = String(integrated.final_text || "").trim();

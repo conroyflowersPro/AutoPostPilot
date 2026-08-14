@@ -222,7 +222,7 @@ export async function reasonCreatorSeeds(
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 28000);
+    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 18000);
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       signal: controller.signal,
