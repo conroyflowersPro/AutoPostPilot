@@ -1,1 +1,50 @@
-placeholder
+[
+  {
+    "name": "index.ts",
+    "repo_path": "supabase/functions/weekly-plan/index.ts",
+    "sha256": "dabed867eff0270401d476bf4c7772e3220ea3fbd25c83164c538cb72d823976",
+    "size": 61758,
+    "parts": 21,
+    "part_prefix": "index.ts.b64."
+  },
+  {
+    "name": "independent-post-generation.ts",
+    "repo_path": "supabase/functions/weekly-plan/independent-post-generation.ts",
+    "sha256": "6b931c5ca3b9ac2448324c66034e5321c724d44e462b3e2c6251adc6120ebf01",
+    "size": 29182,
+    "parts": 10,
+    "part_prefix": "independent-post-generation.ts.b64."
+  },
+  {
+    "name": "semantic-judge.ts",
+    "repo_path": "supabase/functions/weekly-plan/semantic-judge.ts",
+    "sha256": "13f2d1e298e05e932caa96162f27f27aca924f43cd77229e457c59e676f7f303",
+    "size": 22590,
+    "parts": 8,
+    "part_prefix": "semantic-judge.ts.b64."
+  },
+  {
+    "name": "selective-regeneration.ts",
+    "repo_path": "supabase/functions/weekly-plan/selective-regeneration.ts",
+    "sha256": "7ab4e7decff6e1abe5a7001947a6bcd511482d8917f01b79fcccbb75ae8520b8",
+    "size": 15654,
+    "parts": 6,
+    "part_prefix": "selective-regeneration.ts.b64."
+  },
+  {
+    "name": "regeneration-router.ts",
+    "repo_path": "supabase/functions/weekly-plan/regeneration-router.ts",
+    "sha256": "c085a35ca550c836400ab3a3543a06684c527dece20cfe7685c7449994ebd6ba",
+    "size": 24382,
+    "parts": 9,
+    "part_prefix": "regeneration-router.ts.b64."
+  },
+  {
+    "name": "page.tsx",
+    "repo_path": "app/generate/page.tsx",
+    "sha256": "9cad6963b5d11134dbc9b07e1da9d734e0d0de1240809528650f8f3201a54e47",
+    "size": 16328,
+    "parts": 6,
+    "part_prefix": "page.tsx.b64."
+  }
+]
