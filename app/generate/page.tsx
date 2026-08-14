@@ -4,13 +4,16 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
+import {
+  JUDGE_BATCH,
+  WRITE_CHUNK,
+  expandRoundBudget,
+  priorSubjectCap,
+  topupRoundBudget,
+} from "@/lib/weekly-generate-scale";
 
 const GENERATION_DAYS = 7;
-const JUDGE_BATCH = 8;
-const WRITE_CHUNK = 2;
 const COLLISION_DAYS = 30;
-const MAX_EXPAND_ROUNDS = 12;
-const MAX_TOPUP_ROUNDS = 4;
 
 type LafcMatch = { match_date: string; opponent: string; home_or_away?: string; venue?: string };
 
@@ -176,6 +179,9 @@ function GeneratePageInner() {
       const requiredSlots = Number(quotaPart.required_slots || quotaPart.quota.required_slots);
       const postsPerDay = Number(quotaPart.postsPerDay || quotaPart.quota.posts_per_day);
       const quotaNote = String(quotaPart.quota.rationale || "");
+      const maxExpandRounds = expandRoundBudget(requiredSlots);
+      const maxTopupRounds = topupRoundBudget(requiredSlots);
+      const subjectCap = priorSubjectCap(requiredSlots);
       setPlanSummary(`quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}\n${quotaNote}`);
 
       const base: Record<string, unknown> = {
@@ -201,30 +207,42 @@ function GeneratePageInner() {
 
       async function expandOnce() {
         setPhase(`시드 추론 ${allGated.length}/${requiredSlots}…`);
-        const part = await edgeCall(session, {
-          ...base,
-          phase: "expand",
-          dim_batch_index: dimBatch,
-          prior_subjects: priorSubjects,
-          id_counter: idCounter,
-          expand_with_xai: true,
-          allow_xai_enrich: true,
-        });
-        if (!part.success) {
-          throw new Error(part.detail || part.error || `Expand ${dimBatch + 1} 실패`);
+        let advanced = false;
+        try {
+          const part = await edgeCall(session, {
+            ...base,
+            phase: "expand",
+            dim_batch_index: dimBatch,
+            prior_subjects: priorSubjects,
+            id_counter: idCounter,
+            expand_with_xai: true,
+            allow_xai_enrich: true,
+          });
+          dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
+          advanced = true;
+          if (!part.success) {
+            if (String(part.error || "") === "SEED_INFERENCE_REQUIRES_XAI") {
+              throw new Error(part.detail || part.error || "SEED_INFERENCE_REQUIRES_XAI");
+            }
+            return 0;
+          }
+          const seeds = pickSeeds(part);
+          allGated.push(...seeds);
+          for (const s of seeds) {
+            if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
+          }
+          priorSubjects = priorSubjects.slice(-subjectCap);
+          idCounter = Number(part.id_counter) || idCounter + seeds.length;
+          return seeds.length;
+        } catch (e: any) {
+          if (!advanced) dimBatch += 1;
+          const msg = String(e?.message || e);
+          if (/SEED_INFERENCE_REQUIRES_XAI|로그인이 필요합니다/.test(msg)) throw e;
+          return 0;
         }
-        const seeds = pickSeeds(part);
-        allGated.push(...seeds);
-        for (const s of seeds) {
-          if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
-        }
-        priorSubjects = priorSubjects.slice(-80);
-        idCounter = Number(part.id_counter) || idCounter + seeds.length;
-        dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
-        return seeds.length;
       }
 
-      while (allGated.length < requiredSlots && dimBatch < MAX_EXPAND_ROUNDS) {
+      while (allGated.length < requiredSlots && dimBatch < maxExpandRounds) {
         const added = await expandOnce();
         if (added <= 0) {
           emptyStreak += 1;
@@ -267,12 +285,18 @@ function GeneratePageInner() {
         rows.filter((s: any) => s?.status === "ELIGIBLE" || s?.status === "HIGH_VALUE");
 
       let topup = 0;
-      while (eligibleOf(allJudged).length < requiredSlots && topup < MAX_TOPUP_ROUNDS) {
+      let topupEmpty = 0;
+      while (eligibleOf(allJudged).length < requiredSlots && topup < maxTopupRounds) {
         topup += 1;
         setPhase(`할당량 보충 ${eligibleOf(allJudged).length}/${requiredSlots}…`);
         const before = allGated.length;
         const added = await expandOnce();
-        if (added <= 0) break;
+        if (added <= 0) {
+          topupEmpty += 1;
+          if (topupEmpty >= 3) break;
+          continue;
+        }
+        topupEmpty = 0;
         await judgeBatch(allGated.slice(before));
       }
       if (eligibleOf(allJudged).length < requiredSlots) {
@@ -291,7 +315,7 @@ function GeneratePageInner() {
       let selectTries = 0;
       while (
         (!planData.success || planData.need_more_seeds || Number(planData.totalPlanned || 0) < requiredSlots) &&
-        selectTries < MAX_TOPUP_ROUNDS
+        selectTries < maxTopupRounds
       ) {
         selectTries += 1;
         setPhase(`계획 부족 → 시드 추가 ${selectTries}…`);

@@ -34,12 +34,12 @@ ok("H5. client aborts write ~50s", /phase === "write" \? 50000/.test(gen));
 ok("H6. AbortError shows Korean timeout, does not hang", /AbortError/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
 ok("H7. write chunk failure does not abort the week", /writeErrors\.push/.test(gen) && /continue;/.test(gen));
 ok("H8. empty drafts are not saved", /if \(!text\)/.test(gen) && /빈 초안/.test(gen));
-ok("H9. WRITE_CHUNK is 2", /const WRITE_CHUNK = 2/.test(gen));
+ok("H9. WRITE_CHUNK stays 2 (imported scale helper)", /WRITE_CHUNK/.test(gen) && /export const WRITE_CHUNK = 2/.test(readFileSync(path.join(ROOT, "lib/weekly-generate-scale.ts"), "utf8")));
 ok("H10. write concurrency 2 / timeout 16s", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 16000/.test(ow));
 ok("H11. write skips same-seed Grok retry", /allow_one_retry:\s*false/.test(ow));
 ok("H12. 7C honors allow_one_retry false", /options\.allow_one_retry !== false/.test(gi));
 ok("H13. seed-reasoning default timeout 18s", /timeoutMs \?\? 18000/.test(cr));
-ok("H14. shipping version 11.1.2", /const APP_VERSION = "11.1.2"/.test(ix));
+ok("H14. shipping version lockstep (not frozen 11.1.2)", /const APP_VERSION = "11\.\d+\.\d+"/.test(ix));
 
 console.log("========================================");
 console.log(`HANG FIX: ${pass} PASS / ${fail} FAIL`);
