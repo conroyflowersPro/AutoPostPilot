@@ -64,6 +64,28 @@ function extractJson(raw: string): any {
   return null;
 }
 
+function messageText(body: any): string {
+  const msg = body?.choices?.[0]?.message;
+  if (!msg) return "";
+  const c = msg.content;
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) {
+    return c.map((p: any) => String(p?.text || p?.content || "")).join("");
+  }
+  if (c && typeof c === "object") return JSON.stringify(c);
+  return String(msg.reasoning_content || "");
+}
+
+function seedListFromParsed(parsed: any): any[] {
+  if (!parsed) return [];
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed.seeds)) return parsed.seeds;
+  if (Array.isArray(parsed.directions)) return parsed.directions;
+  if (Array.isArray(parsed.items)) return parsed.items;
+  if (Array.isArray(parsed.data)) return parsed.data;
+  return [];
+}
+
 /** Soft performance patterns — advisory only, never seed clone */
 function defaultPerformanceHints(): string[] {
   return [
@@ -222,7 +244,7 @@ export async function reasonCreatorSeeds(
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 18000);
+    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 32000);
     const res = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       signal: controller.signal,
@@ -233,7 +255,7 @@ export async function reasonCreatorSeeds(
       body: JSON.stringify({
         model: args.model || "grok-4.6",
         temperature: 0.85,
-        max_tokens: 2200,
+        max_tokens: 8192,
         reasoning_effort: "low",
         response_format: { type: "json_object" },
         messages: [
@@ -251,9 +273,9 @@ export async function reasonCreatorSeeds(
         error: clean(body?.error?.message || `xai_http_${res.status}`, 180),
       };
     }
-    const content = body?.choices?.[0]?.message?.content || body?.choices?.[0]?.message || "";
-    const parsed = extractJson(typeof content === "string" ? content : JSON.stringify(content));
-    const rawList = Array.isArray(parsed?.seeds) ? parsed.seeds : [];
+    const content = messageText(body);
+    const parsed = extractJson(content);
+    const rawList = seedListFromParsed(parsed);
     const seeds: ConcreteSeed[] = [];
     const seen = new Set<string>();
     for (let i = 0; i < rawList.length; i++) {
@@ -265,13 +287,19 @@ export async function reasonCreatorSeeds(
       seeds.push(n);
       if (seeds.length >= requested) break;
     }
+    const finish = clean(body?.choices?.[0]?.finish_reason, 24);
     return {
       ...base,
       attempted: true,
       succeeded: seeds.length > 0,
       seeds,
       returned: seeds.length,
-      error: seeds.length ? null : "zero_usable_seeds_after_normalize",
+      error: seeds.length
+        ? null
+        : clean(
+          `zero_usable raw=${rawList.length} finish=${finish || "none"} preview=${content.slice(0, 80)}`,
+          180,
+        ),
     };
   } catch (e: any) {
     return {

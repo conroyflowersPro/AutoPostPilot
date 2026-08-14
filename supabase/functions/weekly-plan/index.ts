@@ -56,11 +56,11 @@ import {
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 6;
-const APP_VERSION = "11.1.4";
+const APP_VERSION = "11.1.5";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
-const EXPAND_BATCH = 10;
+const EXPAND_BATCH = 6;
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -362,7 +362,7 @@ Deno.serve(async (req) => {
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
             model: V11_WRITER_MODEL,
-            timeoutMs: 22000,
+            timeoutMs: 32000,
           });
         let xaiRes = await runExpand();
         xai_seed_expansion = {
@@ -399,6 +399,8 @@ Deno.serve(async (req) => {
         candidates,
         gated_seeds: candidates,
         expand_done,
+        expand_error: xai_seed_expansion.error || null,
+        xai_seed_expansion,
         dim_batch_index: batchIndex,
         dim_batch_total: totalBatches,
         next_dim_batch_index: batchIndex + 1,

@@ -86,7 +86,7 @@ function GeneratePageInner() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
     const phase = String(body.phase || "");
-    const ms = phase === "write" ? 50000 : phase === "expand" || phase === "quota" ? 45000 : 30000;
+    const ms = phase === "write" ? 50000 : phase === "expand" ? 55000 : phase === "quota" ? 45000 : 30000;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), ms);
     let res: Response;
@@ -217,7 +217,8 @@ function GeneratePageInner() {
 
       function expandFailReason(part: any): string {
         return String(
-          part?.xai_seed_expansion?.error ||
+          part?.expand_error ||
+            part?.xai_seed_expansion?.error ||
             part?.diagnostics?.xai_seed_expansion?.error ||
             part?.detail ||
             part?.error ||
@@ -241,6 +242,18 @@ function GeneratePageInner() {
           dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
           advanced = true;
           lastExpandError = expandFailReason(part);
+          if (lastExpandError && !pickSeeds(part).length) {
+            setPlanSummary(
+              [
+                `quota: ${postsPerDay}/day × ${GENERATION_DAYS} = ${requiredSlots}`,
+                quotaNote,
+                quotaGrokErr ? `quota_grok: ${quotaGrokErr}` : "",
+                `expand: ${allGated.length}/${requiredSlots} · ${lastExpandError}`,
+              ]
+                .filter(Boolean)
+                .join("\n")
+            );
+          }
           if (!part.success) {
             if (String(part.error || "") === "SEED_INFERENCE_REQUIRES_XAI") {
               throw new Error(part.detail || part.error || "SEED_INFERENCE_REQUIRES_XAI");

@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.1.5 — 2026-08-14
+
+- 할당량 Grok은 됐는데 시드가 0/28. 한 번에 10개·토큰 2200이면 JSON이 비거나 잘림
+- 시드 배치 6개, 출력 토큰을 늘림. 실패 이유를 회색 칸에 바로 보여 줌
+
 ## 11.1.4 — 2026-08-14
 
 - 원인: Grok 4.6 기본 추론이 high라서 18초 안에 JSON이 안 나옴. 할당량은 cadence fallback, 시드는 0/28

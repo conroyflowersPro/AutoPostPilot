@@ -33,7 +33,8 @@ ok("R4. expand abort labeled xai_timeout", /xai_timeout/.test(cr));
 ok("R5. quota fallback keeps grok_error", /grok_error/.test(qu) && /quota_grok_error/.test(ix));
 ok("R6. client shows expand cause", /원인:/.test(gen) && /lastExpandError/.test(gen));
 ok("R7. still no template fill", /템플릿으로 채우지 않습니다/.test(gen));
-ok("R8. shipping 11.1.4", /const APP_VERSION = "11.1.4"/.test(ix));
+ok("R9. expand max_tokens room for JSON", /max_tokens: 8192/.test(cr));
+ok("R10. seed list accepts alternate JSON keys", /seedListFromParsed/.test(cr));
 
 console.log("========================================");
 console.log(`REASONING LOW: ${pass} PASS / ${fail} FAIL`);

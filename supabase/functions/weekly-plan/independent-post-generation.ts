@@ -328,7 +328,7 @@ export async function callXaiWriter(
           { role: "user", content: userMsg },
         ],
         temperature: 0.65,
-        max_tokens: 420,
+        max_tokens: 800,
         reasoning_effort: "low",
       }),
       signal: controller.signal,
