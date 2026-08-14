@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { APP_VERSION_LABEL, BUILD_STAMP } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
+const POSTS_PER_DAY = 6;
+const REQUIRED_SLOTS = GENERATION_DAYS * POSTS_PER_DAY;
 const JUDGE_BATCH = 8;
 const WRITE_CHUNK = 3;
 const COLLISION_DAYS = 30;
@@ -145,7 +147,7 @@ function GeneratePageInner() {
 
       const base = {
         generationDays: GENERATION_DAYS,
-        postsPerDay: 6,
+        postsPerDay: POSTS_PER_DAY,
         startDate,
         topic: topic.trim() || undefined,
         creatorIntent: topic.trim() || undefined,
@@ -185,25 +187,28 @@ function GeneratePageInner() {
         for (const s of seeds) {
           if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
         }
-        priorSubjects = priorSubjects.slice(-40);
+        priorSubjects = priorSubjects.slice(-80);
         idCounter = Number(part.id_counter) || idCounter + seeds.length;
         expandDone = part.expand_done !== false;
         dimBatch = Number(part.next_dim_batch_index) || dimBatch + 1;
-        if (dimBatch > 40) break;
-        if (part.expand_done === true && dimTotal <= 1) break;
+        if (dimBatch > 8) break;
+        if (part.expand_done === true && dimTotal <= 1 && allGated.length >= REQUIRED_SLOTS) break;
       }
 
-      if (allGated.length === 0) {
+      if (allGated.length < REQUIRED_SLOTS) {
         const d = lastExpandDiag || {};
-        const bits = [
-          `Expand 시드 0개`,
-          d.xai_api_used === true ? `xai_api_used=true` : `xai_api_used=${String(d.xai_api_used)}`,
-          d.xai_error ? `xai_error=${String(d.xai_error)}` : null,
-          d.seed_count != null ? `seed_count=${d.seed_count}` : null,
-          d.engine ? `engine=${d.engine}` : null,
-          d.note ? `note=${String(d.note).slice(0, 80)}` : null,
-        ].filter(Boolean);
-        throw new Error(bits.join(" · "));
+        const xai = d.diagnostics?.xai_seed_expansion || d.xai_seed_expansion || {};
+        throw new Error(
+          [
+            `시드 추론 부족: ${allGated.length}/${REQUIRED_SLOTS}. 고정 템플릿으로 채우지 않습니다.`,
+            d.error ? `error=${d.error}` : null,
+            xai.error ? `xai_error=${xai.error}` : null,
+            xai.returned != null ? `xai_returned=${xai.returned}` : null,
+            d.seed_count != null ? `seed_count=${d.seed_count}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        );
       }
 
       const allJudged: any[] = [];
@@ -223,6 +228,15 @@ function GeneratePageInner() {
         }
         const judged = Array.isArray(part.judged) ? part.judged : batch;
         allJudged.push(...judged);
+      }
+
+      const judgedEligible = allJudged.filter((s: any) =>
+        s?.status === "ELIGIBLE" || s?.status === "HIGH_VALUE"
+      );
+      if (judgedEligible.length < REQUIRED_SLOTS) {
+        throw new Error(
+          `판정 통과 시드 ${judgedEligible.length}/${REQUIRED_SLOTS}. 부족한 주를 저장하지 않습니다.`
+        );
       }
 
       setPhase("Weekly Select…");
@@ -248,7 +262,7 @@ function GeneratePageInner() {
       const totalPlanned = mergedDays.reduce((s: number, d: any) => s + (d.posts?.length || 0), 0);
       setPlanSummary(
         [
-          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned}`,
+          `expand_seeds: ${allGated.length} · judged: ${allJudged.length} · planned: ${totalPlanned} · required: ${REQUIRED_SLOTS}`,
           planData.mode_supply_low ? "MODE_SUPPLY_LOW" : "",
           planData.topic_supply_low ? "TOPIC_SUPPLY_LOW" : "",
           planData.diagnostics ? `diag: ${JSON.stringify(planData.diagnostics)}` : "",
@@ -258,9 +272,9 @@ function GeneratePageInner() {
           .join("\n")
       );
 
-      if (totalPlanned < 10) {
-        setError(
-          `계획 슬롯이 ${totalPlanned}개뿐입니다 (7일 목표 ~35–42). Expand/Select 공급을 확인하세요.`
+      if (totalPlanned < REQUIRED_SLOTS) {
+        throw new Error(
+          `주간 계획이 ${totalPlanned}개뿐입니다 (목표 ${REQUIRED_SLOTS}). 고정 축/부족한 주로 초안을 저장하지 않습니다.`
         );
       }
 

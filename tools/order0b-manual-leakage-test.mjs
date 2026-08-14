@@ -268,7 +268,10 @@ check(
   "bootstrap does not emit ACCOUNT_ACTIVITY as seed rows",
   /Learning pass only/.test(se) && /Never auto SEED from manual body/.test(se)
 );
-check("bootstrap DIMENSION abstract seeds", /DIMENSION_REGISTRY/.test(se) && /source_role:\s*\"SEED_SOURCE\"/.test(se));
+check(
+  "bootstrap does NOT emit DIMENSION_REGISTRY as seed bodies",
+  /never a production seed body/.test(se) && !/DIMENSION_ABSTRACT/.test(se)
+);
 
 const ix = readFileSync(join(wp, "index.ts"), "utf8");
 check("index imports manual-leakage-guard", /from\s+\"\.\/manual-leakage-guard\.ts\"/.test(ix));

@@ -2,12 +2,12 @@
  * Dynamic Concrete Seed Engine v9.1.0 — Edge pack (quality gates + idea angle + mode helpers)
  * No production concrete bootstrap templates. ORDER 3 evidence-packet reasoning.
  * ORDER 3+4 FINAL HOTFIX: allowed_facts / factual_anchors propagation.
- * ORDER 0B: Manual posts never auto SEED_SOURCE; DIMENSION_REGISTRY abstract seeds.
+ * ORDER 0B: Manual posts never auto SEED_SOURCE.
+ * DIMENSION_REGISTRY is interest HINTS only — never production seed bodies.
  */
 import {
   extractEvidencePacket,
   reasonSeedSubjectFromPacket,
-  type EvidencePacket,
 } from "./evidence-packet.ts";
 
 export type SeedStatus = "NEW" | "ELIGIBLE" | "HIGH_VALUE" | "REJECTED" | "HOLD" | "FACT_CONTEXT_REQUIRED" | "NEEDS_CREATOR_CONTEXT";
@@ -117,6 +117,7 @@ export function canonicalSemanticGroupKey(seed: any): string {
 export function extractJson(raw: string): any | null {
   try { return JSON.parse(String(raw || "").replace(/^```json\s*/i, "").replace(/```$/i, "").trim()); } catch { return null; }
 }
+/** Interest-cluster hints only. Never emit these labels as concrete_subject bodies. */
 export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string; core?: boolean }> = [
   { cluster: "FSD", dimension: "SUPERVISION", core: true },
   { cluster: "FSD", dimension: "MERGE_BEHAVIOR", core: true },
@@ -127,6 +128,110 @@ export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string; cor
   { cluster: "LAFC", dimension: "MATCHDAY" },
   { cluster: "GAMING", dimension: "SHORT_SESSION" },
 ];
+
+export type ClusterWeight = { cluster: string; n: number };
+export type LearnedSeedSignals = {
+  user_direct_n: number;
+  cluster_weights: ClusterWeight[];
+  recent_angle_labels: string[];
+  registry_interest_hints: Array<{ cluster: string; dimension: string }>;
+  performance_pattern_hints: string[];
+};
+
+function metricsFromMeta(meta: unknown): Record<string, number> {
+  const bag = (meta && typeof meta === "object" ? meta : {}) as Record<string, unknown>;
+  const pub = (bag.public_metrics || bag.publicMetrics || bag) as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(pub || {})) {
+    const n = Number(v);
+    if (Number.isFinite(n)) out[k] = n;
+  }
+  return out;
+}
+
+function rowHasReaderEntry(meta: unknown): boolean {
+  const m = metricsFromMeta(meta);
+  return (
+    (m.reply_count || 0) >= 1 ||
+    (m.retweet_count || 0) >= 1 ||
+    (m.quote_count || 0) >= 1 ||
+    (m.bookmark_count || 0) >= 1
+  );
+}
+
+/**
+ * Learning signals from USER_DIRECT activity + optional performance.
+ * Never a seed list. Registry appears only as cluster hints.
+ */
+export function collectLearnedSeedSignals(opts: {
+  publishedSubjects?: string[];
+  publishedEvidence?: Array<PublishedEvidenceRow & { meta?: unknown; system_origin_class?: string }>;
+  intentText?: string;
+}): LearnedSeedSignals {
+  const topicHits = new Map<string, number>();
+  const entryHits = new Map<string, number>();
+  const recent_angle_labels: string[] = [];
+  const rows: Array<PublishedEvidenceRow & { meta?: unknown; system_origin_class?: string }> =
+    Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
+      ? opts.publishedEvidence
+      : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
+
+  let user_direct_n = 0;
+  for (const row of rows.slice(0, 80)) {
+    const text = String(row.text || "").trim();
+    if (text.length < 12) continue;
+    const soc = String(row.system_origin_class || "").toUpperCase();
+    if (soc && /AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED/.test(soc)) continue;
+    const pt = String(row.post_type || "").toUpperCase();
+    if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
+    user_direct_n += 1;
+    const packet = extractEvidencePacket(text, {
+      source_id: row.source_id || row.published_at,
+      source_type: "ACCOUNT_ACTIVITY",
+      published_at: row.published_at,
+    });
+    const cluster = packet?.topic && packet.topic !== "OTHER" ? packet.topic : "DAILY";
+    topicHits.set(cluster, (topicHits.get(cluster) || 0) + 1);
+    if (rowHasReaderEntry(row.meta)) {
+      entryHits.set(cluster, (entryHits.get(cluster) || 0) + 1);
+    }
+    const label = packet
+      ? `${packet.topic}/${packet.subtopic}`
+      : "DAILY/GENERAL";
+    if (recent_angle_labels.length < 24 && !recent_angle_labels.includes(label)) {
+      recent_angle_labels.push(label);
+    }
+  }
+
+  const cluster_weights = [...topicHits.entries()]
+    .map(([cluster, n]) => ({ cluster, n }))
+    .sort((a, b) => b.n - a.n);
+
+  const performance_pattern_hints: string[] = [
+    "Transfer entry/flow quality only — never reuse a past winning subject as this week's seed",
+    "Likes are algorithm-layer for mix/spacing, not a sentence recipe",
+    "Do not install a repeating punchline (e.g. 논란이 자산) across the week",
+  ];
+  for (const { cluster, n } of cluster_weights) {
+    const entry = entryHits.get(cluster) || 0;
+    if (entry > 0) {
+      performance_pattern_hints.push(
+        `${cluster}: ${entry}/${n} USER_DIRECT originals had reply/repost/bookmark entry — infer a NEW angle in that interest, do not clone the post`,
+      );
+    }
+  }
+  if (opts.intentText && String(opts.intentText).trim().length >= 10) {
+    performance_pattern_hints.push("Operator explicit intent this run outranks default mix");
+  }
+
+  return {
+    user_direct_n,
+    cluster_weights,
+    recent_angle_labels,
+    registry_interest_hints: DIMENSION_REGISTRY.map((d) => ({ cluster: d.cluster, dimension: d.dimension })),
+    performance_pattern_hints: performance_pattern_hints.slice(0, 10),
+  };
+}
 export const QUALITY_REFERENCE: any[] = [];
 
 function textOf(seed: Partial<ConcreteSeed>): string {
@@ -276,7 +381,8 @@ export type PublishedEvidenceRow = {
 /**
  * ORDER 3 + ORDER 0B Manual Leakage Separation.
  * ACCOUNT_ACTIVITY = CREATOR_LEARNING only (topic interest). Never auto SEED from manual body.
- * SEED_SOURCE = DIMENSION_REGISTRY abstract + CREATOR_INTENT.
+ * DIMENSION_REGISTRY is never a production seed body.
+ * Local bootstrap emits CREATOR_INTENT only. Weekly volume comes from inferred xAI seeds.
  */
 export function bootstrapCandidatesFromDimensions(opts: {
   publishedSubjects: string[];
@@ -285,81 +391,30 @@ export function bootstrapCandidatesFromDimensions(opts: {
 }): any[] {
   const out: any[] = [];
   const emitted = new Set<string>();
-  const packets: EvidencePacket[] = [];
-  const topicHits = new Map<string, number>();
   const rows: PublishedEvidenceRow[] = Array.isArray(opts.publishedEvidence) && opts.publishedEvidence.length
     ? opts.publishedEvidence
     : (opts.publishedSubjects || []).map((t) => ({ text: String(t) }));
 
   // Learning pass only — do NOT emit seeds from manual ACCOUNT_ACTIVITY rows (ORDER 0B)
+  // Never auto SEED from manual body. Signals are collected separately via collectLearnedSeedSignals.
   for (const row of rows.slice(0, 40)) {
     const text = String(row.text || "").trim();
     if (text.length < 12) continue;
-    const packet = extractEvidencePacket(text, {
+    extractEvidencePacket(text, {
       source_id: row.source_id || row.published_at,
       source_type: "ACCOUNT_ACTIVITY",
       published_at: row.published_at,
     });
-    if (!packet) continue;
-    if (packet.topic === "OTHER" && packet.entities.length === 0) continue;
-    packets.push(packet);
-    topicHits.set(packet.topic, (topicHits.get(packet.topic) || 0) + 1);
   }
 
-  // Abstract SEED_SOURCE from DIMENSION_REGISTRY (weighted by observed interest)
-  const rankedDims = [...DIMENSION_REGISTRY].sort((a, b) => {
-    const ha = topicHits.get(a.cluster) || 0;
-    const hb = topicHits.get(b.cluster) || 0;
-    if (hb !== ha) return hb - ha;
-    return (b.core ? 1 : 0) - (a.core ? 1 : 0);
-  });
-  for (const dim of rankedDims) {
-    const abstractSubject = `${dim.cluster} ${dim.dimension} 관찰·판단 축`.slice(0, 90);
-    const sig = subjectSignature(`${dim.cluster}|${dim.dimension}|abstract`);
-    if (emitted.has(sig)) continue;
-    emitted.add(sig);
-    const hit = topicHits.get(dim.cluster) || 0;
-    out.push({
-      cluster: dim.cluster,
-      dimension: dim.dimension,
-      concrete_subject: abstractSubject,
-      subject_signature: sig,
-      point_or_tension: "차원 기반 신규 각도 — 수제글 원문·결론 재사용 금지",
-      primary_source: "DIMENSION_REGISTRY",
-      supporting_sources: hit > 0 ? ["DIMENSION_REGISTRY", "CREATOR_LEARNING_SIGNAL"] : ["DIMENSION_REGISTRY"],
-      evidence_source_ids: [],
-      creator_evidence_available: hit > 0,
-      experience_required: false,
-      source_type: "DIMENSION_REGISTRY",
-      claim_types: ["OBSERVATION"],
-      inference_type: "DIMENSION_ABSTRACT",
-      grounding_status: "GROUNDED",
-      grounding_reasons: ["REGISTRY_ABSTRACT"],
-      idea_angle_family: `${dim.cluster}|${dim.dimension}|abstract`,
-      verified_locations: [],
-      verified_entities: [],
-      relationship_evidence_ids: [],
-      xai_would_have_been_required: false,
-      factual_anchors: [],
-      experience_facts: [],
-      static_facts: [],
-      current_facts: [],
-      creator_opinion: [],
-      allowed_facts: [],
-      do_not_invent: ["manual_body_narrative", "manual_punchline", "manual_conclusion"],
-      status: "ELIGIBLE",
-      source_role: "SEED_SOURCE",
-    });
-  }
-
-  // CREATOR_INTENT may still become SEED_SOURCE (not manual body)
+  // CREATOR_INTENT may still become SEED_SOURCE (not manual body, not registry template)
   const intent = String(opts.intentText || "").trim();
   if (intent.length >= 10) {
     const packet = extractEvidencePacket(intent, { source_id: "INTENT", source_type: "CREATOR_INTENT" });
     if (packet && packet.topic !== "OTHER") {
       const reasoned = reasonSeedSubjectFromPacket(packet);
       const sig = subjectSignature(reasoned.concrete_subject);
-      if (!emitted.has(sig)) {
+      if (!emitted.has(sig) && !/관찰·판단 축/.test(reasoned.concrete_subject)) {
         emitted.add(sig);
         out.push({
           cluster: packet.topic,
@@ -395,6 +450,5 @@ export function bootstrapCandidatesFromDimensions(opts: {
     }
   }
 
-  void packets.length;
   return out;
 }

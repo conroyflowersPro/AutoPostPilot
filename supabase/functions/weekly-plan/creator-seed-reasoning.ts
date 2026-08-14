@@ -7,7 +7,7 @@
  */
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 
-export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v1";
+export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
 
 export type ViralCandidate = {
   text: string;
@@ -24,6 +24,11 @@ export type CreatorSeedReasoningInput = {
   viralCandidates?: ViralCandidate[];
   /** Soft pattern lines only — never "reuse this seed" */
   performancePatternHints?: string[];
+  /** Observed USER_DIRECT cluster counts — mix follows data, not 8 frozen axes */
+  clusterInterestWeights?: Array<{ cluster: string; n: number }>;
+  /** Registry labels as HINTS only — never copy as concrete_subject */
+  registryInterestHints?: Array<{ cluster: string; dimension: string }>;
+  userDirectN?: number;
   model?: string;
   timeoutMs?: number;
 };
@@ -96,6 +101,7 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
   if (subject.length < 8) return null;
   // Reject invented lived-experience claims at seed level
   if (/어제\s*내가|오늘\s*직접|방금\s*테스트했/i.test(subject)) return null;
+  if (/관찰·판단 축|차원 기반 신규 각도/.test(subject)) return null;
   const cluster = clean(x?.cluster, 40) || "OBSERVATION";
   const dimension = clean(x?.dimension, 60) || "CREATOR_REASONED";
   const angle = clean(x?.idea_angle_family, 80) || `${cluster}|${dimension}|${i + 1}`;
@@ -190,29 +196,38 @@ export async function reasonCreatorSeeds(
   const system = [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs.",
-    "Each seed must be something @Seung4680 would plausibly hold and write from — based on Creator DNA and recent angles.",
+    "Each seed must be something @Seung4680 would plausibly hold and write from — inferred from learned USER_DIRECT interest + growth patterns.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
-    "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate fixed topic templates.",
-    "Prefer organic human diversity across the set: different angles, tensions, entry points.",
-    "Entry barrier: prefer openings a non-insider can enter; specialist depth only after the door is open.",
-    "Wording intent: everyday words can carry attention (e.g. 돈 vs 자산) when authentic — note when relevant.",
+    "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
+    "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
+    "Each concrete_subject must name a specific observable tension or situation, distinct from every other seed this week.",
+    "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
+    "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",
+    "Account growth: prefer directions a non-insider can enter; do not clone last week's winning subject; do not install one repeating punchline across the week.",
+    "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
-    "Korean for concrete_subject and point_or_tension.",
+    "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
 
   const user = JSON.stringify({
     requested_seed_count: requested,
     creator_dna: creatorDnaBlock(),
+    user_direct_n: args.userDirectN ?? null,
+    cluster_weights_from_user_direct: args.clusterInterestWeights?.length
+      ? args.clusterInterestWeights
+      : null,
+    registry_interest_hints_not_seed_bodies: (args.registryInterestHints || []).slice(0, 12),
     explicit_intent_if_any: intent || null,
     recent_published_angles_avoid_repeat: recent,
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
-    weekly_goal_note: "Planner targets ~5–8 posts/day × 7 days; each seed must be a distinct direction.",
+    weekly_goal_note:
+      "Planner targets ~6 posts/day × 7 days. Each seed is a distinct inferred direction from learned data for account growth — not a repeating bot of fixed axes.",
     requirement:
-      "Produce distinct direction seeds Seung could write this week. No finished posts. No invented experience. No template rotation.",
+      "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
 
   try {
@@ -228,6 +243,8 @@ export async function reasonCreatorSeeds(
       body: JSON.stringify({
         model: args.model || "grok-4.6",
         temperature: 0.85,
+        max_tokens: 2200,
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
