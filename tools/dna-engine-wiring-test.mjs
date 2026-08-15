@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.5.0)");
+console.log("DNA + engine live-path wiring (v11.5.1)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -91,7 +91,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.5.0", /APP_VERSION = "11.5.0"/.test(ver) && /APP_VERSION = "11.5.0"/.test(ix));
+ok("D28. version 11.5.1", /APP_VERSION = "11.5.1"/.test(ver) && /APP_VERSION = "11.5.1"/.test(ix));
 
 ok("D29. review engines stay off generate job",
   !/from "\.\/selective-regeneration\.ts"/.test(job) &&
@@ -174,6 +174,11 @@ ok("D45. Performance DNA interpret order starts with followers gained",
 ok("D46. Missing intelligence is UNKNOWN not zero",
   /UNKNOWN \/ insufficient evidence/.test(read("supabase/functions/weekly-plan/planner-intelligence.ts")) &&
   /빈 값을 성공으로 쓰지 않음/.test(score));
+ok("D47. Operator collaboration is chat-only, not Writer",
+  /operator-collaboration-v1/.test(read("lib/intelligence/operator-collaboration.ts")) &&
+  /Not a being that thinks instead of the operator/.test(read("lib/intelligence/operator-collaboration.ts")) &&
+  !/operator-collaboration/.test(wr) &&
+  !/operatorCollaborationBlock/.test(wr));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

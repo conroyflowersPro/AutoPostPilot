@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.5.1 — 2026-08-15
+
+- 코딩 에이전트는 사용자 사고를 대신하지 않습니다. 판단을 더 정확하고 빠르게 돕는 도구입니다
+- 요청하지 않은 목표를 넣지 않습니다. 동의(`반영해` / `넣어` / `이대로`) 없이 오더·설계·계획을 바꾸지 않습니다. `진행`만으로는 반영하지 않습니다
+- 지시가 명확하면 그대로 합니다. 중요한 변경에 해석이 여러 개면 선택지를 말하고 동의를 기다립니다. 명백한 오류는 근거와 함께 지적합니다
+- 이 계약은 Cursor 대화용입니다. 글 초안·Writer·Planner 프롬프트에는 넣지 않습니다 (`AGENTS.md`)
+
 ## 11.5.0 — 2026-08-15
 
 - 3일 Planner가 Audience DNA, Performance DNA, Revenue DNA, Current X Context, Planner Memory를 읽습니다. 없으면 UNKNOWN이지 0이 아닙니다
