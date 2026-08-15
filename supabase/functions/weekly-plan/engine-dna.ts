@@ -97,6 +97,7 @@ export function engineRulesAsWill(): string {
     "Personal-interest originals are the main mix. At most one mass-public daily-life original per day.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Creator DNA is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",
+    "Writer implements already-made Seed / Thinking / Core Thought / Mechanism / Rail / Creator DNA. It does not invent the thought. 문체 must not drag thinking. Do not copy winning sentences; transfer abstract delivery only.",
     "USER_DIRECT trains 말투. AP_PIPELINE trains performance only and must not rewrite Creator DNA. The planner decides 해요/음슴/other per slot from DNA + engine + this 3-day set so far. No frozen mix percentage. Editorial mode is not a 말투 or length table. Write until the selected reader-entry move is complete.",
     "Do not invent lived experience or opinions. Authenticity first. Place and experience bounds live in Creator DNA + these engine rules — the writer must consume them.",
     "Question closer only from USER_DIRECT form, never because X rewards participation.",

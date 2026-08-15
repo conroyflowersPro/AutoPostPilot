@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.4.5)");
+console.log("Writer quality + leftover seeds (v11.4.6)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.4.5", /APP_VERSION = "11.4.5"/.test(ver) && /APP_VERSION = "11.4.5"/.test(ix));
+ok("W17. version lockstep 11.4.6", /APP_VERSION = "11.4.6"/.test(ver) && /APP_VERSION = "11.4.6"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -142,6 +142,7 @@ ok("W70. mechanism write move is operational not a question gap", /MECHANISM_WRI
 ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
 ok("W72. default observation personality when mechanism would be NONE", /default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 ok("W73. variety: planner decides 말투 per slot, no frozen mix", /VARIETY:/.test(wr) && /No frozen mix ratio/.test(wr) && /planSlotSurface/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")) && /recentEndingCounts/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
+ok("W74. writer implements already-made thought, does not invent it", /WRITER ROLE/.test(wr) && /already-made thought/.test(wr) && /Do not copy a previously successful sentence/.test(wr) && /Make the post look like his own voice/.test(wr));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

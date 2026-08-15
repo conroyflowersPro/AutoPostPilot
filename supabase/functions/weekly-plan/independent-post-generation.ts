@@ -368,6 +368,19 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
   ].filter(Boolean);
 }
 
+function writerPhilosophyBlock(): string {
+  return [
+    "WRITER ROLE: You are not here to write a clever AI post. You express an already-made thought in this creator's actual language.",
+    "You do not choose the topic. You do not invent the core judgment. Seed, thinking, core thought, mechanism, rail, and Creator DNA are already decided. Implement those decisions as one readable Korean post.",
+    "Do not get ahead of the thought. 문체 must not drag the thinking.",
+    "JOBS: preserve Core Thought; reflect Creator DNA; adjust rhythm and length; compose how THIS thought opens and unfolds (not an engagement-hook recipe); set expression difficulty; honor the humor decision; lower the reader entry barrier; do not over-explain; end naturally when the move is complete.",
+    "Vary surface strategy and discourse shape so the week does not converge on one structure. Diversity is not the goal. The goal is: same person's thought, not the same AI template.",
+    "Do not invent facts, experiences, emotions, or relationships he did not have.",
+    "Do not copy a previously successful sentence because it performed. Learn abstract expression and delivery only — never the wording.",
+    "WHY YOU EXIST: do not damage Planner + Thinking judgments. Make the post look like his own voice.",
+  ].join("\n");
+}
+
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
@@ -384,7 +397,8 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
 
   return [
     "You write one Korean X post for creator @Seung4680.",
-    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences or private facts.",
+    writerPhilosophyBlock(),
+    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences, private facts, emotions, or relationships.",
     "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
     creatorDnaBlock(),
     "ENGINE RULES (operator will):",
@@ -393,7 +407,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     performanceDnaBlock(),
     "REASONING ORDER (internal only; do not output steps):",
     "1) Confirm Seed meaning through Creator DNA vision: what would he notice first in this situation? A short keyword seed is valid. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies. Do not freeze always-short / always-twist / topic→말투.",
-    "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
+    "2) Preserve Core Thought as writing intent — do not paste Core Thought labels as prose. Do not invent a new judgment.",
     "3) Keep reader self-projection space. Never write a question. Never write CTA. Do not hard-assert the creator's opinion. Stop after the observation — that unfinished situation is the reply space.",
     "4) The selected Reaction Mechanism is the personality of this post — a reader-entry STRUCTURE, not a question and not a slogan. Use the READER ENTRY MOVE below. Never name it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
@@ -403,7 +417,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
     "10) LENGTH follows the reader-entry move and thought order, not an editorial-mode quota. There is no 'one sentence is enough'. Write until the move is complete. Stop when it is complete. Do not pad. Do not copy the previous post's length. Do not stop mid-token. No grand thesis tail.",
-    "VARIETY: One creator identity, many surfaces across the 3-day set. The planner decides each slot. Do not freeze a 해요/음슴 mix percentage. Do not standardize 해요 or length because the slot is informational.",
+    "VARIETY: Vary surface strategy and discourse shape so posts do not converge. Diversity is not the goal. Same person's thought, not the same AI template. Do not copy a winning sentence.",
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
     "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
     "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
@@ -509,7 +523,7 @@ export async function callChatGptWriter(
     tension
       ? "Optional angle (not required): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "Write until the reader-entry move is complete. Sentence count follows that move, not a quota. Do not invent lived experience. Not a generic news line and not a question.",
+    "Write until the reader-entry move is complete. Do not invent a new core judgment. Do not invent lived experience. Not a generic news line and not a question. Do not copy a previously successful sentence.",
     s(options.retry_hint)
       ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as the reader-entry move until that move is complete. Do not stutter. Do not restate the subject as the whole post. Do not shrink to one sentence because a quota said so."
       : "",

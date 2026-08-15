@@ -28,7 +28,7 @@ ok("H14. v11 write phase wired", /phase === "write"/.test(index) && /writeSlotBa
 ok("H15. pipeline passes openai_key", /openai_key: args\.openaiKey/.test(pipe));
 ok("H16. pipeline uses integrateSlotGeneration", /integrateSlotGeneration/.test(pipe));
 ok("H17. writer model gpt-4o, seed model grok-4.6", /V11_WRITER_MODEL = "gpt-4o"/.test(pipe) && /V11_SEED_MODEL = "grok-4.6"/.test(pipe));
-ok("H18. index APP 11.4.5", /APP_VERSION = "11.4.5"/.test(index));
+ok("H18. index APP 11.4.6", /APP_VERSION = "11.4.6"/.test(index));
 ok("H19. index engine inferred quota fill", /v11_inferred_quota_fill/.test(index));
 ok("H20. generate-post not the write path in index", !/functions\/v1\/generate-post/.test(index));
 ok("H21. dry_run_generation explicit body flag only", /dry_run_generation/.test(index));
