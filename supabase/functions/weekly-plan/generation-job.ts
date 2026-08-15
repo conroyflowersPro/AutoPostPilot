@@ -36,6 +36,7 @@ import {
 import {
   PERSONAL_PER_DAY_MAX,
   isPersonalInterestSubject,
+  isKoreaOnlySituation,
   pickDayForPersonal,
   enforcePersonalPerDay,
   demoteExperienceOnMassSlots,
@@ -48,7 +49,7 @@ import {
   resolveExperienceSupply,
 } from "./experience-evidence.ts";
 
-const EXPAND_BATCH = 6;
+const EXPAND_BATCH = 10;
 const JUDGE_BATCH = 16;
 const WRITE_CHUNK = 2;
 const COLLISION_DAYS = 30;
@@ -430,6 +431,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const added: any[] = [...experienceSeeds];
   for (const s of xaiRes.seeds || []) {
     if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
+    if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
     if (adjacentFill && isCoreInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))) continue;
     const rowSeed = adjacentFill
       ? markAdjacentSeed({
@@ -591,6 +593,7 @@ async function stepSelect(supabase: any, row: any) {
       user_explicit: role === "USER_EXPLICIT_SEED",
     });
     if (!g.allow_as_seed) continue;
+    if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
     pool.push(s);
   }
   const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;
@@ -625,7 +628,7 @@ async function stepSelect(supabase: any, row: any) {
       .sort((a, b) => b.div - a.div);
     let picked: ConcreteSeed | null = null;
     for (const { s, i } of cands) {
-      if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;
+      if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH" && selectedWeekly.length >= Math.ceil(required * 0.5)) continue;
       const personal = isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || "")) ||
         mode === "EXPERIENCE";
       if (personal && pickDayForPersonal(outDays, postsPerDay, PERSONAL_PER_DAY_MAX) < 0) continue;
@@ -670,7 +673,6 @@ async function stepSelect(supabase: any, row: any) {
     const day = pickDayForAdjacent(outDays, postsPerDay, ADJACENT_PER_DAY_MAX);
     if (day < 0) break;
     const seed = pool.splice(idx, 1)[0];
-    if (conceptualRepetitionLevel(seed, selectedWeekly) === "HIGH") continue;
     selectedWeekly.push(seed);
     const mode = (parseEditorialMode(String(seed.requested_editorial_mode || "")) === "EXPERIENCE"
       ? "INFORMATIVE"
@@ -695,7 +697,6 @@ async function stepSelect(supabase: any, row: any) {
     }
     if (day < 0) break;
     const seed = pool.splice(idx, 1)[0];
-    if (conceptualRepetitionLevel(seed, selectedWeekly) === "HIGH") continue;
     selectedWeekly.push(seed);
     let mode = parseEditorialMode(String(seed.requested_editorial_mode || seed.editorial_mode || "INFORMATIVE"));
     if (mode === "EXPERIENCE" && !canServeEditorialMode(seed, "EXPERIENCE")) mode = "INFORMATIVE";
@@ -778,10 +779,14 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     openaiKey: openaiKey || null,
     voiceRows: (voiceActs || []) as any,
   });
-  for (const p of posts) {
+  for (let k = 0; k < posts.length; k++) {
+    const p = posts[k];
     const text = String(p.final_text || p.content || "").trim();
     if (!text) {
       st.write_errors = [...(st.write_errors || []), `${p.slotId || "slot"} 빈 초안`];
+      if (!(chunk[k] as any)?._write_retry) {
+        st.write_flat = [...(st.write_flat || []), { ...chunk[k], _write_retry: true }];
+      }
       continue;
     }
     let ins = await supabase.from("SeungContent").insert({
@@ -809,8 +814,9 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     if (!ins.error) row.saved_count = Number(row.saved_count || 0) + 1;
   }
   st.write_index = i + chunk.length;
-  row.label_ko = `초안 생성 ${row.saved_count}/${flat.length}…`;
-  if (st.write_index >= flat.length) {
+  const planned = (st.write_flat || []).length;
+  row.label_ko = `초안 생성 ${row.saved_count}/${planned}…`;
+  if (st.write_index >= planned) {
     const required = Number(row.required_slots) || 0;
     row.step = "done";
     if (row.saved_count < required) {

@@ -40,7 +40,10 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.3.1", /const APP_VERSION = "11.3.1"/.test(ix));
+ok("J15. shipping 11.3.2", /const APP_VERSION = "11.3.2"/.test(ix));
+ok("J24. empty write retries once then uses planned length", /_write_retry/.test(job) && /const planned = \(st\.write_flat/.test(job));
+ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
+ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
 ok("J16. video not implemented", /Video is out of scope/.test(job) && !/job_type.*video/.test(job));
 ok("J17. migration apply workflow", existsSync(wf));
 ok("J18. learning line on quota tick", /학습:/.test(job));

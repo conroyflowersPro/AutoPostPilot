@@ -38,19 +38,15 @@ export default async function PostDetailPage({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+      <main className="mx-auto max-w-3xl space-y-6 px-4 py-4">
+        <div className="flex items-center gap-3">
           <Link href="/" className="text-zinc-400 hover:text-zinc-200">
-            ←
+            ← 큐
           </Link>
-          <h1 className="text-lg font-semibold">포스트 상세</h1>
           <span className="ml-auto text-[10px] text-zinc-500">
             {idx >= 0 ? `${idx + 1} / ${ids.length}` : ""}
           </span>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full bg-zinc-800 px-2.5 py-1 uppercase">
             {post.status}

@@ -6,7 +6,7 @@
  * Source of truth offline: creator_intelligence/Creator_DNA_Historical_v1.1.json (v1.3.1)
  */
 
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.4-new-readers";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.5-ca-korean";
 
 /** Compact planner-facing block when DB creator_dna row is empty */
 export function buildCreatorDnaPlannerBlock(): {
@@ -17,7 +17,7 @@ export function buildCreatorDnaPlannerBlock(): {
 } {
   const lines: string[] = [
     `${CREATOR_DNA_RUNTIME_VERSION} (Archive/Historical learning — offline validated structure)`,
-    "WHO: Korean Tesla multi-vehicle owner-creator; lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap.",
+    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap. Daily life is US/CA, not Korea civic housing.",
     "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: two-speed; media often; informational → polite intentional (존칭); light-opinion 음슴체 = RECENTLY_EMERGING preference (not long-archive dominant).",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",

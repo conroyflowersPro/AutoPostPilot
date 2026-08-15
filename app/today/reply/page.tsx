@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -13,12 +13,6 @@ type Thread = {
   parent_id?: string | null;
   conversation_id?: string | null;
   fetched_via: string;
-};
-
-type Suggestion = {
-  text: string;
-  style: string;
-  notes?: string | null;
 };
 
 type Reaction = {
@@ -34,7 +28,6 @@ function ManualReplyInner() {
   const [myReply, setMyReply] = useState("");
   const [thread, setThread] = useState<Thread | null>(null);
   const [isReply, setIsReply] = useState(false);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [maxReactions, setMaxReactions] = useState<10 | 20 | 50>(10);
   const [busy, setBusy] = useState(false);
@@ -60,10 +53,6 @@ function ManualReplyInner() {
     }
   }, [searchParams]);
 
-  const targetText = useMemo(
-    () => thread?.target_text || pastedComment.trim(),
-    [thread, pastedComment]
-  );
   const canPost = Boolean(thread?.target_id && myReply.trim() && !postedId);
 
   async function fetchTarget() {
@@ -179,76 +168,6 @@ function ManualReplyInner() {
     }
   }
 
-  async function suggest() {
-    if (!targetText && !myReply.trim()) {
-      setError("상대 글 또는 내 초안이 필요합니다.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/reply/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target_text: targetText,
-          parent_text: thread?.parent_text || "",
-          root_text: thread?.root_text || "",
-          my_draft: myReply,
-          api_consent: {
-            user_initiated: true,
-            feature: "reply_manual",
-            action: "suggest_reply",
-            service: "XAI_GROK",
-            purpose: "Suggest reply",
-          },
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setSuggestions(body.suggestions || []);
-      setApiState("API_RESULT");
-      setMsg("제안은 초안입니다. 수정 후 게시하세요.");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function polish() {
-    if (!myReply.trim()) {
-      setError("다듬을 글이 필요합니다.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch("/api/reply/polish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          my_reply: myReply,
-          target_text: targetText,
-          api_consent: {
-            user_initiated: true,
-            feature: "reply_manual",
-            action: "polish_reply",
-            service: "XAI_GROK",
-            purpose: "Polish reply",
-          },
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setMyReply(body.text || myReply);
-      setMsg("다듬기 완료");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function postReply() {
     if (!canPost) {
       setError(thread?.target_id ? "답글 텍스트가 필요합니다." : "먼저 대상을 읽어 주세요.");
@@ -304,7 +223,7 @@ function ManualReplyInner() {
             Today에서 넘어온 기회: {topicHint}
             {!url.trim() && (
               <span className="block mt-1 text-zinc-500">
-                X 링크를 붙여 대상을 읽거나, 아래 텍스트로 제안만 받을 수 있습니다.
+                X 링크를 붙여 대상을 읽은 뒤 직접 답글을 씁니다.
               </span>
             )}
           </div>
@@ -377,20 +296,11 @@ function ManualReplyInner() {
             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={suggest} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm disabled:opacity-40">답글 제안</button>
-            <button type="button" disabled={busy || !myReply.trim()} onClick={polish} className="rounded-lg bg-zinc-700 px-4 py-2 text-sm disabled:opacity-40">다듬기</button>
             <button type="button" disabled={busy || !canPost} onClick={postReply} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium disabled:opacity-40">게시</button>
             <button type="button" disabled={!myReply.trim()} onClick={() => navigator.clipboard?.writeText(myReply)} className="rounded-lg border border-zinc-600 px-4 py-2 text-sm disabled:opacity-40">복사</button>
           </div>
           {postedId && <p className="text-xs text-emerald-400">게시됨 · {postedId}</p>}
         </section>
-
-        {suggestions.map((s, i) => (
-          <div key={i} className="rounded-xl border border-zinc-800 p-3 space-y-2">
-            <p className="text-sm whitespace-pre-wrap">{s.text}</p>
-            <button type="button" className="text-xs text-emerald-400" onClick={() => { setMyReply(s.text); setPostedId(null); }}>사용</button>
-          </div>
-        ))}
 
         {msg && <p className="text-xs text-zinc-400">{msg}</p>}
         {error && <p className="text-xs text-red-300">{error}</p>}

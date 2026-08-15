@@ -217,7 +217,7 @@ export function judgeSeedGrounding(input: GroundingInput): {
   }
 
   // Korean language ≠ Korea location
-  if (/서울|인천|제주|홍대|경부고속|한국\s*지하철/.test(t)) {
+  if (/서울|인천|제주|홍대|경부고속|한국\s*지하철|이중\s*주차|관리사무소|주민센터|배달의민족|\b배민\b|따릉이|전세|청약|아파트\s*단지/.test(t)) {
     const ok = (input.verified_locations || []).some((v) =>
       /SEOUL|INCHEON|JEJU|HONGDAE|KOREA/i.test(String(v))
     );

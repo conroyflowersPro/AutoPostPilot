@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -146,22 +145,9 @@ export default function CreatorWritePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <Link href="/today" className="text-zinc-400 hover:text-zinc-200">
-            ←
-          </Link>
-          <h1 className="text-lg font-semibold">직접 쓰기</h1>
-          <span className="ml-auto text-[10px] text-zinc-500">
-            CREATOR_INITIATED · {aiTransformation}
-          </span>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
+      <main className="mx-auto max-w-3xl space-y-4 px-4 py-4">
         <p className="text-xs text-zinc-500">
-          X에 쓰듯 그냥 적으세요. 주제/프롬프트 입력창은 없습니다. 필요할 때만
-          다듬기 또는 AI 작성.
+          X에 쓰듯 그냥 적으세요. 기본은 한국어. 필요할 때만 다듬기 또는 AI 작성.
         </p>
         {contextIndicators.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -176,31 +162,6 @@ export default function CreatorWritePage() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setPipelineId("42303")}
-            className={`rounded-lg px-3 py-1.5 text-xs ${
-              pipelineId === "42303"
-                ? "bg-emerald-600"
-                : "bg-zinc-800 text-zinc-300"
-            }`}
-          >
-            한국어 42303
-          </button>
-          <button
-            type="button"
-            onClick={() => setPipelineId("20121")}
-            className={`rounded-lg px-3 py-1.5 text-xs ${
-              pipelineId === "20121"
-                ? "bg-emerald-600"
-                : "bg-zinc-800 text-zinc-300"
-            }`}
-          >
-            영어 20121
-          </button>
-        </div>
-
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -209,32 +170,59 @@ export default function CreatorWritePage() {
           className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm leading-relaxed outline-none focus:border-emerald-500"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] text-zinc-500">길이</span>
-          {(
-            [
-              "AUTO",
-              "KEEP",
-              "SHORT",
-              "MEDIUM",
-              "LONG",
-              "VERY_LONG",
-            ] as LengthControl[]
-          ).map((l) => (
+        <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+          <summary className="cursor-pointer text-xs text-zinc-500">고급 · 언어 / 길이</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
-              key={l}
               type="button"
-              onClick={() => setLengthControl(l)}
-              className={`rounded px-2 py-1 text-[10px] ${
-                lengthControl === l
-                  ? "bg-zinc-600 text-white"
-                  : "bg-zinc-900 text-zinc-400"
+              onClick={() => setPipelineId("42303")}
+              className={`rounded-lg px-3 py-1.5 text-xs ${
+                pipelineId === "42303"
+                  ? "bg-emerald-600"
+                  : "bg-zinc-800 text-zinc-300"
               }`}
             >
-              {l}
+              한국어
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              onClick={() => setPipelineId("20121")}
+              className={`rounded-lg px-3 py-1.5 text-xs ${
+                pipelineId === "20121"
+                  ? "bg-emerald-600"
+                  : "bg-zinc-800 text-zinc-300"
+              }`}
+            >
+              영어
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] text-zinc-500">길이</span>
+            {(
+              [
+                "AUTO",
+                "KEEP",
+                "SHORT",
+                "MEDIUM",
+                "LONG",
+                "VERY_LONG",
+              ] as LengthControl[]
+            ).map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLengthControl(l)}
+                className={`rounded px-2 py-1 text-[10px] ${
+                  lengthControl === l
+                    ? "bg-zinc-600 text-white"
+                    : "bg-zinc-900 text-zinc-400"
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </details>
 
         <div className="flex flex-wrap gap-2">
           <button

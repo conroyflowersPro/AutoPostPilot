@@ -115,7 +115,7 @@ function GeneratePageInner() {
   }
 
   async function followJob(session: any, jobId: string) {
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 200; i++) {
       const started = Date.now();
       try {
         const job = await edgeCall(session, { phase: "job_tick", job_id: jobId });
@@ -251,11 +251,13 @@ function GeneratePageInner() {
 
   return (
     <main className="min-h-screen bg-black text-white p-4 md:p-8 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">이번 주 계획 · 작성</h1>
-        <span className="text-xs font-semibold tabular-nums text-emerald-300">{APP_VERSION_LABEL}</span>
-      </div>
-      <p className="text-sm text-zinc-400 mb-4">{VERSION_SUMMARY_KO}</p>
+      <h1 className="mb-3 text-xl font-semibold">이번 주 계획 · 작성</h1>
+      <details className="mb-4 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+        <summary className="cursor-pointer text-xs text-zinc-500">
+          이번 버전 {APP_VERSION_LABEL}
+        </summary>
+        <p className="mt-2 text-sm text-zinc-400">{VERSION_SUMMARY_KO}</p>
+      </details>
       <label className="block text-sm mb-1 text-zinc-300">시작일</label>
       <input
         type="date"
@@ -271,8 +273,11 @@ function GeneratePageInner() {
         placeholder="이번만 넣고 싶은 주제. 의지는 엔진·DNA에 있습니다."
         className="w-full mb-4 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2"
       />
-      <div className="mb-4 rounded-xl border border-zinc-700 p-3">
-        <div className="text-sm text-zinc-300 mb-2">LAFC 경기 (선택 · D-1만 자동 시드)</div>
+      <details className="mb-4 rounded-xl border border-zinc-700 p-3">
+        <summary className="cursor-pointer text-sm text-zinc-400">
+          LAFC 경기 (선택 · D-1만 자동 시드)
+        </summary>
+        <div className="mt-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
           <input
             type="date"
@@ -320,7 +325,8 @@ function GeneratePageInner() {
             ))}
           </ul>
         )}
-      </div>
+        </div>
+      </details>
       {error && (
         <div className="mb-4 rounded-xl bg-red-950/80 border border-red-800 p-3 text-sm text-red-200">
           {error}
@@ -341,13 +347,16 @@ function GeneratePageInner() {
         </pre>
       )}
       {phase && <p className="mb-2 text-sm text-violet-300">{phase}</p>}
-      {doneCount > 0 && (
-        <p className="mb-4 text-sm text-emerald-400">
-          {doneCount}개 저장됨 · 리뷰하세요 ·{" "}
-          <a href="/" className="underline text-violet-300">
-            홈 콘텐츠 큐에서 보기
-          </a>
-        </p>
+      {doneCount > 0 && !busy && (
+        <a
+          href="/"
+          className="mb-4 block w-full rounded-xl bg-emerald-600 py-3 text-center text-sm font-medium hover:bg-emerald-500"
+        >
+          {doneCount}개 저장됨 · 큐에서 리뷰
+        </a>
+      )}
+      {doneCount > 0 && busy && (
+        <p className="mb-4 text-sm text-emerald-400">{doneCount}개 저장됨 · 이어서 작성 중</p>
       )}
       <button
         type="button"

@@ -6,8 +6,8 @@
  * Keep WHO/WHY/NOT THIS in conceptual sync with lib/intelligence/creator-dna-runtime.ts
  * (Edge cannot import lib/).
  */
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.4-new-readers";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.4-mass-seeds";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.5-ca-korean";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.5-ca-mass";
 
 type PerformanceWindow = {
   status?: string;
@@ -40,6 +40,7 @@ export function performanceDnaBlock(): string {
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion; leave judgment to the reader so they can reply. Keep the entry barrier low.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
     "NEW READERS: center the week in mass like-neighborhoods the public already meets (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Tesla/Elon are not the default seed subject.",
+    "PLACE: Creator lives in California (America/Los_Angeles). Write Korean. Daily situations are US/CA (street parking, freeway, drive-through, DMV/TSA lines, rent/tips/USD subscriptions, June gloom). FORBIDDEN as invented default: Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
     "PERSONAL CAP: at most one personal-interest original per day (FSD/Cybertruck/LAFC/gaming/lived). Keep EXPERIENCE when evidence exists. Do not invent lived episodes.",
     "OON FOR YOU: originals only; new situation inside 48 hours; leave a judgment gap so readers can reply.",
     "LENGTH: informative ~50-110 chars one sentence; casual ~40-80; compare/opinion ~60-130; experience ~70-160. Second sentence only to resolve tension.",
@@ -69,7 +70,7 @@ export function performanceDnaBlock(): string {
 export function creatorDnaBlock(): string {
   return [
     `${CREATOR_DNA_RUNTIME_VERSION} (Archive/Historical learning — offline validated structure)`,
-    "WHO: Korean Tesla multi-vehicle owner-creator; lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap.",
+    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap. Daily life is US/CA, not Korea civic housing.",
     "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: two-speed; media often; informational → polite intentional (존칭); light-opinion 음슴체 = RECENTLY_EMERGING preference (not long-archive dominant).",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
@@ -88,6 +89,7 @@ export function engineRulesAsWill(): string {
     "7-day generate infers seeds from learned data. Never emit DIMENSION_REGISTRY labels as seed bodies.",
     "Infer the week's quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota. Prefer 4/day; 5 fills the 14:00–22:00 PT window. Not a frozen 5.",
     "At most one personal-interest original per day. Remaining seeds are mass public sectors for new readers.",
+    "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "USER_DIRECT trains 말투. AP_PIPELINE trains performance only.",
     "Do not invent lived experience or opinions. Authenticity first.",
     "Question closer only from USER_DIRECT form, never because X rewards participation.",

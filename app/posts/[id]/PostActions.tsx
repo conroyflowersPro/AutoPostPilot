@@ -62,7 +62,6 @@ export default function PostActions({
     null
   );
   const [message, setMessage] = useState<string | null>(null);
-  const [justUploaded, setJustUploaded] = useState(false);
   const [movingNext, setMovingNext] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -163,7 +162,6 @@ export default function PostActions({
 
     setUploading(true);
     setMessage(null);
-    setJustUploaded(false);
 
     try {
       const urls: string[] = [...(post.media_urls || [])];
@@ -196,7 +194,6 @@ export default function PostActions({
       if (error) throw error;
 
       setMessage("미디어 업로드 완료 — 다음을 누르면 reviewed");
-      setJustUploaded(true);
       router.refresh();
     } catch (err: any) {
       setMessage(err.message || "업로드 실패 — 사진 용량을 줄여 다시 시도");
@@ -289,7 +286,6 @@ export default function PostActions({
         .eq("id", post.id);
       if (error) throw error;
       setMessage("선택한 이미지가 첨부되었습니다.");
-      setJustUploaded(true);
       router.refresh();
     } catch (err: any) {
       setMessage(err.message || "첨부 실패");
@@ -331,71 +327,6 @@ export default function PostActions({
 
   return (
     <div className="space-y-4 pb-24">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-medium">특화 Grok 검수 (선택)</h3>
-          <button
-            onClick={handleReview}
-            disabled={loadingReview}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {loadingReview ? "검수 중..." : "검수 요청"}
-          </button>
-        </div>
-        <p className="text-[11px] text-zinc-500">
-          점수·수정 제안이 필요할 때만. 평소에는 미디어 후 <strong>다음</strong>만
-          누르면 reviewed 됩니다.
-        </p>
-
-        {review && (
-          <div className="mt-3 space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-400">종합 점수</span>
-              <span
-                className={`text-lg font-semibold ${
-                  review.score >= 8
-                    ? "text-emerald-400"
-                    : review.score >= 7
-                    ? "text-amber-400"
-                    : "text-red-400"
-                }`}
-              >
-                {review.score?.toFixed?.(1) ?? review.score}
-              </span>
-            </div>
-
-            {review.feedback && (
-              <p className="rounded-lg bg-zinc-800/80 p-3 text-xs leading-relaxed text-zinc-300">
-                {review.feedback}
-              </p>
-            )}
-
-            {review.suggestedMedia && (
-              <p className="text-xs text-amber-300">
-                📷 추천 미디어: {review.suggestedMedia}
-              </p>
-            )}
-
-            {review.revisedContent && (
-              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
-                <p className="mb-1 text-xs text-zinc-400">수정 제안</p>
-                <p className="whitespace-pre-wrap text-xs leading-relaxed">
-                  {review.revisedContent}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleApplyRevision}
-                  disabled={applyingRevision || mediaLocked}
-                  className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
-                >
-                  {applyingRevision ? "적용 중..." : "✓ 수정 제안 적용"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
         <h3 className="mb-3 text-sm font-medium">
           미디어 {hasMedia ? `(${post.media_urls!.length}개)` : ""}
@@ -466,20 +397,74 @@ export default function PostActions({
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          미디어 후 <strong>다음</strong> → reviewed → 홈에서 선택 일괄 스케줄
+          미디어 후 아래 <strong>다음</strong> → reviewed → 큐에서 선택 일괄 스케줄
         </p>
+      </div>
 
+      <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <summary className="cursor-pointer text-sm text-zinc-400">Grok 검수 (선택)</summary>
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-[11px] text-zinc-500">점수·수정 제안이 필요할 때만.</p>
+          <button
+            onClick={handleReview}
+            disabled={loadingReview}
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {loadingReview ? "검수 중..." : "검수 요청"}
+          </button>
+        </div>
+        {review && (
+          <div className="mt-3 space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400">종합 점수</span>
+              <span
+                className={`text-lg font-semibold ${
+                  review.score >= 8
+                    ? "text-emerald-400"
+                    : review.score >= 7
+                    ? "text-amber-400"
+                    : "text-red-400"
+                }`}
+              >
+                {review.score?.toFixed?.(1) ?? review.score}
+              </span>
+            </div>
+            {review.feedback && (
+              <p className="rounded-lg bg-zinc-800/80 p-3 text-xs leading-relaxed text-zinc-300">
+                {review.feedback}
+              </p>
+            )}
+            {review.suggestedMedia && (
+              <p className="text-xs text-amber-300">📷 추천 미디어: {review.suggestedMedia}</p>
+            )}
+            {review.revisedContent && (
+              <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                <p className="mb-1 text-xs text-zinc-400">수정 제안</p>
+                <p className="whitespace-pre-wrap text-xs leading-relaxed">{review.revisedContent}</p>
+                <button
+                  type="button"
+                  onClick={handleApplyRevision}
+                  disabled={applyingRevision || mediaLocked}
+                  className="mt-3 w-full rounded-lg bg-indigo-600 py-2 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {applyingRevision ? "적용 중..." : "✓ 수정 제안 적용"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </details>
+
+      <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <summary className="cursor-pointer text-sm text-zinc-400">Grok 이미지 샘플 (선택)</summary>
         <button
           type="button"
           onClick={handleGenerateImage}
           disabled={generating || mediaLocked}
           className="mt-3 w-full rounded-lg border border-indigo-800/60 bg-indigo-950/40 py-2.5 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
         >
-          {generating
-            ? "샘플 생성 중 (최대 2장)..."
-            : "✨ Grok 이미지 샘플 (선택)"}
+          {generating ? "샘플 생성 중 (최대 2장)..." : "✨ Grok 이미지 샘플"}
         </button>
-
         {candidates.length > 0 && (
           <div className="mt-3 grid grid-cols-2 gap-2">
             {candidates.map((url, i) => (
@@ -503,25 +488,10 @@ export default function PostActions({
             ))}
           </div>
         )}
-      </div>
-
-      {(justUploaded || hasMedia) && (
-        <button
-          type="button"
-          onClick={() => goNext()}
-          disabled={movingNext}
-          className="w-full rounded-xl bg-indigo-600 py-4 text-center text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {movingNext
-            ? "처리 중…"
-            : nextId
-            ? "다음 포스트 → (reviewed)"
-            : "완료 · 홈으로 (reviewed)"}
-        </button>
-      )}
+      </details>
 
       <p className="text-center text-[11px] text-zinc-500">
-        Fedica 스케줄은 홈에서 <strong className="text-emerald-400">선택 일괄</strong>
+        Fedica 스케줄은 큐에서 <strong className="text-emerald-400">선택 일괄</strong>
       </p>
 
       <button

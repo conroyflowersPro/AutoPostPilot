@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import CalendarControlCenter from "@/app/components/CalendarControlCenter";
 import { getCalendarActivities, getAccountSyncState } from "@/lib/calendar/activity-provider";
 
@@ -26,27 +25,11 @@ export default async function CalendarPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-medium">캘린더</h1>
-          <p className="mt-1 text-xs text-zinc-500">
-            계획 · 예약 · 실제 게시가 한곳에서 보입니다. 날짜를 고르면 계획/작성으로 이어집니다.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            href="/generate"
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
-          >
-            이번 주 계획
-          </Link>
-          <Link
-            href="/today"
-            className="rounded-lg bg-zinc-700 px-3 py-2 text-sm hover:bg-zinc-600"
-          >
-            오늘
-          </Link>
-        </div>
+      <div className="mb-4">
+        <h1 className="text-xl font-medium">캘린더</h1>
+        <p className="mt-1 text-xs text-zinc-500">
+          계획 · 예약 · 실제 게시가 한곳에서 보입니다. 날짜를 고르면 계획/작성으로 이어집니다.
+        </p>
       </div>
 
       {isDemo && (

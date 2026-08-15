@@ -50,7 +50,7 @@ function todayLA() {
 }
 
 export default function PostList({ posts }: { posts: Post[] }) {
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>("draft");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState(todayLA);
   const [maxPerDay, setMaxPerDay] = useState(5);
@@ -289,7 +289,14 @@ export default function PostList({ posts }: { posts: Post[] }) {
         ))}
       </div>
 
-      <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-3">
+      <details
+        className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4"
+        open={selected.size > 0}
+      >
+        <summary className="cursor-pointer text-xs text-zinc-400">
+          일괄 스케줄 · 선택 {selected.size}개
+        </summary>
+        <div className="mt-3 space-y-3">
         <p className="text-xs text-zinc-400">
           Fedica는 <strong className="text-emerald-300">선택한 포스트만</strong>{" "}
           · {SCHEDULE_BATCH_SIZE}개씩 자동 배치
@@ -410,7 +417,8 @@ export default function PostList({ posts }: { posts: Post[] }) {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </details>
 
       {visible.length === 0 ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
@@ -428,21 +436,12 @@ export default function PostList({ posts }: { posts: Post[] }) {
             return (
               <div
                 key={post.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => toggle(post.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggle(post.id);
-                  }
-                }}
-                className={`cursor-pointer rounded-xl border bg-zinc-900/60 p-4 transition-colors ${
+                className={`rounded-xl border bg-zinc-900/60 p-4 ${
                   checked
                     ? canSchedule
                       ? "border-emerald-600 bg-emerald-950/20"
                       : "border-indigo-600/60 bg-indigo-950/15"
-                    : "border-zinc-800 hover:border-zinc-600"
+                    : "border-zinc-800"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -450,13 +449,15 @@ export default function PostList({ posts }: { posts: Post[] }) {
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggle(post.id)}
-                    onClick={(e) => e.stopPropagation()}
                     className="mt-1 h-5 w-5 accent-emerald-500"
+                    aria-label="선택"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
-                      {postBody(post) || "(본문 없음)"}
-                    </p>
+                    <Link href={`/posts/${post.id}`} className="block">
+                      <p className="line-clamp-3 text-sm leading-relaxed text-zinc-200">
+                        {postBody(post) || "(본문 없음)"}
+                      </p>
+                    </Link>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                       <StatusBadge status={post.status} />
                       {post.pipeline_id === "42303" ? "KR" : "EN"}
@@ -470,7 +471,6 @@ export default function PostList({ posts }: { posts: Post[] }) {
                       )}
                       <Link
                         href={`/posts/${post.id}`}
-                        onClick={(e) => e.stopPropagation()}
                         className="text-indigo-400 hover:text-indigo-300"
                       >
                         상세 →

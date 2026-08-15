@@ -6,7 +6,6 @@ import CollectMaxButton from "./components/CollectMaxButton";
 import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
 import EvidenceExportButton from "./components/EvidenceExportButton";
 import { getHomeDashboardData } from "@/lib/calendar/activity-provider";
-import VersionBadge from "./components/VersionBadge";
 
 function syncLabel(status: string) {
   switch (status) {
@@ -41,68 +40,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">AutoPostPilot</h1>
-            <VersionBadge />
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-zinc-400">{user.email}</span>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="rounded-md bg-zinc-800 px-3 py-1.5 text-xs hover:bg-zinc-700"
-              >
-                Logout
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-4 py-6 space-y-6">
-        <section className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-emerald-400/80">
-            오늘 할 일
-          </div>
-          <p className="text-sm text-zinc-300">
-            오늘은 무엇을 할까요? 계획·작성·대화·캘린더로 바로 이동하세요.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/today"
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
-            >
-              오늘 시작하기
-            </Link>
-            <Link
-              href="/generate"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
-            >
-              이번 주 계획
-            </Link>
-            <Link
-              href="/today/write"
-              className="rounded-lg bg-zinc-700 px-4 py-2 text-sm hover:bg-zinc-600"
-            >
-              지금 쓰기
-            </Link>
-            <Link
-              href="/calendar"
-              className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-            >
-              캘린더
-            </Link>
-            <Link
-              href="/learning"
-              className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
-            >
-              인사이트
-            </Link>
-          </div>
-        </section>
-
+      <main className="mx-auto max-w-3xl px-4 py-4 space-y-5">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -126,14 +64,6 @@ export default async function HomePage() {
               )}
             </div>
             <div className="text-right text-sm">
-              <div className="text-zinc-500 text-xs">팔로워</div>
-              <div className="font-semibold">
-                {account.followersCount != null ? account.followersCount : "—"}
-              </div>
-              <div className="mt-1 text-zinc-500 text-xs">팔로잉</div>
-              <div className="font-semibold">
-                {account.followingCount != null ? account.followingCount : "—"}
-              </div>
               <div className="mt-3 flex flex-col items-end gap-1.5">
                 {account.status === "not_connected" ? (
                   <a
@@ -143,24 +73,18 @@ export default async function HomePage() {
                     X 연결
                   </a>
                 ) : (
-                  <>
-                    <a
-                      href="/api/x/sync"
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500"
-                    >
-                      지금 동기화
-                    </a>
-                    <form action="/api/x/oauth/disconnect" method="post">
-                      <button
-                        type="submit"
-                        className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs hover:bg-zinc-600"
-                      >
-                        X 연결 해제
-                      </button>
-                    </form>
-                  </>
+                  <a
+                    href="/api/x/sync"
+                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500"
+                  >
+                    지금 동기화
+                  </a>
                 )}
               </div>
+              <p className="mt-3 text-[11px] text-zinc-600">
+                팔로워 {account.followersCount != null ? account.followersCount : "—"} · 팔로잉{" "}
+                {account.followingCount != null ? account.followingCount : "—"}
+              </p>
             </div>
           </div>
         </section>
@@ -229,21 +153,44 @@ export default async function HomePage() {
           )}
         </section>
 
-        {account.status !== "not_connected" && (
-          <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
-            <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
-              고급 · 데이터 / 진단
-            </summary>
-            <p className="mt-2 text-[11px] text-zinc-600">
-              평소 사용에는 필요 없습니다. 수집·커버리지·내보내기 등 운영 도구입니다.
-            </p>
+        <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+          <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
+            고급 · 설정 / 데이터
+          </summary>
+          <p className="mt-2 text-[11px] text-zinc-600">
+            평소 사용에는 필요 없습니다. 수집·커버리지·내보내기·계정 도구입니다.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <Link href="/calendar" className="text-zinc-400 underline hover:text-zinc-200">
+              캘린더
+            </Link>
+            <Link href="/learning" className="text-zinc-400 underline hover:text-zinc-200">
+              인사이트
+            </Link>
+          </div>
+          {account.status !== "not_connected" && (
             <div className="mt-3 flex flex-wrap gap-2">
               <CollectMaxButton />
               <PerformanceCoverageButton />
               <EvidenceExportButton />
             </div>
-          </details>
-        )}
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+            {account.status !== "not_connected" && (
+              <form action="/api/x/oauth/disconnect" method="post">
+                <button type="submit" className="text-zinc-500 underline hover:text-zinc-300">
+                  X 연결 해제
+                </button>
+              </form>
+            )}
+            <span className="text-zinc-600">{user.email}</span>
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="text-zinc-500 underline hover:text-zinc-300">
+                로그아웃
+              </button>
+            </form>
+          </div>
+        </details>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-medium">콘텐츠 큐</h2>

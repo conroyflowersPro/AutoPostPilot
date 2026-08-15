@@ -104,6 +104,17 @@ personalDays[1].posts = [{ concrete_subject: "구독 수수료", cluster: "LIVIN
 ok("A21. day 0 has two personal before cap", countPersonal(personalDays[0].posts) === 2);
 ok("A22. expand uses placeable count not raw 6-batch", /placeableSeedCount/.test(job) && /대중 시드 보충/.test(job));
 ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
+ok("A25. Korea-only civic is forbidden default", /isKoreaOnlySituation/.test(scopeSrc) && /이중\\s\*주차/.test(scopeSrc));
+ok("A26. 이중주차 is Korea-only", /이중\\s\*주차/.test(scopeSrc) && /관리사무소/.test(scopeSrc) && /배민/.test(scopeSrc));
+ok("A27. adjacent prompt is CA road not 이중주차 as default", /California road\/parking/.test(adjSrc) && /not 이중주차/.test(adjSrc));
+ok("A28. seed prompt lives in California", /Creator lives in California/.test(cr) && /FORBIDDEN invented subjects: 이중주차/.test(cr));
+ok("A29. job skips Korea-only on expand and select", /isKoreaOnlySituation/.test(job));
+ok("A30. expand batch 10 on job path", /const EXPAND_BATCH = 10/.test(job));
+const KOREA_ONLY_RE =
+  /이중\s*주차|관리사무소|관리비|주민센터|배달의민족|\b배민\b|쿠팡이츠|따릉이|마을버스|김밥천국|전세|청약|아파트\s*단지|경비실|공동현관|층간소음|무인\s*택배함|명절\s*귀성|\bktx\b|경부고속|한국\s*지하철|서울\s*지하철|홍대|인천공항(?!\s*환승)/i;
+ok("A31. 이중 주차 is Korea-only", KOREA_ONLY_RE.test("단지 이중 주차"));
+ok("A32. CA street parking is not Korea-only", !KOREA_ONLY_RE.test("빨간 연석 옆 길가 주차"));
+ok("A33. 배민 is Korea-only, drive-through is not", KOREA_ONLY_RE.test("배민 쿠폰") && !KOREA_ONLY_RE.test("드라이브스루 대기줄"));
 ok("A24. six Tesla seeds are all personal so a 28-week is still short", (() => {
   const seeds = Array.from({ length: 6 }, (_, i) => ({ concrete_subject: `야간 FSD 보행자 ${i}`, cluster: "FSD" }));
   const personal = seeds.filter((s) => isPersonal(s.concrete_subject, s.cluster)).length;

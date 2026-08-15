@@ -36,32 +36,6 @@ export default async function TodayPage() {
         됩니다.
       </p>
 
-      <section className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-emerald-400/80">
-          지금 하기
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/today/write"
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
-          >
-            지금 쓰기
-          </Link>
-          <Link
-            href="/generate"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500"
-          >
-            이번 주 계획
-          </Link>
-          <Link
-            href="/calendar"
-            className="rounded-lg bg-zinc-700 px-4 py-2 text-sm hover:bg-zinc-600"
-          >
-            캘린더
-          </Link>
-        </div>
-      </section>
-
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
           이벤트 · 맥락
@@ -104,12 +78,22 @@ export default async function TodayPage() {
         )}
       </section>
 
-      <TodayEngagementClient
-        initialOpportunities={engagement.opportunities}
-        apiActions={engagement.api_required_actions}
-        indicators={engagement.indicators}
-        contextTimestamp={engagement.context_timestamp}
-      />
+      <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
+          오늘의 대화 기회 · 고급
+        </summary>
+        <p className="mt-2 text-[11px] text-zinc-600">
+          AI 답글 제안은 멈춤. 댓글 상태만 볼 때 엽니다.
+        </p>
+        <div className="mt-3">
+          <TodayEngagementClient
+            initialOpportunities={engagement.opportunities}
+            apiActions={engagement.api_required_actions}
+            indicators={engagement.indicators}
+            contextTimestamp={engagement.context_timestamp}
+          />
+        </div>
+      </details>
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
         <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">

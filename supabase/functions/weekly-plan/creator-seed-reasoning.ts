@@ -231,6 +231,7 @@ export async function reasonCreatorSeeds(
     "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "NEW READERS FIRST. Tesla/Elon/Robotaxi-news are not the default seed subject.",
+    "Creator lives in California. Seeds are Korean words about US/CA daily life. FORBIDDEN invented subjects: 이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약, Korea subway/apartment-complex civic life.",
     "At most about 1 personal-interest seed per day of quota (FSD/Cybertruck/LAFC/gaming/lived Tesla). Remaining seeds MUST be mass public sectors: DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
     "If this batch asks for 6 seeds, return 5 mass + at most 1 personal. Do not return a Tesla-only list.",
     "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",

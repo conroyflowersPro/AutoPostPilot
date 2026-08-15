@@ -7,7 +7,7 @@
  */
 
 export const PERFORMANCE_DNA_RUNTIME_VERSION =
-  "performance-dna-runtime-v1.4-mass-seeds";
+  "performance-dna-runtime-v1.5-ca-mass";
 
 export function buildPerformanceDnaPlannerBlock(): {
   block: string;
@@ -26,6 +26,7 @@ export function buildPerformanceDnaPlannerBlock(): {
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion; leave judgment to the reader so they can reply. Keep the entry barrier low.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
     "NEW READERS: center the week in mass like-neighborhoods the public already meets (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Tesla/Elon are not the default seed subject.",
+    "PLACE: Creator lives in California (America/Los_Angeles). Write Korean. Daily situations are US/CA (street parking, freeway, drive-through, DMV/TSA lines, rent/tips/USD subscriptions, June gloom). FORBIDDEN as invented default: Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
     "PERSONAL CAP: at most one personal-interest original per day (FSD/Cybertruck/LAFC/gaming/lived). Keep EXPERIENCE when evidence exists. Do not invent lived episodes.",
     "OON FOR YOU: originals only; new situation inside 48 hours; leave a judgment gap so readers can reply.",
     "LENGTH: informative ~50-110 chars one sentence; casual ~40-80; compare/opinion ~60-130; experience ~70-160. Second sentence only to resolve tension.",
