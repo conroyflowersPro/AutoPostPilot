@@ -189,6 +189,9 @@ export async function POST(req: NextRequest) {
         whyPatterns: performanceDna.whyPatterns.slice(0, 5),
       },
       revenueDna: { summaryKo: revenueDna.summaryKo },
+      plannerMustRead: true,
+      learningCycle:
+        "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning",
       status: "analyzed",
     });
   } catch (err: any) {

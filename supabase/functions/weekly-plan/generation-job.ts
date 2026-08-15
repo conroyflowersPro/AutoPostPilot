@@ -24,6 +24,7 @@ import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
+import { loadPlannerIntelligence } from "./planner-intelligence.ts";
 import {
   isAdjacentExpansionSeed,
   pickDayForAdjacent,
@@ -333,13 +334,14 @@ async function loadEvidence(supabase: any, extraSubjects: string[], intentText: 
       post_type: r.post_type || r.action_type,
     })),
   );
-  return { publishedEvidence, learned, experience, intent14d: intent };
+  const intelligence = await loadPlannerIntelligence(supabase, learned.recent_angle_labels);
+  return { publishedEvidence, learned, experience, intent14d: intent, intelligence };
 }
 
 async function stepQuota(supabase: any, xaiKey: string, row: any) {
   const st = row.state;
   const intentText = String(st.topic || "").trim();
-  const { learned, intent14d } = await loadEvidence(supabase, st.publishedTopics || [], intentText);
+  const { learned, intent14d, intelligence } = await loadEvidence(supabase, st.publishedTopics || [], intentText);
   st.cluster_weights = learned.cluster_weights;
   st.intent14d_top = (intent14d?.publishing_interests || []).slice(0, 6);
   const quota = xaiKey
@@ -350,6 +352,7 @@ async function stepQuota(supabase: any, xaiKey: string, row: any) {
       userDirectN: learned.user_direct_n,
       performanceHints: learned.performance_pattern_hints,
       learning: learned.learning,
+      intelligence,
       explicitCreatorIntent: intentText || undefined,
       model: V11_SEED_MODEL,
       timeoutMs: 18000,
@@ -378,7 +381,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const required = Number(row.required_slots) || 0;
   const intentText = String(st.topic || "").trim();
   const published = (st.publishedTopics || []).map(String);
-  const { publishedEvidence, learned, experience, intent14d } = await loadEvidence(supabase, published, intentText);
+  const { publishedEvidence, learned, experience, intent14d, intelligence } = await loadEvidence(supabase, published, intentText);
   st.cluster_weights = learned.cluster_weights;
   st.intent14d_top = (intent14d?.publishing_interests || []).slice(0, 6);
   if (!xaiKey) {
@@ -444,6 +447,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     registryInterestHints: learned.registry_interest_hints,
     userDirectN: learned.user_direct_n,
     learning: learned.learning,
+    intelligence,
     adjacentRing: false,
     humorRing: humorFill || massAtCap,
     model: V11_SEED_MODEL,

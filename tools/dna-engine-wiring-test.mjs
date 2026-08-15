@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.4.9)");
+console.log("DNA + engine live-path wiring (v11.5.0)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -91,7 +91,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.4.9", /APP_VERSION = "11.4.9"/.test(ver) && /APP_VERSION = "11.4.9"/.test(ix));
+ok("D28. version 11.5.0", /APP_VERSION = "11.5.0"/.test(ver) && /APP_VERSION = "11.5.0"/.test(ix));
 
 ok("D29. review engines stay off generate job",
   !/from "\.\/selective-regeneration\.ts"/.test(job) &&
@@ -153,6 +153,27 @@ ok("D41. Writer gets everyday/style/humor/discourse philosophy",
   /writingStagePhilosophyBlock/.test(wr) &&
   /Easy must not mean shallow/.test(stage) &&
   /NONE is normal/.test(stage));
+ok("D42. 3-day Planner loads Audience/Performance/Revenue/Memory/Current X",
+  /loadPlannerIntelligence/.test(job) &&
+  /loadPlannerIntelligence/.test(ix) &&
+  /intelligence/.test(quota) &&
+  /audience_dna_current/.test(seedReason) &&
+  /planner_memory/.test(seedReason) &&
+  /current_x_context/.test(seedReason));
+ok("D43. Audience DNA primary is X Analytics, not follow-the-followers",
+  /X Analytics primary/.test(arch) &&
+  /Primary source: X Analytics/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")) &&
+  /Must not overwrite Creator DNA/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")));
+ok("D44. Learning loop closes only when Planner reads",
+  /next 3-day Planner reads/.test(arch) &&
+  /LEARNING_CYCLE/.test(libArch) &&
+  /plannerMustRead/.test(read("app/api/learning/analyze/route.ts")));
+ok("D45. Performance DNA interpret order starts with followers gained",
+  /followersGained: 50/.test(read("lib/learning/types.ts")) &&
+  /Followers Gained → Profile Visits → Revenue/.test(dna));
+ok("D46. Missing intelligence is UNKNOWN not zero",
+  /UNKNOWN \/ insufficient evidence/.test(read("supabase/functions/weekly-plan/planner-intelligence.ts")) &&
+  /빈 값을 성공으로 쓰지 않음/.test(score));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

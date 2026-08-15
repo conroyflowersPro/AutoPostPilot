@@ -19,6 +19,7 @@ export function buildPerformanceDnaPlannerBlock(): {
   const lines: string[] = [
     `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
     "STATUS: INITIAL BASELINE v1 previously run — candidates only; VALIDATED patterns = 0",
+    "INTERPRET: Followers Gained → Profile Visits → Revenue → Bookmarks → Replies → Reposts → Quotes → Likes → Impressions. Not a wording store. Must not overwrite Creator DNA.",
     "EVIDENCE BASIS: Phase1A public_metrics samples + observed published posts (not full 3009 correlation job)",
     "METRIC POLICY: public_metrics usable as weak signal; non_public/organic often PARTIAL — missing ≠ 0",
     "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",

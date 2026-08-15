@@ -153,21 +153,40 @@ export function buildCreatorDnaHint(
 export function buildAudienceDnaHint(
   scored: ScoredPostMetrics[]
 ): AudienceDnaPayload {
-  const successes = scored.filter((s) => s.isSuccess);
-  const interests = successes
-    .map((s) => s.features?.topicGuess)
-    .filter((t): t is string => !!t && t !== "reply")
-    .slice(0, 10);
-
+  const published = scored.filter((s) => !s.features?.isReply);
+  if (published.length === 0) {
+    return {
+      interestGraph: [],
+      sentiment: "unknown",
+      topicMovement: [],
+      followerInterests: [],
+      summaryKo:
+        "Audience DNA: UNKNOWN / insufficient evidence. Primary source is X Analytics. Do not invent interest.",
+    };
+  }
+  const topicScore: Record<string, number> = {};
+  for (const s of published) {
+    const t = s.features?.topicGuess;
+    if (!t || t === "reply") continue;
+    topicScore[t] =
+      (topicScore[t] || 0) +
+      (s.followersGained > 0 ? 4 : 0) +
+      (s.profileVisits > 0 ? 3 : 0) +
+      (s.bookmarks > 0 ? 2 : 0) +
+      (s.replies > 0 ? 2 : 0);
+  }
+  const ranked = Object.entries(topicScore)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => k);
   return {
-    interestGraph: [...new Set(interests)],
+    interestGraph: ranked.slice(0, 10),
     sentiment: "unknown",
-    topicMovement: [...new Set(interests)].slice(0, 5),
-    followerInterests: [...new Set(interests)],
+    topicMovement: ranked.slice(0, 5),
+    followerInterests: ranked.slice(0, 8),
     summaryKo:
-      successes.length > 0
-        ? `고성과 주제 ${[...new Set(interests)].length}개 — Fedica Audience DNA의 보조 신호. 게시 문장은 저장하지 않음.`
-        : "Audience DNA는 Fedica 관심 신호 우선 유지",
+      ranked.length > 0
+        ? `Audience DNA: X Analytics 주제 반응 ${ranked.length}개. Fedica는 보조. Creator DNA를 덮지 않음. 문장 원문 없음.`
+        : "Audience DNA: UNKNOWN / insufficient evidence. Primary source is X Analytics.",
   };
 }
 
@@ -248,9 +267,11 @@ export function buildPerformanceDna(
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k}×${v}`),
     summaryKo:
-      successes.length > 0
-        ? `Performance DNA: 고성과 ${successes.length}건의 추상 요인. Creator DNA를 덮어쓰지 않음.`
-        : "Performance DNA: 이번 주기 고성과 부족",
+      successes.length >= 2
+        ? `Performance DNA: 반복 가능 신호 ${successes.length}건. 해석 순서는 팔로워→프로필→수익→북마크→댓글. Creator DNA를 덮어쓰지 않음.`
+        : successes.length === 1
+        ? "Performance DNA: 단일 고성과는 hypothesis. 반복 사이클 전까지 검증된 패턴이 아님."
+        : "Performance DNA: UNKNOWN / insufficient evidence. 빈 값을 성공으로 쓰지 않음.",
   };
 }
 
@@ -265,7 +286,7 @@ export function buildRevenueDna(
         "현재 수익 데이터 0 — Revenue DNA 대기",
         "진정성·장기 신뢰보다 우선하지 않음. Planner 최상위 목적을 침범하지 않음.",
       ],
-      summaryKo: "Revenue DNA: 수익 신호 없음 (구조만 유지). 전략을 지배하지 않음.",
+      summaryKo: "Revenue DNA: UNKNOWN / insufficient evidence. 빈 수익을 성공 패턴으로 쓰지 않음. 전략을 지배하지 않음.",
     };
   }
   const byTopic: Record<string, number> = {};
@@ -273,6 +294,9 @@ export function buildRevenueDna(
     const t = s.features?.topicGuess || "other";
     byTopic[t] = (byTopic[t] || 0) + s.revenue;
   }
+  const trustWarn = withRev.some(
+    (s) => s.revenue > 0 && s.followersGained <= 0 && s.profileVisits <= 0 && s.bookmarks <= 0
+  );
   return {
     revenueByTopic: Object.entries(byTopic)
       .sort((a, b) => b[1] - a[1])
@@ -280,6 +304,9 @@ export function buildRevenueDna(
     notes: [
       `수익 포스트 ${withRev.length}건`,
       "진정성·장기 신뢰보다 우선하지 않음. Planner 최상위 목적을 침범하지 않음.",
+      ...(trustWarn
+        ? ["WARNING: 수익은 있으나 팔로워·프로필·북마크 신호가 약함 — 단기 수익이 신뢰/품질을 해칠 수 있음"]
+        : []),
     ],
     summaryKo: `Revenue DNA: ${withRev.length}건 수익 신호. 전략을 지배하지 않음.`,
   };

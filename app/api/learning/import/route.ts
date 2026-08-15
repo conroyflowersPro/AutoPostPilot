@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         source: "x_analytics_csv",
         status: "imported",
         notes,
-        raw_meta: { rowCount: rows.length, origin },
+        raw_meta: { rowCount: rows.length, origin, adapter: "x_analytics_csv", primary: "x_analytics" },
       })
       .select("id")
       .single();

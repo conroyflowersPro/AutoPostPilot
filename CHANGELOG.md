@@ -7,6 +7,14 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.5.0 — 2026-08-15
+
+- 3일 Planner가 Audience DNA, Performance DNA, Revenue DNA, Current X Context, Planner Memory를 읽습니다. 없으면 UNKNOWN이지 0이 아닙니다
+- Audience DNA의 주 출처는 X Analytics입니다. Fedica는 보조입니다. Creator DNA를 덮지 않습니다
+- Performance DNA는 잘된 글 목록이 아닙니다. 게시한 뒤 Analytics가 붙은 결과만 증거입니다
+- 학습은 닫힌 루프입니다. 학습 페이지에만 저장되고 생성이 읽지 않으면 학습이 아닙니다
+- 수익 증거가 없으면 UNKNOWN입니다. 빈 값을 성공 패턴으로 쓰지 않습니다
+
 ## 11.4.9 — 2026-08-15
 
 - Seed는 고정 주제 목록이 아니라 이번 주 사고 재료입니다. 키워드가 곧 포스트 주제가 되지 않습니다

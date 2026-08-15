@@ -8,6 +8,8 @@ import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
 import { plannerArchitectureLock } from "./engine-architecture.ts";
 import { planningStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
+import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines } from "./humor-fill.ts";
 import {
@@ -52,6 +54,7 @@ export type CreatorSeedReasoningInput = {
   adjacentRing?: boolean;
   /** Personal-interest observational humor to fill quota holes. */
   humorRing?: boolean;
+  intelligence?: PlannerIntelligenceBlocks | null;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -240,6 +243,9 @@ export async function reasonCreatorSeeds(
     plannerPhilosophyBlock(),
     plannerArchitectureLock(),
     planningStagePhilosophyBlock(),
+    dnaIntelligencePhilosophyBlock(),
+    learningLoopPhilosophyBlock(),
+    "You MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory. Use them for why-now and mix. Do not overwrite Creator DNA. Do not copy winning wording. Do not copy Current X Context into a seed body.",
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
     "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
@@ -271,6 +277,11 @@ export async function reasonCreatorSeeds(
     creator_dna: creatorDnaBlock(),
     engine_rules_are_the_will: engineRulesAsWill(),
     performance_dna: performanceDnaBlock(),
+    audience_dna_current: args.intelligence?.audience_dna || null,
+    performance_dna_learned: args.intelligence?.performance_learned || null,
+    revenue_dna_current: args.intelligence?.revenue_dna || null,
+    planner_memory: args.intelligence?.planner_memory || null,
+    current_x_context: args.intelligence?.current_x_context || null,
     user_direct_n: args.userDirectN ?? null,
     cluster_weights_from_user_direct: args.clusterInterestWeights?.length
       ? args.clusterInterestWeights

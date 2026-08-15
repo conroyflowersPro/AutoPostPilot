@@ -1,6 +1,9 @@
 import type { MetricOrigin, NormalizedPostMetrics } from "./types";
 import { extractFeatures } from "./features";
 
+/** X Analytics Content CSV adapter. Canonical internal model stays stable; other providers add adapters. */
+export const ANALYTICS_PRIMARY_ADAPTER = "x_analytics_csv";
+
 /** Flexible header aliases — X Analytics Content CSV first priority */
 const ALIASES: Record<string, string[]> = {
   postId: ["post_id", "postid", "id", "tweet_id", "tweetid"],

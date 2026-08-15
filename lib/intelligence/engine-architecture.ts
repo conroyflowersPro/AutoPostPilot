@@ -14,3 +14,9 @@ export const ARCHITECTURE_PIPELINE =
 
 export const ARCHITECTURE_FORBIDDEN_MIXES =
   "Writer must not become Planner. Performance DNA must not overwrite Creator DNA. Revenue DNA must not dominate strategy. Judge must not rewrite. Unpublished AI drafts must not train Planner Memory.";
+
+export const LEARNING_CYCLE =
+  "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning";
+
+export const AUDIENCE_DNA_PRIMARY = "x_analytics";
+export const AUDIENCE_DNA_AUXILIARY = "fedica";

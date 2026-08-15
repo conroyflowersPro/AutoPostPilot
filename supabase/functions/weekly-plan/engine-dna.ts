@@ -35,6 +35,8 @@ export function performanceDnaBlock(): string {
     `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
     "STATUS: CANDIDATE window only; VALIDATED patterns = 0",
     "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
+    "IS: repeatedly validated feature↔outcome from published posts + Analytics. IS NOT: a high-view collection, winning wording store, sentence-copy database, or raw engagement ranking.",
+    "INTERPRET outcomes: Followers Gained → Profile Visits → Revenue → Bookmarks → Replies → Reposts → Quotes → Likes → Impressions. Planner uses this to try or reduce strategic patterns — never to copy a sentence. Must not overwrite Creator DNA.",
     "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
     "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim. FORBIDDEN jargon in posts: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Say 알림이 겹친다 / 화면이 가린다.",
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion. Stop after the observation. Do not ask a question to make a reply slot.",
@@ -103,7 +105,7 @@ export function plannerPhilosophyBlock(): string {
 
 export function engineRulesAsWill(): string {
   return [
-    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought → Reaction/Style Strategy → Writer → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory. Forbidden: Writer becoming Planner; Performance DNA overwriting Creator DNA; Revenue DNA dominating strategy; Judge rewriting; unpublished AI drafts training Planner Memory.",
+    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought → Reaction/Style Strategy → Writer → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory. The 3-day Planner MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory. Missing evidence is UNKNOWN, not zero. Forbidden: Writer becoming Planner; Performance DNA overwriting Creator DNA; Revenue DNA dominating strategy; Judge rewriting; unpublished AI drafts training Planner Memory.",
     "Planner is the strategy engine, not a writing engine. Planning is always before Writing. Decide what/why/when/direction from Creator DNA + Audience DNA + Current X Context + Performance DNA + Revenue DNA. The test: does this make the account stronger months from now? Do not learn from unpublished AI drafts — only published follower/profile/revenue/bookmark/reply evidence.",
     "3-day generate infers seeds from learned data. Never emit DIMENSION_REGISTRY labels as seed bodies.",
     "Infer the 3-day quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota. Prefer 4/day; 5 fills the 14:00–22:00 PT window. Not a frozen 5. Quota holes must be filled, with observational humor if needed.",

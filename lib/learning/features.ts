@@ -44,6 +44,27 @@ export function extractFeatures(
   const hasCta =
     /확인해|보세요|해보세요|눌러|업데이트|링크|더 보기|follow|check/i.test(t);
 
+  let discourseShape = strategy?.writingApproach || "observation";
+  if (/그런데|하지만|반대로|오히려/.test(t)) discourseShape = "contrast_twist";
+  else if (/그래서|결국|그래서인지/.test(t)) discourseShape = "consequence";
+  else if (/내가|제가/.test(t) && /그때|어제|오늘/.test(t)) discourseShape = "lived_scene";
+
+  const personalStoryLevel =
+    strategy?.experienceUsage ||
+    (/내가|제가/.test(t) && /직접|타보|해봤|기다/.test(t) ? "first_person" : "none");
+
+  let hookStyle = strategy?.hookStyle;
+  if (!hookStyle) {
+    if (/^\d/.test(t) || /\d/.test(t.slice(0, 12))) hookStyle = "number_lead";
+    else if (/내가|제가/.test(t.slice(0, 24))) hookStyle = "first_person_scene";
+    else hookStyle = "situation_observation";
+  }
+
+  let opinionStrength = strategy?.opinionStrength;
+  if (!opinionStrength) {
+    opinionStrength = /해야|무조건|틀린|맞다/.test(t) ? "assertive" : "observational";
+  }
+
   let topicGuess = "other";
   const lower = t.toLowerCase();
   if (/fsd|hw3|v14|lite|오토파일럿|자율/.test(lower)) topicGuess = "fsd_field";
@@ -79,10 +100,10 @@ export function extractFeatures(
     actionType,
     subtopic: strategy?.subtopic,
     strategicAngle: strategy?.strategicAngle,
-    hookStyle: strategy?.hookStyle,
-    writingApproach: strategy?.writingApproach,
+    hookStyle,
+    writingApproach: strategy?.writingApproach || discourseShape,
     experienceUsage: strategy?.experienceUsage,
-    opinionStrength: strategy?.opinionStrength,
+    opinionStrength,
     observationLevel: strategy?.observationLevel,
     technicalDepth: strategy?.technicalDepth,
     emotionalLevel: strategy?.emotionalLevel,
@@ -91,6 +112,8 @@ export function extractFeatures(
     ctaUsage: strategy?.ctaUsage ?? hasCta,
     mediaType: strategy?.mediaType,
     mediaPresence: strategy?.mediaPresence ?? hasMediaLink,
+    discourseShape,
+    personalStoryLevel,
     targetGrowthObjective: strategy?.targetGrowthObjective,
     strategySource: strategy?.strategySource || "unknown",
   };
