@@ -80,12 +80,18 @@ export function massSectorFromText(text: string): MassSector {
   return "WEATHER_OUT";
 }
 
+/** Expert/internal terms the operator forbade in seeds and posts. */
+export function hasExpertJargon(text: string): boolean {
+  const t = String(text || "");
+  return /레이어|레이어\s*\d|\bL2\b|\bL1\b|스택\b|프로토콜|엔드포인트|페이로드|엔트리\s*포인트|메커니즘|\bM[1-9]_\w+/i.test(t);
+}
+
 export function lengthBandForMode(mode: string): string {
   const m = String(mode || "").toUpperCase();
   if (m === "CASUAL_OBSERVATION") return "One sentence, about 40-80 Korean characters.";
   if (m === "EXPERIENCE") return "One or two sentences, about 70-160 Korean characters. Second sentence only to show how the tension resolved.";
   if (m === "COMPARE" || m === "OPINION") {
-    return "One or two sentences, about 60-130 Korean characters. Leave the judgment open.";
+    return "One or two sentences, about 60-130 Korean characters. Do not close with a verdict. Do not ask a question.";
   }
   return "Prefer one finished sentence, about 50-110 Korean characters. Second sentence only to resolve tension.";
 }

@@ -33,6 +33,7 @@ import {
   MASS_PER_DAY_MAX,
   isPersonalInterestSubject,
   isKoreaOnlySituation,
+  hasExpertJargon,
   pickDayForMass,
   enforceMassPerDay,
   demoteExperienceOnMassSlots,
@@ -453,6 +454,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   for (const s of xaiRes.seeds || []) {
     if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
     if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
+    if (hasExpertJargon(String(s.concrete_subject || ""))) continue;
     const rowSeed = humorFill
       ? {
         ...s,
@@ -619,6 +621,7 @@ async function stepSelect(supabase: any, row: any) {
     });
     if (!g.allow_as_seed) continue;
     if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
+    if (hasExpertJargon(String(s.concrete_subject || ""))) continue;
     pool.push(s);
   }
   const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;

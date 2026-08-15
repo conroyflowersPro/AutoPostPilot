@@ -144,15 +144,15 @@ export function inferSlotVoice(args: {
     : posts;
   const pool = comparable.length >= 2 ? comparable : posts;
   const q = pool.filter((p) => endingKind(p.text) === "QUESTION").length;
-  const question_ending_allowed = pool.length >= 2 && q / pool.length >= 0.35;
+  const question_ending_allowed = false;
   const notes: string[] = [];
   notes.push(`USER_DIRECT window ${built.window_days}d n=${n}${thin ? " thin" : ""}`);
   if (pool !== posts) notes.push(`comparable cluster ${cluster} n=${pool.length}`);
-  if (question_ending_allowed) {
-    notes.push("question ending allowed — comparable USER_DIRECT often ended that way");
-  } else {
-    notes.push("do not end with a question unless this slot's USER_DIRECT form did; never for algorithm");
-  }
+  notes.push(
+    q > 0
+      ? "handmade questions exist as stats only — AP drafts still must not end as a question"
+      : "do not end with a question; never for algorithm",
+  );
   const kk = pool.filter((p) => hasKk(p.text)).length;
   if (kk / Math.max(pool.length, 1) < 0.2) notes.push("ㅋㅋ not typical in comparable handmade");
   const entryN = pool.filter((p) => hasEntry(p)).length;
@@ -199,7 +199,7 @@ export function voiceRegisterConstraintLine(
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,
     character,
-    "Do not copy handmade wording. Do not install a question because X rewards participation.",
+    "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
     "Length follows median_chars of comparable handmade, then this slot's character. One finished sentence is allowed. Do not inflate with a dummy second sentence.",
   ].join("\n");
 }

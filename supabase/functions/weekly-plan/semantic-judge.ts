@@ -147,9 +147,12 @@ const FORCED_CTA_PATTERNS = [
 ];
 
 const FORCED_QUESTION_PATTERNS = [
-  /\?\s*$/m,
+  /[?？]/,
   /어떻게\s*생각하/,
-  /어떠신가요\s*\?/,
+  /어떠신가요/,
+  /보이시나요/,
+  /있으신가요/,
+  /(까요|나요|을까|ㄹ까)\s*[.…]?$/,
 ];
 
 const EXPERIENCE_FABRICATION_PATTERNS = [
@@ -403,9 +406,12 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
       break;
     }
   }
-  if (FORCED_QUESTION_PATTERNS.some((re) => re.test(text)) && /생각|어떠|의견/.test(text)) {
+  if (FORCED_QUESTION_PATTERNS.some((re) => re.test(text))) {
     flags.forced_question = true;
-    soft.push("forced_question_bait");
+    hard.push("question_closer");
+  }
+  if (/레이어|\bL2\b|\bL1\b|프로토콜|엔드포인트|메커니즘/i.test(text)) {
+    hard.push("expert_jargon");
   }
 
   let aiHits = 0;

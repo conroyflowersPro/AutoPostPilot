@@ -232,7 +232,7 @@ export async function reasonCreatorSeeds(
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
     "A short keyword subject is valid. Infer a public-agreeable situation through Creator DNA vision. Never emit hardcoded example seed bodies or example post prose.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
-    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
+    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Everyday words only. FORBIDDEN seed jargon: 레이어, 레이어2, L2, 스택, 프로토콜. Prefer 알림 겹침 / 화면 가림.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "NEW READERS FIRST via one mass-public slot per day. Personal-interest originals fill the rest. Tesla/Elon/Robotaxi-news are not the default seed subject.",
     "Creator lives in California. Seeds are Korean words about US/CA daily life. FORBIDDEN invented subjects: 이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약, Korea subway/apartment-complex civic life.",

@@ -2,7 +2,7 @@
 
 Specialized Growth OS for **@Seung4680**.
 
-Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.4.1**). Shown in the app header as `v11.4.1`. See [CHANGELOG.md](CHANGELOG.md).
+Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.4.2**). Shown in the app header as `v11.4.2`. See [CHANGELOG.md](CHANGELOG.md).
 
 **Product direction (v11 lock):** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 

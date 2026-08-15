@@ -10,9 +10,14 @@ export const HUMOR_SOURCE_TYPE = "HUMOR_FILL";
 export const DNA_HUMOR_KEYWORD_SEEDS: Array<{ cluster: string; concrete_subject: string }> = [
   { cluster: "FSD", concrete_subject: "FSD 감독 화면" },
   { cluster: "CYBERTRUCK", concrete_subject: "사이버트럭 사이드미러" },
-  { cluster: "TESLA", concrete_subject: "테슬라 앱 레이어" },
+  { cluster: "TESLA", concrete_subject: "테슬라 앱 알림 겹침" },
   { cluster: "LAFC", concrete_subject: "LAFC 홈 경기" },
   { cluster: "GAMING", concrete_subject: "게임 매치메이킹" },
+  { cluster: "FSD", concrete_subject: "차선 합류 망설임" },
+  { cluster: "CYBERTRUCK", concrete_subject: "사이버트럭 충전 줄" },
+  { cluster: "GAMING", concrete_subject: "한 판 큐 대기" },
+  { cluster: "LAFC", concrete_subject: "경기장 입구 줄" },
+  { cluster: "TESLA", concrete_subject: "테슬라 앱 화면 가림" },
 ];
 
 export function isHumorFillSeed(seed: { source_type?: string; source_kind?: string }): boolean {
@@ -41,8 +46,7 @@ export function localHumorKeywordSeeds(needed: number, heldSubjects: string[]): 
     guard += 1;
     const base = DNA_HUMOR_KEYWORD_SEEDS[i % DNA_HUMOR_KEYWORD_SEEDS.length];
     i += 1;
-    const suffix = Math.floor((guard - 1) / DNA_HUMOR_KEYWORD_SEEDS.length);
-    const subject = suffix === 0 ? base.concrete_subject : `${base.concrete_subject} ${suffix + 1}`;
+    const subject = base.concrete_subject;
     const sig = subject.toLowerCase().slice(0, 80);
     if (held.has(sig)) continue;
     held.add(sig);

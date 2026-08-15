@@ -217,7 +217,7 @@ export function selectReactionMechanism(input: SelectMechanismInput): MechanismS
       const everydayIds: MechanismId[] = [
         "M4_LIFE_PATTERN_EXPOSURE",
         "M7_GROUP_BEHAVIOR_DISCOVERY",
-        "M9_EVERYDAY_BLANK_FILLING",
+        "M5_SHARED_TENSION_REVERSAL",
         "M3_EVIDENCE_JUDGMENT",
       ];
       const everydayTop = candidates.find((c) => everydayIds.includes(c.mechanism_id) && c.score >= 0) ||
@@ -226,8 +226,9 @@ export function selectReactionMechanism(input: SelectMechanismInput): MechanismS
       status = "MECHANISM_WEAK";
       selection_reason = "everyday_public_reader_entry";
     } else {
-      selected = "NONE"; status = "NO_MECHANISM_NEEDED";
-      selection_reason = strength === "NONE" ? "self_projection_none_informative_ok" : "no_candidate_scored_positive";
+      selected = "M4_LIFE_PATTERN_EXPOSURE";
+      status = "MECHANISM_WEAK";
+      selection_reason = "default_observation_personality";
     }
   } else if (top.score >= 3) {
     selected = top.mechanism_id; status = "MECHANISM_OK"; selection_reason = top.fit_reasons.join(",") || "best_candidate";

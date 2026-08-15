@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.4.1)");
+console.log("Writer quality + leftover seeds (v11.4.2)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -76,8 +76,8 @@ ok("W4. hyphenated ent stutter", isTokenStutter("ent 시트-ent 미러가 ent en
 ok("W5. Korean 엔트 filler twice", isTokenStutter("엔트 등이 막 바뀌었는데 시스템이 엔트를 얼마나 붙잡고 있는지."));
 ok("W6. normal Supercharger sentence is not stutter", !isTokenStutter("슈퍼차저 줄에서 앞차가 안 움직이면 충전 예상이 통째로 밀린다."));
 ok("W7. tiny fragment is too short", isFragmentOriginal("충전 중에 알림이 겹친다."));
-ok("W8. one finished sentence is allowed", !isFragmentOriginal("충전 중에 알림이 겹치면 어느 레이어가 위인지 손으로 확인하게 된다."));
-ok("W9. 140+ observation is not a fragment", !isFragmentOriginal("충전 중 알림이 겹쳐 보이면 어느 레이어가 위인지 손으로 확인하게 된다. ".repeat(3)));
+ok("W8. one finished sentence is allowed", !isFragmentOriginal("충전 중에 알림이 겹치면 어느 화면이 위인지 손으로 확인하게 된다."));
+ok("W9. 140+ observation is not a fragment", !isFragmentOriginal("충전 중 알림이 겹쳐 보이면 어느 화면이 위인지 손으로 확인하게 된다. ".repeat(3)));
 ok("W10. writer does not lock two sentences", /One complete sentence is enough/.test(wr) && !/At least two sentences/.test(wr));
 ok("W11. validateOutput hard-fails stutter/fragment/restate", /reasons\.includes\("token_stutter"\)/.test(wr) && /subject_restate/.test(wr) && /generic_thesis/.test(wr));
 ok("W12. writer retries once", /allow_one_retry !== false/.test(wr) && /allow_one_retry:\s*true/.test(ow));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.4.1", /APP_VERSION = "11.4.1"/.test(ver) && /APP_VERSION = "11.4.1"/.test(ix));
+ok("W17. version lockstep 11.4.2", /APP_VERSION = "11.4.2"/.test(ver) && /APP_VERSION = "11.4.2"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -109,7 +109,7 @@ ok("W37. DNA audience is readers not a Tesla club", /Audience is readers/.test(d
 ok("W38. DNA mix not keep-worthy-only", /do not write only keep-worthy/.test(dna));
 ok("W39. DNA copy-link is predicted Home viewer not author DM", /Author copying an original and DMing/.test(dna) && /Direct navigation/.test(dna));
 ok("W40. writer readers + wording range", /Audience is readers/.test(wr) && /wording AND the range of wording/.test(wr));
-ok("W41. writer tension can inform without preaching", /leave judgment to the reader/.test(wr) && /that can make the post informative/.test(wr));
+ok("W41. writer tension can inform without preaching", /Stop after the observation/.test(wr) && /that can make the post informative/.test(wr));
 ok("W42. writer mix for bookmarks not archive-only", /do not write only keep-worthy archive posts/.test(wr));
 ok("W43. writer has no copy-link weight numbers", !/ShareViaCopyLink/.test(wr) && !/weight 20/.test(wr) && !/가중치 20/.test(wr));
 ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시/.test(ver));
@@ -136,6 +136,11 @@ ok("W64. writer everyday language reaches ChatGPT", /writerEverydayConstraintLin
 ok("W65. writer style reaches ChatGPT", /writerStyleConstraintLines/.test(wr) && /CREATOR STYLE/.test(wr));
 ok("W66. writer factual do-not-invent reaches ChatGPT", /FACTUAL DO-NOT-INVENT/.test(wr));
 ok("W67. 14d intent overlays cluster weights on the job", /overlayClusterWeightsWithIntent14d/.test(job));
+ok("W68. drafts never end as a question", /isQuestionCloser/.test(wr) && /question_closer/.test(wr));
+ok("W69. expert jargon is a hard fail", /expert_jargon/.test(wr) && /레이어2/.test(wr));
+ok("W70. mechanism write move is operational not a question gap", /MECHANISM_WRITE_MOVES/.test(wr) && /A question is not a mechanism/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8")));
+ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
+ok("W72. default observation personality when mechanism would be NONE", /default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);
