@@ -1,6 +1,6 @@
 /**
- * v11 write path: local ORDER 1–6 + 7A context → ORDER 7C/7B writer → ORDER 8A judge.
- * Paid xAI: writer only (plus expand, which lives in index expand phase).
+ * v11 write path: local ORDER 1–6 + 7A context → ORDER 7C/7B ChatGPT writer → ORDER 8A judge.
+ * Paid xAI: seed expand + quota only. Original post body is ChatGPT.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
 import { selectReactionMechanism } from "./reader-self-projection.ts";
@@ -23,7 +23,10 @@ import {
   type VoiceRegister,
 } from "./user-direct-voice-window.ts";
 
-export const V11_WRITER_MODEL = "grok-4.6";
+/** Seed quota + expand stay on Grok. */
+export const V11_SEED_MODEL = "grok-4.6";
+/** Original post body is ChatGPT (OpenAI). */
+export const V11_WRITER_MODEL = "gpt-4o";
 export const V11_WRITE_CONCURRENCY = 2;
 export const V11_WRITER_TIMEOUT_MS = 16000;
 
@@ -50,7 +53,7 @@ export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode):
 
 export async function writeOneSlot(args: {
   seed: Record<string, unknown>;
-  xaiKey: string | null;
+  openaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
 }): Promise<{
@@ -155,7 +158,7 @@ export async function writeOneSlot(args: {
 
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
-    xai_key: args.xaiKey,
+    openai_key: args.openaiKey,
     model: V11_WRITER_MODEL,
     timeout_ms: V11_WRITER_TIMEOUT_MS,
     seed_id: seed.seed_id,
@@ -202,7 +205,7 @@ export async function writeOneSlot(args: {
 
 export async function writeSlotBatch(args: {
   slots: Record<string, unknown>[];
-  xaiKey: string | null;
+  openaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
@@ -214,7 +217,7 @@ export async function writeSlotBatch(args: {
       chunk.map((seed) =>
         writeOneSlot({
           seed,
-          xaiKey: args.xaiKey,
+          openaiKey: args.openaiKey,
           dryRun: args.dryRun,
           voiceRows: args.voiceRows,
         })

@@ -22,7 +22,7 @@ import { guardCandidateAgainstManualLeakage, type RecentManualPost } from "./man
 import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
 import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
-import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
+import { writeSlotBatch, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
 import {
   ADJACENT_PER_DAY_MAX,
@@ -33,6 +33,13 @@ import {
   pickDayForAdjacent,
   enforceAdjacentPerDay,
 } from "./adjacent-expansion.ts";
+import {
+  PERSONAL_PER_DAY_MAX,
+  isPersonalInterestSubject,
+  pickDayForPersonal,
+  enforcePersonalPerDay,
+  demoteExperienceOnMassSlots,
+} from "./seed-scope.ts";
 import {
   ARCHIVE_EXPERIENCE_FALLBACK,
   buildRecentExperienceCandidates,
@@ -238,6 +245,7 @@ export async function tickWeeklyJob(args: {
   userId: string;
   jobId: string;
   xaiKey: string;
+  openaiKey?: string;
 }): Promise<JobPublic> {
   const { data: row, error } = await args.supabase
     .from("generation_jobs")
@@ -259,7 +267,7 @@ export async function tickWeeklyJob(args: {
     else if (row.step === "expand") await stepExpand(args.supabase, args.xaiKey, row);
     else if (row.step === "judge") await stepJudge(row);
     else if (row.step === "select") await stepSelect(args.supabase, row);
-    else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey, args.userId, row);
+    else if (row.step === "write") await stepWrite(args.supabase, args.openaiKey || "", args.userId, row);
     else {
       row.status = "done";
       row.label_ko = `완료: ${row.saved_count}개 draft 저장`;
@@ -325,7 +333,7 @@ async function stepQuota(supabase: any, xaiKey: string, row: any) {
       performanceHints: learned.performance_pattern_hints,
       learning: learned.learning,
       explicitCreatorIntent: intentText || undefined,
-      model: V11_WRITER_MODEL,
+      model: V11_SEED_MODEL,
       timeoutMs: 18000,
     })
     : quotaFromCadence(learned.cadence, intentText);
@@ -371,7 +379,10 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const gated = applyLocalGates(local, [], createSeedIdFactory("s"));
   const experienceSeeds: any[] = [];
   if (!st.experience_injected) {
-    const needExp = Math.max(4, Math.ceil(required * 0.2));
+    const needExp = Math.min(
+      QUOTA_DAYS * PERSONAL_PER_DAY_MAX,
+      Math.max(1, Math.ceil(required * 0.25)),
+    );
     const resolved = resolveExperienceSupply(needExp, experience || [], ARCHIVE_EXPERIENCE_FALLBACK);
     let n = 0;
     for (const c of resolved.selected) {
@@ -408,7 +419,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     userDirectN: learned.user_direct_n,
     learning: learned.learning,
     adjacentRing: adjacentFill,
-    model: V11_WRITER_MODEL,
+    model: V11_SEED_MODEL,
     timeoutMs: 32000,
   });
   st.dim_batch = Number(st.dim_batch || 0) + 1;
@@ -569,13 +580,17 @@ async function stepSelect(supabase: any, row: any) {
     if (!g.allow_as_seed) continue;
     pool.push(s);
   }
-  const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s)).length;
+  const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;
+  const personalCap = QUOTA_DAYS * PERSONAL_PER_DAY_MAX;
+  const expPct = expSupply > 0
+    ? Math.round((Math.min(expSupply, personalCap) / Math.max(required, 1)) * 100)
+    : 0;
   const mix = allocateEditorialSlots(required, {
-    INFORMATIVE: 30,
+    INFORMATIVE: 35,
     COMPARE: 15,
-    OPINION: 25,
-    EXPERIENCE: expSupply > 0 ? Math.round((expSupply / Math.max(required, 1)) * 100) : 0,
-    CASUAL_OBSERVATION: 10,
+    OPINION: 20,
+    EXPERIENCE: expPct,
+    CASUAL_OBSERVATION: 15,
   });
   const selectedWeekly: ConcreteSeed[] = [];
   const queue = buildEditorialQueue(mix.allocation as any);
@@ -587,28 +602,42 @@ async function stepSelect(supabase: any, row: any) {
     const mode = plannedMode as EditorialMode;
     const cands = pool
       .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
-      .filter(({ s }) => canServeEditorialMode(s, mode) && !isAdjacentExpansionSeed(s))
+      .filter(({ s }) => {
+        if (!canServeEditorialMode(s, mode) || isAdjacentExpansionSeed(s)) return false;
+        if (mode === "EXPERIENCE") {
+          return isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""));
+        }
+        return true;
+      })
       .sort((a, b) => b.div - a.div);
     let picked: ConcreteSeed | null = null;
     for (const { s, i } of cands) {
       if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;
+      const personal = isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || "")) ||
+        mode === "EXPERIENCE";
+      if (personal && pickDayForPersonal(outDays, postsPerDay, PERSONAL_PER_DAY_MAX) < 0) continue;
       picked = s;
       pool.splice(i, 1);
       break;
     }
     if (!picked) continue;
     selectedWeekly.push(picked);
-    let bestDay = 0;
-    let bestScore = 1e9;
-    for (let d = 0; d < QUOTA_DAYS; d++) {
-      if (outDays[d].posts.length >= postsPerDay) continue;
-      const n = outDays[d].posts.filter(
-        (p) => majorKey(p.cluster, p.concrete_subject) === majorKey(picked!.cluster, picked!.concrete_subject),
-      ).length;
-      const score = n * 10 + outDays[d].posts.length;
-      if (score < bestScore) {
-        bestScore = score;
-        bestDay = d;
+    const personal = isPersonalInterestSubject(String(picked.concrete_subject || ""), String(picked.cluster || "")) ||
+      mode === "EXPERIENCE";
+    let bestDay = personal ? pickDayForPersonal(outDays, postsPerDay, PERSONAL_PER_DAY_MAX) : -1;
+    if (bestDay < 0) {
+      bestDay = 0;
+      let bestScore = 1e9;
+      for (let d = 0; d < QUOTA_DAYS; d++) {
+        if (outDays[d].posts.length >= postsPerDay) continue;
+        const n = outDays[d].posts.filter(
+          (p) => majorKey(p.cluster, p.concrete_subject) === majorKey(picked!.cluster, picked!.concrete_subject),
+        ).length;
+        const score = n * 10 + outDays[d].posts.length;
+        if (score < bestScore) {
+          bestScore = score;
+          bestDay = d;
+        }
       }
     }
     if (outDays[bestDay].posts.length >= postsPerDay) {
@@ -657,11 +686,20 @@ async function stepSelect(supabase: any, row: any) {
     selectedWeekly.push(seed);
     let mode = parseEditorialMode(String(seed.requested_editorial_mode || seed.editorial_mode || "INFORMATIVE"));
     if (mode === "EXPERIENCE" && !canServeEditorialMode(seed, "EXPERIENCE")) mode = "INFORMATIVE";
+    const personal = isPersonalInterestSubject(String(seed.concrete_subject || ""), String(seed.cluster || ""));
+    if (personal) {
+      const pDay = pickDayForPersonal(outDays, postsPerDay, PERSONAL_PER_DAY_MAX);
+      if (pDay >= 0) day = pDay;
+      else continue;
+    }
+    if (mode === "EXPERIENCE" && !personal) mode = "INFORMATIVE";
     outDays[day].posts.push(compactSlotLite(seed, day, outDays[day].posts.length + 1, mode));
     totalPlanned += 1;
   }
   const redistributed = redistributeDailyTopics(outDays, postsPerDay);
   enforceAdjacentPerDay(redistributed.days, postsPerDay, ADJACENT_PER_DAY_MAX);
+  enforcePersonalPerDay(redistributed.days, PERSONAL_PER_DAY_MAX);
+  demoteExperienceOnMassSlots(redistributed.days);
   for (let di = 0; di < redistributed.days.length; di++) {
     redistributed.days[di].posts.forEach((p: any, si: number) => {
       p.dayOffset = di;
@@ -702,7 +740,7 @@ async function stepSelect(supabase: any, row: any) {
     : `초안 생성 0/${totalAfter}…`;
 }
 
-async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
+async function stepWrite(supabase: any, openaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
   const i = Number(st.write_index || 0);
@@ -724,7 +762,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     .limit(400);
   const posts = await writeSlotBatch({
     slots: chunk,
-    xaiKey: xaiKey || null,
+    openaiKey: openaiKey || null,
     voiceRows: (voiceActs || []) as any,
   });
   for (const p of posts) {
@@ -742,7 +780,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       strategy_json: {
         system_origin_class: "AP_PIPELINE",
         slotId: p.slotId || null,
-        writer_model: "grok-4.6",
+        writer_model: "gpt-4o",
         engine: "v11_inferred_quota_fill",
         job_id: row.id,
       },

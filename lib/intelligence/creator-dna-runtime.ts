@@ -6,7 +6,7 @@
  * Source of truth offline: creator_intelligence/Creator_DNA_Historical_v1.1.json (v1.3.1)
  */
 
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.3.1-snapshot";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.4-new-readers";
 
 /** Compact planner-facing block when DB creator_dna row is empty */
 export function buildCreatorDnaPlannerBlock(): {
@@ -17,15 +17,15 @@ export function buildCreatorDnaPlannerBlock(): {
 } {
   const lines: string[] = [
     `${CREATOR_DNA_RUNTIME_VERSION} (Archive/Historical learning — offline validated structure)`,
-    "WHO: Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC) retained.",
-    "WHY WRITE: inform/explain · share experience · light opinion · social reply",
+    "WHO: Korean Tesla multi-vehicle owner-creator; lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap.",
+    "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: two-speed; media often; informational → polite intentional (존칭); light-opinion 음슴체 = RECENTLY_EMERGING preference (not long-archive dominant).",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
     "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post",
     "REPOST: manual by Creator only; system may store/learn metadata; no auto-repost; REPOST text excluded from Writing DNA",
     "ARTICLES: quality-first; not default weekly pipeline",
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
-    "CONTENT STANCE: long-term Tesla investor / product progress; not short-term stock price chatter",
+    "CONTENT STANCE: do not default to Elon/Tesla ticker/Robotaxi news. Personal Tesla lived stays in the 1/day cap. Not short-term stock price chatter",
     "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
   ];
 

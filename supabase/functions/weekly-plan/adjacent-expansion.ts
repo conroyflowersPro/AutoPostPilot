@@ -1,29 +1,22 @@
 /**
- * Quota-hole fill: one ring outside core Creator interest.
- * Tesla/FSD → EV industry, semiconductors, space. Never lived Tesla.
- * Max 2 adjacent posts per day. Mix is not a frozen ratio.
+ * Quota-hole fill: mass public sectors (new readers), not Tesla/Elon.
+ * Max 3 mass-fill posts per day. Mix is not a frozen ratio.
  */
+import { isPersonalInterestSubject, MASS_SECTORS, massSectorFromText } from "./seed-scope.ts";
 
-export const ADJACENT_PER_DAY_MAX = 2;
+export const ADJACENT_PER_DAY_MAX = 3;
 export const ADJACENT_SOURCE_TYPE = "ADJACENT_EXPANSION";
-export const ADJACENT_CLUSTERS = ["EV_INDUSTRY", "SEMICONDUCTOR", "SPACE"] as const;
+export const ADJACENT_CLUSTERS = MASS_SECTORS;
 
-const CORE_RE =
-  /tesla|테슬라|cybertruck|사이버트럭|\bfsd\b|오토파일럿|로보택시|robotaxi|모델\s*[3sy]|플래드|plaid/i;
-const ADJACENT_RE =
-  /전기차|\bev\b|e-mobility|semicon|반도체|우주|spacex|starship|starlink|배터리|battery|nvidia|칩셋|로켓|orbit|화성|\bmars\b|충전망|배터리셀|위성|aerospace|foundry|hbm/i;
+const MASS_RE =
+  /번역|초안|요약|음성|알림|휴대폰|화면|주차|와이퍼|구독|수수료|대기|줄|날씨|외출|길찾기|요금|업데이트 미루/i;
 
 export function isCoreInterestSubject(text: string, cluster?: string): boolean {
-  const c = String(cluster || "").toUpperCase();
-  if (["FSD", "CYBERTRUCK", "ROBOTAXI", "TESLA"].includes(c)) return true;
-  return CORE_RE.test(String(text || ""));
+  return isPersonalInterestSubject(text, cluster);
 }
 
 export function adjacentClusterFromText(text: string): (typeof ADJACENT_CLUSTERS)[number] {
-  const t = String(text || "");
-  if (/semicon|반도체|nvidia|칩|foundry|hbm/i.test(t)) return "SEMICONDUCTOR";
-  if (/우주|spacex|starship|starlink|로켓|orbit|화성|\bmars\b|위성|aerospace/i.test(t)) return "SPACE";
-  return "EV_INDUSTRY";
+  return massSectorFromText(text);
 }
 
 export function isAdjacentExpansionSeed(seed: {
@@ -37,23 +30,23 @@ export function isAdjacentExpansionSeed(seed: {
   const c = String(seed.cluster || "").toUpperCase();
   if ((ADJACENT_CLUSTERS as readonly string[]).includes(c)) return true;
   const sub = String(seed.concrete_subject || "");
-  return ADJACENT_RE.test(sub) && !isCoreInterestSubject(sub, seed.cluster);
+  return MASS_RE.test(sub) && !isCoreInterestSubject(sub, seed.cluster);
 }
 
 export function adjacentDomainGate(text: string): boolean {
   const t = String(text || "");
   if (t.length < 12) return false;
   if (isCoreInterestSubject(t)) return false;
-  return ADJACENT_RE.test(t);
+  return MASS_RE.test(t);
 }
 
 export function adjacentRingPromptLines(): string[] {
   return [
-    "QUOTA HOLE FILL — adjacent ring only. Core interest this week is Tesla/FSD/Cybertruck.",
-    "Expand the CONCEPT one ring out: electric-vehicle industry (not Tesla-as-lived), semiconductors, space/aerospace.",
-    "cluster MUST be one of EV_INDUSTRY, SEMICONDUCTOR, SPACE.",
-    "INFORMATIVE / OPINION / COMPARE / CASUAL only. Never EXPERIENCE. Never first-person lived driving.",
-    "Do not clone viral wording. Do not write Tesla FSD episodes. Distinct directions only.",
+    "QUOTA HOLE FILL — mass public sectors for NEW readers. Not Tesla/Elon as the subject.",
+    "Sectors: daily AI use, phone/notifications, road/parking without a car brand, living costs/fees, queues/waiting, weather/going out.",
+    "cluster MUST be one of DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
+    "INFORMATIVE / OPINION / COMPARE / CASUAL only. Never EXPERIENCE. Never first-person Tesla driving. Never Elon/Musk.",
+    "Do not clone viral wording. Distinct directions only.",
   ];
 }
 

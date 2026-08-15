@@ -62,10 +62,8 @@ export function isPrioritySuccess(m: {
   impressions: number;
 }): { ok: boolean; impressions_only: boolean } {
   const primary =
-    m.followersGained > 0 ||
-    m.profileVisits > 0 ||
-    m.bookmarks >= 3 ||
-    m.replies >= 2;
+    m.replies >= 2 ||
+    m.bookmarks >= 3;
   const impressions_only =
     !primary && m.impressions > 0 && m.followersGained === 0;
   return { ok: primary, impressions_only };

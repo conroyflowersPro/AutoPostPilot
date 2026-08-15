@@ -281,6 +281,7 @@ export async function executeSelectiveRegeneration(args: {
   const independent = await fns.generateIndependentPost(deep as DeepGenerationContext, {
     dry_run: genOpts?.dry_run === true,
     xai_key: (genOpts as any)?.xai_key ?? null,
+    openai_key: (genOpts as any)?.openai_key ?? null,
     allow_one_retry: false,
   } as any);
   stages_recomputed.push("writer");
@@ -295,6 +296,7 @@ export async function executeSelectiveRegeneration(args: {
 
   const judge = fns.judgeIndependentResult(deep as DeepGenerationContext, independent, undefined, {
     xai_key: (genOpts as any)?.xai_key ?? null,
+    openai_key: (genOpts as any)?.openai_key ?? null,
   } as any);
   stages_recomputed.push("judge");
 

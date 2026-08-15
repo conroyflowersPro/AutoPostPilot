@@ -1,9 +1,9 @@
 /**
- * ORDER 7B — Independent Per-Post Generation + HOTFIX live xAI writer
+ * ORDER 7B — Independent Per-Post Generation
  * One DeepGenerationContext in → one IndependentPostResult out.
  * Batch transport allowed; batch reasoning forbidden.
- * Production default = actual xAI writer when key present.
- * dry_run = explicit test/diagnostics only.
+ * Production default = ChatGPT (OpenAI) writer when OPENAI_API_KEY present.
+ * Seed quota/expand stay on Grok (xAI). dry_run = explicit test/diagnostics only.
  */
 import type {
   DeepGenerationContext,
@@ -12,8 +12,9 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
+import { isPersonalInterestSubject, lengthBandForMode } from "./seed-scope.ts";
 
-export const ORDER7B_VERSION = "independent_post_generation_v1_order7b_hotfix_live_xai";
+export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
 export const ORDER7B_BATCH_TRANSPORT_NOT_REASONING = true as const;
 export const ORDER7B_NO_CROSS_POST_CONTAMINATION = true as const;
@@ -34,7 +35,7 @@ export const ORDER7B_MECHANISM_NOT_TEMPLATE = true as const;
 export const ORDER7B_RAIL_NOT_TEMPLATE = true as const;
 export const ORDER7B_HUMOR_NONE_ALLOWED = true as const;
 export const ORDER7B_SILENT_SLOT_DROP_FORBIDDEN = true as const;
-export const ORDER7B_LIVE_XAI_WRITER = true as const;
+export const ORDER7B_LIVE_CHATGPT_WRITER = true as const;
 export const ORDER7B_PRODUCTION_DEFAULT_LIVE = true as const;
 export const ORDER7B_NO_FAKE_FALLBACK_TEXT = true as const;
 
@@ -46,7 +47,7 @@ export type IndependentGenerationStatus =
   | "GENERATION_SEED_INSUFFICIENT"
   | "GENERATION_BOUNDARY_VIOLATION";
 
-export type WriterMode = "live_xai" | "dry_run" | "no_key" | "none";
+export type WriterMode = "live_chatgpt" | "dry_run" | "no_key" | "none";
 
 export type IndependentPostResult = {
   slot_id: string;
@@ -87,7 +88,7 @@ export type IndependentPostResult = {
 export type GenerateIndependentOptions = {
   /** Explicit only — production default is live when key present */
   dry_run?: boolean;
-  xai_key?: string | null;
+  openai_key?: string | null;
   model?: string;
   allow_one_retry?: boolean;
   timeout_ms?: number;
@@ -116,7 +117,7 @@ export const ORDER7B_GUARDS = {
   rail_not_template: ORDER7B_RAIL_NOT_TEMPLATE,
   humor_none_allowed: ORDER7B_HUMOR_NONE_ALLOWED,
   silent_slot_drop_forbidden: ORDER7B_SILENT_SLOT_DROP_FORBIDDEN,
-  live_xai_writer: ORDER7B_LIVE_XAI_WRITER,
+  live_chatgpt_writer: ORDER7B_LIVE_CHATGPT_WRITER,
   production_default_live: ORDER7B_PRODUCTION_DEFAULT_LIVE,
   no_fake_fallback_text: ORDER7B_NO_FAKE_FALLBACK_TEXT,
 } as const;
@@ -201,7 +202,7 @@ export function buildWriterPlanMarkers(ctx: DeepGenerationContext): IndependentP
 }
 
 /**
- * Constraint-only system instructions for live xAI writer.
+ * Constraint-only system instructions for the live ChatGPT writer.
  * No finished examples, no templates, no CTA, no fabrication.
  */
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
@@ -214,6 +215,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const expBound = ctx.experience_boundaries || {};
   const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
+  const editorialMode = s((ctx as any).seed_identity?.editorial_mode || (ctx as any).editorial_mode);
+  const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
+  const personal = isPersonalInterestSubject(subject, cluster);
 
   return [
     "You write one Korean X post for creator @Seung4680.",
@@ -221,16 +225,19 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "REASONING ORDER (internal only; do not output steps):",
     "1) Confirm Seed meaning. A short keyword seed is valid — infer a public-agreeable situation through Creator DNA vision. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies.",
     "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
-    "3) Keep reader self-projection space; never force questions or CTA.",
+    "3) Keep reader self-projection space; never force questions or CTA. Do not hard-assert the creator's opinion — leave judgment to the reader so they can reply.",
     "4) Reference the selected Reaction Mechanism as the reader-entry structure — never name it or template it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
-    "6) Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
+    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
     "7) Apply Creator Style as surface register — not a fixed template. Register follows this post's character (editorial mode), not a single global ending.",
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
     "10) One complete sentence is enough if the situation is delivered. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
+    "LENGTH: " + lengthBandForMode(editorialMode),
     "INFORMATIVE/COMPARE register: polite 해요/존칭. Do not use 음슴체 on information posts.",
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
+    "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
+    "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
     "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
@@ -242,8 +249,11 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     s((ctx as any).cite_episode_hint)
       ? "CITE RELATED: You MAY mention the prior lived episode by situation (e.g. 지난 야간 FSD 보행자 대기). Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용."
       : "",
+    personal
+      ? ""
+      : "MASS PUBLIC SLOT: do not name Elon, Tesla, FSD, Cybertruck, or Robotaxi as the subject. Write the everyday public situation.",
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
-      ? "ADJACENT RING: one step outside core Tesla/FSD. EV industry, semiconductors, or space. Observation/opinion only. FORBIDDEN: first-person Tesla driving, same FSD episode, viral clone."
+      ? "ADJACENT RING: mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone."
       : "",
     "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
     "PUNCHLINE_STOP: " + String(punchStop),
@@ -295,7 +305,7 @@ function composeConstrainedText(ctx: DeepGenerationContext, markers: Independent
   return body.slice(0, comp === "VERY_COMPRESSED" ? 120 : comp === "COMPRESSED" ? 180 : 480);
 }
 
-export type XaiWriterCallResult = {
+export type WriterCallResult = {
   ok: boolean;
   text: string;
   error: string | null;
@@ -303,13 +313,14 @@ export type XaiWriterCallResult = {
 };
 
 /**
- * Actual xAI /v1/chat/completions writer — one slot, constraint-only, no shared history.
+ * ChatGPT /v1/chat/completions writer — one slot, constraint-only, no shared history.
+ * Seed expand/quota stay on Grok. This function writes the original post body only.
  */
-export async function callXaiWriter(
+export async function callChatGptWriter(
   ctx: DeepGenerationContext,
-  xaiKey: string,
+  openaiKey: string,
   options: { model?: string; timeout_ms?: number; retry_hint?: string; temperature?: number } = {},
-): Promise<XaiWriterCallResult> {
+): Promise<WriterCallResult> {
   const system = buildConstraintOnlyWriterInstructions(ctx);
   const subject = subjectFromCtx(ctx);
   const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
@@ -331,21 +342,20 @@ export async function callXaiWriter(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${xaiKey}`,
+        Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: options.model || "grok-4.6",
+        model: options.model || "gpt-4o",
         messages: [
           { role: "system", content: system },
           { role: "user", content: userMsg },
         ],
         temperature: options.temperature ?? 0.7,
         max_tokens: 1400,
-        reasoning_effort: "low",
       }),
       signal: controller.signal,
     });
@@ -354,7 +364,7 @@ export async function callXaiWriter(
       return {
         ok: false,
         text: "",
-        error: `xai_http_${response.status}:${rawText.slice(0, 180)}`,
+        error: `openai_http_${response.status}:${rawText.slice(0, 180)}`,
         attempted: true,
       };
     }
@@ -362,11 +372,11 @@ export async function callXaiWriter(
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      return { ok: false, text: "", error: "xai_json_parse_failed", attempted: true };
+      return { ok: false, text: "", error: "openai_json_parse_failed", attempted: true };
     }
     const content = s(parsed?.choices?.[0]?.message?.content);
     if (!content || content.length < 4) {
-      return { ok: false, text: "", error: "xai_empty_content", attempted: true };
+      return { ok: false, text: "", error: "openai_empty_content", attempted: true };
     }
     let text = content
       .replace(/^```[\s\S]*?```$/g, (m) => m.replace(/```\w*\n?/g, "").replace(/```/g, ""))
@@ -374,7 +384,7 @@ export async function callXaiWriter(
       .trim();
     return { ok: true, text, error: null, attempted: true };
   } catch (e: any) {
-    const msg = e?.name === "AbortError" ? "xai_timeout" : s(e?.message, "xai_fetch_error").slice(0, 160);
+    const msg = e?.name === "AbortError" ? "openai_timeout" : s(e?.message, "openai_fetch_error").slice(0, 160);
     return { ok: false, text: "", error: msg, attempted: true };
   } finally {
     clearTimeout(timer);
@@ -577,9 +587,9 @@ function blockedResult(
 }
 
 /**
- * Primary entry: one context → one independent result (async for live xAI).
+ * Primary entry: one context → one independent result (async for live ChatGPT).
  * Never accepts sibling contexts or recent drafts.
- * Production default: live xAI when key present; dry_run only if explicit.
+ * Production default: live ChatGPT when OPENAI_API_KEY present; dry_run only if explicit.
  * API failure → empty final_text + GENERATION_RETRY_REQUIRED (no fake text).
  */
 export async function generateIndependentPost(
@@ -604,7 +614,7 @@ export async function generateIndependentPost(
 
   const markers = buildWriterPlanMarkers(ctx);
   const explicitDry = options.dry_run === true;
-  const key = s(options.xai_key);
+  const key = s(options.openai_key);
 
   // Explicit dry_run: constrained offline only (tests / diagnostics)
   if (explicitDry) {
@@ -656,17 +666,17 @@ export async function generateIndependentPost(
     };
   }
 
-  // Production path: require live xAI when key present; no silent offline fake fallback
+  // Production path: require live ChatGPT when key present; no silent offline fake fallback
   if (!key) {
-    return blockedResult(ctx, "GENERATION_RETRY_REQUIRED", ["xai_key_missing"], {
+    return blockedResult(ctx, "GENERATION_RETRY_REQUIRED", ["openai_key_missing"], {
       writer_mode: "no_key",
       writer_call_attempted: false,
       writer_call_succeeded: false,
-      writer_error: "XAI_API_KEY_missing",
+      writer_error: "OPENAI_API_KEY_missing",
     });
   }
 
-  let call = await callXaiWriter(ctx, key, {
+  let call = await callChatGptWriter(ctx, key, {
     model: options.model,
     timeout_ms: options.timeout_ms,
     retry_hint: options.retry_hint,
@@ -675,7 +685,7 @@ export async function generateIndependentPost(
   let v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
   if ((!call.ok || !call.text || (v && !v.ok)) && options.allow_one_retry !== false) {
     const why = (v?.reasons || [call.error || "empty"]).filter(Boolean).join(",");
-    call = await callXaiWriter(ctx, key, {
+    call = await callChatGptWriter(ctx, key, {
       model: options.model,
       timeout_ms: options.timeout_ms,
       retry_hint: why,
@@ -689,7 +699,7 @@ export async function generateIndependentPost(
       "writer_call_failed",
       call.error || "empty",
     ], {
-      writer_mode: "live_xai",
+      writer_mode: "live_chatgpt",
       writer_call_attempted: call.attempted,
       writer_call_succeeded: false,
       writer_error: call.error,
@@ -717,7 +727,7 @@ export async function generateIndependentPost(
       block_reasons: v?.reasons || ["writer_call_failed"],
       order7b_version: ORDER7B_VERSION,
       order7a_context_version: ORDER7A_VERSION,
-      writer_mode: "live_xai",
+      writer_mode: "live_chatgpt",
       writer_call_attempted: true,
       writer_call_succeeded: true,
       writer_error: null,
@@ -742,7 +752,7 @@ export async function generateIndependentPost(
     block_reasons: [],
     order7b_version: ORDER7B_VERSION,
     order7a_context_version: ORDER7A_VERSION,
-    writer_mode: "live_xai",
+    writer_mode: "live_chatgpt",
     writer_call_attempted: true,
     writer_call_succeeded: true,
     writer_error: null,

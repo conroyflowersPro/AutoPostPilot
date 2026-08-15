@@ -2,7 +2,7 @@
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
  * Seed supply: Creator DNA + engine rules + learned USER_DIRECT/performance → Grok infers quota AND fills it.
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
- * Target volume: postsPerDay 5–8 × days (≈35–56 / week).
+ * Target volume: prefer 4/day; 5 fills 14:00–22:00 PT; bounds 3–8.
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
  */
@@ -43,8 +43,9 @@ import {
   topicDistributionReport,
   softDailyCap,
 } from "./daily-topic-distribute.ts";
+import { enforcePersonalPerDay, demoteExperienceOnMassSlots, PERSONAL_PER_DAY_MAX } from "./seed-scope.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
-import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
+import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
   inferWeeklyQuota,
   quotaFromCadence,
@@ -56,8 +57,8 @@ import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job
 
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
-const POSTS_TARGET = 6;
-const APP_VERSION = "11.2.5";
+const POSTS_TARGET = 4;
+const APP_VERSION = "11.3.0";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -142,6 +143,7 @@ Deno.serve(async (req) => {
       ? Math.round(Number(body.required_slots))
       : postsPerDay * daysCount;
     const xaiKey = (Deno.env.get("XAI_API_KEY") || "").trim();
+    const openaiKey = (Deno.env.get("OPENAI_API_KEY") || "").trim();
     const t0 = Date.now();
 
     if (phase === "job_start") {
@@ -168,7 +170,7 @@ Deno.serve(async (req) => {
     if (phase === "job_tick") {
       const jobId = String(body.job_id || "");
       if (!jobId) return json({ success: false, error: "job_id required", phase: "job_tick" }, 400);
-      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey });
+      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey, openaiKey });
       return json({ ...job, phase: "job_tick", app_version: APP_VERSION, timing: { total_ms: Date.now() - t0 } });
     }
 
@@ -217,7 +219,7 @@ Deno.serve(async (req) => {
           performanceHints: learned.performance_pattern_hints,
           learning: learned.learning,
           explicitCreatorIntent: intentText || undefined,
-          model: V11_WRITER_MODEL,
+          model: V11_SEED_MODEL,
           timeoutMs: 18000,
         })
         : quotaFromCadence(learned.cadence, intentText);
@@ -394,7 +396,7 @@ Deno.serve(async (req) => {
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
             learning: learned.learning,
-            model: V11_WRITER_MODEL,
+            model: V11_SEED_MODEL,
             timeoutMs: 32000,
           });
         let xaiRes = await runExpand();
@@ -444,7 +446,7 @@ Deno.serve(async (req) => {
         required_slots,
         key_present: !!xaiKey,
         key_len: xaiKey.length,
-        expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none",
+        expand_model: xai_seed_expansion.attempted ? V11_SEED_MODEL : "none",
         supply_low: cumulative < required_slots,
         diagnostics: {
           app_version: APP_VERSION,
@@ -454,7 +456,7 @@ Deno.serve(async (req) => {
           local_raw: local.length,
           local_passed: gated.passed.length,
           local_rejected: gated.local_gate_rejected,
-          expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none",
+          expand_model: xai_seed_expansion.attempted ? V11_SEED_MODEL : "none",
           evidence_activity_rows: (actRows || []).length,
           evidence_subjects: evidenceSubjects.length,
           published_evidence_rows: publishedEvidence.length,
@@ -649,6 +651,8 @@ Deno.serve(async (req) => {
         flatCount++;
       }
       const redistributed = redistributeDailyTopics(outDays, postsPerDay);
+      enforcePersonalPerDay(redistributed.days, PERSONAL_PER_DAY_MAX);
+      demoteExperienceOnMassSlots(redistributed.days);
       for (let di = 0; di < redistributed.days.length; di++) {
         redistributed.days[di].posts.forEach((p: any, si: number) => {
           p.dayOffset = di;
@@ -699,7 +703,7 @@ Deno.serve(async (req) => {
           order8d_functional_restore: true,
           order8d_cors_methods: true,
           order0b_manual_leakage_separation: true,
-          order8d_note: "v11 write phase uses ORDER 7B independent writer; generate-post is fallback only",
+          order8d_note: "v11 write phase uses ORDER 7B ChatGPT writer; Grok is quota/seeds only; generate-post is not the write path",
           soft_daily_cap: softDailyCap(postsPerDay),
           max_daily_topic: redistributed.max_daily_topic,
           topic_distribution: topicDistributionReport(redistributed.days),
@@ -723,7 +727,7 @@ Deno.serve(async (req) => {
         .limit(400);
       const posts = await writeSlotBatch({
         slots,
-        xaiKey: xaiKey || null,
+        openaiKey: openaiKey || null,
         dryRun,
         voiceRows: (voiceActs || []) as any,
       });
@@ -734,10 +738,11 @@ Deno.serve(async (req) => {
         engine: WEEKLY_ENGINE_VERSION,
         writer_model: V11_WRITER_MODEL,
         system_origin_class: "AP_PIPELINE",
+        chatgpt_writer_attempted: posts.some((p) => p.writer_call_attempted),
         xai_usage: {
           seed_expansion: false,
           external_supplement: false,
-          creator_generation: posts.some((p) => p.writer_call_attempted),
+          creator_generation: false,
         },
         timing: { total_ms: Date.now() - t0 },
       });

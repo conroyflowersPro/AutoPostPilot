@@ -16,6 +16,7 @@ const cr = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/creator-
 const se = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-engine.ts"), "utf8");
 const gi = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/generation-integration.ts"), "utf8");
 const voice = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8");
+const dna = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8");
 const ver = readFileSync(path.join(ROOT, "lib/version.ts"), "utf8");
 const ix = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/index.ts"), "utf8");
 
@@ -67,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.2.5)");
+console.log("Writer quality + leftover seeds (v11.3.0)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -84,8 +85,8 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.2.5", /APP_VERSION = "11.2.5"/.test(ver) && /APP_VERSION = "11.2.5"/.test(ix));
-ok("W18. Korean summary names keyword infer", /키워드만 있어도/.test(ver));
+ok("W17. version lockstep 11.3.0", /APP_VERSION = "11.3.0"/.test(ver) && /APP_VERSION = "11.3.0"/.test(ix));
+ok("W18. Korean summary names ChatGPT writer and new readers", /ChatGPT/.test(ver) && /새 독자/.test(ver) && /하루 관심사/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
@@ -99,6 +100,25 @@ ok("W28. info posts forbid 음슴체", /Do not use 음슴체 on information post
 ok("W29. public words must not distort the claim", /NEVER swap a word if it would change the claim/.test(wr));
 ok("W30. pipeline passes editorial mode into voice", /voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
+ok("W32. original body uses OpenAI ChatGPT", /api\.openai\.com\/v1\/chat\/completions/.test(wr) && /OPENAI_API_KEY/.test(ix));
+ok("W33. writer does not call xAI", !/api\.x\.ai/.test(wr));
+ok("W34. DNA participation order replies bookmarks quotes reposts", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
+ok("W35. DNA says weights are probabilities not counts", /predicted action probabilities/.test(dna));
+ok("W36. DNA spacing 48h For You window 14-22 PT", /48 hours/.test(dna) && /14:00 America\/Los_Angeles/.test(dna) && /14:00–22:00 PT/.test(dna) && /Do not stack originals/.test(dna));
+ok("W37. DNA audience is readers not a Tesla club", /Audience is readers/.test(dna) && /not a Tesla club/.test(dna));
+ok("W38. DNA mix not keep-worthy-only", /do not write only keep-worthy/.test(dna));
+ok("W39. DNA copy-link is predicted Home viewer not author DM", /Author copying an original and DMing/.test(dna) && /Direct navigation/.test(dna));
+ok("W40. writer readers + wording range", /Audience is readers/.test(wr) && /wording AND the range of wording/.test(wr));
+ok("W41. writer tension can inform without preaching", /leave judgment to the reader/.test(wr) && /that can make the post informative/.test(wr));
+ok("W42. writer mix for bookmarks not archive-only", /do not write only keep-worthy archive posts/.test(wr));
+ok("W43. writer has no copy-link weight numbers", !/ShareViaCopyLink/.test(wr) && !/weight 20/.test(wr) && !/가중치 20/.test(wr));
+ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시/.test(ver));
+ok("W45. write phase does not credit Grok for ChatGPT originals", /chatgpt_writer_attempted/.test(ix) && /phase === "write"/.test(ix) && /creator_generation: false/.test(ix));
+ok("W46. DNA new readers first, Tesla not default", /NEW READERS/.test(dna) && /Tesla\/Elon are not the default/.test(dna));
+ok("W47. DNA personal cap 1/day", /PERSONAL CAP/.test(dna) && /at most one personal-interest original per day/.test(dna));
+ok("W48. DNA length bands", /informative ~50-110/.test(dna) && /experience ~70-160/.test(dna));
+ok("W49. writer length band helper", /lengthBandForMode/.test(wr) && /LENGTH: /.test(wr));
+ok("W50. prefer 4/day not frozen 5", /Prefer 4\/day/.test(dna) && /POSTS_TARGET = 4/.test(ix));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

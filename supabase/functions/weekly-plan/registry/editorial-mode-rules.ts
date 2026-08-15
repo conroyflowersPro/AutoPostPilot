@@ -33,9 +33,9 @@ export const MODE_SEED_GUIDANCE: Record<EditorialMode, string> = {
 };
 
 export const DEFAULT_EDITORIAL_RATIO: Record<EditorialMode, number> = {
-  INFORMATIVE: 28,
-  COMPARE: 18,
-  OPINION: 18,
+  INFORMATIVE: 35,
+  COMPARE: 15,
+  OPINION: 20,
   EXPERIENCE: 18,
-  CASUAL_OBSERVATION: 18,
+  CASUAL_OBSERVATION: 12,
 };

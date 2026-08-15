@@ -28,7 +28,7 @@ function ok(name, cond) {
 console.log("Grok 4.6 reasoning_effort low (v11.1.4 0/28)");
 ok("R1. seed expand uses reasoning_effort low", /reasoning_effort:\s*"low"/.test(cr));
 ok("R2. quota uses reasoning_effort low", /reasoning_effort:\s*"low"/.test(qu));
-ok("R3. writer uses reasoning_effort low", /reasoning_effort:\s*"low"/.test(wr));
+ok("R3. writer is ChatGPT not Grok reasoning", /api\.openai\.com\/v1\/chat\/completions/.test(wr) && !/reasoning_effort/.test(wr));
 ok("R4. expand abort labeled xai_timeout", /xai_timeout/.test(cr));
 ok("R5. quota fallback keeps grok_error", /grok_error/.test(qu) && /quota_grok_error/.test(ix));
 ok("R6. expand cause is kept on the job", /last_expand_error/.test(job) && /원인:/.test(job));

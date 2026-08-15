@@ -7,7 +7,7 @@
  */
 
 export const PERFORMANCE_DNA_RUNTIME_VERSION =
-  "performance-dna-runtime-baseline-v1-candidates";
+  "performance-dna-runtime-v1.4-mass-seeds";
 
 export function buildPerformanceDnaPlannerBlock(): {
   block: string;
@@ -21,7 +21,17 @@ export function buildPerformanceDnaPlannerBlock(): {
     "STATUS: INITIAL BASELINE v1 previously run — candidates only; VALIDATED patterns = 0",
     "EVIDENCE BASIS: Phase1A public_metrics samples + observed published posts (not full 3009 correlation job)",
     "METRIC POLICY: public_metrics usable as weak signal; non_public/organic often PARTIAL — missing ≠ 0",
-    "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > reposts > quotes > likes > impressions",
+    "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
+    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim.",
+    "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion; leave judgment to the reader so they can reply. Keep the entry barrier low.",
+    "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
+    "NEW READERS: center the week in mass like-neighborhoods the public already meets (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Tesla/Elon are not the default seed subject.",
+    "PERSONAL CAP: at most one personal-interest original per day (FSD/Cybertruck/LAFC/gaming/lived). Keep EXPERIENCE when evidence exists. Do not invent lived episodes.",
+    "OON FOR YOU: originals only; new situation inside 48 hours; leave a judgment gap so readers can reply.",
+    "LENGTH: informative ~50-110 chars one sentence; casual ~40-80; compare/opinion ~60-130; experience ~70-160. Second sentence only to resolve tension.",
+    "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
+    "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
+    "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
     "CANDIDATE associations (do NOT treat as proven rules):",
     "1) Practical investigation + on-device video → higher bookmarks/views (CANDIDATE)",
     "2) Pointing to ultra-practical community how-to → higher likes/RTs (CANDIDATE)",

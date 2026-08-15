@@ -107,15 +107,16 @@ export type RevenueDnaPayload = {
 };
 
 export const METRIC_WEIGHTS = {
-  followersGained: 40,
-  profileVisits: 18,
-  revenue: 15,
-  bookmarks: 10,
-  replies: 7,
-  reposts: 5,
-  quotes: 2,
+  replies: 40,
+  bookmarks: 30,
+  quotes: 20,
+  reposts: 15,
+  profileVisits: 8,
+  revenue: 8,
   likes: 2,
   impressions: 1,
   detailExpands: 3,
   shares: 2,
+  /** Lagging result. Out of strategy rank. */
+  followersGained: 0,
 } as const;

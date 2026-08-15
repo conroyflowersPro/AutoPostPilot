@@ -45,11 +45,12 @@ function extractJson(raw: string): any {
 export function quotaFromCadence(cadence: CadenceSignal, intentText?: string): WeeklyQuota {
   const avg = Number(cadence?.avg_originals_on_active_days) || 0;
   const last14 = Number(cadence?.originals_last_14d) || 0;
-  let ppd = 6;
-  if (avg >= 2) ppd = Math.round(avg);
-  else if (last14 >= 10) ppd = Math.round(last14 / 14);
-  if (intentText && /적게|줄여|4개|하루\s*4/.test(intentText)) ppd = Math.min(ppd, 4);
-  if (intentText && /많이|성장|채워|할당/.test(intentText)) ppd = Math.max(ppd, 5);
+  let ppd = 4;
+  if (avg >= 5) ppd = 5;
+  else if (avg >= 3) ppd = Math.round(avg);
+  else if (last14 >= 28) ppd = 5;
+  if (intentText && /적게|줄여|하루\s*3/.test(intentText)) ppd = Math.min(ppd, 3);
+  if (intentText && /많이|성장|채워|하루\s*5|5개/.test(intentText)) ppd = Math.max(ppd, 5);
   ppd = clampPostsPerDay(ppd);
   return {
     posts_per_day: ppd,
@@ -79,12 +80,12 @@ export async function inferWeeklyQuota(args: {
     "You infer the weekly ORIGINAL post quota for X account @Seung4680.",
     "Will is already in Creator DNA + engine rules. Do not wait for a typed slogan.",
     "this_run_note is an optional overlay, not the will.",
-    "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise), mix, whether higher volume linked to growth.",
-    "The algorithm does not write posts and does not pick the last sentence.",
+    "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise; same-author decay per For You refresh), 48-hour For You freshness, start 14:00 America/Los_Angeles, even-spread inside 14:00–22:00 PT, mix, whether higher volume linked to growth.",
+    "X ranking weights multiply predicted viewer-action probabilities on Home-served posts, not raw engagement counts and not author DMs of own links. They do not write posts and do not pick the last sentence.",
     "Days are 7 because 7-day generate is the engine action.",
-    `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Do not freeze 6 as a default.`,
+    `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Prefer 4/day. 5 fills the 14:00–22:00 PT window. Not a frozen 5. Do not freeze 6 as a default.`,
     "Thin or missing learned evidence is expected (cold start). Still infer posts_per_day from DNA + cadence within bounds. Do not refuse. Do not wait for validated performance patterns.",
-    "If handmade cadence is healthy and growth evidence supports it, go higher within max. If dumping likely hurt reach, go lower within min.",
+    "If handmade cadence is healthy and the 14:00–22:00 PT window has room, 5 is enough. Go to 6–8 only if dumping is unlikely. If dumping likely hurt reach, stay at 3–4.",
     "Korean rationale, one or two sentences.",
     'Output strict JSON: {"posts_per_day":6,"rationale":"..."}',
   ].join("\n");
