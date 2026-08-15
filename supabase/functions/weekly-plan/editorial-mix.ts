@@ -15,11 +15,11 @@ export const EDITORIAL_MODES = [
 export type EditorialMode = (typeof EDITORIAL_MODES)[number];
 
 export const DEFAULT_EDITORIAL_RATIO: Record<EditorialMode, number> = {
-  INFORMATIVE: 30,
+  INFORMATIVE: 35,
   COMPARE: 15,
-  OPINION: 25,
-  EXPERIENCE: 20,
-  CASUAL_OBSERVATION: 10,
+  OPINION: 20,
+  EXPERIENCE: 18,
+  CASUAL_OBSERVATION: 12,
 };
 
 const REDUCE_PRIORITY: EditorialMode[] = [
@@ -145,8 +145,8 @@ export function buildEditorialQueue(
 }
 
 export function lengthForEditorial(mode: EditorialMode | string): "SHORT" | "MEDIUM" | "LONG" {
-  if (mode === "COMPARE") return "LONG";
   if (mode === "CASUAL_OBSERVATION") return "SHORT";
+  if (mode === "EXPERIENCE") return "MEDIUM";
   return "MEDIUM";
 }
 

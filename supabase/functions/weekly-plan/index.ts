@@ -2,7 +2,7 @@
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
  * Seed supply: Creator DNA + engine rules + learned USER_DIRECT/performance → Grok infers quota AND fills it.
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
- * Target volume: postsPerDay 5–8 × days (≈35–56 / week).
+ * Target volume: prefer 4/day; 5 fills 14:00–22:00 PT; bounds 3–8.
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
  */
@@ -43,6 +43,7 @@ import {
   topicDistributionReport,
   softDailyCap,
 } from "./daily-topic-distribute.ts";
+import { enforcePersonalPerDay, demoteExperienceOnMassSlots, PERSONAL_PER_DAY_MAX } from "./seed-scope.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
@@ -56,8 +57,8 @@ import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job
 
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
-const POSTS_TARGET = 6;
-const APP_VERSION = "11.2.7";
+const POSTS_TARGET = 4;
+const APP_VERSION = "11.3.0";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -650,6 +651,8 @@ Deno.serve(async (req) => {
         flatCount++;
       }
       const redistributed = redistributeDailyTopics(outDays, postsPerDay);
+      enforcePersonalPerDay(redistributed.days, PERSONAL_PER_DAY_MAX);
+      demoteExperienceOnMassSlots(redistributed.days);
       for (let di = 0; di < redistributed.days.length; di++) {
         redistributed.days[di].posts.forEach((p: any, si: number) => {
           p.dayOffset = di;

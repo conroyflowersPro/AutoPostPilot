@@ -119,12 +119,14 @@ export function extractJson(raw: string): any | null {
 }
 /** Interest-cluster hints only. Never emit these labels as concrete_subject bodies. */
 export const DIMENSION_REGISTRY: Array<{ cluster: string; dimension: string; core?: boolean }> = [
+  { cluster: "DAILY_AI", dimension: "PHONE_DRAFT" },
+  { cluster: "PHONE_NOTIFY", dimension: "ALERT_LAYER" },
+  { cluster: "ROAD_PARK", dimension: "NO_BRAND" },
+  { cluster: "LIVING_COST", dimension: "FEE_WAIT" },
+  { cluster: "QUEUE_WAIT", dimension: "LINE" },
+  { cluster: "WEATHER_OUT", dimension: "GOING_OUT" },
   { cluster: "FSD", dimension: "SUPERVISION", core: true },
-  { cluster: "FSD", dimension: "MERGE_BEHAVIOR", core: true },
-  { cluster: "CYBERTRUCK", dimension: "CHARGING", core: true },
   { cluster: "CYBERTRUCK", dimension: "OWNER_TRADEOFF", core: true },
-  { cluster: "ROBOTAXI", dimension: "CURBSIDE_OPS", core: true },
-  { cluster: "AI_TECH", dimension: "TOOL_LIMITS" },
   { cluster: "LAFC", dimension: "MATCHDAY" },
   { cluster: "GAMING", dimension: "SHORT_SESSION" },
 ];

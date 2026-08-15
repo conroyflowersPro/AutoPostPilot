@@ -7,6 +7,12 @@
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
+import {
+  isForbiddenDefaultSubject,
+  isPersonalInterestSubject,
+  massSectorFromText,
+  PERSONAL_PER_DAY_MAX,
+} from "./seed-scope.ts";
 
 export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
 
@@ -38,7 +44,7 @@ export type CreatorSeedReasoningInput = {
   };
   model?: string;
   timeoutMs?: number;
-  /** One ring outside core interest (EV / semiconductor / space). Quota-hole fill. */
+  /** Mass public sectors for quota-hole fill. Not Tesla/Elon. */
   adjacentRing?: boolean;
 };
 
@@ -108,13 +114,11 @@ function defaultPerformanceHints(): string[] {
 }
 
 function interestDomainGate(text: string): boolean {
-  const t = text.toLowerCase();
-  // Creator interest domains — viral must pass this filter
-  return (
-    /tesla|fsd|cyber|robotaxi|로보|오토파일|자율|충전|수퍼차|lafc|축구|경기|직관|게임|그록|grok|ai|도지|doge|미국|한국|운전|차\b|모델\s*[3sy]|플래드|plaid/i.test(
-      t,
-    ) || t.length < 8
-  );
+  const t = String(text || "");
+  if (isForbiddenDefaultSubject(t)) return false;
+  if (adjacentDomainGate(t)) return true;
+  if (isPersonalInterestSubject(t)) return true;
+  return t.length < 8;
 }
 
 function normalizeSeed(x: any, i: number): ConcreteSeed | null {
@@ -226,8 +230,10 @@ export async function reasonCreatorSeeds(
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
     "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
-    "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
-    "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",
+    "NEW READERS FIRST. Tesla/Elon/Robotaxi-news are not the default seed subject.",
+    "At most about 1 personal-interest seed per day of quota (FSD/Cybertruck/LAFC/gaming/lived Tesla). Remaining seeds MUST be mass public sectors: DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
+    "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",
+    "cluster_weights may inform the ONE personal slot, not the whole week. Do not let Tesla dominate the mix.",
     "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
@@ -262,8 +268,8 @@ export async function reasonCreatorSeeds(
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
     weekly_goal_note: args.adjacentRing
-      ? "Fill quota holes with adjacent-ring directions (EV / semiconductor / space). Not Tesla lived. Return requested_seed_count seeds."
-      : "Fill the inferred quota. Distinct directions from DNA + engine + learned data. No frozen axes. Return requested_seed_count seeds.",
+      ? "Fill quota holes with mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Not Tesla/Elon. Return requested_seed_count seeds."
+      : "Fill the inferred quota. New readers first. At most ~1 personal-interest seed per day. Rest mass public sectors. No frozen Tesla axes. Return requested_seed_count seeds.",
     requirement:
       "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
@@ -304,9 +310,21 @@ export async function reasonCreatorSeeds(
     const rawList = seedListFromParsed(parsed);
     const seeds: ConcreteSeed[] = [];
     const seen = new Set<string>();
+    const maxPersonal = args.adjacentRing
+      ? 0
+      : Math.max(1, Math.min(PERSONAL_PER_DAY_MAX * 7, Math.ceil(requested / 7)));
+    let personalN = 0;
     for (let i = 0; i < rawList.length; i++) {
       const n = normalizeSeed(rawList[i], seeds.length);
       if (!n) continue;
+      if (isForbiddenDefaultSubject(n.concrete_subject)) continue;
+      const personal = isPersonalInterestSubject(n.concrete_subject, n.cluster);
+      if (personal) {
+        if (personalN >= maxPersonal) continue;
+        personalN += 1;
+      } else {
+        n.cluster = massSectorFromText(n.concrete_subject);
+      }
       const sig = n.subject_signature || subjectSignature(n.concrete_subject);
       if (seen.has(sig)) continue;
       seen.add(sig);

@@ -6,8 +6,8 @@
  * Keep WHO/WHY/NOT THIS in conceptual sync with lib/intelligence/creator-dna-runtime.ts
  * (Edge cannot import lib/).
  */
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.3.1-snapshot";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.3-readers-for-you";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.4-new-readers";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.4-mass-seeds";
 
 type PerformanceWindow = {
   status?: string;
@@ -39,6 +39,10 @@ export function performanceDnaBlock(): string {
     "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim.",
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion; leave judgment to the reader so they can reply. Keep the entry barrier low.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
+    "NEW READERS: center the week in mass like-neighborhoods the public already meets (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Tesla/Elon are not the default seed subject.",
+    "PERSONAL CAP: at most one personal-interest original per day (FSD/Cybertruck/LAFC/gaming/lived). Keep EXPERIENCE when evidence exists. Do not invent lived episodes.",
+    "OON FOR YOU: originals only; new situation inside 48 hours; leave a judgment gap so readers can reply.",
+    "LENGTH: informative ~50-110 chars one sentence; casual ~40-80; compare/opinion ~60-130; experience ~70-160. Second sentence only to resolve tension.",
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
     "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
@@ -65,15 +69,15 @@ export function performanceDnaBlock(): string {
 export function creatorDnaBlock(): string {
   return [
     `${CREATOR_DNA_RUNTIME_VERSION} (Archive/Historical learning — offline validated structure)`,
-    "WHO: Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC) retained.",
-    "WHY WRITE: inform/explain · share experience · light opinion · social reply",
+    "WHO: Korean Tesla multi-vehicle owner-creator; lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap.",
+    "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: two-speed; media often; informational → polite intentional (존칭); light-opinion 음슴체 = RECENTLY_EMERGING preference (not long-archive dominant).",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
     "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post",
     "REPOST: manual by Creator only; system may store/learn metadata; no auto-repost; REPOST text excluded from Writing DNA",
     "ARTICLES: quality-first; not default weekly pipeline",
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
-    "CONTENT STANCE: long-term Tesla investor / product progress; not short-term stock price chatter",
+    "CONTENT STANCE: do not default to Elon/Tesla ticker/Robotaxi news. Personal Tesla lived stays in the 1/day cap. Not short-term stock price chatter",
     "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
   ].join("\n");
 }
@@ -82,7 +86,8 @@ export function creatorDnaBlock(): string {
 export function engineRulesAsWill(): string {
   return [
     "7-day generate infers seeds from learned data. Never emit DIMENSION_REGISTRY labels as seed bodies.",
-    "Infer the week's quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota.",
+    "Infer the week's quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota. Prefer 4/day; 5 fills the 14:00–22:00 PT window. Not a frozen 5.",
+    "At most one personal-interest original per day. Remaining seeds are mass public sectors for new readers.",
     "USER_DIRECT trains 말투. AP_PIPELINE trains performance only.",
     "Do not invent lived experience or opinions. Authenticity first.",
     "Question closer only from USER_DIRECT form, never because X rewards participation.",

@@ -12,6 +12,7 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
+import { isPersonalInterestSubject, lengthBandForMode } from "./seed-scope.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -214,6 +215,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const expBound = ctx.experience_boundaries || {};
   const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
+  const editorialMode = s((ctx as any).seed_identity?.editorial_mode || (ctx as any).editorial_mode);
+  const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
+  const personal = isPersonalInterestSubject(subject, cluster);
 
   return [
     "You write one Korean X post for creator @Seung4680.",
@@ -229,6 +233,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
     "10) One complete sentence is enough if the situation is delivered. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
+    "LENGTH: " + lengthBandForMode(editorialMode),
     "INFORMATIVE/COMPARE register: polite 해요/존칭. Do not use 음슴체 on information posts.",
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
     "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
@@ -244,8 +249,11 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     s((ctx as any).cite_episode_hint)
       ? "CITE RELATED: You MAY mention the prior lived episode by situation (e.g. 지난 야간 FSD 보행자 대기). Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용."
       : "",
+    personal
+      ? ""
+      : "MASS PUBLIC SLOT: do not name Elon, Tesla, FSD, Cybertruck, or Robotaxi as the subject. Write the everyday public situation.",
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
-      ? "ADJACENT RING: one step outside core Tesla/FSD. EV industry, semiconductors, or space. Observation/opinion only. FORBIDDEN: first-person Tesla driving, same FSD episode, viral clone."
+      ? "ADJACENT RING: mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone."
       : "",
     "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
     "PUNCHLINE_STOP: " + String(punchStop),

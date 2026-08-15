@@ -39,7 +39,7 @@ const windowMs = 8 * 60 * 60 * 1000;
 const four = evenSpreadInWindow(0, windowMs, 4);
 const eight = evenSpreadInWindow(0, windowMs, 8);
 
-console.log("For You schedule (v11.2.7)");
+console.log("For You schedule (v11.3.0)");
 ok("S1. start hour 14", /FOR_YOU_START_HOUR = 14/.test(sch));
 ok("S2. end hour 22", /FOR_YOU_END_HOUR = 22/.test(sch));
 ok("S3. preferred gap 2h", /FOR_YOU_PREFERRED_GAP_MS = 2 \* 60 \* 60 \* 1000/.test(sch));
