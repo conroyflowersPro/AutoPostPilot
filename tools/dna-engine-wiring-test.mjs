@@ -36,7 +36,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.4.6)");
+console.log("DNA + engine live-path wiring (v11.4.7)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -83,7 +83,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.4.6", /APP_VERSION = "11.4.6"/.test(ver) && /APP_VERSION = "11.4.6"/.test(ix));
+ok("D28. version 11.4.7", /APP_VERSION = "11.4.7"/.test(ver) && /APP_VERSION = "11.4.7"/.test(ix));
 
 ok("D29. review engines stay off generate job",
   !/from "\.\/selective-regeneration\.ts"/.test(job) &&
@@ -99,6 +99,13 @@ ok("D31. Creator DNA is how he sees/thinks/expresses, not a template",
   /AP_PIPELINE drafts must not rewrite Creator DNA/.test(dna) &&
   /PURPOSE: Preserve how this person sees/.test(libDna) &&
   /Ask what he would notice first/.test(dna));
+ok("D32. Planner is strategy engine, planning before writing",
+  /plannerPhilosophyBlock/.test(quota) &&
+  /plannerPhilosophyBlock/.test(seedReason) &&
+  /PLANNER ROLE/.test(dna) &&
+  /not a writing engine/.test(dna) &&
+  /stronger months from now/.test(dna) &&
+  /Do not learn from unpublished AI drafts/.test(dna));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

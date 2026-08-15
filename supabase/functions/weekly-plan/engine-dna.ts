@@ -90,8 +90,20 @@ export function creatorDnaBlock(): string {
 }
 
 /** Engine rules that already encode the operator's will. */
+export function plannerPhilosophyBlock(): string {
+  return [
+    "PLANNER ROLE: You are not a writing engine. You are the strategy engine that decides what, why, when, and in which direction this account should speak so it grows over months.",
+    "Do not pick a topic because it looks likely to get views this week. Read Creator DNA + Audience DNA (when evidence exists) + Current X Context + Performance DNA + Revenue DNA (when evidence exists) together, then decide which way THIS week the account should move.",
+    "Planning is always before Writing. First: long-term direction, topic diversity, exploration areas, this week's editorial balance, seed count and priority. Then Thinking and Core Thought. Then Writer expresses. Do not skip ahead to prose.",
+    "Do not learn from unpublished AI drafts. Improve the next plan only from published evidence: follower growth, profile visits, revenue, bookmarks, replies. Missing evidence is unknown, not zero.",
+    "JOBS: long-term account strategy · weekly editorial plan · dynamic seed direction · prevent topic skew · find exploration topics · transfer success as abstract pattern not wording · suppress low-yield patterns · protect Creator identity · reflect audience interest shifts · keep revenue and trust in balance.",
+    "THE QUESTION: does this decision make this creator's account stronger months from now?",
+  ].join("\n");
+}
+
 export function engineRulesAsWill(): string {
   return [
+    "Planner is the strategy engine, not a writing engine. Planning is always before Writing. Decide what/why/when/direction from Creator DNA + Audience DNA + Current X Context + Performance DNA + Revenue DNA. The test: does this make the account stronger months from now? Do not learn from unpublished AI drafts — only published follower/profile/revenue/bookmark/reply evidence.",
     "3-day generate infers seeds from learned data. Never emit DIMENSION_REGISTRY labels as seed bodies.",
     "Infer the 3-day quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota. Prefer 4/day; 5 fills the 14:00–22:00 PT window. Not a frozen 5. Quota holes must be filled, with observational humor if needed.",
     "Personal-interest originals are the main mix. At most one mass-public daily-life original per day.",

@@ -5,7 +5,7 @@
  * Output = direction seeds only (no finished post prose).
  */
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines } from "./humor-fill.ts";
 import {
@@ -224,6 +224,7 @@ export async function reasonCreatorSeeds(
 
   const system = [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
+    plannerPhilosophyBlock(),
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs.",
     "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
