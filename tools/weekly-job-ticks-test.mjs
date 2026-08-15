@@ -40,10 +40,15 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.3.3", /const APP_VERSION = "11.3.3"/.test(ix));
+ok("J15. shipping 11.3.4", /const APP_VERSION = "11.3.4"/.test(ix));
 ok("J24. empty write retries once then uses planned length", /_write_retry/.test(job) && /const planned = \(st\.write_flat/.test(job));
 ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
+ok("J27. Load failed is treated as resume not a hard stop", /isTransientEdgeError/.test(gen) && /Load failed/i.test(readFileSync(path.join(ROOT, "lib/transient-edge-error.ts"), "utf8")));
+ok("J28. followJob resumes on Safari drop not only Korean timeout", /if \(!isTransientEdgeError\(e\)\) throw e/.test(gen) && /사파리 연결이 잠깐 끊겼습니다/.test(gen));
+ok("J29. job_start Load failed polls job_status", /phase: "job_start"/.test(gen) && /phase: "job_status"/.test(gen) && /다시 눌러 주세요/.test(gen));
+ok("J30. red box never dumps English Load failed", /setError\(koreanEdgeError\(e\)\)/.test(gen) && !/setError\(e\?\.message/.test(gen));
+ok("J31. job_status retries after Safari drop", /phaseName === "job_status" \? 3 : 1/.test(gen));
 ok("J16. video not implemented", /Video is out of scope/.test(job) && !/job_type.*video/.test(job));
 ok("J17. migration apply workflow", existsSync(wf));
 ok("J18. learning line on quota tick", /학습:/.test(job));
