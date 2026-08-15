@@ -271,7 +271,7 @@ export function collectLearnedSeedSignals(opts: {
     "Likes are algorithm-layer for mix/spacing, not a sentence recipe",
     "X weights multiply predicted Home-viewer actions, not raw counts — never copy weight numbers into a post",
     "Do not write only keep-worthy posts; mix/diversity is how bookmarks are sought",
-    "Do not install a repeating punchline (e.g. 논란이 자산) across the week",
+    "Do not install a repeating punchline across the week",
   ];
   for (const { cluster, n } of cluster_weights) {
     const entry = entryHits.get(cluster) || 0;

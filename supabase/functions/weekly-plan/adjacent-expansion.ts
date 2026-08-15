@@ -51,7 +51,7 @@ export function adjacentDomainGate(text: string): boolean {
 export function adjacentRingPromptLines(): string[] {
   return [
     "QUOTA HOLE FILL — mass public sectors for NEW readers. Not Tesla/Elon as the subject.",
-    "Sectors: daily AI use, phone/notifications, California road/parking (street / structure / red curb — not 이중주차), living costs/fees in USD, queues (drive-through, airport, store), SoCal weather/out.",
+    "Sectors are schema only: DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT. Infer a NEW mass-public situation in those bounds. Do not copy a situation menu from this prompt. California life, not invented Korea civic housing.",
     "cluster MUST be one of DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
     "INFORMATIVE / OPINION / COMPARE / CASUAL only. Never EXPERIENCE. Never first-person Tesla driving. Never Elon/Musk.",
     "Do not clone viral wording. Distinct directions only.",

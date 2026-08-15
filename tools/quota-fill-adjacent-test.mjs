@@ -106,7 +106,7 @@ ok("A22. expand uses placeable count not raw 6-batch", /placeableSeedCount/.test
 ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
 ok("A25. Korea-only civic is forbidden default", /isKoreaOnlySituation/.test(scopeSrc) && /이중\\s\*주차/.test(scopeSrc));
 ok("A26. 이중주차 is Korea-only", /이중\\s\*주차/.test(scopeSrc) && /관리사무소/.test(scopeSrc) && /배민/.test(scopeSrc));
-ok("A27. adjacent prompt is CA road not 이중주차 as default", /California road\/parking/.test(adjSrc) && /not 이중주차/.test(adjSrc));
+ok("A27. adjacent infers mass situation, no street-parking menu", /Infer a NEW mass-public situation/.test(adjSrc) && !/street \/ structure \/ red curb/.test(adjSrc) && /이중\\s\*주차/.test(scopeSrc));
 ok("A28. seed prompt lives in California", /Creator lives in California/.test(cr) && /FORBIDDEN invented subjects: 이중주차/.test(cr));
 ok("A29. job skips Korea-only on expand and select", /isKoreaOnlySituation/.test(job));
 ok("A30. expand batch 10 on job path", /const EXPAND_BATCH = 10/.test(job));
@@ -139,6 +139,10 @@ ok("A40. job lock covers a write tick", /JOB_LOCK_MS = 90000/.test(job));
 ok("A41. write is one slot per tick so Safari can continue past 2/12", /const WRITE_CHUNK = 1/.test(job) && /skipSelectiveRegen: true/.test(job));
 ok("A42. Grok seed prompt does not list the canned 11.5.6 subjects",
   !/사이버트럭 사이드미러/.test(cr) && !/차선 합류 망설임/.test(cr) && !/FORBIDDEN clone subjects/.test(humor) && !/Prefer 알림 겹침/.test(cr));
+ok("A43. seed philosophy is infer, not prompt examples",
+  /Infer\. Do not paste examples/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")) &&
+  /Never emit a prompt example/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8")) &&
+  !/night FSD pedestrian wait/.test(cr) && !/e\.g\. 돈 not 자산/.test(cr));
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);

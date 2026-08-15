@@ -119,7 +119,7 @@ function defaultPerformanceHints(): string[] {
     "Practical investigation + real media → bookmarks/views candidate",
     "Honest incident / observation with low entry barrier (wording AND wording range) → readers, not a Tesla club",
     "Lived tension + how it resolved can be informative; do not hard-assert — leave judgment so readers can reply",
-    "Everyday wording (e.g. 돈 not 자산) can raise attention without changing meaning",
+    "Everyday wording can raise attention without changing meaning",
     "Do not write only keep-worthy posts; mix/diversity is how bookmarks are sought",
     "Do NOT reuse a past winning seed subject; transfer flow/entry/wording quality only",
   ];
@@ -247,7 +247,7 @@ export async function reasonCreatorSeeds(
     ? [
       "You infer X direction seeds for @Seung4680 (Korean track, California life).",
       "Return DIRECTION seeds only — never finished posts, never example prose.",
-      "Infer NEW situations from Creator DNA interests: FSD, Cybertruck, Tesla product, LAFC, gaming. Mix; do not rotate one list.",
+      "Infer NEW situations from Creator DNA interest domains this run. Mix the domains. Do not rotate a canned list.",
       "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
       "Do NOT copy DIMENSION labels. Do NOT emit a canned keyword list. Do not copy already_held or recent_published.",
       "Do not write example phrases from this prompt into concrete_subject. Infer a NEW situation this run.",
@@ -268,7 +268,7 @@ export async function reasonCreatorSeeds(
     "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
-    "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
+    "Do not dump CLUSTER + DIMENSION labels as concrete_subject. Code drops registry-label bodies.",
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
     "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
@@ -285,7 +285,7 @@ export async function reasonCreatorSeeds(
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
-    "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
+    "Lived evidence seeds may be CITE+RELATED follow-ups from held episodes. Never clone the same content. Do not copy a prompt example as the new subject.",
     ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
     ...(args.humorRing
       ? [

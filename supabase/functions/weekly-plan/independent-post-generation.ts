@@ -414,7 +414,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "3) Keep reader self-projection space. Never write a question. Never write CTA. Do not hard-assert the creator's opinion. Stop after the observation — that unfinished situation is the reply space.",
     "4) The selected Reaction Mechanism is the personality of this post — a reader-entry STRUCTURE, not a question and not a slogan. Use the READER ENTRY MOVE below. Never name it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
-    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Prefer 알림이 겹친다 / 화면이 가린다. NEVER swap a word if it would change the claim.",
+    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Do not paste a wording example from this prompt. NEVER swap a word if it would change the claim.",
     "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
     "7) Apply Creator Style as surface tendency — not a template. The planner chooses 해요/음슴/other for THIS slot from DNA + engine + the 3-day set so far. No frozen mix ratio. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not copy the previous post's ending.",
     "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
@@ -440,16 +440,16 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "READER MEANING HINT: " + s(core?.reader_relevant_meaning).slice(0, 100),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "limited first-person allowed only if already grounded" : "no fabricated first-person experience"),
     s((ctx as any).cite_episode_hint)
-      ? "CITE RELATED: You MAY mention the prior lived episode by situation (e.g. 지난 야간 FSD 보행자 대기). Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용."
+      ? "CITE RELATED: You MAY mention the prior lived episode named in the evidence hint. Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용. Do not copy a prompt example."
       : "",
     personal
       ? ""
       : "MASS PUBLIC SLOT: do not name Elon, Tesla, FSD, Cybertruck, or Robotaxi as the subject. Write the everyday public situation.",
     humorFill
-      ? "HUMOR FILL SLOT: light observational humor. FORBIDDEN: first-person lived drive/test/date. Keyword seed is valid. Do not fake a story."
+      ? "HUMOR FILL SLOT: light observational humor inferred from the seed direction. FORBIDDEN: first-person lived drive/test/date. Do not paste a prompt example. Do not fake a story."
       : "",
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
-      ? "ADJACENT RING: mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone."
+      ? "ADJACENT RING: mass-public daily life for new readers. Infer the situation. Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone, prompt-example subjects."
       : "",
     "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
     "PUNCHLINE_STOP: " + String(punchStop),

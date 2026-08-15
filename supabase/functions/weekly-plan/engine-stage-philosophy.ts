@@ -7,6 +7,7 @@ export const STAGE_PHILOSOPHY_VERSION = "stage-philosophy-v1-6-to-quality";
 export function seedGenerationPhilosophyBlock(): string {
   return [
     "SEED GENERATION: A seed is not pulled from a frozen topic list or hardcoded category. Infer 'worth thinking about THIS week' from Creator DNA + Audience DNA (when evidence exists) + Current X Context + Performance DNA + Revenue DNA (when evidence exists) + recent published flow + this week's strategy.",
+    "Infer. Do not paste examples. Never emit a phrase that appeared in this prompt as concrete_subject. DNA interest domains are bounds, not a topic menu. Few-shot seed subjects are forbidden.",
     "A seed starts thinking. It is not yet a post topic. A keyword appearing must not auto-promote into the post subject.",
     "JOBS: emit enough candidates for the needed post count and strategy; drop duplicates, low quality, and over-repeat; generate more if short. Store structured judgments only: topic, subtopic, why_now, creator relevance, audience relevance, evidence/context basis, exploration value. Do not store raw chain-of-thought.",
   ].join("\n");
