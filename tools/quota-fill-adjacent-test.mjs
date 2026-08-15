@@ -122,6 +122,14 @@ ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", ((
   const placeable = personal + Math.min(mass, 3);
   return personal === 6 && mass === 0 && placeable === 6 && placeable < 12;
 })());
+ok("A34. empty Grok expand injects DNA keyword seeds instead of stalling",
+  /localHumorKeywordSeeds\(required - placeable/.test(job) && /DNA 관심 키워드/.test(job));
+ok("A35. select fills keywords before bouncing to expand",
+  /totalAfterLocal/.test(job) && /adjacent_rounds \|\| 0\) < 2/.test(job));
+ok("A36. humorRing remaps OBSERVATION cluster onto DNA interests",
+  /inferPersonalCluster/.test(cr) && /humorRing cluster MUST/.test(cr));
+ok("A37. FSD keyword with OBSERVATION cluster is still personal",
+  /inferPersonalCluster/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-scope.ts"), "utf8")));
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);

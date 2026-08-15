@@ -485,7 +485,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   }
   st.prior_subjects = priorSubjects.slice(-priorSubjectCap(required));
   st.last_expand_error = xaiRes.error || "";
-  const placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, MASS_PER_DAY_MAX);
+  let placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, MASS_PER_DAY_MAX);
   if (added.length <= 0) {
     st.empty_streak = Number(st.empty_streak || 0) + 1;
     if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
@@ -496,12 +496,30 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.summary = [row.summary, st.last_expand_error ? `expand: ${st.last_expand_error}` : ""].filter(Boolean).join("\n");
       return;
     }
+    if (placeable < required) {
+      const held = (st.gated || []).map((s: any) => String(s.concrete_subject || ""));
+      const localFill = localHumorKeywordSeeds(required - placeable, held);
+      for (const s of localFill) {
+        st.gated.push(s);
+        if (s.concrete_subject) priorSubjects.push(String(s.concrete_subject));
+      }
+      st.prior_subjects = priorSubjects.slice(-priorSubjectCap(required));
+      placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, MASS_PER_DAY_MAX);
+      if (localFill.length) {
+        row.summary = [row.summary, `DNA 관심 키워드 ${localFill.length}개로 시드 구멍 채움`].filter(Boolean).join("\n");
+      }
+    }
     if (humorFill && placeable >= required && (st.gated || []).length > 0) {
-      row.step = "select";
-      row.label_ko = "3일 배치…";
+      row.step = "judge";
+      row.label_ko = "시드 판정…";
       return;
     }
-    if (placeable < required && st.dim_batch < st.max_expand) {
+    if (placeable >= required && (st.gated || []).length > 0) {
+      row.step = "judge";
+      row.label_ko = "시드 판정…";
+      return;
+    }
+    if (placeable < required && st.dim_batch < st.max_expand && st.empty_streak < 2) {
       st.humor_fill = true;
       row.label_ko = `유머·관심 시드로 할당량 보충 ${placeable}/${required}…`;
       return;
@@ -782,15 +800,6 @@ async function stepSelect(supabase: any, row: any) {
     (s, d) => s + (d.posts || []).filter((p: any) => isAdjacentExpansionSeed(p)).length,
     0,
   );
-  if (totalAfter < required && Number(st.adjacent_rounds || 0) < 8) {
-    st.adjacent_rounds = Number(st.adjacent_rounds || 0) + 1;
-    st.humor_fill = true;
-    st.adjacent_fill = true;
-    row.step = "expand";
-    row.label_ko = `유머·관심 시드로 할당량 보충 ${totalAfter}/${required}…`;
-    row.summary = [row.summary, `계획 ${totalAfter}/${required} → 유머·관심 시드로 채움`].filter(Boolean).join("\n");
-    return;
-  }
   if (totalAfter < required) {
     const held = redistributed.days.flatMap((d) => (d.posts || []).map((p: any) => String(p.concrete_subject || "")));
     const humor = localHumorKeywordSeeds(required - totalAfter, held);
@@ -800,6 +809,16 @@ async function stepSelect(supabase: any, row: any) {
       if (di >= redistributed.days.length) break;
       redistributed.days[di].posts.push(compactSlotLite(seed, di, redistributed.days[di].posts.length + 1, "CASUAL_OBSERVATION"));
     }
+  }
+  const totalAfterLocal = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
+  if (totalAfterLocal < required && Number(st.adjacent_rounds || 0) < 2) {
+    st.adjacent_rounds = Number(st.adjacent_rounds || 0) + 1;
+    st.humor_fill = true;
+    st.adjacent_fill = false;
+    row.step = "expand";
+    row.label_ko = `유머·관심 시드로 할당량 보충 ${totalAfterLocal}/${required}…`;
+    row.summary = [row.summary, `계획 ${totalAfterLocal}/${required} → 관심 시드로 채움`].filter(Boolean).join("\n");
+    return;
   }
   const totalFilled = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
   if (totalFilled < 1) {

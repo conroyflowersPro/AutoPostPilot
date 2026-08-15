@@ -20,8 +20,30 @@ export const MASS_SECTORS = [
 
 export type MassSector = (typeof MASS_SECTORS)[number];
 
+export const PERSONAL_CLUSTERS = [
+  "FSD",
+  "CYBERTRUCK",
+  "ROBOTAXI",
+  "TESLA",
+  "LAFC",
+  "GAMING",
+] as const;
+
 const PERSONAL_RE =
-  /tesla|테슬라|elon|musk|일론|머스크|cybertruck|사이버트럭|\bfsd\b|오토파일럿|로보택시|robotaxi|모델\s*[3sy]|플래드|plaid|lafc|직관|게임\s*한\s*판|매치메이킹/i;
+  /tesla|테슬라|elon|musk|일론|머스크|cybertruck|사이버트럭|\bfsd\b|hw3|v14|오토파일럿|로보택시|robotaxi|모델\s*[3sy]|플래드|plaid|lafc|축구|직관|\b게임\b|스팀|매치메이킹|\bgrok\b|그록|충전|슈퍼차저|supercharger/i;
+
+/** Map a subject onto a Creator-DNA interest cluster when Grok used OBSERVATION/HUMOR. */
+export function inferPersonalCluster(text: string, cluster?: string): string {
+  const c = String(cluster || "").toUpperCase();
+  if ((PERSONAL_CLUSTERS as readonly string[]).includes(c)) return c;
+  const t = String(text || "").toLowerCase();
+  if (/fsd|hw3|v14|오토파일럿|자율/.test(t)) return "FSD";
+  if (/cybertruck|사이버트럭/.test(t)) return "CYBERTRUCK";
+  if (/lafc|축구|손흥민|\bbmo\b/.test(t)) return "LAFC";
+  if (/게임|스팀|\bsteam\b|매치메이킹|큐 대기/.test(t)) return "GAMING";
+  if (/테슬라|tesla|\bgrok\b|그록|충전|슈퍼차저|supercharger/.test(t)) return "TESLA";
+  return c;
+}
 
 const ELON_TESLA_DEFAULT_RE =
   /elon|musk|일론|머스크|테슬라\s*주가|tsla\b|로보택시\s*뉴스|robotaxi news/i;
@@ -35,8 +57,8 @@ export function isKoreaOnlySituation(text: string): boolean {
 }
 
 export function isPersonalInterestSubject(text: string, cluster?: string): boolean {
-  const c = String(cluster || "").toUpperCase();
-  if (["FSD", "CYBERTRUCK", "ROBOTAXI", "TESLA", "LAFC", "GAMING"].includes(c)) return true;
+  const inferred = inferPersonalCluster(text, cluster);
+  if ((PERSONAL_CLUSTERS as readonly string[]).includes(inferred)) return true;
   return PERSONAL_RE.test(String(text || ""));
 }
 
