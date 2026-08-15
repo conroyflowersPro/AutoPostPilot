@@ -159,10 +159,14 @@ export type DailyAccountPulse = {
   date: string;
   impressions: number;
   likes: number;
+  engagements: number;
   newFollows: number;
   unfollows: number;
+  replies: number;
+  reposts: number;
   profileVisits: number;
   bookmarks: number;
+  shares: number;
 };
 
 function parseDailyOverview(text: string): DailyAccountPulse[] {
@@ -173,10 +177,14 @@ function parseDailyOverview(text: string): DailyAccountPulse[] {
     date: findCol(headers, ALIASES.date),
     impressions: findCol(headers, ALIASES.impressions),
     likes: findCol(headers, ALIASES.likes),
+    engagements: findCol(headers, ALIASES.engagements),
     followersGained: findCol(headers, ALIASES.followersGained),
     unfollows: findCol(headers, ["unfollows", "unfollow"]),
+    replies: findCol(headers, ALIASES.replies),
+    reposts: findCol(headers, ALIASES.reposts),
     profileVisits: findCol(headers, ALIASES.profileVisits),
     bookmarks: findCol(headers, ALIASES.bookmarks),
+    shares: findCol(headers, ALIASES.shares),
   };
   const out: DailyAccountPulse[] = [];
   for (let r = headerIdx + 1; r < rows.length; r++) {
@@ -188,10 +196,14 @@ function parseDailyOverview(text: string): DailyAccountPulse[] {
       date,
       impressions: parseNum(get(col.impressions)),
       likes: parseNum(get(col.likes)),
+      engagements: parseNum(get(col.engagements)),
       newFollows: parseNum(get(col.followersGained)),
       unfollows: parseNum(get(col.unfollows)),
+      replies: parseNum(get(col.replies)),
+      reposts: parseNum(get(col.reposts)),
       profileVisits: parseNum(get(col.profileVisits)),
       bookmarks: parseNum(get(col.bookmarks)),
+      shares: parseNum(get(col.shares)),
     });
   }
   return out;

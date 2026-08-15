@@ -15,6 +15,8 @@ const deep = read("supabase/functions/weekly-plan/deep-generation-context.ts");
 const judge = read("supabase/functions/weekly-plan/semantic-judge.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 const page = read("app/generate/page.tsx");
+const analyticsImport = read("app/api/learning/import/route.ts");
+const analyticsParser = read("lib/learning/parse-csv.ts");
 
 let pass = 0;
 let fail = 0;
@@ -45,7 +47,8 @@ ok("R7. Seed ranking system removed", !/seedSelectionValueScore/.test(seedEngine
 ok("R8. Planner strategy happens without Seed Pool input",
   /inferSevenDayStrategy/.test(planner) && !/seedPool: ConcreteSeed\[\][\s\S]*inferSevenDayStrategy/.test(planner));
 ok("R9. Planner uses up to 30 days actual X Analytics",
-  /from\("post_metrics"\)/.test(planner) && /Math\.min\(30, days\)/.test(planner) && /recent_x_analytics/.test(planner));
+  /from\("post_metrics"\)/.test(planner) && /Math\.min\(30, days\)/.test(planner) &&
+  /limit\(1000\)/.test(planner) && /recent_x_analytics/.test(planner));
 ok("R10. Planner does not replace missing analytics", /Do not estimate missing dates/.test(planner));
 ok("R11. Planner selects and allocates only after strategy",
   /selectSeedsForSevenDayPlan/.test(planner) && /seven_day_strategy/.test(planner) && /seed_pool/.test(planner));
@@ -73,6 +76,9 @@ ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent S
 ok("R20. count completes only from saved Judge-pass posts", /quotaFilled/.test(job) && /acceptedOutcomes/.test(job));
 ok("R21. each xAI stage is one-call-per-tick", /callPlanner/.test(planner) && /one xAI request/.test(planner));
 ok("R22. old local Seed judge/select are not live", /legacySeedJudgeUnused/.test(job) && /legacyLocalSelectUnused/.test(job));
+ok("R23. account overview remains a separate daily Planner signal",
+  /dailyAccountPulse/.test(analyticsImport) && /engagements: number/.test(analyticsParser) &&
+  /account_overview_daily/.test(planner) && /never to attribute an account total to an individual post/.test(planner));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

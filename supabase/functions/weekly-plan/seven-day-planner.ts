@@ -23,10 +23,28 @@ export type XAnalyticsPublishedPost = {
   features?: Record<string, unknown> | null;
 };
 
+export type XAnalyticsDailyAccountPulse = {
+  date: string;
+  impressions: number;
+  likes: number;
+  engagements: number;
+  bookmarks: number;
+  shares: number;
+  new_follows: number;
+  unfollows: number;
+  replies: number;
+  reposts: number;
+  profile_visits: number;
+};
+
 export async function loadRecentXAnalyticsPublished(
   supabase: { from: (table: string) => any },
   days = 30,
-): Promise<{ rows: XAnalyticsPublishedPost[]; coverage_days: number }> {
+): Promise<{
+  rows: XAnalyticsPublishedPost[];
+  coverage_days: number;
+  account_daily: XAnalyticsDailyAccountPulse[];
+}> {
   const since = new Date(Date.now() - Math.max(1, Math.min(30, days)) * 24 * 3600 * 1000).toISOString();
   try {
     let { data, error } = await supabase
@@ -34,18 +52,18 @@ export async function loadRecentXAnalyticsPublished(
       .select("post_id, content_snippet, published_at, action_type, followers_gained, profile_visits, bookmarks, replies, reposts, likes, impressions, quotes, shares, detail_expands, features")
       .gte("published_at", since)
       .order("published_at", { ascending: false })
-      .limit(300);
+      .limit(1000);
     if (error && /column|schema/i.test(String(error.message || ""))) {
       const fallback = await supabase
         .from("post_metrics")
         .select("content_snippet, published_at, followers_gained, profile_visits, bookmarks, replies, reposts, likes, impressions, quotes, features")
         .gte("published_at", since)
         .order("published_at", { ascending: false })
-        .limit(300);
+        .limit(1000);
       data = fallback.data;
       error = fallback.error;
     }
-    if (error || !Array.isArray(data)) return { rows: [], coverage_days: 0 };
+    if (error || !Array.isArray(data)) return { rows: [], coverage_days: 0, account_daily: [] };
     const rows: XAnalyticsPublishedPost[] = [];
     const dates = new Set<string>();
     const seenPosts = new Set<string>();
@@ -81,9 +99,37 @@ export async function loadRecentXAnalyticsPublished(
         features: row?.features && typeof row.features === "object" ? row.features : null,
       });
     }
-    return { rows, coverage_days: dates.size };
+    const accountDaily: XAnalyticsDailyAccountPulse[] = [];
+    const latestRun = await supabase
+      .from("learning_runs")
+      .select("raw_meta")
+      .eq("source", "x_analytics_csv")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const rawDaily = latestRun?.data?.raw_meta?.dailyAccountPulse;
+    if (Array.isArray(rawDaily)) {
+      for (const pulse of rawDaily.slice(0, 31)) {
+        const parsed = Date.parse(s(pulse?.date, 60));
+        if (!Number.isFinite(parsed) || parsed < Date.parse(since)) continue;
+        accountDaily.push({
+          date: new Date(parsed).toISOString().slice(0, 10),
+          impressions: Number(pulse?.impressions) || 0,
+          likes: Number(pulse?.likes) || 0,
+          engagements: Number(pulse?.engagements) || 0,
+          bookmarks: Number(pulse?.bookmarks) || 0,
+          shares: Number(pulse?.shares) || 0,
+          new_follows: Number(pulse?.newFollows) || 0,
+          unfollows: Number(pulse?.unfollows) || 0,
+          replies: Number(pulse?.replies) || 0,
+          reposts: Number(pulse?.reposts) || 0,
+          profile_visits: Number(pulse?.profileVisits) || 0,
+        });
+      }
+    }
+    return { rows, coverage_days: dates.size, account_daily: accountDaily };
   } catch {
-    return { rows: [], coverage_days: 0 };
+    return { rows: [], coverage_days: 0, account_daily: [] };
   }
 }
 
@@ -244,6 +290,7 @@ function strategySystem(): string {
     "Your only job in this call is to infer the seven-day account strategy and slot intents. Do not inspect or select Seeds. Do not write posts. Do not choose prose, thought order, tone, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Planning Horizon is seven days. Intelligence horizons remain whatever their evidence supports.",
     "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
+    "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
     "capacity_recommendation is operational context, not a command. Choose a final slot count that is credible for seven days and return exactly that many slot intents.",
@@ -258,6 +305,7 @@ export async function inferSevenDayStrategy(args: {
   capacityRecommendation: number;
   analytics: XAnalyticsPublishedPost[];
   analyticsCoverageDays: number;
+  accountDaily?: XAnalyticsDailyAccountPulse[];
   intelligence: PlannerIntelligenceBlocks;
   operatorNote?: string;
   timeoutMs?: number;
@@ -276,6 +324,7 @@ export async function inferSevenDayStrategy(args: {
       editorial_mode_labels: [...VALID_MODES],
       capacity_recommendation: args.capacityRecommendation,
       recent_x_analytics: analytics,
+      account_overview_daily: (args.accountDaily || []).slice(0, 31),
       analytics_rows_available: analytics.length,
       analytics_coverage_days: args.analyticsCoverageDays,
       operator_note_overlay_only: s(args.operatorNote, 180) || null,

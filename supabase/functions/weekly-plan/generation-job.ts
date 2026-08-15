@@ -772,6 +772,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     capacityRecommendation: Number(row.required_slots) || 28,
     analytics: analytics.rows,
     analyticsCoverageDays: analytics.coverage_days,
+    accountDaily: analytics.account_daily,
     intelligence,
     operatorNote: String(st.topic || "") || undefined,
     timeoutMs: 32000,
@@ -795,6 +796,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     row.summary,
     `Planner 7일 전략: ${result.value.strategy_summary}`,
     `X Analytics 실제 게시 ${result.value.analytics_rows_used}행 · 실제 날짜 ${result.value.analytics_coverage_days}일`,
+    `X Analytics 계정 개요 ${analytics.account_daily.length}일`,
     result.value.analytics_request_needed
       ? `X Analytics 추가 요청 필요: ${result.value.analytics_request_reason || "Planner 판단"}`
       : "",

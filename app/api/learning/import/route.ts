@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
           nextPayout: OPERATOR_REVENUE_START.nextPayout,
           videoEstimatedRevenueSum,
           dailyDays: daily.length,
+          dailyAccountPulse: daily.slice(0, 31),
           overviewNewFollows: daily.reduce((a, d) => a + d.newFollows, 0),
           contentNewFollows: rows.reduce((a, r) => a + r.followersGained, 0),
           revenueLayer: "account_payout_not_per_post",
