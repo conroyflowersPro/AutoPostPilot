@@ -33,6 +33,7 @@ export function revenueDnaPhilosophyBlock(): string {
     "REVENUE DNA: Not a standalone ad engine that maximizes money. It explains which content–audience relationships connect to durable revenue.",
     "Revenue matters. It must not outrank Creator authenticity, Audience Quality, Trust, or Authority.",
     "JOBS: analyze Revenue per Post / Impression / Engagement, and by Topic, Content Type, Publish Time, Media Type, from real revenue data so Planner can see profitable directions.",
+    "First evidence may be account-level payout. That is a start, not per-post revenue. Do not spread the amount across posts. Video estimated revenue 0 is not that payout. Per-post missing stays UNKNOWN.",
     "Do not repeat a topic only because it paid. Do not steer the account where the Creator does not want to go. If revenue evidence is missing, keep UNKNOWN / insufficient evidence — never treat an empty value as a success pattern.",
   ].join("\n");
 }
@@ -60,6 +61,7 @@ export function analyticsImportPhilosophyBlock(): string {
     "ANALYTICS IMPORT: Not 'read a CSV'. It is the inlet that turns post-publish reality into a form the system can learn.",
     "Keep source format separate from the internal model so a provider change does not shake Learning Architecture.",
     "JOBS: ingest X Analytics reports first — Post ID, publish time, followers gained, profile visits, bookmarks, replies, reposts, quotes, likes, impressions, detail expands, link actions — into the canonical internal model. Fedica or a future source adds an adapter only.",
+    "Content CSV is posts. Account overview and video overview are not posts. Do not turn daily totals or clip rows into post_metrics. Overview follows and content follows may disagree — missing ≠ 0, do not average them.",
   ].join("\n");
 }
 

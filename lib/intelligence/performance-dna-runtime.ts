@@ -41,8 +41,8 @@ export function buildPerformanceDnaPlannerBlock(): {
     "4) Milestone personal story + gratitude → higher replies (CANDIDATE)",
     "5) Honest incident report → higher replies (CANDIDATE)",
     "6) Ultra-short reply-only posts → weak as reach drivers (may still build relationships)",
-    "OPERATOR WINDOW 2026-08-01..2026-08-14 (CANDIDATE): lived FSD+clip and in-car/in-shop friction transferred as patterns only — never clone a post.",
-    "Revenue candidate 42.29 USD in 2026-08-01/15. Do not tweet the number. Do not raise daily quota from this one window.",
+    "OPERATOR WINDOW 2026-08-01..2026-08-15 (CANDIDATE): X Analytics content + overview + video export. Lived patterns only — never clone a post.",
+    "Revenue START 42.29 USD 2026-08-01..2026-08-15 (X Payouts). Next payout 2026-08-28. Account-level, not per-post. Video Estimated Revenue 0 is not this payout. Do not tweet the number. Do not raise daily quota from this one window.",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · promote candidate→validated here · clone a winning post",
     "Planner use: soft preference only; never override Creator DNA authenticity or Creator Intent",
   ];

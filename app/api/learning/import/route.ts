@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { parseMetricsCsv } from "@/lib/learning/parse-csv";
-import type { MetricOrigin } from "@/lib/learning/types";
+import { parseXAnalyticsExport, type DailyAccountPulse } from "@/lib/learning/parse-csv";
+import { OPERATOR_REVENUE_START } from "@/lib/learning/operator-revenue-start";
+import type { MetricOrigin, NormalizedPostMetrics } from "@/lib/learning/types";
 
 export const maxDuration = 26;
 
@@ -16,8 +17,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const csvText = typeof body.csvText === "string" ? body.csvText : "";
-    if (!csvText.trim()) {
+    const texts: string[] = [];
+    if (typeof body.csvText === "string" && body.csvText.trim()) texts.push(body.csvText);
+    if (Array.isArray(body.csvTexts)) {
+      for (const t of body.csvTexts) {
+        if (typeof t === "string" && t.trim()) texts.push(t);
+      }
+    }
+    if (texts.length === 0) {
       return NextResponse.json({ error: "csvText required" }, { status: 400 });
     }
 
@@ -25,10 +32,24 @@ export async function POST(req: NextRequest) {
       ? body.origin
       : "unknown") as MetricOrigin;
     const notes = typeof body.notes === "string" ? body.notes.slice(0, 500) : null;
+    const payoutUsdRaw = Number(body.payoutUsd);
+    const payoutUsd =
+      Number.isFinite(payoutUsdRaw) && payoutUsdRaw > 0
+        ? payoutUsdRaw
+        : OPERATOR_REVENUE_START.amountUsd;
 
-    let rows;
+    const rows: NormalizedPostMetrics[] = [];
+    const kinds: string[] = [];
+    let videoEstimatedRevenueSum = 0;
+    const daily: DailyAccountPulse[] = [];
     try {
-      rows = parseMetricsCsv(csvText, origin);
+      for (const text of texts) {
+        const parsed = parseXAnalyticsExport(text, origin);
+        kinds.push(parsed.kind);
+        rows.push(...parsed.posts);
+        daily.push(...parsed.daily);
+        videoEstimatedRevenueSum += parsed.videoEstimatedRevenueSum;
+      }
     } catch (e: any) {
       return NextResponse.json(
         { error: "CSV parse failed", detail: String(e?.message || e) },
@@ -49,7 +70,21 @@ export async function POST(req: NextRequest) {
         source: "x_analytics_csv",
         status: "imported",
         notes,
-        raw_meta: { rowCount: rows.length, origin, adapter: "x_analytics_csv", primary: "x_analytics" },
+        raw_meta: {
+          rowCount: rows.length,
+          origin,
+          adapter: "x_analytics_csv",
+          primary: "x_analytics",
+          kinds,
+          payoutUsd,
+          payoutPeriod: `${OPERATOR_REVENUE_START.periodFrom}..${OPERATOR_REVENUE_START.periodTo}`,
+          nextPayout: OPERATOR_REVENUE_START.nextPayout,
+          videoEstimatedRevenueSum,
+          dailyDays: daily.length,
+          overviewNewFollows: daily.reduce((a, d) => a + d.newFollows, 0),
+          contentNewFollows: rows.reduce((a, r) => a + r.followersGained, 0),
+          revenueLayer: "account_payout_not_per_post",
+        },
       })
       .select("id")
       .single();
@@ -126,6 +161,9 @@ export async function POST(req: NextRequest) {
       success: true,
       learningRunId: run.id,
       imported: rows.length,
+      kinds,
+      payoutUsd,
+      videoEstimatedRevenueSum,
       status: "imported",
       next: "POST /api/learning/analyze with learningRunId",
     });

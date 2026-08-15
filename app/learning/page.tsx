@@ -14,7 +14,9 @@ type MemoryRow = {
 };
 
 export default function LearningPage() {
+  const [csvTexts, setCsvTexts] = useState<string[]>([]);
   const [csvText, setCsvText] = useState("");
+  const [payoutUsd, setPayoutUsd] = useState("42.29");
   const [origin, setOrigin] = useState<"unknown" | "ai" | "manual">("unknown");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,15 +44,20 @@ export default function LearningPage() {
     refreshMemory();
   }, []);
 
-  async function handleFile(file: File | null) {
-    if (!file) return;
-    const text = await file.text();
-    setCsvText(text);
+  async function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const texts: string[] = [];
+    for (const file of Array.from(list)) {
+      texts.push(await file.text());
+    }
+    setCsvTexts(texts);
   }
 
   async function handleImport() {
-    if (!csvText.trim()) {
-      setError("CSV 내용이 필요합니다.");
+    const pasted = csvText.trim();
+    const texts = [...csvTexts, ...(pasted ? [pasted] : [])];
+    if (texts.length === 0) {
+      setError("CSV 파일이 필요합니다.");
       return;
     }
     setLoading(true);
@@ -62,9 +69,10 @@ export default function LearningPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          csvText,
+          csvTexts: texts,
           origin,
           notes: notes.trim() || undefined,
+          payoutUsd: Number(payoutUsd) || 42.29,
         }),
       });
       const data = await res.json();
@@ -132,14 +140,29 @@ export default function LearningPage() {
           </summary>
           <div className="mt-3 space-y-3">
             <label className="block text-xs text-zinc-400">
-              성과 CSV 가져오기 (X Analytics 우선)
+              X Analytics CSV (콘텐츠 / 계정 개요 / 영상 개요를 같이 올려도 됩니다)
             </label>
             <input
               type="file"
               accept=".csv,text/csv"
-              onChange={(e) => handleFile(e.target.files?.[0] || null)}
+              multiple
+              onChange={(e) => handleFiles(e.target.files)}
               className="block w-full text-xs text-zinc-400"
             />
+            {csvTexts.length > 0 && (
+              <p className="text-xs text-zinc-500">파일 {csvTexts.length}개 읽음</p>
+            )}
+            <label className="block text-xs text-zinc-400">
+              이번부터 수익 (계정 지급 USD). 글마다 나눈 값이 아닙니다.
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={payoutUsd}
+                onChange={(e) => setPayoutUsd(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs outline-none focus:border-emerald-500"
+              />
+            </label>
             <textarea
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
@@ -163,7 +186,7 @@ export default function LearningPage() {
             </div>
             <button
               type="button"
-              disabled={loading || !csvText.trim()}
+              disabled={loading || (csvTexts.length === 0 && !csvText.trim())}
               onClick={handleImport}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm hover:bg-indigo-500 disabled:opacity-40"
             >

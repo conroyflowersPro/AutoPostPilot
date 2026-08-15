@@ -11,6 +11,8 @@ export type PlannerIntelligenceBlocks = {
   current_x_context: string;
 };
 
+import { operatorRevenueStartBlock } from "./operator-revenue-start.ts";
+
 const UNKNOWN = "UNKNOWN / insufficient evidence";
 
 function compact(v: unknown, max = 400): string {
@@ -89,7 +91,10 @@ function performanceLearnedBlock(row: Record<string, unknown> | null): string {
 
 function revenueBlock(row: Record<string, unknown> | null): string {
   if (!row) {
-    return `REVENUE DNA (current): ${UNKNOWN}. Do not treat empty revenue as a success pattern. Must not dominate Planner or outrank authenticity/trust.`;
+    return [
+      operatorRevenueStartBlock(),
+      "No revenue_dna row yet. Account payout is the start. Per-post revenue stays UNKNOWN. Do not invent per-post dollars.",
+    ].join("\n");
   }
   const summary = compact(row.summary_ko, 220) || UNKNOWN;
   const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};

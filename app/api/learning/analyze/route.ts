@@ -10,6 +10,7 @@ import {
 } from "@/lib/learning/score";
 import { extractFeatures } from "@/lib/learning/features";
 import { promoteInterestLadder, interestLadderPromptLines } from "@/lib/learning/interest-promotion";
+import { OPERATOR_REVENUE_START } from "@/lib/learning/operator-revenue-start";
 import type { NormalizedPostMetrics, MetricOrigin } from "@/lib/learning/types";
 
 export const maxDuration = 26;
@@ -107,7 +108,18 @@ export async function POST(req: NextRequest) {
     const creatorDna = buildCreatorDnaHint(scored);
     const audienceDna = buildAudienceDnaHint(scored);
     const performanceDna = buildPerformanceDna(scored);
-    const revenueDna = buildRevenueDna(scored);
+    const { data: runRow } = await supabase
+      .from("learning_runs")
+      .select("raw_meta")
+      .eq("id", learningRunId)
+      .maybeSingle();
+    const meta = (runRow?.raw_meta && typeof runRow.raw_meta === "object") ? runRow.raw_meta as Record<string, unknown> : {};
+    const payoutUsd = Number(meta.payoutUsd) > 0 ? Number(meta.payoutUsd) : OPERATOR_REVENUE_START.amountUsd;
+    const revenueDna = buildRevenueDna(scored, {
+      amountUsd: payoutUsd,
+      period: String(meta.payoutPeriod || `${OPERATOR_REVENUE_START.periodFrom}..${OPERATOR_REVENUE_START.periodTo}`),
+      nextPayout: String(meta.nextPayout || OPERATOR_REVENUE_START.nextPayout),
+    });
 
     const { data: prevAudience } = await supabase
       .from("audience_dna")
@@ -182,6 +194,7 @@ export async function POST(req: NextRequest) {
         status: "analyzed",
         notes: memory.summaryKo,
         raw_meta: {
+          ...meta,
           successCount: memory.successCount,
           analyzedCount: memory.analyzedCount,
           performanceSummary: performanceDna.summaryKo,

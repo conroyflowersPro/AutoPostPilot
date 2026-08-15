@@ -276,10 +276,23 @@ export function buildPerformanceDna(
 }
 
 export function buildRevenueDna(
-  scored: ScoredPostMetrics[]
+  scored: ScoredPostMetrics[],
+  accountPayout?: { amountUsd: number; period?: string; nextPayout?: string } | null
 ): RevenueDnaPayload {
   const withRev = scored.filter((s) => s.revenue > 0);
   if (withRev.length === 0) {
+    if (accountPayout && accountPayout.amountUsd > 0) {
+      return {
+        revenueByTopic: [],
+        notes: [
+          `계정 지급 ${accountPayout.amountUsd} USD (${accountPayout.period || "window"}). 글 단위 수익은 UNKNOWN.`,
+          ...(accountPayout.nextPayout ? [`다음 지급 ${accountPayout.nextPayout}.`] : []),
+          "영상 Estimated Revenue 0은 이 지급액이 아님.",
+          "진정성·장기 신뢰보다 우선하지 않음. 한 슬라이스로 할당량을 올리지 않음. 글에 금액을 쓰지 않음.",
+        ],
+        summaryKo: `Revenue DNA: 계정 지급 ${accountPayout.amountUsd} USD부터 시작. 글 단위는 UNKNOWN. 전략을 지배하지 않음.`,
+      };
+    }
     return {
       revenueByTopic: [],
       notes: [
