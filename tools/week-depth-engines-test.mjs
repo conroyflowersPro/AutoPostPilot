@@ -20,6 +20,7 @@ const analyze = read("app/api/learning/analyze/route.ts");
 const intel = read("supabase/functions/weekly-plan/planner-intelligence.ts");
 const ver = read("lib/version.ts");
 const ix = read("supabase/functions/weekly-plan/index.ts");
+const planner = read("supabase/functions/weekly-plan/seven-day-planner.ts");
 
 let pass = 0;
 let fail = 0;
@@ -97,28 +98,19 @@ ok("E5. first of that unfold is allowed",
     { hook_type: "situation", discourse_shape: DISCOURSE_TWIST_REINTERPRET, ending_type: "statement" },
     [],
   ).length === 0);
-ok("E6. Writer gets week structure lines, not prior wording",
-  /writerWeekStructureConstraintLines/.test(wr) &&
-    /WEEK STRUCTURE/.test(sig) &&
-    /not sentences to copy/.test(sig) &&
-    !/performanceDnaBlock\(\)/.test(wr));
-ok("E7. Judge uses weekStructureHardReasons with weekly_context",
-  /weekStructureHardReasons\(mine, sigs\)/.test(judge) &&
-    /other_post_structural_signatures/.test(pipe));
+ok("E6. Writer does not get virtual-week structure commands",
+  !/writerWeekStructureConstraintLines\(ctx/.test(wr) && !/performanceDnaBlock\(\)/.test(wr));
+ok("E7. Judge does not evaluate Planner week structure",
+  !/weekStructureHardReasons\(mine, sigs\)/.test(judge));
 ok("E8. write path sequential so signatures accumulate",
   /weekSignatures: signatures/.test(pipe) &&
     !/i \+= V11_WRITE_CONCURRENCY/.test(pipe));
-ok("E9. REJECT runs selective regen on that slot only",
-  /executeSelectiveRegeneration/.test(pipe) &&
-    /decideRegenerationRoute/.test(pipe) &&
-    /REGENERATED_PASS/.test(pipe) &&
-    /selective_regen_rejected/.test(pipe));
-ok("E10. Regen does not pass prior final_text as few-shot",
-  /include_previous_final_text: false/.test(router) &&
-    /prior_final_text_leaked: false/.test(regen) &&
-    /retry_hint: hints\.join/.test(regen));
-ok("E11. Regen re-judges with week signatures",
-  /judgeIndependentResult\(deep as DeepGenerationContext, independent, weekly_context/.test(regen));
+ok("E9. REJECT returns the slot to Planner",
+  /pending_recovery/.test(job) && /row\.step = "recover"/.test(job));
+ok("E10. Planner recovery receives Judge reasons, not failed post prose",
+  /semantic_judge_reasons/.test(planner) && !/previous_final_text/.test(planner));
+ok("E11. Planner recovery returns through Writer then Judge",
+  /recoverRejectedPlannerSlot/.test(job) && /st\.write_flat\.push\(replacement\)/.test(job));
 ok("E12. Job calls weekly-count-ledger",
   /evaluateOrder8cCompletionGate/.test(job) &&
     /attachCountLedger/.test(job) &&
@@ -145,9 +137,8 @@ ok("E18. Writer still does not ingest Performance DNA",
   !/performanceDnaBlock\(\)/.test(wr) && /Performance DNA is Planner-only/.test(read("supabase/functions/weekly-plan/engine-architecture.ts")));
 ok("E19. shipping 11.11.0",
   /APP_VERSION = "11.11.0"/.test(ver) && /APP_VERSION = "11.11.0"/.test(ix));
-ok("E20. structural_repetition hard-maps to writer regen",
-  /if \(s\.includes\("structural"\)\) return "STRUCTURAL_REPETITION"/.test(router) &&
-    /structural_week_repeat/.test(router));
+ok("E20. profile repetition belongs to Planner actual-X strategy",
+  /recent_x_analytics/.test(planner) && !/hard\.push\("structural_repetition_high"\)/.test(judge));
 
 console.log("========================================");
 console.log(`WEEK DEPTH: ${pass} PASS / ${fail} FAIL`);
