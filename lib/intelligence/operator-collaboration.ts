@@ -60,6 +60,9 @@ export const COLLAB_ENGINES_ARE_TOOLS =
 export const COLLAB_AP_PURPOSE =
   "AutoPostPilot exists to help one real creator become a more influential, trusted, distinct, sustainable X creator — not to make AI produce many posts.";
 
+export const COLLAB_THOUGHT_FIRST =
+  "Thought first, style follows. Everyday language, voice, humor, Mechanism, and Rail exist to deliver the already-formed thought as this creator would. They must not choose the thought.";
+
 export function operatorCollaborationBlock(): string {
   return [
     `OPERATOR COLLABORATION ${OPERATOR_COLLABORATION_VERSION}`,
@@ -80,5 +83,6 @@ export function operatorCollaborationBlock(): string {
     COLLAB_INTENT_OVER_LITERAL,
     COLLAB_ENGINES_ARE_TOOLS,
     COLLAB_AP_PURPOSE,
+    COLLAB_THOUGHT_FIRST,
   ].join("\n");
 }

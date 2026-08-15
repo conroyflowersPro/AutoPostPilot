@@ -28,6 +28,8 @@ A pointed file/screen/function is often where the problem **appeared**, not wher
 
 Product engines (Thinking Rail, Reaction Mechanism, Creator/Audience/Performance DNA, Seed Interpretation, Core Thought, Humor, Everyday Language, Semantic Judge, Reader Self-Projection) are **tools for a good result**, not goals. If a tool wrecks the result, do not force it.
 
+**Thought first, style follows.** The thought exists first. Everyday language, 말투, humor, Mechanism, and Rail follow only to deliver that thought as this creator would. Delivery must not choose the thought.
+
 Do not over-read every design rule as an absolute for every post. “Leave the reader space to think” is not “the writer must not conclude.”
 
 Natural-language feedback is about the **feel of the result**, not a request to rearrange files. Extract the operator’s judgment criteria from an edit; do not freeze one example into a new template. When they give an example, extract the abstract principle — do not copy topic, wording, hook, punchline, or conclusion into other posts.
@@ -90,3 +92,4 @@ Philosophy dumps that **define** how AP or this collaboration must work are oper
 - Do not invent Korea-only civic/housing life.
 - Do not commit `package-lock.json`.
 - Audience is readers, not followers and not a Tesla club.
+- Thought first, style follows. 말투·유머·쉬운 말·Mechanism·Rail do not decide the thought.

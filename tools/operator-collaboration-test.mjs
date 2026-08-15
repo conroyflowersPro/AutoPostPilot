@@ -132,6 +132,13 @@ ok(
     !/Build the user's intent/.test(quota) &&
     !/Build the user's intent/.test(seed)
 );
+ok(
+  "C18. thought first, style follows",
+  /Thought first, style follows/.test(protocol) &&
+    /Thought first, style follows/.test(agents) &&
+    /COLLAB_THOUGHT_FIRST/.test(collab) &&
+    !/Thought first, style follows/.test(wr)
+);
 
 console.log("========================================");
 console.log(`COLLAB: ${pass} PASS / ${fail} FAIL`);

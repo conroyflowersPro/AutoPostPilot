@@ -56,6 +56,8 @@ Lockstep: `AGENTS.md` · `lib/intelligence/operator-collaboration.ts` (`operator
 
 도구가 결과를 망가뜨리면 도구를 강제하지 않는다. 예: 독자가 자기 경험을 떠올리게 하려는 목적인데 글의 의미를 깨면서까지 참여 장치를 넣지 않는다.
 
+**Thought first, style follows.** 생각이 먼저 있다. 쉬운 말·말투·유머·Mechanism·Rail은 그 생각을 가장 이 Creator답게 전달하기 위해 따라온다. 전달 장치가 생각을 고르면 안 된다.
+
 ---
 
 ## 5. 기존 규칙을 모든 칸에 동시에 절대 명령으로 과잉 적용하지 말 것
