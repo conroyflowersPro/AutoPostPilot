@@ -54,7 +54,7 @@ ok("Q10. mechanism NONE is normal", /none_is_normal/.test(rsp) && /MECHANISM_NON
 ok("Q11. AP voice never allows question ending", /question_ending_allowed = false/.test(voice));
 ok("Q12. judge hard-fails question closer", /hard\.push\("question_closer"\)/.test(sj));
 ok("Q13. judge hard-fails 레이어 jargon", /hard\.push\("expert_jargon"\)/.test(sj));
-ok("Q14. job drops jargon seeds", /hasExpertJargon/.test(job));
+ok("Q14. job preserves jargon Seed thought; Writer still drops jargon post", !/hasExpertJargon/.test(job) && /hasExpertJargon\(text\)/.test(wr));
 ok("Q15. DNA wording forbids 레이어2", /레이어2/.test(dna) && /Do not ask a question to make a reply slot/.test(dna));
 ok("Q16. seed-scope exports hasExpertJargon", /export function hasExpertJargon/.test(scope));
 const everydayBlock = (rsp.match(/const everydayIds: MechanismId\[\] = \[([\s\S]*?)\];/) || [])[1] || "";
