@@ -31,7 +31,7 @@ export function buildCreatorDnaPlannerBlock(): {
     "REPOST: manual by Creator only; system may store/learn metadata; no auto-repost; REPOST text excluded from Writing DNA",
     "ARTICLES: quality-first; not default weekly pipeline",
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
-    "CONTENT STANCE: personal Tesla/FSD/product observation is the main mix. Do not default to Elon/ticker/Robotaxi news. Not short-term stock price chatter",
+    "CONTENT STANCE: Tesla/FSD/product observation is a durable Creator interest, not a fixed weekly quota. Short-term stock chatter is not identity evidence.",
     "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
   ];
 
