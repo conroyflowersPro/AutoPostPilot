@@ -1,3 +1,4 @@
+/**
  * ORDER 3 — Thinking Rail Runtime
  * Thinking explores several readings of one seed before any sentence.
  * A Rail is an abstract path, not a topic→rail template.

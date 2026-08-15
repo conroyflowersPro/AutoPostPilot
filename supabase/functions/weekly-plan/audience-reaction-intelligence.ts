@@ -1,3 +1,4 @@
+/**
  * ORDER 4 — Audience Reaction Intelligence
  * Not a "will people like this" predictor.
  * Understands likely psychological reaction. Does not manipulate reaction.

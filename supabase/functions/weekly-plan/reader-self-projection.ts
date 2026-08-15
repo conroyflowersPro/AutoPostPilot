@@ -1,3 +1,4 @@
+/**
  * ORDER 2 — Reader Self-Projection + Reaction Mechanism
  * Mechanisms describe how a reader may receive an already-decided Core Thought.
  * NONE is normal. No topic→mechanism. No forced questions, twists, or emotion.
