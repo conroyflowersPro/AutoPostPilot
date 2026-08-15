@@ -36,9 +36,9 @@ import {
 /** Seed quota + expand stay on Grok. */
 export const V11_SEED_MODEL = "grok-4.6";
 /** Original post body is ChatGPT (OpenAI). */
-export const V11_WRITER_MODEL = "gpt-4o";
+export const V11_WRITER_MODEL = "gpt-5.6-sol";
 export const V11_WRITE_CONCURRENCY = 2;
-export const V11_WRITER_TIMEOUT_MS = 16000;
+export const V11_WRITER_TIMEOUT_MS = 28000;
 
 export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode): SeedInterpretation {
   return interpretSeed({

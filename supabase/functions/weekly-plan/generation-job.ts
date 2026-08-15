@@ -22,7 +22,7 @@ import { guardCandidateAgainstManualLeakage, type RecentManualPost } from "./man
 import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
 import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
-import { writeSlotBatch, V11_SEED_MODEL } from "./order-write-pipeline.ts";
+import { writeSlotBatch, V11_SEED_MODEL, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
 import { evaluateOrder8cCompletionGate } from "./weekly-count-ledger.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
 import { loadPlannerIntelligence } from "./planner-intelligence.ts";
@@ -1037,7 +1037,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
       strategy_json: {
         system_origin_class: "AP_PIPELINE",
         slotId: p.slotId || null,
-        writer_model: "gpt-4o",
+        writer_model: V11_WRITER_MODEL,
         engine: "v11_inferred_quota_fill",
         job_id: row.id,
       },

@@ -546,13 +546,13 @@ export async function callChatGptWriter(
         Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: options.model || "gpt-4o",
+        model: options.model || "gpt-5.6-sol",
         messages: [
           { role: "system", content: system },
           { role: "user", content: userMsg },
         ],
-        temperature: options.temperature ?? 0.7,
-        max_tokens: 1400,
+        reasoning_effort: "low",
+        max_completion_tokens: 1400,
       }),
       signal: controller.signal,
     });
@@ -571,7 +571,11 @@ export async function callChatGptWriter(
     } catch {
       return { ok: false, text: "", error: "openai_json_parse_failed", attempted: true };
     }
-    const content = s(parsed?.choices?.[0]?.message?.content);
+    const msg = parsed?.choices?.[0]?.message;
+    const rawContent = msg?.content;
+    const content = Array.isArray(rawContent)
+      ? rawContent.map((p: any) => s(p?.text || p?.content)).filter(Boolean).join("")
+      : s(rawContent);
     if (!content || content.length < 4) {
       return { ok: false, text: "", error: "openai_empty_content", attempted: true };
     }

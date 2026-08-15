@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.6.0)");
+console.log("Writer quality + leftover seeds (v11.6.1)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.6.0", /APP_VERSION = "11.6.0"/.test(ver) && /APP_VERSION = "11.6.0"/.test(ix));
+ok("W17. version lockstep 11.6.1", /APP_VERSION = "11.6.1"/.test(ver) && /APP_VERSION = "11.6.1"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -146,6 +146,8 @@ ok("W74. writer implements already-made thought, does not invent it", /WRITER RO
 ok("W75. writer is not Planner and does not ingest Performance DNA", /writerArchitectureLock/.test(wr) && /You do not become the Planner/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-architecture.ts"), "utf8")) && !/performanceDnaBlock\(\)/.test(wr));
 ok("W76. writer gets stage philosophy 14-17", /writingStagePhilosophyBlock/.test(wr) && /Easy must not mean shallow/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")));
 ok("W77. writer receives week structure helper", /writerWeekStructureConstraintLines/.test(wr));
+ok("W78. writer model is GPT-5.6 Sol with low reasoning",
+  /V11_WRITER_MODEL = "gpt-5.6-sol"/.test(ow) && /reasoning_effort: "low"/.test(wr) && /max_completion_tokens: 1400/.test(wr) && /GPT-5.6 Sol/.test(ver));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);
