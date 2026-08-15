@@ -200,6 +200,6 @@ export function voiceRegisterConstraintLine(
     ...reg.notes,
     character,
     "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
-    "Length follows median_chars of comparable handmade, then this slot's character. One finished sentence is allowed. Do not inflate with a dummy second sentence.",
+    "median_chars is a handmade statistic, not this post's target. Length follows THIS slot's LENGTH band. Casual stays short. Compare/opinion/experience may use a second sentence. Do not inflate with a dummy second sentence.",
   ].join("\n");
 }

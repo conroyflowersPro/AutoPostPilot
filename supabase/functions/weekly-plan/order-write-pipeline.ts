@@ -59,6 +59,7 @@ export async function writeOneSlot(args: {
   voiceRows?: VoiceActivityRow[];
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
   audienceSignals?: AudienceBarrierSignals | null;
+  recentStyleCounts?: Record<string, number> | null;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -70,6 +71,7 @@ export async function writeOneSlot(args: {
   block_reasons: string[];
   writer_call_attempted: boolean;
   mechanism_id?: string | null;
+  style_family?: string | null;
   system_origin_class: "AP_PIPELINE";
 }> {
   const seed = args.seed as ConcreteSeed & Record<string, unknown>;
@@ -128,13 +130,13 @@ export async function writeOneSlot(args: {
   const creator_style = decideCreatorStyle({
     context: {
       creator_dna: {
-        prefers_compression: true,
+        prefers_compression: mode === "CASUAL_OBSERVATION",
         prefers_conversational: true,
         prefers_reflective: mode === "EXPERIENCE" || mode === "OPINION",
-        allows_technical_density: true,
-        community_native_ok: true,
-        longform_selective_ok: false,
-        politeness_default: mode === "INFORMATIVE" || mode === "COMPARE" ? "polite" : "mixed",
+        allows_technical_density: mode === "INFORMATIVE" || mode === "COMPARE",
+        community_native_ok: mode === "CASUAL_OBSERVATION" || mode === "OPINION",
+        longform_selective_ok: mode === "EXPERIENCE" || mode === "OPINION",
+        politeness_default: mode === "INFORMATIVE" || mode === "COMPARE" ? "polite" : mode === "CASUAL_OBSERVATION" ? "casual" : "mixed",
         identity_stable: true,
       },
       everyday_language_status: everyday_language.status,
@@ -153,6 +155,7 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
       editorial_mode: mode,
       topic_cluster: seed.cluster,
+      recent_style_counts: args.recentStyleCounts || null,
     },
   });
   const natural_humor = decideNaturalHumor({
@@ -223,6 +226,7 @@ export async function writeOneSlot(args: {
       block_reasons: reasons,
       writer_call_attempted: !!integrated.writer_call_attempted,
       mechanism_id: selectedMechanismId,
+      style_family: String(creator_style.style_family || "") || null,
       system_origin_class: "AP_PIPELINE",
     };
   }
@@ -237,6 +241,7 @@ export async function writeOneSlot(args: {
     block_reasons: reasons,
     writer_call_attempted: !!integrated.writer_call_attempted,
     mechanism_id: selectedMechanismId,
+    style_family: String(creator_style.style_family || "") || null,
     system_origin_class: "AP_PIPELINE",
   };
 }
@@ -251,6 +256,7 @@ export async function writeSlotBatch(args: {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
   const recent: Array<{ mechanism_id?: string }> = [];
+  const styleCounts: Record<string, number> = {};
   for (let i = 0; i < slots.length; i += V11_WRITE_CONCURRENCY) {
     const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
     const part = await Promise.all(
@@ -262,11 +268,13 @@ export async function writeSlotBatch(args: {
           voiceRows: args.voiceRows,
           recentMechanismUsage: recent.slice(-12),
           audienceSignals: args.audienceSignals || null,
+          recentStyleCounts: { ...styleCounts },
         })
       )
     );
     for (const p of part) {
       if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
+      if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;
     }
     out.push(...part);
   }

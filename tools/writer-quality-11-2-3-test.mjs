@@ -78,7 +78,7 @@ ok("W6. normal Supercharger sentence is not stutter", !isTokenStutter("슈퍼차
 ok("W7. tiny fragment is too short", isFragmentOriginal("충전 중에 알림이 겹친다."));
 ok("W8. one finished sentence is allowed", !isFragmentOriginal("충전 중에 알림이 겹치면 어느 화면이 위인지 손으로 확인하게 된다."));
 ok("W9. 140+ observation is not a fragment", !isFragmentOriginal("충전 중 알림이 겹쳐 보이면 어느 화면이 위인지 손으로 확인하게 된다. ".repeat(3)));
-ok("W10. writer does not lock two sentences", /One complete sentence is enough/.test(wr) && !/At least two sentences/.test(wr));
+ok("W10. writer does not lock every post to one length", /Do not make every post the same length/.test(wr) && !/At least two sentences/.test(wr));
 ok("W11. validateOutput hard-fails stutter/fragment/restate", /reasons\.includes\("token_stutter"\)/.test(wr) && /subject_restate/.test(wr) && /generic_thesis/.test(wr));
 ok("W12. writer retries once", /allow_one_retry !== false/.test(wr) && /allow_one_retry:\s*true/.test(ow));
 ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
@@ -92,7 +92,7 @@ ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optio
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
 ok("W22. finished observation is not a restate", !isSubjectRestate("슈퍼차저 대기줄에서 앞차가 안 움직이면 충전 예상이 통째로 밀린다.", "슈퍼차저 대기줄"));
 ok("W23. generic thesis is rejected", GENERIC_THESIS_RE.test("전기차 보조금은 중요한 이슈다."));
-ok("W24. voice allows one sentence", /One finished sentence is allowed/.test(voice));
+ok("W24. voice length follows this slot not one median", /median_chars is a handmade statistic/.test(voice));
 ok("W25. 7C retry passes rewrite hint", /quality_rewrite|retry_hint: \(last\.block_reasons/.test(gi));
 ok("W26. short keyword subject is usable", /export function isUsableKeywordSubject/.test(se));
 ok("W27. writer infers keyword via vision, no example posts", /short keyword seed is valid/.test(wr) && /hardcoded example posts/.test(wr));
@@ -141,6 +141,7 @@ ok("W69. expert jargon is a hard fail", /expert_jargon/.test(wr) && /레이어2/
 ok("W70. mechanism write move is operational not a question gap", /MECHANISM_WRITE_MOVES/.test(wr) && /A question is not a mechanism/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8")));
 ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
 ok("W72. default observation personality when mechanism would be NONE", /default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
+ok("W73. variety: 말투 and length follow this slot not one template", /VARIETY:/.test(wr) && /recentStyleCounts/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);
