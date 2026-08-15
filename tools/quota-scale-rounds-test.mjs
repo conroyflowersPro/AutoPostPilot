@@ -18,10 +18,6 @@ function expandRoundBudget(requiredSlots) {
   const fill = Math.ceil((slots * 1.2) / 3);
   return Math.min(36, Math.max(16, fill + 8));
 }
-function topupRoundBudget(requiredSlots) {
-  const slots = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
-  return Math.min(16, Math.max(6, Math.ceil(slots / 7)));
-}
 function priorSubjectCap(requiredSlots) {
   const slots = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
   return Math.max(80, slots * 2);
@@ -41,14 +37,14 @@ function ok(name, cond) {
 
 console.log("Quota scale: more slots → more rounds, not fatter requests");
 ok("Q1. X anti-dump max 8/day", /QUOTA_PER_DAY_MAX = 8/.test(qi) && /MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX \* QUOTA_DAYS/.test(scale));
-ok("Q2. Edge expand batch stays 6 at any quota", /const EXPAND_BATCH = 6/.test(ix) && /export const EXPAND_BATCH = 6/.test(scale));
+ok("Q2. Edge expand batch stays 10 at any quota", /const EXPAND_BATCH = 10/.test(ix) && /export const EXPAND_BATCH = 10/.test(scale));
 ok("Q3. write chunk stays 1", /export const WRITE_CHUNK = 1/.test(scale) && /const WRITE_CHUNK = 1/.test(job));
 ok("Q4. 28-slot budget exceeds frozen 12", expandRoundBudget(28) > 12);
 ok("Q5. 56-slot fill at ~3 seeds/round", expandRoundBudget(56) >= Math.ceil((56 * 1.2) / 3));
-ok("Q6. 56-slot topup > frozen 4", topupRoundBudget(56) > 4);
+ok("Q6. Planner-targeted expansion remains one bounded batch", /refillRequestCount/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("Q7. 56-slot prior subjects > 80", priorSubjectCap(56) > 80);
 ok("Q8. job uses expandRoundBudget(requiredSlots)", /expandRoundBudget\(quota\.required_slots\)/.test(job) || /expandRoundBudget\(required/.test(job));
-ok("Q9. job uses topupRoundBudget", /topupRoundBudget\(quota\.required_slots\)/.test(job) || /max_topup = topupRoundBudget/.test(job));
+ok("Q9. Planner recovery is bounded", /pending\.attempts > 4/.test(job));
 ok("Q10. job uses priorSubjectCap", /priorSubjectCap\(required\)/.test(job) && !/slice\(-80\)/.test(job));
 ok("Q11. no frozen MAX_EXPAND_ROUNDS = 12", !/MAX_EXPAND_ROUNDS = 12/.test(job) && !/MAX_EXPAND_ROUNDS = 12/.test(gen));
 ok("Q12. expand timeout does not abort the week", /SEED_INFERENCE_REQUIRES_XAI/.test(job) && /empty_streak/.test(job));
