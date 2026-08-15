@@ -153,7 +153,7 @@ function hasText(s: unknown): boolean {
 }
 
 function maxBarrier(a: BarrierLevel, b: BarrierLevel): BarrierLevel {
-  const rank: Record<BarrierLevel, number> = { LOW: 1, MODERATE: 2, HIGH: 3, UNKNOWN: 0 };
+  const rank: Record<BarrierLevel, number> = { VERY_LOW: 0, LOW: 1, MODERATE: 2, HIGH: 3, UNKNOWN: 0 };
   return rank[a] >= rank[b] ? a : b;
 }
 
