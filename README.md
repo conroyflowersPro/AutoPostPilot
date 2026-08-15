@@ -2,7 +2,7 @@
 
 Specialized Growth OS for **@Seung4680**.
 
-Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.5.7**). Shown in the app header as `v11.5.7`. See [CHANGELOG.md](CHANGELOG.md). Agent contract: [AGENTS.md](AGENTS.md).
+Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.5.8**). Shown in the app header as `v11.5.8`. See [CHANGELOG.md](CHANGELOG.md). Agent contract: [AGENTS.md](AGENTS.md).
 
 **Product direction (v11 lock):** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 

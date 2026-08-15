@@ -41,8 +41,8 @@ export function isHumorFillSeed(seed: { source_type?: string; source_kind?: stri
 export function humorRingPromptLines(): string[] {
   return [
     "QUOTA HOLE FILL — infer NEW personal-interest CASUAL/OPINION directions with light observational humor.",
-    "Infer from Creator DNA interests (FSD/Cybertruck/Tesla product/LAFC/gaming). Do NOT emit a frozen keyword list.",
-    `FORBIDDEN clone subjects (do not reuse): ${FORBIDDEN_FROZEN_HUMOR_SUBJECTS.join(" / ")}.`,
+    "Infer from Creator DNA interest domains (FSD / Cybertruck / Tesla product / LAFC / gaming). Mix the domains. Do not rotate one canned phrase list.",
+    "Do not copy already_held_seeds or recent_published_angles as concrete_subject. Do not emit example phrases from this prompt as seed bodies.",
     "FORBIDDEN: inventing a drive, a test, a price, a date, or a private event. No first-person lived claim without evidence.",
     "Humor is wording/observation, not a fake story and not forced ㅋㅋ on every seed.",
     "Never EXPERIENCE mode on these hole-fill seeds. Distinct situation each seed.",

@@ -23,7 +23,7 @@ export function buildPerformanceDnaPlannerBlock(): {
     "EVIDENCE BASIS: Phase1A public_metrics samples + observed published posts (not full 3009 correlation job)",
     "METRIC POLICY: public_metrics usable as weak signal; non_public/organic often PARTIAL — missing ≠ 0",
     "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
-    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim. FORBIDDEN jargon in posts: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Say 알림이 겹친다 / 화면이 가린다.",
+    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim. FORBIDDEN jargon in posts: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Everyday substitutions belong in the finished post, never as this week's seed concrete_subject.",
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion. Stop after the observation. Do not ask a question to make a reply slot.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
     "NEW READERS: one mass-public daily-life slot per day (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Personal-interest originals fill the rest. Tesla/Elon ticker/Robotaxi-news are not the default seed subject.",
