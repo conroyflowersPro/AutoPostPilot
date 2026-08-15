@@ -39,7 +39,7 @@ ok("P6. Elon mention alone is not forbidden", !/ELON_TESLA_DEFAULT_RE/.test(scop
 ok("P7. cross-interest is hypothesis-only, not reject", /CROSS_INTEREST_HYPOTHESIS_ONLY/.test(grounding) && !/CROSS_INTEREST_WITHOUT_RELATIONSHIP/.test(grounding));
 ok("P8. jargon remains a post gate, not a Seed deletion gate", !/hasExpertJargon/.test(job) && /hasExpertJargon\(text\)/.test(writer));
 ok("P9. duplicate comparison is USER_DIRECT originals only", /USER_DIRECT\|MANUAL/.test(job) && /REPLY\|REPOST\|RETWEET/.test(job));
-ok("P10. manual semantic HIGH requires strong overlap", /best >= 0\.72/.test(leakage));
+ok("P10. manual semantic HIGH requires clone overlap, not shared context", /bestClone >= 0\.72/.test(leakage) && /bestContext >= 0\.45/.test(leakage));
 ok("P11. structured xAI judgments rank selection", /seedSelectionValueScore/.test(engine) && /value \* 0\.55 \+ div \* 0\.45/.test(job));
 ok("P12. Seed Grok receives candidate-only philosophy", /seedCandidatePhilosophyBlock/.test(seed) && /EXPLORE MANY/.test(stage));
 ok("P13. reserve Seeds are used before another API search", /addedFromReserve/.test(job) && /새 API 탐색 없음/.test(job));
