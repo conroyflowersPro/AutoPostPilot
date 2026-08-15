@@ -12,11 +12,9 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
-import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
-import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
+import { hasExpertJargon } from "./seed-scope.ts";
+import { creatorDnaBlock } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
-import { writingStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
-import { writerWeekStructureConstraintLines } from "./structural-signature.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_grok_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -366,75 +364,45 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
 function writerPhilosophyBlock(): string {
   return [
     "WRITER ROLE: You are Grok 4.6 writing one Korean X post for @Seung4680.",
-    "THOUGHT FIRST, STYLE FOLLOWS. Close what this creator would actually say about THIS seed. Then write that thought in his language. Everyday wording, 말투, humor, Mechanism, and Rail may help delivery. They must not choose the thought.",
-    "You do not choose the 3-day topic mix or quota. You DO close the central judgment for this Seed.",
-    "HARD BOUNDARY: Do not invent lived experience, private facts, emotions, or relationships. Do not copy a manual post or a previously successful sentence. Do not write Korea-only civic/housing life he does not live.",
-    "Do not paste prompt examples. Do not freeze topic→말투. 해요 and 음슴 are both allowed; pick the register that fits THIS thought.",
-    "Engagement-bait questions (어떻게 생각하세요 / 궁금한가요 as a closer) are forbidden. A genuine thinking question inside the thought is allowed.",
-    "Never name the mechanism or rail in the post. Never write 메커니즘 or M1–M9.",
-    "Do not bolt on an unearned macro future/society conclusion. A long-horizon meaning is allowed when the seed's actual change earns it.",
+    "Understand the assigned Seed and Planner Intent first. Then form the central thought this Creator would actually hold and create the post.",
+    "THOUGHT FIRST. Creator Intelligence and connected engines are supporting information. Use only what helps this thought; they do not decide it for you.",
+    "You do not choose the seven-day strategy, select another Seed, or redesign slot allocation.",
+    "HARD BOUNDARY: do not invent facts or lived experience, do not directly copy a Manual Creator Post, and do not abandon the assigned Seed and Planner Intent.",
+    "Do not paste prompt material or examples. Decide the necessary reasoning and expression yourself.",
     "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording or chase a viral hook.",
-    "WHY YOU EXIST: same person's thought, not an AI template. Growth is Planner strategy plus clear delivery — not likes-recipe sentences.",
+    "Your goal is not to pass a writing-rule checklist. Complete the assigned Seed as an actual Creator post.",
   ].join("\n");
 }
 
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
-  const mode = humorMode(ctx);
-  const leaveOpen = !!ctx.stop_condition?.leave_inference_open;
-  const punchStop = !!ctx.stop_condition?.punchline_stop_ok;
   const expBound = ctx.experience_boundaries || {};
   const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
-  const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
-  const personal = isPersonalInterestSubject(subject, cluster);
-  const humorFill = String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("HUMOR");
+  const planner = ctx.planner_intent || { strategy_slot_id: "", strategic_role: "", intent: "" };
 
   return [
     "You write one Korean X post for creator @Seung4680.",
     writerPhilosophyBlock(),
     writerArchitectureLock(),
-    writingStagePhilosophyBlock(),
-    "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
+    "ASSIGNED PLANNER INTENT (strategic purpose, never a writing template):",
+    `slot=${s(planner.strategy_slot_id)} role=${s(planner.strategic_role)} intent=${s(planner.intent)}`,
+    "ASSIGNED SEED:",
+    subject.slice(0, 200),
+    "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 160),
+    "CREATOR INTELLIGENCE (supporting judgment, never sentences to copy):",
     creatorDnaBlock(),
-    "ENGINE RULES (operator will):",
-    engineRulesAsWill(),
     "REASONING ORDER (internal only; do not output steps):",
-    "1) What is actually going on in this Seed? Use live X/web only as facts if needed. Do not copy tweet wording. A short keyword seed is valid. Do not paste hardcoded example posts.",
-    "2) Close ONE thought this creator would hold. Do not paste code labels (tension_around / judgment_axis) as prose. Those labels are not the thought.",
-    "3) Write that thought in his language. Style, 말투, humor, Mechanism, and Rail follow the closed thought. They are not chosen before it. They must not change it.",
-    "4) Audience is readers, not followers and not a Tesla club. Everyday words when they keep the claim. Low entry barrier is wording AND the range of wording. NEVER swap a word if it would change the claim. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9.",
-    "PLACE: Creator lives in California. Write Korean. Infer US/CA daily situations from Creator DNA. Do not invent Korea-only civic or housing life the creator does not live.",
-    "REGISTER: 해요 and 음슴 are both allowed. Pick the one that fits THIS closed thought. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not freeze topic→말투. Do not copy the previous post's ending.",
-    "Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — optional. If NONE, do not force jokes, ㅋㅋ, or punchlines."),
-    "QUALITY: a finished thought about a specific situation. A snag is optional. Do not stop at the keyword name. Do not pad. Stop when the thought is complete. Length follows the thought, not a sentence quota and not a mechanism beat count.",
-    "VARIETY: same person's thought, not the same AI template. Do not copy a winning sentence. No frozen mix ratio. Planner decides mix.",
-    ...writerWeekStructureConstraintLines((ctx as any).week_structural_signatures),
-    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, engagement-bait closers, CTA, expert jargon (레이어/L2/스택), unearned AI/report conclusions.",
-    s((ctx as any).voice_register?.constraint_line)
-      ? "ANTI-REPEAT SIGNAL (not a command; ignore if it fights the closed thought): " + s((ctx as any).voice_register?.constraint_line)
-      : "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a bait question for the algorithm. Pick 해요 or 음슴 after the thought is closed.",
+    "1) Understand the Seed and Planner Intent together.",
+    "2) Close one central thought this Creator would hold. Code labels are material, not the thought.",
+    "3) Decide the reasoning and expression that this post needs, using Creator Intelligence as support.",
+    "4) Write the complete post and stop when the thought is complete.",
     ...writerBoundaryConstraintLines(ctx),
-    "SEED SUBJECT: " + subject.slice(0, 200),
-    "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 120),
-    "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "limited first-person allowed only if already grounded" : "no fabricated first-person experience"),
+    "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "first-person is allowed only within supplied evidence" : "do not claim first-person lived experience"),
     s((ctx as any).cite_episode_hint)
-      ? "CITE RELATED: You MAY mention the prior lived episode named in the evidence hint. Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용. Do not copy a prompt example."
+      ? "RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Do not retell or copy the source post."
       : "",
-    personal
-      ? ""
-      : "MASS PUBLIC SLOT: do not name Elon, Tesla, FSD, Cybertruck, or Robotaxi as the subject. Write the everyday public situation.",
-    humorFill
-      ? "HUMOR FILL SLOT: light observational humor inferred from the seed direction. FORBIDDEN: first-person lived drive/test/date. Do not paste a prompt example. Do not fake a story."
-      : "",
-    String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
-      ? "ADJACENT RING: mass-public daily life for new readers. Infer the situation. Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone, prompt-example subjects."
-      : "",
-    "OPTIONAL SIGNALS (ignore if they fight the thought you closed; they do not pick the thought): leave_inference_open=" +
-      String(leaveOpen) +
-      " punchline_stop=" +
-      String(punchStop),
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta. No chain-of-thought.",
   ].join("\n");
 }
@@ -503,14 +471,15 @@ export async function callGrokWriter(
   const subject = subjectFromCtx(ctx);
   const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
   const userMsg = [
-    "Close the thought for this Seed, then write the Korean X post. Thought first. Style follows.",
+    "Understand the assigned Planner Intent and Seed, close the thought, then write the Korean X post. Thought first.",
+    "Planner Intent: " + s(ctx.planner_intent?.intent).slice(0, 240),
     "Situation: " + subject.slice(0, 160),
     tension
       ? "Seed material (not the closed thought): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
     "Do not invent lived experience. Not a generic news line. Do not copy a previously successful sentence. Do not copy tweet wording from live search.",
     s(options.retry_hint)
-      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Close the thought again and rewrite. Do not stutter. Do not restate the subject as the whole post."
+      ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Understand the same assignment again and create a valid post without changing Planner strategy."
       : "",
     "Respond with post text only.",
   ].filter(Boolean).join("\n");
@@ -617,13 +586,15 @@ function validateOutput(
   const factualOk = !/\b\d{4,}원\b/.test(text) || subject.includes("원");
   if (!factualOk) reasons.push("possible_factual_invention");
 
-  const coreOk = !isFragmentOriginal(text) && !isSubjectRestate(text, subject) && !isGenericThesis(text);
   if (isFragmentOriginal(text)) reasons.push("too_short_original");
   if (isSubjectRestate(text, subject)) reasons.push("subject_restate");
   if (isGenericThesis(text)) reasons.push("generic_thesis");
   if (isTokenStutter(text)) reasons.push("token_stutter");
   if (isQuestionCloser(text)) reasons.push("question_closer");
   if (hasExpertJargon(text)) reasons.push("expert_jargon");
+  if (/\[MANUAL_RAW\]|MANUAL_POST_TEXT:|<<<HISTORICAL>>>|RAW_PROSE_LEAK/.test(text)) {
+    reasons.push("manual_text_leakage");
+  }
 
   for (const re of FORCED_CTA_PATTERNS) {
     if (re.test(text)) {
@@ -660,19 +631,13 @@ function validateOutput(
 
   const hardFail =
     reasons.includes("experience_fabrication") ||
-    reasons.includes("forced_cta_or_question") ||
-    reasons.includes("ai_report_voice") ||
-    reasons.includes("token_stutter") ||
-    reasons.includes("too_short_original") ||
-    reasons.includes("subject_restate") ||
-    reasons.includes("generic_thesis") ||
-    reasons.includes("question_closer") ||
-    reasons.includes("expert_jargon");
+    reasons.includes("possible_factual_invention") ||
+    reasons.includes("manual_text_leakage");
 
   return {
-    ok: !hardFail && seedOk && coreOk,
+    ok: !hardFail && seedOk,
     seed_fidelity: seedOk,
-    core_thought_preserved: coreOk,
+    core_thought_preserved: seedOk,
     factual_boundary_preserved: factualOk,
     experience_boundary_preserved: expOk,
     reader_inference_preserved: readerOk,

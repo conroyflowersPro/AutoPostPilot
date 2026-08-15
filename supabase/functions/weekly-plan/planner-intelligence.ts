@@ -1,5 +1,5 @@
 /**
- * Load latest Audience / Performance / Revenue DNA + Planner Memory for the 3-day Planner.
+ * Load latest Audience / Performance / Revenue DNA + Planner Memory for the seven-day Planner.
  * Missing rows are UNKNOWN / insufficient evidence — never treated as zero success.
  * Current X Context is currentness, not a news feed and not a post prompt.
  */
@@ -67,7 +67,7 @@ function audienceBlock(row: Record<string, unknown> | null): string {
     "AUDIENCE DNA (current, X Analytics primary, Fedica auxiliary):",
     summary,
     ...bits,
-    "Use for Seed + editorial balance. Must not overwrite Creator DNA. Must not become popularity chasing.",
+    "Use only for Planner strategy, selection, and allocation. Seed Generator does not use this to rank candidates. Must not overwrite Creator DNA or become popularity chasing.",
     "Promote Exploration → Emerging → Secondary → Core only after repeated follower/profile/bookmark/reply signals across cycles.",
   ].join("\n");
 }
@@ -130,7 +130,7 @@ export function currentXContextBlock(recentAngles?: string[]): string {
     angles.length
       ? `Recent published flow (this account's conversation, not X-wide news): ${angles.join(" · ")}`
       : `Live X events / official announcements: ${UNKNOWN}. Do not invent news or debates.`,
-    "Judge why-this-subject-now. Separate short-term noise from seed-worthy change. Creator authentic events stay valid even if X is quiet.",
+    "Planner may use this as broader intelligence. It does not replace the up-to-30-day actual X Analytics published-flow input.",
   ].join("\n");
 }
 

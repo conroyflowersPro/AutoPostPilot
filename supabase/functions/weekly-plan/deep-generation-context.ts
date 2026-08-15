@@ -75,6 +75,11 @@ export type DeepGenerationContext = {
   slot_id: string;
   context_id: string;
   seed_identity: { seed_id: string; concrete_subject: string; cluster: string; editorial_mode: string };
+  planner_intent: {
+    strategy_slot_id: string;
+    strategic_role: string;
+    intent: string;
+  };
   interpreted_meaning: {
     status: string;
     seed_subject: string;
@@ -156,6 +161,11 @@ export type BuildDeepGenerationInput = {
   creator_style?: Record<string, unknown> | null;
   natural_humor?: Record<string, unknown> | null;
   editorial_mode?: string | null;
+  planner_intent?: {
+    strategy_slot_id?: string | null;
+    strategic_role?: string | null;
+    intent?: string | null;
+  } | null;
   voice_register?: {
     n: number;
     window_days: number;
@@ -364,6 +374,11 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       concrete_subject: s(seed.concrete_subject || interp.seed_subject),
       cluster: s(seed.cluster),
       editorial_mode: mode,
+    },
+    planner_intent: {
+      strategy_slot_id: s(input.planner_intent?.strategy_slot_id),
+      strategic_role: s(input.planner_intent?.strategic_role),
+      intent: s(input.planner_intent?.intent),
     },
     interpreted_meaning: {
       status: s(interp.status),

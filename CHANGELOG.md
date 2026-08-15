@@ -7,6 +7,18 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.11.0 — 2026-08-15
+
+- 실제 흐름은 `Seed Pool → 7일 Planner 전략 → Planner Seed 선택·배차 → Writer → Semantic Judge`입니다
+- Seed Generator는 탐색만 합니다. 전략 점수·ranking·Editorial Mode·선택·배차·표현 결정을 하지 않습니다
+- Planner는 Seed를 보기 전에 7일 전략과 슬롯 Intent를 만들고, 그 뒤 Pool에서 Seed를 선택합니다. 고정 비율 없이 매 cycle 추론합니다
+- 최근 profile 흐름은 `post_metrics`의 최대 30일 실제 X Analytics 게시 데이터만 사용합니다. 없는 날짜를 추정하거나 draft로 대체하지 않습니다
+- Writer는 Seed + Planner Intent를 먼저 이해하고 Creator Intelligence를 참고해 생각과 표현을 스스로 결정합니다. Writer 사전 hard gate는 날조·직접 복제·완전한 Seed 이탈 경계만 둡니다
+- Semantic Judge는 완성 포스트의 최종 허용성만 검사합니다. 전략·구조·길이·말투 선호는 hard reject하지 않습니다
+- Judge Reject는 Planner로 돌아갑니다. Planner가 기존 Pool에서 먼저 재선택/재배차하고, 후보가 없을 때만 필요한 분야를 지정해 Seed 추가 탐색을 요청합니다
+- 기존 job/tick/chunk/persist/resume 구조를 유지하며, 한 tick에는 외부 xAI 호출 하나만 실행합니다
+- Planner가 만든 N개 슬롯은 최종적으로 N개의 Judge PASS draft가 저장돼야 완료됩니다
+
 ## 11.10.1 — 2026-08-15
 
 - Seed는 글이 아니라 생각 재료입니다. 현재 사실·장소는 폐기하지 않고 `VERIFY_REQUIRED` 경계로 Writer와 최종 Judge에 넘깁니다

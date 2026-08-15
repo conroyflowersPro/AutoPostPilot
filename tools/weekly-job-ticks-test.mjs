@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.10.1", /const APP_VERSION = "11.10.1"/.test(ix));
+ok("J15. shipping 11.11.0", /const APP_VERSION = "11.11.0"/.test(ix));
 ok("J24. empty write preserves saved drafts and never reports a short success", /keepOnlySavedWriteSlots/.test(job) && /bounceToFillQuota/.test(job) && /quotaFilled/.test(job) && !/할당 미달/.test(job) && !/_write_retry/.test(job));
 ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));

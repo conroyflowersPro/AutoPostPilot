@@ -6,10 +6,10 @@ export const STAGE_PHILOSOPHY_VERSION = "stage-philosophy-v1-6-to-quality";
 
 export function seedGenerationPhilosophyBlock(): string {
   return [
-    "SEED GENERATION: A seed is not pulled from a frozen topic list or hardcoded category. Infer 'worth thinking about THIS week' from Creator DNA + Audience DNA (when evidence exists) + Current X Context + Performance DNA + Revenue DNA (when evidence exists) + recent published flow + this week's strategy.",
+    "SEED GENERATION: Explore broadly across current interests, adjacent expansion areas, and plausible new expansion areas. A Seed is a candidate material, not strategy and not a post.",
     "Infer. Do not paste examples. Never emit a phrase that appeared in this prompt as concrete_subject. DNA interest domains are bounds, not a topic menu. Few-shot seed subjects are forbidden.",
     "A seed starts thinking. It is not yet a post topic. A keyword appearing must not auto-promote into the post subject.",
-    "JOBS: emit enough candidates for the needed post count and strategy; drop duplicates, low quality, and over-repeat; generate more if short until the inferred quota is filled. Store structured judgments only: topic, subtopic, why_now, creator relevance, audience relevance, evidence/context basis, exploration value. Do not store raw chain-of-thought.",
+    "JOBS: create a sufficiently broad candidate pool. Do not score or judge strategic fit, performance, Audience fit, or Creator fit. Do not rank, select, allocate, or decide writing form. Keep only minimum boundaries against fabrication, direct Manual Post copying, and effectively identical Seed repetition.",
   ].join("\n");
 }
 
@@ -89,7 +89,7 @@ export function naturalHumorPhilosophyBlock(): string {
   return [
     "NATURAL HUMOR: Humor is this creator's natural reaction, not an engagement device.",
     "If the situation is serious, do not add humor. Do not force a punchline or ㅋㅋ to be funny.",
-    "JOBS: when the context earns it, choose Mock-Formal Deadpan, Self-Deprecation, Pragmatic Oversharing, Observed Consequence, Wordplay, or Hidden Context — or NONE. Do not use humor that cuts down a relationship or attacks someone.",
+    "JOBS: Writer decides whether and how humor belongs after understanding the thought. Do not enumerate or preselect a humor form.",
   ].join("\n");
 }
 
@@ -103,8 +103,8 @@ export function surfaceDiscoursePhilosophyBlock(): string {
 
 export function qualityPhilosophyBlock(): string {
   return [
-    "QUALITY: Not an editor that makes prose smoother. The last defense: did this post preserve the intended thought and Creator identity? Is it fact-safe? Did it repeat?",
-    "JOBS: check Core Thought preservation, Creator DNA fit, structural repeat, fact/experience boundary, excess AI voice, week-level duplicate, forced reader reaction. Do not stop at a soft warning when the post should REJECT or go to selective regeneration.",
+    "QUALITY: Final publishability validation only. Judge does not select Seeds, redesign Planner strategy, or replace Writer creativity.",
+    "JOBS: reject only a completed post that is not actually publishable, including fabrication, direct leakage, unusable output, or complete departure from the assignment. Return Reject to Planner. Writing preferences and profile-level repetition are not Judge strategy decisions.",
   ].join("\n");
 }
 
@@ -126,10 +126,8 @@ export function planningStagePhilosophyBlock(): string {
 export function seedCandidatePhilosophyBlock(): string {
   return [
     seedGenerationPhilosophyBlock(),
-    topicDiversityPhilosophyBlock(),
-    weeklyEditorialPhilosophyBlock(),
-    "EXPLORE MANY: generate a candidate pool larger than the publish quota. Structured relevance judgments rank candidates; they are not hard safety gates.",
-    "HARD REJECT only fabrication, an unusable/engine-label body, clear same-event/same-conclusion clone, or material with no thought at all. Current facts and locations stay as VERIFY_REQUIRED boundaries; AI-generic risk lowers rank. Wording difficulty, short usable keywords, cross-interest hypotheses, and final mix are not reasons to delete a candidate.",
+    "EXPLORE MANY: generate candidates without fixed domain ratios, strategic scores, or a ranking system.",
+    "HARD BOUNDARY only: fabrication, direct Manual Creator Post copy, or effectively identical Seed repetition. Do not use this boundary to narrow normal exploration.",
     "Do not interpret the final post, close Core Thought, choose Mechanism/Rail, or write prose here.",
   ].join("\n");
 }

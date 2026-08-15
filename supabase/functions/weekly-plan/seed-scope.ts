@@ -1,6 +1,6 @@
 /**
- * Seed scope: personal-interest originals fill the 3-day plan.
- * Mass public daily life is at most one original per Pacific day.
+ * Seed discovery classification helpers. Candidate generation has no fixed mix;
+ * seven-day Planner owns final strategy and allocation.
  * Elon/ticker/Robotaxi news is still not a default subject.
  * Do not invent lived experience — DNA/engine bounds only.
  */
@@ -50,12 +50,8 @@ export type OpenSeedSlot = {
    */
   slot_kind: "OPEN_DISCOVERY";
   cluster_bound: "CREATOR_DNA_OR_ADJACENT";
-  editorial_mode: string;
   concrete_subject: "";
 };
-
-const PERSONAL_SLOT_MODES = ["INFORMATIVE", "CASUAL_OBSERVATION", "OPINION", "COMPARE", "EXPERIENCE"] as const;
-const MASS_SLOT_MODES = ["INFORMATIVE", "CASUAL_OBSERVATION", "OPINION", "COMPARE"] as const;
 
 /** Typed empty cells. concrete_subject stays empty until Grok infers a situation. */
 export function buildOpenSlots(args: {
@@ -67,12 +63,10 @@ export function buildOpenSlots(args: {
   const needed = Math.max(0, Math.min(64, Math.ceil(Number(args.needed) || 0)));
   const slots: OpenSeedSlot[] = [];
   for (let i = 0; i < needed; i++) {
-    const modes = [...PERSONAL_SLOT_MODES, ...MASS_SLOT_MODES];
     slots.push({
       slot_id: `open-${i + 1}`,
       slot_kind: "OPEN_DISCOVERY",
       cluster_bound: "CREATOR_DNA_OR_ADJACENT",
-      editorial_mode: modes[i % modes.length],
       concrete_subject: "",
     });
   }

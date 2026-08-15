@@ -1,12 +1,12 @@
 /**
  * Operator DNA + Learning philosophy (v11.5.0).
  * Closed loop: Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis
- * → Learning → DNA/Memory update → next 3-day Planner reads it.
+ * → Learning → DNA/Memory update → next seven-day Planner reads it.
  */
 export const LEARNING_PHILOSOPHY_VERSION = "learning-philosophy-v1-closed-loop";
 
 export const LEARNING_CYCLE =
-  "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning";
+  "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next seven-day Planner reads → new Planning";
 
 export function audienceDnaPhilosophyBlock(): string {
   return [
@@ -14,7 +14,7 @@ export function audienceDnaPhilosophyBlock(): string {
     "Primary source: X Analytics reports. Fedica is an auxiliary signal only.",
     "Creator DNA is who I am. Audience DNA is who is looking now, what they react to, and where they are moving.",
     "JOBS: join followers gained, profile visits, bookmarks, replies, reposts, quotes, likes, impressions, detail expands, link actions to Topic / Subtopic / Content Type / Writing Feature. Extract Audience Interest, Reaction Pattern, Topic Movement, Audience Quality.",
-    "The 3-day Planner MUST read current Audience DNA into seeds and editorial strategy. Audience DNA must not overwrite Creator DNA and must not become simple popularity chasing. Missing evidence is UNKNOWN, not zero.",
+    "The seven-day Planner MUST read current Audience DNA into strategy and allocation. Seed Generator does not use it to rank candidates. Audience DNA must not overwrite Creator DNA or become popularity chasing. Missing evidence is UNKNOWN, not zero.",
   ].join("\n");
 }
 
@@ -24,7 +24,7 @@ export function performanceDnaPhilosophyBlock(): string {
     "Do not learn because AI generated it. Evidence is only Publishing + Analytics. Missing ≠ 0.",
     "IS: repeatedly validated feature↔outcome relationships. IS NOT: a high-view collection, a store of winning post wording, a sentence-copy database, or a raw engagement ranking.",
     "INTERPRET outcomes in this order: Followers Gained → Profile Visits → Revenue → Bookmarks → Replies → Reposts → Quotes → Likes → Impressions. Join Topic, Hook, Length, Opinion Strength, Technical Depth, Media, Experience, Discourse Shape to those results.",
-    "The 3-day Planner reads this to decide which strategic patterns to experiment more or reduce — never what wording to copy. Must not overwrite Creator DNA.",
+    "The seven-day Planner reads this to decide strategic direction — never what wording to copy. Must not overwrite Creator DNA.",
   ].join("\n");
 }
 
@@ -43,7 +43,7 @@ export function currentXContextPhilosophyBlock(): string {
     "CURRENT X CONTEXT: Not a news feed. It is the currentness model: what change, conversation, official announcement, debate, or new context is forming around this Creator and Audience on X right now.",
     "Long-term DNA changes slowly. Current X Context carries the fast external environment.",
     "JOBS: collect current context in Creator-interest fields, Audience-moving fields, related official accounts / product / company / policy / civic issues. Separate short-term noise from seed-worthy change.",
-    "The 3-day Planner MUST read this to judge why this subject now. Never copy Current X Context itself into a post prompt.",
+    "The seven-day Planner may read this as intelligence. Recent profile-flow repetition still comes only from actual X Analytics. Never copy Current X Context into a post prompt.",
   ].join("\n");
 }
 
@@ -52,7 +52,7 @@ export function plannerMemoryPhilosophyBlock(): string {
     "PLANNER MEMORY: Not a store of every post the system ever made. Long-term memory of strategic learning that Publishing + Analytics repeatedly validated.",
     "Generated post = hypothesis. Published post + Analytics = evidence. Only validated evidence becomes memory.",
     "JOBS: store abstract patterns tied to follower growth, profile visits, authority, revenue, bookmarks, meaningful discussion, long-term value. Example shape: 'personal experience expanded into structural observation → profile visits rose'. Never store a specific sentence.",
-    "The 3-day Planner MUST read this on the next generate. Saving it only on the learning page does not close the loop.",
+    "The seven-day Planner MUST read this on the next generate. Saving it only on the learning page does not close the loop.",
   ].join("\n");
 }
 
@@ -83,7 +83,7 @@ export function learningEnginePhilosophyBlock(): string {
   return [
     "LEARNING ENGINE: Not a system that looks at its own drafts and grows more sure. It promotes only reality-validated results into Intelligence and Planner Memory.",
     "The ~14-day cycle exists so learning sees at least two real Planning/Publishing cycles.",
-    "JOBS: gather recent publishing results, run Performance Analysis, compare to existing Creator/Audience/Performance/Revenue DNA, update only changes with enough evidence. Block a self-reinforcement loop on average AI drafts. Keep a one-off success as hypothesis. Learning closes only when the next 3-day Planner actually reads the result.",
+    "JOBS: gather recent publishing results, run Performance Analysis, compare to existing Creator/Audience/Performance/Revenue DNA, update only changes with enough evidence. Block a self-reinforcement loop on average AI drafts. Keep a one-off success as hypothesis. Learning closes only when the next seven-day Planner actually reads the result.",
   ].join("\n");
 }
 

@@ -5,17 +5,13 @@
  * Output = direction seeds only (no finished post prose).
  */
 import { isUsableKeywordSubject, subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
-import { plannerArchitectureLock } from "./engine-architecture.ts";
+import { creatorDnaBlock } from "./engine-dna.ts";
 import { seedCandidatePhilosophyBlock } from "./engine-stage-philosophy.ts";
-import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
-import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
-import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
-import { humorRingPromptLines, isFrozenHumorClone } from "./humor-fill.ts";
+import { isFrozenHumorClone } from "./humor-fill.ts";
 import {
   buildOpenSlots,
   inferPersonalCluster,
-  isForbiddenDefaultSubject,
+  isKoreaOnlySituation,
   isPersonalInterestSubject,
   isSlotTypeLabel,
   massSectorFromText,
@@ -37,30 +33,14 @@ export type CreatorSeedReasoningInput = {
   recentPublishedAngles?: string[];
   explicitCreatorIntent?: string;
   viralCandidates?: ViralCandidate[];
-  /** Soft pattern lines only — never "reuse this seed" */
-  performancePatternHints?: string[];
-  /** Observed USER_DIRECT cluster counts — mix follows data, not 8 frozen axes */
-  clusterInterestWeights?: Array<{ cluster: string; n: number }>;
-  /** Registry labels as HINTS only — never copy as concrete_subject */
-  registryInterestHints?: Array<{ cluster: string; dimension: string }>;
-  userDirectN?: number;
-  learning?: {
-    stage?: string;
-    note_ko?: string;
-    seed_rule?: string;
-    validated_performance_patterns?: number;
-  };
   model?: string;
   timeoutMs?: number;
-  /** Mass public sectors (legacy hole fill). Prefer humorRing. */
-  adjacentRing?: boolean;
-  /** Personal-interest observational humor to fill quota holes. */
-  humorRing?: boolean;
   /** Short DNA-only retry when the full prompt returned zero usable seeds. */
   compactRetry?: boolean;
+  /** Planner-requested field for a recovery expansion. Direction only; not selection. */
+  explorationDirection?: string;
   /** Typed empty cells. If omitted, built from needed + existing. */
   openSlots?: OpenSeedSlot[];
-  intelligence?: PlannerIntelligenceBlocks | null;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -118,26 +98,6 @@ function seedListFromParsed(parsed: any): any[] {
   return [];
 }
 
-/** Soft performance patterns — advisory only, never seed clone */
-function defaultPerformanceHints(): string[] {
-  return [
-    "Practical investigation + real media → bookmarks/views candidate",
-    "Honest incident / observation with low entry barrier (wording AND wording range) → readers, not a Tesla club",
-    "Lived tension + how it resolved can be informative; do not hard-assert — leave judgment so readers can reply",
-    "Everyday wording can raise attention without changing meaning",
-    "Do not write only keep-worthy posts; mix/diversity is how bookmarks are sought",
-    "Do NOT reuse a past winning seed subject; transfer flow/entry/wording quality only",
-  ];
-}
-
-function interestDomainGate(text: string): boolean {
-  const t = String(text || "");
-  if (isForbiddenDefaultSubject(t)) return false;
-  if (adjacentDomainGate(t)) return true;
-  if (isPersonalInterestSubject(t)) return true;
-  return t.length < 8;
-}
-
 type NormalizeSeedResult = { seed: ConcreteSeed | null; reason?: string };
 
 function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
@@ -159,12 +119,6 @@ function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
   const wording = clean(x?.wording_note, 80);
   const tension = clean(x?.point_or_tension, 140) ||
     (entry ? `진입: ${entry}` : "관찰·판단 각도");
-  const exploration = clean(x?.exploration_value, 24).toLowerCase();
-  const exploration_value = /^(core|secondary|emerging|exploration)$/.test(exploration)
-    ? exploration
-    : "";
-  const rawPriority = Number(x?.seed_priority);
-  const priority = Math.max(0, Math.min(100, Math.round(Number.isFinite(rawPriority) ? rawPriority : 50)));
   return { seed: {
     seed_id: `creator-reason-${i + 1}`,
     cluster,
@@ -174,13 +128,6 @@ function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
     point_or_tension: tension,
     topic: clean(x?.topic, 60) || cluster,
     subtopic: clean(x?.subtopic, 80) || dimension,
-    why_now: clean(x?.why_now, 140),
-    creator_relevance: clean(x?.creator_relevance, 140),
-    audience_relevance: clean(x?.audience_relevance, 140),
-    evidence_basis: clean(x?.evidence_basis, 140),
-    exploration_value,
-    seed_priority: priority,
-    selection_reason: clean(x?.selection_reason, 140),
     primary_source: "CREATOR_SEED_REASONING",
     supporting_sources: ["CREATOR_DNA", "RECENT_PUBLISHED", "XAI_REASONING"].concat(
       wording ? ["WORDING_INTENT"] : [],
@@ -253,11 +200,8 @@ export async function reasonCreatorSeeds(
       text: clean(v.text, 140),
       engagement_hint: clean(v.engagement_hint, 40),
     }))
-    .filter((v) => v.text.length >= 12 && (args.humorRing || !args.adjacentRing ? interestDomainGate(v.text) : adjacentDomainGate(v.text)))
+    .filter((v) => v.text.length >= 12 && !isKoreaOnlySituation(v.text))
     .slice(0, 12);
-  const perf = (args.performancePatternHints?.length
-    ? args.performancePatternHints
-    : defaultPerformanceHints()).map((p) => clean(p, 120)).slice(0, 8);
   const intent = clean(args.explicitCreatorIntent, 180);
 
   const compact = !!args.compactRetry;
@@ -268,7 +212,7 @@ export async function reasonCreatorSeeds(
       existing: args.existing,
     })).slice(0, requested);
   const slotFillRule =
-    "open_slots are candidate-discovery cells, not final publish slots. Fill each concrete_subject by inferring from Creator DNA + engine rules. Leave no cell empty. Do not copy slot_kind, cluster_bound, editorial_mode, or cluster enum names into concrete_subject. Do not write example sentences or sample phrases. Infer a NEW situation or usable short keyword per cell.";
+    "open_slots are candidate-discovery cells, not final publish slots. Fill each concrete_subject by exploring from Creator DNA bounds. Leave no cell empty. Do not copy slot_kind, cluster_bound, or cluster enum names into concrete_subject. Do not write example sentences or sample phrases. Infer a NEW situation or usable short keyword per cell.";
   const system = compact
     ? [
       "You infer X direction seeds for @Seung4680 (Korean track, California life).",
@@ -280,18 +224,13 @@ export async function reasonCreatorSeeds(
       "Each concrete_subject is a distinct writable situation or a usable short Korean/English keyword, different from already_held and recent_published.",
       "Explore Creator interests and adjacent public situations. Final selection—not candidate generation—applies the daily public-topic mix.",
       "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
-      'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","seed_priority":0,"selection_reason":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
+      "Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.",
     ].join("\n")
     : [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
-    plannerPhilosophyBlock(),
-    plannerArchitectureLock(),
     seedCandidatePhilosophyBlock(),
-    dnaIntelligencePhilosophyBlock(),
-    learningLoopPhilosophyBlock(),
-    "You MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory. Use them for why-now and mix. Do not overwrite Creator DNA. Do not copy winning wording. Do not copy Current X Context into a seed body.",
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
-    "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
+    "Explore broadly within Creator DNA interests, adjacent areas, and plausible new expansion areas. Do not decide which candidate is strategically good; Planner owns that.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Do not dump CLUSTER + DIMENSION labels as concrete_subject. Code drops registry-label bodies.",
@@ -299,28 +238,16 @@ export async function reasonCreatorSeeds(
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
     "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
-    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Everyday words only. FORBIDDEN seed jargon: 레이어, 레이어2, L2, 스택, 프로토콜. Wording examples in Performance DNA are for posts, not this week's concrete_subject.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
-    "Explore Creator-interest and adjacent public candidates. Generic Tesla ticker or Robotaxi-news recaps are not useful seeds; Elon/Musk mention alone is not a rejection.",
+    "Explore current interests, adjacent areas, and plausible new expansion areas without deciding strategic value.",
     "Creator lives in California. Seeds are Korean words about US/CA daily life. Do not invent Korea-only civic or housing situations the creator does not live. Code drops those.",
-    "Candidate generation has no personal/mass quota. Explore broadly inside Creator DNA and adjacent reader life. The final Planner applies at most one mass-public post per day.",
-    "Do not emit a generic Tesla ticker or Robotaxi news recap as concrete_subject. Do not invent lived episodes.",
+    "Candidate generation has no topic, domain, Editorial Mode, or personal/public quota. Do not invent lived episodes.",
     "Do not copy already_held_seeds or recent_published_angles. Do not rotate last week's subjects. Infer a NEW situation each seed.",
-    "cluster_weights inform candidate relevance. They do not hard-limit the candidate pool.",
-    "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
-    "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
+    "Do not score Creator fit, Audience fit, performance potential, strategic relevance, or selection priority. Do not rank candidates.",
+    "this_run_note and planner_exploration_direction are exploration bounds only. They do not authorize selection or allocation.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
-    "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
     "Lived evidence seeds may be CITE+RELATED follow-ups from held episodes. Never clone the same content. Do not copy a prompt example as the new subject.",
-    ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
-    ...(args.humorRing
-      ? [
-        "humorRing cluster MUST be one of FSD, CYBERTRUCK, TESLA, LAFC, GAMING. Do not use OBSERVATION, HUMOR, or CASUAL as cluster.",
-        "Return requested_seed_count personal-interest seeds. Do not return a mass-only or empty list.",
-      ]
-      : []),
-    "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
-    'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","seed_priority":0,"selection_reason":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
+    'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',
   ].join("\n");
 
   const user = compact
@@ -330,6 +257,7 @@ export async function reasonCreatorSeeds(
       creator_dna: creatorDnaBlock(),
       already_held_seeds: existingAbstract,
       recent_published_angles_avoid_repeat: recent,
+      planner_exploration_direction: clean(args.explorationDirection, 240) || null,
       weekly_goal_note:
         "Fill every open_slot.concrete_subject by inference. Return requested_seed_count seeds. No frozen keyword list. No last-week clones. No invented experience. No example sentences.",
     })
@@ -337,36 +265,13 @@ export async function reasonCreatorSeeds(
     requested_seed_count: requested,
     open_slots: openSlots,
     creator_dna: creatorDnaBlock(),
-    engine_rules_are_the_will: engineRulesAsWill(),
-    performance_dna: performanceDnaBlock(),
-    audience_dna_current: args.intelligence?.audience_dna || null,
-    performance_dna_learned: args.intelligence?.performance_learned || null,
-    revenue_dna_current: args.intelligence?.revenue_dna || null,
-    planner_memory: args.intelligence?.planner_memory || null,
-    current_x_context: args.intelligence?.current_x_context || null,
-    user_direct_n: args.userDirectN ?? null,
-    cluster_weights_from_user_direct: args.clusterInterestWeights?.length
-      ? args.clusterInterestWeights
-      : null,
-    learning: args.learning
-      ? {
-          stage: args.learning.stage || null,
-          note_ko: args.learning.note_ko || null,
-          seed_rule: args.learning.seed_rule || null,
-          validated_performance_patterns: args.learning.validated_performance_patterns ?? 0,
-        }
-      : null,
-    registry_interest_hints_not_seed_bodies: (args.registryInterestHints || []).slice(0, 12),
     this_run_note_overlay_only: intent || null,
+    planner_exploration_direction: clean(args.explorationDirection, 240) || null,
     recent_published_angles_avoid_repeat: recent,
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
-    performance_pattern_hints_not_seed_clones: perf,
-    weekly_goal_note: args.humorRing
-      ? "Fill every open_slot.concrete_subject by inference from Creator DNA. Personal-interest CASUAL/OPINION humor. No invented lived experience. Return requested_seed_count seeds."
-      : args.adjacentRing
-      ? "Fill leftover mass-public open_slots only (max 1/day). Rest of the hole fill is personal. Return requested_seed_count seeds."
-      : "Return requested_seed_count distinct candidates for the inferred 3-day quota. Explore Creator interests and adjacent reader situations; final selection applies the publish mix. No invented experience.",
+    weekly_goal_note:
+      "Return requested_seed_count distinct candidates for the seven-day Seed Pool. Explore broadly; do not score, select, allocate, or decide writing form. No invented experience.",
     requirement:
       "Fill typed empty cells by inference. No example sentences. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
@@ -418,8 +323,8 @@ export async function reasonCreatorSeeds(
         reject(normalized.reason || "NORMALIZE_REJECT");
         continue;
       }
-      if (isForbiddenDefaultSubject(n.concrete_subject)) {
-        reject("FORBIDDEN_FACT_OR_LOCATION");
+      if (isKoreaOnlySituation(n.concrete_subject)) {
+        reject("KOREA_ONLY_FABRICATION");
         continue;
       }
       n.cluster = inferPersonalCluster(n.concrete_subject, n.cluster);

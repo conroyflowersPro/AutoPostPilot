@@ -278,6 +278,7 @@ export async function executeSelectiveRegeneration(args: {
       creator_style: style as any,
       natural_humor: humor as any,
       editorial_mode: mode as any,
+      planner_intent: snapshot.deep_context?.planner_intent || null,
       week_structural_signatures: weekly_context?.other_post_structural_signatures || [],
     } as any;
     deep = fns.buildDeepGenerationContext(buildInput);

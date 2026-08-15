@@ -3,9 +3,8 @@
  * Evaluate only. Never rewrite final_text, never generate alternatives.
  * Hard fail vs soft concern. Per-post isolation. generation_status ≠ judge_status.
  * Architecture: Judge does not write. No engine replaces the Creator.
- * Quality is the last defense: preserve intended thought and Creator identity,
- * stay fact-safe, reject structural repeat. Soft warning is not enough when REJECT
- * or selective regeneration is required.
+ * Final publishability only. Strategy, selection, allocation, profile diversity,
+ * and creative preferences remain Planner/Writer responsibilities.
  */
 import type { DeepGenerationContext, CoreThought, CompressionTarget } from "./deep-generation-context.ts";
 import type { IndependentPostResult } from "./independent-post-generation.ts";
@@ -14,10 +13,6 @@ import {
   ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR,
 } from "./engine-architecture.ts";
 import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
-import {
-  extractStructuralSignature,
-  weekStructureHardReasons,
-} from "./structural-signature.ts";
 
 export {
   extractStructuralSignature,
@@ -67,6 +62,7 @@ export type SemanticJudgeInput = {
     concrete_subject?: string;
   };
   interpretation?: Record<string, unknown> | null;
+  planner_intent?: Record<string, unknown> | null;
   core_thought?: Partial<CoreThought> | null;
   reaction_mechanism?: Record<string, unknown> | null;
   thinking_rail?: Record<string, unknown> | null;
@@ -281,6 +277,7 @@ export function buildSemanticJudgeInput(
       concrete_subject: s((ctx as any).seed_identity?.concrete_subject) || undefined,
     },
     interpretation: (ctx as any).interpreted_meaning || null,
+    planner_intent: (ctx as any).planner_intent || null,
     core_thought: ctx.core_thought || null,
     reaction_mechanism: (ctx as any).reaction_mechanism || (ctx as any).mechanism || null,
     thinking_rail: (ctx as any).thinking_rail || null,
@@ -384,7 +381,7 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
       soft.push("core_thought_weak_surface_match");
     } else {
       coreScore = 0.2;
-      hard.push("core_thought_lost");
+      soft.push("writer_core_thought_lost");
     }
   }
   scores.core_thought_preservation = clamp01(coreScore);
@@ -456,7 +453,7 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   }
   const trimmedLen = text.replace(/\s+/g, " ").trim().length;
   if (trimmedLen > 0 && trimmedLen < 28) {
-    hard.push("too_short_original");
+    soft.push("writer_too_short_original");
   }
   if (/중요한\s*이슈|관심이\s*쏠|주목할\s*만|향후\s*전망|의미가\s*크다/.test(text)) {
     hard.push("generic_thesis");
@@ -519,36 +516,10 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     scores.creator_fit = clamp01(scores.creator_fit - 0.15);
   }
 
-  const sigs = [
-    ...(input.weekly_context?.other_post_structural_signatures || []),
-    ...(input.weekly_context?.recent_generated_signatures || []),
-  ];
-  const mine = extractStructuralSignature(text);
-  const weekHard = weekStructureHardReasons(mine, sigs);
-  if (weekHard.length) {
-    hard.push(...weekHard);
-    flags.template_like = true;
-    flags.conceptual_repetition = "HIGH";
-  }
-  let sameOpening = 0;
-  let sameEnding = 0;
-  for (const sig of sigs) {
-    if (sig && sig.opening_type === mine.opening_type && sig.length_bucket === mine.length_bucket) sameOpening++;
-    if (sig && sig.ending_type === mine.ending_type && sig.punchline_used === mine.punchline_used) sameEnding++;
-  }
-  if (sameOpening >= 3 || sameEnding >= 3) {
-    hard.push("structural_repetition_high");
-    flags.template_like = true;
-    flags.conceptual_repetition = "HIGH";
-  } else if (!weekHard.length && (sameOpening >= 2 || sameEnding >= 2)) {
-    soft.push("structural_repetition_medium");
-    flags.conceptual_repetition = "MEDIUM";
-  } else if (!weekHard.length) {
-    flags.conceptual_repetition = "LOW";
-  }
-  scores.novelty_fit = clamp01(
-    flags.conceptual_repetition === "HIGH" ? 0.25 : flags.conceptual_repetition === "MEDIUM" ? 0.55 : 0.85,
-  );
+  // Profile-level repetition is Planner strategy, using actual X Analytics.
+  // Judge does not reject or score the completed post against a virtual week.
+  flags.conceptual_repetition = "LOW";
+  scores.novelty_fit = 0.8;
 
   return finalize(slot, cid, hard, soft, scores, flags, "rule_based", true, true, null);
 }

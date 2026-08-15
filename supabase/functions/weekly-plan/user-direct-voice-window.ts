@@ -223,14 +223,14 @@ export function planSlotSurface(args: {
   const least = candidates.filter((k) => used(k) === min);
   const ending = least[slotSalt(args.seedKey, args.slotIndex) % least.length];
   const reason =
-    "planner chose this slot from DNA two-speed + engine (no single tone) + this 3-day set so far. No frozen 해요/음슴 mix ratio.";
+    "historical Creator voice range only; Writer decides expression after understanding the assigned thought. No frozen seven-day surface mix.";
   return {
     ending,
     reason,
     constraint_line: [
       surfaceLine(ending),
       "REASON: " + reason,
-      "Editorial mode is not 말투. Do not lock 해요 to information posts. Do not lock 음슴 to casual. USER_DIRECT rates are evidence, not a quota. Do not copy the previous post's ending. Do not collapse the 3-day set to one register.",
+      "Editorial mode is not 말투. USER_DIRECT rates are evidence, not a quota or a preselected surface. Writer decides after the thought.",
     ].join("\n"),
   };
 }

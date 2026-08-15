@@ -1,8 +1,8 @@
 /** Single source of truth for AutoPostPilot product version (UI badges + package + weekly-plan). */
-export const APP_VERSION = "11.10.1";
+export const APP_VERSION = "11.11.0";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 export const BUILD_STAMP = APP_VERSION;
 
 /** One Korean line the operator can read in the app after a bump. */
 export const VERSION_SUMMARY_KO =
-  "xAI Grok 4.6이 필요한 수보다 넓게 Seed 후보를 탐색합니다. Seed는 날조·진짜 복제·빈 재료만 막고, 현재 사실·장소·AI 일반론은 검증 표시나 감점으로 살립니다. 개인 관심 중심이며 대중 생활은 최종 배치에서 하루 1개입니다. 예비 Seed를 먼저 쓰고, 생각이 먼저며 스타일은 따라옵니다. 발행은 태평양시 오후 2시부터.";
+  "7일 생성은 Seed Pool 탐색 → Planner 전략 → Planner 선택·배차 → Writer → Semantic Judge 순서입니다. Reject는 Planner가 기존 Pool에서 먼저 재배차하고 필요할 때만 분야를 지정해 추가 탐색합니다. Writer는 Seed와 Planner Intent를 이해한 뒤 스스로 생각하고 씁니다. 최근 흐름은 최대 30일의 실제 X Analytics만 사용합니다.";

@@ -9,7 +9,6 @@ import {
   CREATOR_SEED_REASONING_VERSION,
   type ViralCandidate,
 } from "./creator-seed-reasoning.ts";
-import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 
 export const SEED_SUPPLY_HOTFIX_VERSION = "seed_supply_creator_reasoning_v1";
 export { CREATOR_SEED_REASONING_VERSION };
@@ -39,20 +38,8 @@ export async function expandSeedSupplyWithXai(args: {
   explicitCreatorIntent?: string;
   recentPublishedAngles?: string[];
   viralCandidates?: ViralCandidate[];
-  performancePatternHints?: string[];
-  clusterInterestWeights?: Array<{ cluster: string; n: number }>;
-  registryInterestHints?: Array<{ cluster: string; dimension: string }>;
-  userDirectN?: number;
-  adjacentRing?: boolean;
-  humorRing?: boolean;
-  learning?: {
-    stage?: string;
-    note_ko?: string;
-    seed_rule?: string;
-    validated_performance_patterns?: number;
-  };
   compactRetry?: boolean;
-  intelligence?: PlannerIntelligenceBlocks | null;
+  explorationDirection?: string;
   model?: string;
   timeoutMs?: number;
 }): Promise<XaiSeedExpansionResult> {
@@ -63,15 +50,8 @@ export async function expandSeedSupplyWithXai(args: {
     explicitCreatorIntent: args.explicitCreatorIntent,
     recentPublishedAngles: args.recentPublishedAngles,
     viralCandidates: args.viralCandidates,
-    performancePatternHints: args.performancePatternHints,
-    clusterInterestWeights: args.clusterInterestWeights,
-    registryInterestHints: args.registryInterestHints,
-    userDirectN: args.userDirectN,
-    adjacentRing: args.adjacentRing,
-    humorRing: args.humorRing,
     compactRetry: args.compactRetry,
-    learning: args.learning,
-    intelligence: args.intelligence || null,
+    explorationDirection: args.explorationDirection,
     model: args.model,
     timeoutMs: args.timeoutMs,
   });

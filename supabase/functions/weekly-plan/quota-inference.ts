@@ -1,15 +1,11 @@
 /**
- * Infer the week's post quota from Creator DNA + engine rules + learned cadence.
- * Will is not a generate-box sentence. Bounds exist only as X anti-dump safety.
+ * Infer an operational seven-day capacity recommendation used to size the
+ * initial Seed Pool. This is not the Planner strategy or final slot count.
  */
 import type { CadenceSignal, ClusterWeight, LearningState } from "./seed-engine.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
-import { plannerArchitectureLock } from "./engine-architecture.ts";
-import { weeklyEditorialPhilosophyBlock } from "./engine-stage-philosophy.ts";
-import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
 import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 
-export const QUOTA_DAYS = 3;
+export const QUOTA_DAYS = 7;
 export const QUOTA_PER_DAY_MAX = 8;
 export const QUOTA_PER_DAY_MIN = 3;
 export const QUOTA_INFERENCE_VERSION = "weekly_quota_v1";
@@ -80,18 +76,12 @@ export async function inferWeeklyQuota(args: {
   if (!args.xaiKey) return fallback;
 
   const system = [
-    "You infer the weekly ORIGINAL post quota for X account @Seung4680.",
-    plannerPhilosophyBlock(),
-    plannerArchitectureLock(),
-    weeklyEditorialPhilosophyBlock(),
-    dnaIntelligencePhilosophyBlock(),
-    learningLoopPhilosophyBlock(),
-    "You MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory in the user JSON. Missing layers are UNKNOWN — not zero, not a reason to refuse.",
-    "Will is already in Creator DNA + engine rules. Do not wait for a typed slogan.",
+    "You infer an operational seven-day candidate-capacity recommendation for X account @Seung4680.",
+    "This call does not create the seven-day strategy, select Seeds, allocate slots, or set final count. The Planner does that after the Seed Pool exists.",
     "this_run_note is an optional overlay, not the will.",
     "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise; same-author decay per For You refresh), 48-hour For You freshness, start 14:00 America/Los_Angeles, even-spread inside 14:00–22:00 PT, mix, whether higher volume linked to growth.",
     "X ranking weights multiply predicted viewer-action probabilities on Home-served posts, not raw engagement counts and not author DMs of own links. They do not write posts and do not pick the last sentence.",
-    "Days are 3 because 3-day generate is the engine action.",
+    "The operational capacity horizon is seven days. Final slot count and strategy belong to the seven-day Planner after the Seed Pool exists.",
     `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Prefer 4/day. 5 fills the 14:00–22:00 PT window. Not a frozen 5. Do not freeze 6 as a default.`,
     "Thin or missing learned evidence is expected (cold start). Still infer posts_per_day from DNA + cadence within bounds. Do not refuse. Do not wait for validated performance patterns.",
     "If handmade cadence is healthy and the 14:00–22:00 PT window has room, 5 is enough. Go to 6–8 only if dumping is unlikely. If dumping likely hurt reach, stay at 3–4.",
@@ -101,20 +91,9 @@ export async function inferWeeklyQuota(args: {
   ].join("\n");
 
   const user = JSON.stringify({
-    creator_dna: creatorDnaBlock(),
-    engine_rules_are_the_will: engineRulesAsWill(),
-    performance_dna: performanceDnaBlock(),
-    audience_dna_current: args.intelligence?.audience_dna || null,
-    performance_dna_learned: args.intelligence?.performance_learned || null,
-    revenue_dna_current: args.intelligence?.revenue_dna || null,
-    planner_memory: args.intelligence?.planner_memory || null,
-    current_x_context: args.intelligence?.current_x_context || null,
     this_run_note_overlay_only: args.explicitCreatorIntent || null,
     user_direct_n: args.userDirectN,
     cadence: args.cadence,
-    cluster_weights: args.clusterWeights,
-    performance_pattern_hints: (args.performanceHints || []).slice(0, 8),
-    learning: args.learning || null,
     week_days: QUOTA_DAYS,
     bounds: { min_per_day: QUOTA_PER_DAY_MIN, max_per_day: QUOTA_PER_DAY_MAX },
   });

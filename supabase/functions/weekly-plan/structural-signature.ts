@@ -101,7 +101,7 @@ export function writerWeekStructureConstraintLines(
   const prior = (signatures || []).filter((s) => s && typeof s === "object");
   if (prior.length === 0) {
     return [
-      "WEEK STRUCTURE: first post this 3-day set. Still do not default to 관찰 then 반전 then 재해석.",
+      "WEEK STRUCTURE SIGNAL: first post in this seven-day set.",
     ];
   }
   const shapes = prior.map((s) => String(s.discourse_shape || "")).filter(Boolean);

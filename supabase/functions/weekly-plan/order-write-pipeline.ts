@@ -251,6 +251,11 @@ export async function writeOneSlot(args: {
     seed: seed as any,
     interpretation: seed_interpretation as any,
     editorial_mode: mode,
+    planner_intent: {
+      strategy_slot_id: String(seed.strategy_slot_id || ""),
+      strategic_role: String(seed.strategic_role || ""),
+      intent: String(seed.planner_intent || ""),
+    },
     voice_register: voicePayload,
     week_structural_signatures: weekSignatures,
   });

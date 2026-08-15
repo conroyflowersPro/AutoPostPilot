@@ -18,7 +18,6 @@ import {
   evaluateEditorialSeedQuality,
   ideaAngleKey,
   conceptualDiversityScore,
-  seedSelectionValueScore,
   conceptualRepetitionLevel,
   type ConcreteSeed,
 } from "./seed-engine.ts";
@@ -62,11 +61,11 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.10.1";
+const APP_VERSION = "11.11.0";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
-const EXPAND_BATCH = 6;
+const EXPAND_BATCH = 10;
 const GIT_COMMIT = Deno.env.get("GIT_COMMIT") || Deno.env.get("COMMIT_SHA") || "main";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -304,10 +303,9 @@ Deno.serve(async (req) => {
         (actRows || []) as any[],
       );
       learned.cluster_weights = cluster_weights;
-      const intelligence = await loadPlannerIntelligence(supabase, [...learned.recent_angle_labels, ...published]);
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
-      const targetSupply = Math.max(required_slots + 6, Math.ceil(required_slots * 2));
+      const targetSupply = required_slots + 6 + Math.ceil(Math.sqrt(Math.max(1, required_slots)));
       const totalBatches = Math.max(1, Math.ceil(targetSupply / EXPAND_BATCH));
       const remaining = Math.max(0, targetSupply - priorSubjects.length);
 
@@ -405,14 +403,7 @@ Deno.serve(async (req) => {
             needed: Math.max(thisNeed, 1),
             existing: [...candidates, ...existingHeld] as ConcreteSeed[],
             explicitCreatorIntent: intentText || undefined,
-            recentPublishedAngles: [...learned.recent_angle_labels, ...published].slice(0, 30),
             viralCandidates: viralIn.slice(0, 12),
-            performancePatternHints: learned.performance_pattern_hints,
-            clusterInterestWeights: learned.cluster_weights,
-            registryInterestHints: learned.registry_interest_hints,
-            userDirectN: learned.user_direct_n,
-            learning: learned.learning,
-            intelligence,
             model: V11_SEED_MODEL,
             timeoutMs: 32000,
           });
@@ -621,13 +612,9 @@ Deno.serve(async (req) => {
       for (const plannedMode of queue) {
         const mode = plannedMode as EditorialMode;
         const candidates = pool
-          .map((s, i) => {
-            const div = conceptualDiversityScore(s, selectedWeekly);
-            const value = seedSelectionValueScore(s);
-            return { s, i, div, value, score: value * 0.55 + div * 0.45 };
-          })
+          .map((s, i) => ({ s, i }))
           .filter(({ s }) => canServeEditorialMode(s, mode))
-          .sort((a, b) => b.score - a.score);
+          ;
         let picked: ConcreteSeed | null = null;
         for (const { s, i } of candidates) {
           if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;
@@ -759,6 +746,7 @@ Deno.serve(async (req) => {
         dryRun,
         voiceRows: (voiceActs || []) as any,
         audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
+        skipSelectiveRegen: true,
       });
       return json({
         success: true,

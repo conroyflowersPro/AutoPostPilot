@@ -10,13 +10,13 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation(boundaries) → Writer closes thought then writes (style follows) → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → 4 DNA → Seed Pool(explore) → Planner seven-day strategy → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory";
 
 export const ARCHITECTURE_FORBIDDEN_MIXES =
   "Writer must not become Planner. Performance DNA must not overwrite Creator DNA. Revenue DNA must not dominate strategy. Judge must not rewrite. Unpublished AI drafts must not train Planner Memory.";
 
 export const LEARNING_CYCLE =
-  "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning";
+  "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next seven-day Planner reads → new Planning";
 
 export const AUDIENCE_DNA_PRIMARY = "x_analytics";
 export const AUDIENCE_DNA_AUXILIARY = "fedica";

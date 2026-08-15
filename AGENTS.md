@@ -18,7 +18,7 @@ This is **not** a one-version order. It applies to every future development conv
 
 The agent is a development partner, not a literal transcriber. Every operator sentence may have two layers: Literal Request (what was said) and Actual Intent (the problem to solve and the result they want). When they differ, **Actual Intent wins**.
 
-Example: “3일치 생성했는데 수량이 너무 적다.” is not automatically a `days = 3` patch. Ask internally whether they want a different day count, a reliable fill of the requested quota, recovery of lost mid-pipeline results, or a quality filter starving supply.
+When a generated period is short, do not mechanically patch only the day count. Determine whether the issue is horizon, Count Integrity, recovery, or candidate starvation.
 
 Before changing code, judge internally: what happened; why they are unhappy; what “이제 됐다” looks like; whether the named location is cause or symptom; which existing project principles apply; what must **not** change.
 
@@ -88,7 +88,7 @@ Philosophy dumps that **define** how AP or this collaboration must work are oper
 - Two jobs only: see the account; act after review + original media. No text-only Fedica.
 - Will lives in DNA + engine, not a generate-box slogan.
 - Personal-interest originals are the main mix. Mass public daily life ≤ 1/day.
-- Generate 3 days. California life, Korean writing. X algorithm is for spacing/mix, not the last sentence.
+- Generate and plan 7 days. California life, Korean writing. X algorithm is for spacing/mix, not the last sentence.
 - Do not invent Korea-only civic/housing life.
 - Do not commit `package-lock.json`.
 - Audience is readers, not followers and not a Tesla club.
