@@ -26,7 +26,7 @@ ok("V7. pipeline infers slot voice", /inferSlotVoice/.test(pipe) && /voice_regis
 ok("V8. writer consumes register", /voice_register\?\.constraint_line/.test(writer));
 ok("V9. question only from USER_DIRECT stats, never allowed on AP drafts", /question_ending_allowed = false/.test(voice));
 ok("V10. planner decides surface, not a mode 해요 table", /planSlotSurface/.test(voice) && /No frozen 해요\/음슴 mix ratio/.test(voice) && !/POST CHARACTER: information\/compare/.test(voice));
-ok("V11. pipeline uses planner surface instead of mode as 해요 lock", /planSlotSurface/.test(pipe) && /voiceRegisterConstraintLine\(voice, surface\)/.test(pipe) && !/thin \? 0\.4/.test(voice));
+ok("V11. pipeline does not lock 해요/음슴 before the thought", !/planSlotSurface/.test(pipe) && /voiceRegisterConstraintLine\(voice\)/.test(pipe) && !/thin \? 0\.4/.test(voice));
 console.log("========================================");
 console.log(`VOICE WINDOW: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

@@ -52,7 +52,7 @@ export function plannerArchitectureLock(): string {
 export function writerArchitectureLock(): string {
   return [
     architecturePrincipleBlock(),
-    "YOUR LAYER: Writing. Thought first, then style. You close this Seed's central thought, then deliver it as this creator would.",
+    "YOUR LAYER: Writing. Thought first, then style. You close this Seed's central thought from Seed + Creator DNA + fact/experience boundaries, then deliver it as this creator would. Delivery engines are not inputs that pick the thought.",
     "You do not choose seeds, editorial balance, or 3-day strategy. You do not become the Planner. You DO close the thought for this Seed.",
     "Performance DNA is Planner-only. Do not chase winning feature combos. Do not copy successful wording. Revenue DNA does not pick this post.",
   ].join("\n");

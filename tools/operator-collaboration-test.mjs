@@ -14,6 +14,7 @@ const agents = read("AGENTS.md");
 const protocol = read("architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md");
 const dir = read("architecture/v11.0.0_PRODUCT_DIRECTION.md");
 const wr = read("supabase/functions/weekly-plan/independent-post-generation.ts");
+const pipe = read("supabase/functions/weekly-plan/order-write-pipeline.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 const seed = read("supabase/functions/weekly-plan/creator-seed-reasoning.ts");
 const dna = read("supabase/functions/weekly-plan/engine-dna.ts");
@@ -32,7 +33,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Operator collaboration contract (v11.8.1)");
+console.log("Operator collaboration contract (v11.9.0)");
 
 ok("C1. version lock", /operator-collaboration-v1\.1/.test(collab));
 ok(
@@ -105,8 +106,8 @@ ok(
     !/operator-collaboration-v1/.test(dna)
 );
 ok(
-  "C12. shipping 11.8.1",
-  /APP_VERSION = "11.8.1"/.test(ver) && /APP_VERSION = "11.8.1"/.test(ix)
+  "C12. shipping 11.9.0",
+  /APP_VERSION = "11.9.0"/.test(ver) && /APP_VERSION = "11.9.0"/.test(ix)
 );
 ok(
   "C13. AGENTS.md forbids leaking into post prompts",
@@ -133,11 +134,13 @@ ok(
     !/Build the user's intent/.test(seed)
 );
 ok(
-  "C18. thought first, style follows",
+  "C18. thought first, style follows — docs and writeOneSlot runtime",
   /Thought first, style follows/.test(protocol) &&
     /Thought first, style follows/.test(agents) &&
     /COLLAB_THOUGHT_FIRST/.test(collab) &&
-    !/Thought first, style follows/.test(wr)
+    !/Thought first, style follows/.test(wr) &&
+    /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
+    /selectDeliveryAfterThought/.test(pipe)
 );
 
 console.log("========================================");

@@ -39,8 +39,8 @@ function isEverydayPublicScene(text) {
 
 console.log("Grok writer mechanism wiring");
 ok("M1. writer exports mechanism constraint helper", /export function writerMechanismConstraintLines/.test(wr));
-ok("M2. writer instructions treat mechanism as optional delivery", /OPTIONAL DELIVERY/.test(wr) && /Personality is this creator's closed thought/.test(wr));
-ok("M3. live user message uses mechanism lines", /writerMechanismConstraintLines\(ctx\)/.test(wr));
+ok("M2. mechanism helper does not pick the thought", /writerMechanismConstraintLines/.test(wr) && /Not injected into the live writer prompt/.test(wr) && /NONE is normal/.test(wr));
+ok("M3. live user message does not inject mechanism lines", /callGrokWriter/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 ok("M4. deep context reads selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(dgc) && /getMechanismById/.test(dgc));
 ok("M5. deep context copies reader_entry_point", /reader_entry_point: s\(mech\.reader_entry_point/.test(dgc));
 ok("M6. NONE string is not treated as human text", /none\|low/.test(rsp) && /hasText/.test(rsp));

@@ -1,6 +1,9 @@
 /**
- * v11 write path: Planner/Seeds → Grok 4.6 closes thought then writes → Semantic Judge.
- * Thought first, style follows. Writer does not become Planner. Judge does not rewrite.
+ * v11 write path: Planner/Seeds → Interpretation(boundaries) → Grok 4.6 closes thought then writes → Semantic Judge.
+ * Thought first, style follows — in execution, not only in documents.
+ * Mechanism / Rail / 말투 / humor / compression do not run before the writer and do not pick the thought.
+ * After the post exists they may be recorded as delivery telemetry. They do not rewrite.
+ * Writer does not become Planner. Judge does not rewrite.
  * Paid xAI: quota, seed expand, and original post body. No OpenAI.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
@@ -26,12 +29,14 @@ import type { EditorialMode } from "./editorial-mix.ts";
 import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
 import {
   inferSlotVoice,
-  planSlotSurface,
   voiceRegisterConstraintLine,
   endingKind,
   type VoiceActivityRow,
   type VoiceRegister,
 } from "./user-direct-voice-window.ts";
+
+export const THOUGHT_FIRST_RUNTIME = true as const;
+export const DELIVERY_AFTER_THOUGHT = true as const;
 
 /** Seed quota + expand stay on Grok. Original post body is also Grok 4.6. */
 export const V11_SEED_MODEL = "grok-4.6";
@@ -61,74 +66,21 @@ export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode):
   });
 }
 
-export async function writeOneSlot(args: {
-  seed: Record<string, unknown>;
-  xaiKey: string | null;
-  dryRun?: boolean;
-  voiceRows?: VoiceActivityRow[];
+/** Delivery telemetry after a thought exists as a post. Never fed back to pick the thought. */
+function selectDeliveryAfterThought(args: {
+  seed: ConcreteSeed & Record<string, unknown>;
+  mode: EditorialMode;
+  seed_interpretation: SeedInterpretation;
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
   audienceSignals?: AudienceBarrierSignals | null;
   recentStyleCounts?: Record<string, number> | null;
-  recentEndingCounts?: Record<string, number> | null;
-  lastEnding?: string | null;
-  weekSignatures?: Array<Record<string, unknown>>;
-  /** Weekly job ticks: one Grok writer call per slot. Judge reject does not start a second write. */
-  skipSelectiveRegen?: boolean;
-}): Promise<{
-  slotId: string;
-  primaryTopic: string;
-  concrete_subject: string;
-  editorial_mode: string;
-  final_text: string;
-  generation_status: string;
-  judge_status?: string;
-  block_reasons: string[];
-  writer_call_attempted: boolean;
-  mechanism_id?: string | null;
-  style_family?: string | null;
-  ending_kind?: string | null;
-  system_origin_class: "AP_PIPELINE";
-  semantic_regen_attempts: number;
-  slot_final_state: string;
-  regeneration_route_history: string[];
-  structural_signature: Record<string, unknown> | null;
-}> {
-  const seed = args.seed as ConcreteSeed & Record<string, unknown>;
-  const mode = String(seed.editorial_mode || "INFORMATIVE").toUpperCase() as EditorialMode;
-  const dayOffset = Number(seed.dayOffset ?? 0);
-  const slot = Number(String(seed.slotId || "").replace(/^D\d+P/, "") || 1) || 1;
-  const slotId = String(seed.slotId || `D${dayOffset + 1}P${slot}`);
-  const voice: VoiceRegister = inferSlotVoice({
-    rows: args.voiceRows || [],
-    cluster: String(seed.cluster || seed.topic_cluster || ""),
-    editorial_mode: mode,
-  });
-  const surface = planSlotSurface({
-    voice,
-    recentEndingCounts: args.recentEndingCounts || null,
-    lastEnding: args.lastEnding || null,
-    slotIndex: slot,
-    seedKey: String(seed.concrete_subject || seed.seed_id || slotId),
-  });
-  const voicePayload = {
-    n: voice.n,
-    window_days: voice.window_days,
-    median_chars: voice.median_chars,
-    question_ending_allowed: voice.question_ending_allowed,
-    constraint_line: voiceRegisterConstraintLine(voice, surface),
-  };
-
-  const seed_interpretation = interpretConcreteSeed(seed, mode);
+}) {
+  const { seed, mode, seed_interpretation } = args;
   const reaction_mechanism = selectReactionMechanism({
     interpretation: seed_interpretation,
     editorial_mode: mode,
     recent_mechanism_usage: args.recentMechanismUsage || [],
   });
-  const selectedMechanismId = String(
-    (reaction_mechanism as any)?.selected_mechanism ||
-      (reaction_mechanism as any)?.selected_mechanism_id ||
-      "",
-  ) || null;
   const thinking_rail = selectThinkingRail({
     interpretation: seed_interpretation,
     mechanism: reaction_mechanism,
@@ -172,7 +124,11 @@ export async function writeOneSlot(args: {
       prefer_short: false,
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
-      mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
+      mechanism_id:
+        (reaction_mechanism as any)?.selected_mechanism ||
+        (reaction_mechanism as any)?.selected_mechanism_id ||
+        (reaction_mechanism as any)?.mechanism_id ||
+        null,
       story_invitation_strength: String((reaction_mechanism as any)?.story_invitation_strength || ""),
       self_projection_strength: String((reaction_mechanism as any)?.self_projection_strength || ""),
       rail_status: thinking_rail?.status || null,
@@ -201,10 +157,81 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
     },
   });
-  const humorFill = String(seed.source_type || seed.source_kind || "").toUpperCase().includes("HUMOR");
-  const humorForCtx = humorFill
-    ? { ...natural_humor, humor_compatible: true, humor_strength: "LIGHT", humor_grounded: true }
-    : natural_humor;
+  const selectedMechanismId =
+    String(
+      (reaction_mechanism as any)?.selected_mechanism ||
+        (reaction_mechanism as any)?.selected_mechanism_id ||
+        "",
+    ) || null;
+  return {
+    reaction_mechanism,
+    thinking_rail,
+    everyday_language,
+    creator_style,
+    natural_humor,
+    selectedMechanismId,
+  };
+}
+
+export async function writeOneSlot(args: {
+  seed: Record<string, unknown>;
+  xaiKey: string | null;
+  dryRun?: boolean;
+  voiceRows?: VoiceActivityRow[];
+  recentMechanismUsage?: Array<{ mechanism_id?: string }>;
+  audienceSignals?: AudienceBarrierSignals | null;
+  recentStyleCounts?: Record<string, number> | null;
+  recentEndingCounts?: Record<string, number> | null;
+  lastEnding?: string | null;
+  weekSignatures?: Array<Record<string, unknown>>;
+  /** Weekly job ticks: one Grok writer call per slot. Judge reject does not start a second write. */
+  skipSelectiveRegen?: boolean;
+}): Promise<{
+  slotId: string;
+  primaryTopic: string;
+  concrete_subject: string;
+  editorial_mode: string;
+  final_text: string;
+  generation_status: string;
+  judge_status?: string;
+  block_reasons: string[];
+  writer_call_attempted: boolean;
+  mechanism_id?: string | null;
+  style_family?: string | null;
+  ending_kind?: string | null;
+  system_origin_class: "AP_PIPELINE";
+  semantic_regen_attempts: number;
+  slot_final_state: string;
+  regeneration_route_history: string[];
+  structural_signature: Record<string, unknown> | null;
+}> {
+  const seed = args.seed as ConcreteSeed & Record<string, unknown>;
+  const mode = String(seed.editorial_mode || "INFORMATIVE").toUpperCase() as EditorialMode;
+  const dayOffset = Number(seed.dayOffset ?? 0);
+  const slot = Number(String(seed.slotId || "").replace(/^D\d+P/, "") || 1) || 1;
+  const slotId = String(seed.slotId || `D${dayOffset + 1}P${slot}`);
+
+  // 1. Interpretation first: fact / experience boundaries. Does not close the thought.
+  const seed_interpretation = interpretConcreteSeed(seed, mode);
+
+  // Handmade stats are who this person is — not a locked 말투/ending before the thought exists.
+  const voice: VoiceRegister = inferSlotVoice({
+    rows: args.voiceRows || [],
+    cluster: String(seed.cluster || seed.topic_cluster || ""),
+    editorial_mode: mode,
+  });
+  const voicePayload = {
+    n: voice.n,
+    window_days: voice.window_days,
+    median_chars: voice.median_chars,
+    question_ending_allowed: voice.question_ending_allowed,
+    constraint_line: [
+      voiceRegisterConstraintLine(voice),
+      args.lastEnding ? `Do not copy the previous post's ending (${args.lastEnding}).` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
 
   const weekSignatures = Array.isArray(args.weekSignatures) ? args.weekSignatures : [];
   const weeklyContext = {
@@ -212,22 +239,20 @@ export async function writeOneSlot(args: {
     recent_generated_signatures: weekSignatures,
   };
 
+  // 2. Writer context is interpretation + seed + DNA identity only.
+  // Delivery engines do not run yet and must not pick the thought.
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
     day_offset: dayOffset,
     slot_index: slot,
     seed: seed as any,
     interpretation: seed_interpretation as any,
-    reaction_mechanism: reaction_mechanism as any,
-    thinking_rail: thinking_rail as any,
-    everyday_language: everyday_language as any,
-    creator_style: creator_style as any,
-    natural_humor: humorForCtx as any,
     editorial_mode: mode,
     voice_register: voicePayload,
     week_structural_signatures: weekSignatures,
   });
 
+  // 3. Grok closes one thought for this Seed, then writes it.
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
     xai_key: args.xaiKey,
@@ -247,6 +272,24 @@ export async function writeOneSlot(args: {
   let signature: Record<string, unknown> | null = null;
   let writerAttempted = !!integrated.writer_call_attempted;
 
+  // 4. Delivery after the thought exists. Telemetry only — does not rewrite the post.
+  const delivery = selectDeliveryAfterThought({
+    seed,
+    mode,
+    seed_interpretation,
+    recentMechanismUsage: args.recentMechanismUsage,
+    audienceSignals: args.audienceSignals,
+    recentStyleCounts: args.recentStyleCounts,
+  });
+  const {
+    reaction_mechanism,
+    thinking_rail,
+    everyday_language,
+    creator_style,
+    natural_humor,
+    selectedMechanismId,
+  } = delivery;
+
   const pack = (extra: Partial<Awaited<ReturnType<typeof writeOneSlot>>> = {}) => ({
     slotId,
     primaryTopic: String(seed.concrete_subject || seed.primaryTopic || ""),
@@ -259,7 +302,7 @@ export async function writeOneSlot(args: {
     writer_call_attempted: writerAttempted,
     mechanism_id: selectedMechanismId,
     style_family: String(creator_style.style_family || "") || null,
-    ending_kind: finalText ? endingKind(finalText) : surface.ending,
+    ending_kind: finalText ? endingKind(finalText) : null,
     system_origin_class: "AP_PIPELINE" as const,
     semantic_regen_attempts: regenAttempts,
     slot_final_state: slotFinal,
@@ -292,7 +335,7 @@ export async function writeOneSlot(args: {
           thinking_rail: thinking_rail as any,
           everyday_language: everyday_language as any,
           creator_style: creator_style as any,
-          natural_humor: humorForCtx as any,
+          natural_humor: natural_humor as any,
           deep_context: deep,
         });
         const regen = await executeSelectiveRegeneration({

@@ -1,7 +1,8 @@
 /**
  * ORDER 7A — Deep Generation Architecture Foundation
- * Isolated per-post DeepGenerationContext. Consumes upstream decisions; does not re-decide.
- * Pipeline: … → Style → Humor → Core Thought → Deep Generation Context → downstream writer
+ * Isolated per-post DeepGenerationContext.
+ * Pipeline: Interpretation(boundaries) → Writer closes thought then writes → optional delivery telemetry.
+ * Mechanism / Rail / Style do not pick the thought.
  */
 import { getMechanismById, type MechanismId } from "./reaction-mechanisms.ts";
 
