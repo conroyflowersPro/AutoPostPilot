@@ -9,7 +9,7 @@ import {
   buildRevenueDna,
 } from "@/lib/learning/score";
 import { extractFeatures } from "@/lib/learning/features";
-import { promoteInterestLadder, interestLadderPromptLines } from "@/lib/learning/interest-promotion";
+import { promoteInterestLadder, interestLadderPromptLines, type InterestLadderEntry } from "@/lib/learning/interest-promotion";
 import { OPERATOR_REVENUE_START } from "@/lib/learning/operator-revenue-start";
 import type { NormalizedPostMetrics, MetricOrigin } from "@/lib/learning/types";
 
@@ -126,11 +126,17 @@ export async function POST(req: NextRequest) {
       .select("data")
       .order("created_at", { ascending: false })
       .limit(1);
-    const prevLadder = Array.isArray((prevAudience?.[0] as any)?.data?.interestLadder)
-      ? (prevAudience[0] as any).data.interestLadder
+    const prevRow = Array.isArray(prevAudience) ? prevAudience[0] : null;
+    const ladderRaw =
+      prevRow && typeof prevRow === "object"
+        ? (prevRow as { data?: { interestLadder?: unknown } }).data?.interestLadder
+        : undefined;
+    const prevLadder: InterestLadderEntry[] = Array.isArray(ladderRaw)
+      ? (ladderRaw as InterestLadderEntry[])
       : [];
-    audienceDna.interestLadder = promoteInterestLadder(prevLadder, scored);
-    const ladderLines = interestLadderPromptLines(audienceDna.interestLadder);
+    const nextLadder = promoteInterestLadder(prevLadder, scored);
+    audienceDna.interestLadder = nextLadder;
+    const ladderLines = interestLadderPromptLines(nextLadder);
     if (ladderLines.length) {
       audienceDna.summaryKo = [audienceDna.summaryKo, ladderLines[0]].filter(Boolean).join(" ");
     }

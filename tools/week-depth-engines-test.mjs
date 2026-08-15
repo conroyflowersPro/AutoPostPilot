@@ -76,7 +76,7 @@ function promote(prev, signal) {
   return { stage, signalCycles: cycles };
 }
 
-console.log("Week-depth engines (v11.5.4)");
+console.log("Week-depth engines (v11.5.5)");
 
 ok("E1. twist+reinterp is the AI unfold",
   inferDiscourseShape("충전 중 알림이 겹친다. 그런데 화면이 가린다. 다시 보면 손이 먼저 간다.") === DISCOURSE_TWIST_REINTERPRET);
@@ -136,14 +136,15 @@ ok("E15. No signal resets cycles, does not demote",
 ok("E16. Analyze persists ladder; Planner reads it; UNKNOWN if empty",
   /promoteInterestLadder/.test(analyze) &&
     /interestLadder/.test(analyze) &&
+    /Array.isArray\(prevAudience\)/.test(analyze) &&
     /INTEREST LADDER/.test(intel) &&
     /Do not promote from one post/.test(intel));
 ok("E17. Core Creator topics stay core",
   /CREATOR_CORE_TOPICS/.test(promo) && /fsd_field/.test(promo) && /lafc/.test(promo));
 ok("E18. Writer still does not ingest Performance DNA",
   !/performanceDnaBlock\(\)/.test(wr) && /Performance DNA is Planner-only/.test(read("supabase/functions/weekly-plan/engine-architecture.ts")));
-ok("E19. shipping 11.5.4",
-  /APP_VERSION = "11.5.4"/.test(ver) && /APP_VERSION = "11.5.4"/.test(ix));
+ok("E19. shipping 11.5.5",
+  /APP_VERSION = "11.5.5"/.test(ver) && /APP_VERSION = "11.5.5"/.test(ix));
 ok("E20. structural_repetition hard-maps to writer regen",
   /if \(s\.includes\("structural"\)\) return "STRUCTURAL_REPETITION"/.test(router) &&
     /structural_week_repeat/.test(router));
