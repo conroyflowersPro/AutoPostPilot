@@ -52,7 +52,7 @@ ok("M11. abstract ticker is not everyday public", !isEverydayPublicScene("macro 
 ok("M12. NONE is not meaningful human text", !hasMeaningful("NONE") && hasMeaningful("daily time / effort / choice friction"));
 ok("M13. write batch anti-repeats mechanisms", /recentMechanismUsage/.test(pipe) && /recent\.push/.test(pipe));
 ok("M14. human element sees 알림/주차/구독", /알림\|화면\|주차\|구독/.test(se));
-ok("M15. writer still forbids naming mechanism in the post", /never name the mechanism/.test(wr) && /M1–M9/.test(wr));
+ok("M15. writer still forbids naming mechanism in the post", /never name the mechanism/i.test(wr) && /M1–M9/.test(wr));
 
 console.log("========================================");
 console.log(`MECHANISM WIRE: ${pass} PASS / ${fail} FAIL`);

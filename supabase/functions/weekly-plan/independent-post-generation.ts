@@ -371,6 +371,7 @@ function writerPhilosophyBlock(): string {
     "HARD BOUNDARY: Do not invent lived experience, private facts, emotions, or relationships. Do not copy a manual post or a previously successful sentence. Do not write Korea-only civic/housing life he does not live.",
     "Do not paste prompt examples. Do not freeze topic→말투. 해요 and 음슴 are both allowed; pick the register that fits THIS thought.",
     "Engagement-bait questions (어떻게 생각하세요 / 궁금한가요 as a closer) are forbidden. A genuine thinking question inside the thought is allowed.",
+    "Never name the mechanism or rail in the post. Never write 메커니즘 or M1–M9.",
     "Do not bolt on an unearned macro future/society conclusion. A long-horizon meaning is allowed when the seed's actual change earns it.",
     "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording or chase a viral hook.",
     "WHY YOU EXIST: same person's thought, not an AI template. Growth is Planner strategy plus clear delivery — not likes-recipe sentences.",
