@@ -13,6 +13,7 @@ import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines } from "./humor-fill.ts";
 import {
+  inferPersonalCluster,
   isForbiddenDefaultSubject,
   isPersonalInterestSubject,
   massSectorFromText,
@@ -268,6 +269,12 @@ export async function reasonCreatorSeeds(
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
     ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
+    ...(args.humorRing
+      ? [
+        "humorRing cluster MUST be one of FSD, CYBERTRUCK, TESLA, LAFC, GAMING. Do not use OBSERVATION, HUMOR, or CASUAL as cluster.",
+        "Return requested_seed_count personal-interest seeds. Do not return a mass-only or empty list.",
+      ]
+      : []),
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
@@ -355,6 +362,7 @@ export async function reasonCreatorSeeds(
       const n = normalizeSeed(rawList[i], seeds.length);
       if (!n) continue;
       if (isForbiddenDefaultSubject(n.concrete_subject)) continue;
+      n.cluster = inferPersonalCluster(n.concrete_subject, n.cluster);
       const personal = isPersonalInterestSubject(n.concrete_subject, n.cluster);
       if (!personal) {
         if (massN >= maxMass) continue;

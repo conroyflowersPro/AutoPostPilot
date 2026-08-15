@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.5.5)");
+console.log("DNA + engine live-path wiring (v11.5.6)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -91,7 +91,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.5.5", /APP_VERSION = "11.5.5"/.test(ver) && /APP_VERSION = "11.5.5"/.test(ix));
+ok("D28. version 11.5.6", /APP_VERSION = "11.5.6"/.test(ver) && /APP_VERSION = "11.5.6"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
