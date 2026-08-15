@@ -18,6 +18,7 @@ import {
   evaluateEditorialSeedQuality,
   ideaAngleKey,
   conceptualDiversityScore,
+  seedSelectionValueScore,
   conceptualRepetitionLevel,
   type ConcreteSeed,
 } from "./seed-engine.ts";
@@ -61,7 +62,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.9.0";
+const APP_VERSION = "11.10.0";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -306,7 +307,7 @@ Deno.serve(async (req) => {
       const intelligence = await loadPlannerIntelligence(supabase, [...learned.recent_angle_labels, ...published]);
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
-      const targetSupply = Math.max(required_slots, Math.ceil(required_slots * 1.15));
+      const targetSupply = Math.max(required_slots + 6, Math.ceil(required_slots * 2));
       const totalBatches = Math.max(1, Math.ceil(targetSupply / EXPAND_BATCH));
       const remaining = Math.max(0, targetSupply - priorSubjects.length);
 
@@ -580,6 +581,13 @@ Deno.serve(async (req) => {
         .gte("published_at", since)
         .limit(500);
       const recentManualSelect: RecentManualPost[] = (acts || [])
+        .filter((row: any) => {
+          const origin = String(row.system_origin_class || "").toUpperCase();
+          const postType = String(row.post_type || row.action_type || "").toUpperCase();
+          if (origin && !/USER_DIRECT|MANUAL/.test(origin)) return false;
+          if (/REPLY|REPOST|RETWEET/.test(postType)) return false;
+          return !postType || /ORIGINAL|QUOTE|UNKNOWN/.test(postType);
+        })
         .map((row: any) => ({
           text: String(row.text_body || "").trim(),
           source_id: row.x_post_id,
@@ -613,9 +621,13 @@ Deno.serve(async (req) => {
       for (const plannedMode of queue) {
         const mode = plannedMode as EditorialMode;
         const candidates = pool
-          .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
+          .map((s, i) => {
+            const div = conceptualDiversityScore(s, selectedWeekly);
+            const value = seedSelectionValueScore(s);
+            return { s, i, div, value, score: value * 0.55 + div * 0.45 };
+          })
           .filter(({ s }) => canServeEditorialMode(s, mode))
-          .sort((a, b) => b.div - a.div);
+          .sort((a, b) => b.score - a.score);
         let picked: ConcreteSeed | null = null;
         for (const { s, i } of candidates) {
           if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH") continue;

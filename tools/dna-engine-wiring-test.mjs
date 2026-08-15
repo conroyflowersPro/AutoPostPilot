@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.9.0)");
+console.log("DNA + engine live-path wiring (v11.10.0)");
 
 ok("D1. Grok writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. Grok writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -92,7 +92,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.9.0", /APP_VERSION = "11.9.0"/.test(ver) && /APP_VERSION = "11.9.0"/.test(ix));
+ok("D28. version 11.10.0", /APP_VERSION = "11.10.0"/.test(ver) && /APP_VERSION = "11.10.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));

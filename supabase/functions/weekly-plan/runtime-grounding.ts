@@ -158,17 +158,10 @@ export function judgeSeedGrounding(input: GroundingInput): {
   const interests = input.interests?.length ? input.interests : detectInterests(t);
   if (interests.length >= 2) {
     if (!input.relationship_evidence_ids?.length && !input.runtime_joint_context_id) {
-      return {
-        pass: false,
-        provenance: {
-          source_type: String(input.primary_source || "UNKNOWN"),
-          source_id: input.evidence_source_ids?.[0],
-          claim_types,
-          inference_type: "UNKNOWN",
-          grounding_status: "NEEDS_RELATIONSHIP_EVIDENCE",
-          reasons: ["CROSS_INTEREST_WITHOUT_RELATIONSHIP"],
-        },
-      };
+      // A Seed may explore a connection. The Writer still may not assert an
+      // ungrounded factual relationship. Keep the candidate and preserve the
+      // boundary instead of deleting the thought before interpretation.
+      reasons.push("CROSS_INTEREST_HYPOTHESIS_ONLY");
     }
   }
 

@@ -122,6 +122,18 @@ export function planningStagePhilosophyBlock(): string {
   ].join("\n");
 }
 
+/** Seed candidate Grok only: explore supply. It must not close post thoughts. */
+export function seedCandidatePhilosophyBlock(): string {
+  return [
+    seedGenerationPhilosophyBlock(),
+    topicDiversityPhilosophyBlock(),
+    weeklyEditorialPhilosophyBlock(),
+    "EXPLORE MANY: generate a candidate pool larger than the publish quota. Structured relevance judgments rank candidates; they are not hard safety gates.",
+    "HARD REJECT only fabrication, unsupported current fact, clear clone, engine-label body, or worthless generic material. Wording difficulty, short usable keywords, cross-interest hypotheses, and final mix are not reasons to delete a candidate.",
+    "Do not interpret the final post, close Core Thought, choose Mechanism/Rail, or write prose here.",
+  ].join("\n");
+}
+
 /** Writer Grok 4.6: close thought, then style follows. Quality is Judge, not Writer. */
 export function writingStagePhilosophyBlock(): string {
   return [
