@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.4.2)");
+console.log("Writer quality + leftover seeds (v11.4.3)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -78,14 +78,14 @@ ok("W6. normal Supercharger sentence is not stutter", !isTokenStutter("슈퍼차
 ok("W7. tiny fragment is too short", isFragmentOriginal("충전 중에 알림이 겹친다."));
 ok("W8. one finished sentence is allowed", !isFragmentOriginal("충전 중에 알림이 겹치면 어느 화면이 위인지 손으로 확인하게 된다."));
 ok("W9. 140+ observation is not a fragment", !isFragmentOriginal("충전 중 알림이 겹쳐 보이면 어느 화면이 위인지 손으로 확인하게 된다. ".repeat(3)));
-ok("W10. writer does not lock every post to one length", /Do not make every post the same length/.test(wr) && !/At least two sentences/.test(wr));
+ok("W10. writer does not lock every post to one length", /Write until the move is complete/.test(wr) && !/At least two sentences/.test(wr) && !/one finished sentence is enough/.test(wr));
 ok("W11. validateOutput hard-fails stutter/fragment/restate", /reasons\.includes\("token_stutter"\)/.test(wr) && /subject_restate/.test(wr) && /generic_thesis/.test(wr));
 ok("W12. writer retries once", /allow_one_retry !== false/.test(wr) && /allow_one_retry:\s*true/.test(ow));
 ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.4.2", /APP_VERSION = "11.4.2"/.test(ver) && /APP_VERSION = "11.4.2"/.test(ix));
+ok("W17. version lockstep 11.4.3", /APP_VERSION = "11.4.3"/.test(ver) && /APP_VERSION = "11.4.3"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -96,9 +96,9 @@ ok("W24. voice length follows this slot not one median", /median_chars is a hand
 ok("W25. 7C retry passes rewrite hint", /quality_rewrite|retry_hint: \(last\.block_reasons/.test(gi));
 ok("W26. short keyword subject is usable", /export function isUsableKeywordSubject/.test(se));
 ok("W27. writer infers keyword via vision, no example posts", /short keyword seed is valid/.test(wr) && /hardcoded example posts/.test(wr));
-ok("W28. info posts forbid 음슴체", /Do not use 음슴체 on information posts/.test(wr) && /Do not use 음슴체/.test(voice));
+ok("W28. info posts do not lock 해요 / forbid 음슴", /Editorial mode is not a 말투 table/.test(wr) && /Information posts may use 음슴/.test(wr) && !/Do not use 음슴체 on information posts/.test(wr));
 ok("W29. public words must not distort the claim", /NEVER swap a word if it would change the claim/.test(wr));
-ok("W30. pipeline passes editorial mode into voice", /voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
+ok("W30. pipeline infers surface, does not pass mode as 해요 lock", /inferSlotSurface/.test(ow) && /voiceRegisterConstraintLine\(voice, surface\)/.test(ow) && !/voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
 ok("W32. original body uses OpenAI ChatGPT", /api\.openai\.com\/v1\/chat\/completions/.test(wr) && /OPENAI_API_KEY/.test(ix));
 ok("W33. writer does not call xAI", !/api\.x\.ai/.test(wr));
@@ -116,8 +116,8 @@ ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시
 ok("W45. write phase does not credit Grok for ChatGPT originals", /chatgpt_writer_attempted/.test(ix) && /phase === "write"/.test(ix) && /creator_generation: false/.test(ix));
 ok("W46. DNA one mass slot per day, Tesla ticker not default", /NEW READERS/.test(dna) && /Tesla\/Elon ticker\/Robotaxi-news are not the default/.test(dna));
 ok("W47. DNA mass cap 1/day, personal fills the rest", /MASS CAP/.test(dna) && /at most one mass-public daily-life original per day/.test(dna));
-ok("W48. DNA length bands", /informative ~50-110/.test(dna) && /experience ~70-160/.test(dna));
-ok("W49. writer length band helper", /lengthBandForMode/.test(wr) && /LENGTH: /.test(wr));
+ok("W48. DNA length is mechanism-complete not a 50-110 quota", /not a mode quota/.test(dna) && !/informative ~50-110/.test(dna));
+ok("W49. writer length follows the move not a mode band", /HOW FAR THE MOVE RUNS/.test(wr) && /There is no 'one sentence is enough'/.test(wr) && !/lengthBandForMode/.test(wr));
 ok("W50. prefer 4/day not frozen 5", /Prefer 4\/day/.test(dna) && /POSTS_TARGET = 4/.test(ix));
 ok("W51. DNA PLACE is California Korean", /Creator lives in California/.test(dna) && /Language is Korean/.test(dna) && /이중주차/.test(dna));
 ok("W52. writer PLACE forbids Korea-only civic", /PLACE: Creator lives in California/.test(wr) && /이중주차/.test(wr));
@@ -141,7 +141,7 @@ ok("W69. expert jargon is a hard fail", /expert_jargon/.test(wr) && /레이어2/
 ok("W70. mechanism write move is operational not a question gap", /MECHANISM_WRITE_MOVES/.test(wr) && /A question is not a mechanism/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8")));
 ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
 ok("W72. default observation personality when mechanism would be NONE", /default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
-ok("W73. variety: 말투 and length follow this slot not one template", /VARIETY:/.test(wr) && /recentStyleCounts/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
+ok("W73. variety: infer 말투 across 3 days, not one template", /VARIETY:/.test(wr) && /inferSlotSurface/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")) && /recentEndingCounts/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

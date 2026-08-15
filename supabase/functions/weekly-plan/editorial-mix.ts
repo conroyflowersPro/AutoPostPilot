@@ -144,9 +144,7 @@ export function buildEditorialQueue(
   return queue;
 }
 
-export function lengthForEditorial(mode: EditorialMode | string): "SHORT" | "MEDIUM" | "LONG" {
-  if (mode === "CASUAL_OBSERVATION") return "SHORT";
-  if (mode === "EXPERIENCE") return "MEDIUM";
+export function lengthForEditorial(_mode: EditorialMode | string): "SHORT" | "MEDIUM" | "LONG" {
   return "MEDIUM";
 }
 

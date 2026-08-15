@@ -25,8 +25,8 @@ ok("V6. write phase loads 60d activities", /voiceSince/.test(index) && /voiceRow
 ok("V7. pipeline infers slot voice", /inferSlotVoice/.test(pipe) && /voice_register: voicePayload/.test(pipe));
 ok("V8. writer consumes register", /voice_register\?\.constraint_line/.test(writer));
 ok("V9. question only from USER_DIRECT stats, never allowed on AP drafts", /question_ending_allowed = false/.test(voice));
-ok("V10. register follows post character", /POST CHARACTER/.test(voice) && /음슴체/.test(voice));
-ok("V11. pipeline passes mode into voice line", /voiceRegisterConstraintLine\(voice, mode\)/.test(pipe));
+ok("V10. surface is inferred not a mode 해요 table", /inferSlotSurface/.test(voice) && /Editorial mode is not 말투/.test(voice) && !/POST CHARACTER: information\/compare/.test(voice));
+ok("V11. pipeline infers surface instead of passing mode as 해요 lock", /inferSlotSurface/.test(pipe) && /voiceRegisterConstraintLine\(voice, surface\)/.test(pipe));
 console.log("========================================");
 console.log(`VOICE WINDOW: ${pass} PASS / ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

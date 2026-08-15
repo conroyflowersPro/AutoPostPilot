@@ -19,7 +19,9 @@ import type { EditorialMode } from "./editorial-mix.ts";
 import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
 import {
   inferSlotVoice,
+  inferSlotSurface,
   voiceRegisterConstraintLine,
+  endingKind,
   type VoiceActivityRow,
   type VoiceRegister,
 } from "./user-direct-voice-window.ts";
@@ -60,6 +62,8 @@ export async function writeOneSlot(args: {
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
   audienceSignals?: AudienceBarrierSignals | null;
   recentStyleCounts?: Record<string, number> | null;
+  recentEndingCounts?: Record<string, number> | null;
+  lastEnding?: string | null;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -72,6 +76,7 @@ export async function writeOneSlot(args: {
   writer_call_attempted: boolean;
   mechanism_id?: string | null;
   style_family?: string | null;
+  ending_kind?: string | null;
   system_origin_class: "AP_PIPELINE";
 }> {
   const seed = args.seed as ConcreteSeed & Record<string, unknown>;
@@ -84,12 +89,18 @@ export async function writeOneSlot(args: {
     cluster: String(seed.cluster || seed.topic_cluster || ""),
     editorial_mode: mode,
   });
+  const surface = inferSlotSurface({
+    voice,
+    recentEndingCounts: args.recentEndingCounts || null,
+    lastEnding: args.lastEnding || null,
+    slotIndex: slot,
+  });
   const voicePayload = {
     n: voice.n,
     window_days: voice.window_days,
     median_chars: voice.median_chars,
     question_ending_allowed: voice.question_ending_allowed,
-    constraint_line: voiceRegisterConstraintLine(voice, mode),
+    constraint_line: voiceRegisterConstraintLine(voice, surface),
   };
 
   const seed_interpretation = interpretConcreteSeed(seed, mode);
@@ -130,20 +141,20 @@ export async function writeOneSlot(args: {
   const creator_style = decideCreatorStyle({
     context: {
       creator_dna: {
-        prefers_compression: mode === "CASUAL_OBSERVATION",
+        prefers_compression: false,
         prefers_conversational: true,
-        prefers_reflective: mode === "EXPERIENCE" || mode === "OPINION",
-        allows_technical_density: mode === "INFORMATIVE" || mode === "COMPARE",
-        community_native_ok: mode === "CASUAL_OBSERVATION" || mode === "OPINION",
-        longform_selective_ok: mode === "EXPERIENCE" || mode === "OPINION",
-        politeness_default: mode === "INFORMATIVE" || mode === "COMPARE" ? "polite" : mode === "CASUAL_OBSERVATION" ? "casual" : "mixed",
+        prefers_reflective: null,
+        allows_technical_density: true,
+        community_native_ok: true,
+        longform_selective_ok: true,
+        politeness_default: "mixed",
         identity_stable: true,
       },
       everyday_language_status: everyday_language.status,
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
       everyday_precision_conflict: everyday_language.precision_conflict,
       rail_compression_preference: thinking_rail?.compression_preference || everyday_language.compression_preference,
-      prefer_short: mode === "CASUAL_OBSERVATION",
+      prefer_short: false,
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
       mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
@@ -170,7 +181,7 @@ export async function writeOneSlot(args: {
       style_dialogue_compatible: creator_style.dialogue_compatible,
       style_conversational_level: creator_style.conversational_level,
       style_family: creator_style.style_family,
-      prefer_short: mode === "CASUAL_OBSERVATION",
+      prefer_short: false,
       has_lived_experience_grounding: !!seed.creator_evidence_available,
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
     },
@@ -227,6 +238,7 @@ export async function writeOneSlot(args: {
       writer_call_attempted: !!integrated.writer_call_attempted,
       mechanism_id: selectedMechanismId,
       style_family: String(creator_style.style_family || "") || null,
+      ending_kind: finalText ? endingKind(finalText) : surface.ending,
       system_origin_class: "AP_PIPELINE",
     };
   }
@@ -242,6 +254,7 @@ export async function writeOneSlot(args: {
     writer_call_attempted: !!integrated.writer_call_attempted,
     mechanism_id: selectedMechanismId,
     style_family: String(creator_style.style_family || "") || null,
+    ending_kind: finalText ? endingKind(finalText) : surface.ending,
     system_origin_class: "AP_PIPELINE",
   };
 }
@@ -257,6 +270,8 @@ export async function writeSlotBatch(args: {
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
   const recent: Array<{ mechanism_id?: string }> = [];
   const styleCounts: Record<string, number> = {};
+  const endingCounts: Record<string, number> = {};
+  let lastEnding: string | null = null;
   for (let i = 0; i < slots.length; i += V11_WRITE_CONCURRENCY) {
     const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
     const part = await Promise.all(
@@ -269,12 +284,18 @@ export async function writeSlotBatch(args: {
           recentMechanismUsage: recent.slice(-12),
           audienceSignals: args.audienceSignals || null,
           recentStyleCounts: { ...styleCounts },
+          recentEndingCounts: { ...endingCounts },
+          lastEnding,
         })
       )
     );
     for (const p of part) {
       if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
       if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;
+      if (p.ending_kind) {
+        endingCounts[p.ending_kind] = (endingCounts[p.ending_kind] || 0) + 1;
+        lastEnding = p.ending_kind;
+      }
     }
     out.push(...part);
   }

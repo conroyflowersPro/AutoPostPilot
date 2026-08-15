@@ -174,23 +174,93 @@ export function inferSlotVoice(args: {
   };
 }
 
+export type SurfaceEnding = "HAEYO" | "EUMSEUM" | "OTHER";
+
+export type InferredSurface = {
+  ending: SurfaceEnding;
+  reason: string;
+  constraint_line: string;
+};
+
+function surfaceLine(ending: SurfaceEnding): string {
+  if (ending === "HAEYO") {
+    return "THIS POST SURFACE (inferred, not a mode table): 해요/존칭 ending this time.";
+  }
+  if (ending === "EUMSEUM") {
+    return "THIS POST SURFACE (inferred, not a mode table): 음슴체 ending this time if it fits the observation.";
+  }
+  return "THIS POST SURFACE (inferred, not a mode table): a finished statement that is neither default 해요 nor default 음슴 — not the previous post's ending.";
+}
+
+/**
+ * Infer 해요 / 음슴 / other from DNA two-speed + USER_DIRECT mix + this 3-day batch.
+ * Editorial mode is not a 말투 table. Information posts may use 음슴. Casual may use 해요.
+ */
+export function inferSlotSurface(args: {
+  voice?: VoiceRegister | null;
+  recentEndingCounts?: Record<string, number> | null;
+  lastEnding?: string | null;
+  slotIndex?: number;
+}): InferredSurface {
+  const v = args.voice || null;
+  const counts = args.recentEndingCounts || {};
+  const haeyoN = Number(counts.HAEYO || 0);
+  const eumN = Number(counts.EUMSEUM || 0);
+  const otherN = Number(counts.OTHER || 0);
+  const total = haeyoN + eumN + otherN;
+  const thin = !v || v.n < 5;
+  const pHaeyo = thin ? 0.4 : Math.max(0.15, Number(v.ending_haeyo_rate) || 0);
+  const pEum = thin ? 0.25 : Math.max(0.12, Number(v.ending_eumseum_rate) || 0);
+  const pOther = Math.max(0.15, 1 - Math.min(0.85, pHaeyo + pEum));
+  const share = (n: number) => (total <= 0 ? 0 : n / total);
+  const gap: Record<SurfaceEnding, number> = {
+    HAEYO: pHaeyo - share(haeyoN),
+    EUMSEUM: pEum - share(eumN),
+    OTHER: pOther - share(otherN),
+  };
+  const last = String(args.lastEnding || "").toUpperCase();
+  const idx = Number(args.slotIndex || 0);
+  let ending: SurfaceEnding = "OTHER";
+  let best = -999;
+  for (const k of ["HAEYO", "EUMSEUM", "OTHER"] as SurfaceEnding[]) {
+    let s = gap[k] + ((idx + (k === "HAEYO" ? 0 : k === "EUMSEUM" ? 1 : 2)) % 3) * 0.02;
+    if (last && k === last) s -= 0.4;
+    if (s > best) {
+      best = s;
+      ending = k;
+    }
+  }
+  if (total >= 3) {
+    if (haeyoN / total >= 0.75 && ending === "HAEYO") ending = eumN <= otherN ? "EUMSEUM" : "OTHER";
+    else if (eumN / total >= 0.75 && ending === "EUMSEUM") ending = haeyoN <= otherN ? "HAEYO" : "OTHER";
+    else if (otherN / total >= 0.75 && ending === "OTHER") ending = haeyoN <= eumN ? "HAEYO" : "EUMSEUM";
+  }
+  const reason = thin
+    ? "thin USER_DIRECT window — DNA two-speed mix + batch variety, not an editorial-mode table"
+    : "USER_DIRECT mix + DNA two-speed + batch anti-collapse";
+  return {
+    ending,
+    reason,
+    constraint_line: [
+      surfaceLine(ending),
+      "REASON: " + reason,
+      "Editorial mode is not 말투. Do not lock 해요 to information posts. Do not lock 음슴 to casual. Infer. Across the 3-day set, endings must not collapse to one register. Do not copy the previous post's ending.",
+    ].join("\n"),
+  };
+}
+
 export function voiceRegisterConstraintLine(
   reg: VoiceRegister | null | undefined,
-  editorialMode?: string | null,
+  surface?: InferredSurface | null,
 ): string {
-  const mode = String(editorialMode || "").toUpperCase();
-  const character =
-    mode === "INFORMATIVE" || mode === "COMPARE"
-      ? "POST CHARACTER: information/compare — polite 해요/존칭. Do not use 음슴체. Endings follow this slot's character, not a casual handmade default."
-      : mode === "EXPERIENCE"
-        ? "POST CHARACTER: experience — USER_DIRECT endings for lived slots only. Still no fabricated first person."
-        : mode === "CASUAL_OBSERVATION" || mode === "OPINION"
-          ? "POST CHARACTER: casual/opinion — USER_DIRECT endings (including 음슴) may apply if comparable handmade used them."
-          : "POST CHARACTER: follow USER_DIRECT stats; endings still follow this slot's character when a mode is set.";
+  const inferred = surface?.constraint_line ||
+    "THIS POST SURFACE: infer 해요/음슴/other from Creator DNA + engine + USER_DIRECT mix. Editorial mode is not a 말투 table.";
   if (!reg || reg.n <= 0) {
     return [
-      "USER_DIRECT REGISTER: none in window — write conservatively as him, no archive endings, no example posts.",
-      character,
+      "USER_DIRECT REGISTER: none in window — infer from Creator DNA two-speed mix + engine (no single global tone). No archive endings. No example posts.",
+      inferred,
+      "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
+      "median_chars is a handmade statistic, not this post's target. Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.",
     ].join("\n");
   }
   return [
@@ -198,8 +268,8 @@ export function voiceRegisterConstraintLine(
     `haeyo=${reg.ending_haeyo_rate} eumseum=${reg.ending_eumseum_rate} question=${reg.ending_question_rate} kk=${reg.kk_rate}`,
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,
-    character,
+    inferred,
     "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
-    "median_chars is a handmade statistic, not this post's target. Length follows THIS slot's LENGTH band. Casual stays short. Compare/opinion/experience may use a second sentence. Do not inflate with a dummy second sentence.",
+    "median_chars is a handmade statistic, not this post's target. Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.",
   ].join("\n");
 }

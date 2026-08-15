@@ -12,7 +12,7 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
-import { isPersonalInterestSubject, lengthBandForMode, hasExpertJargon } from "./seed-scope.ts";
+import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
@@ -238,6 +238,28 @@ const MECHANISM_WRITE_MOVES: Record<string, string> = {
     "Name the small missing piece as a situation (which screen, which line). The blank is inside the observation. Do not put a question mark at the end.",
 };
 
+/** How far the move runs — not a character quota, not "one sentence is enough". */
+const MECHANISM_SHAPE_HINTS: Record<string, string> = {
+  M1_SURPRISE_DEBATE_CHANGE:
+    "Keep going until the off-expectation change is visible. Stop there. One sentence or more — whatever the change needs.",
+  M2_EXPERIENCE_EMPATHY:
+    "Keep the lived-scene detail until a stranger could have been there. Not a one-line memo.",
+  M3_EVIDENCE_JUDGMENT:
+    "Need both how it looks and what is going on. Two beats. Stop before the verdict.",
+  M4_LIFE_PATTERN_EXPOSURE:
+    "Compress the repeated behavior. Write a second beat only if the pattern is not visible yet.",
+  M5_SHARED_TENSION_REVERSAL:
+    "Set the shared tension, then reverse it. Stop at the reverse. No explanation after.",
+  M6_SELF_REFERENTIAL_OBVIOUSNESS:
+    "Show the outsider surprise and that it is ordinary here. Both beats.",
+  M7_GROUP_BEHAVIOR_DISCOVERY:
+    "Show the repeated group behavior. Leave why unfinished as a statement.",
+  M8_SELF_DEPRECATING_DISCLOSURE:
+    "One imperfect self-detail first, only with evidence. Then the observation.",
+  M9_EVERYDAY_BLANK_FILLING:
+    "Name the missing piece inside the observation. Complete the situation. Not a question.",
+};
+
 export function writerMechanismConstraintLines(ctx: DeepGenerationContext): string[] {
   const mech = ((ctx as any).reaction_mechanism || {}) as Record<string, unknown>;
   const id = s(mech.selected_mechanism_id || mech.selected_mechanism);
@@ -248,11 +270,13 @@ export function writerMechanismConstraintLines(ctx: DeepGenerationContext): stri
     ];
   }
   const move = MECHANISM_WRITE_MOVES[id] || MECHANISM_WRITE_MOVES.M4_LIFE_PATTERN_EXPOSURE;
+  const shape = MECHANISM_SHAPE_HINTS[id] || MECHANISM_SHAPE_HINTS.M4_LIFE_PATTERN_EXPOSURE;
   return [
     "READER ENTRY MOVE (this IS the personality of the post; never name the mechanism; never write 메커니즘 or M1–M9):",
     move,
-    "Personality is this entry move, not a slogan and not a generic news sentence.",
-    "If the draft is a generic news line or ends with a question, the mechanism was not used. Rewrite as this move.",
+    "HOW FAR THE MOVE RUNS: " + shape,
+    "Personality is this entry move, not a slogan, not a generic news sentence, and not a sentence-count quota.",
+    "If the draft is a generic news line, a one-line memo that never used the move, or ends with a question, the mechanism was not used. Rewrite as this move.",
   ];
 }
 
@@ -354,7 +378,6 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const expBound = ctx.experience_boundaries || {};
   const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
-  const editorialMode = s((ctx as any).seed_identity?.editorial_mode || (ctx as any).editorial_mode);
   const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
   const personal = isPersonalInterestSubject(subject, cluster);
   const humorFill = String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("HUMOR");
@@ -376,13 +399,11 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
     "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Prefer 알림이 겹친다 / 화면이 가린다. NEVER swap a word if it would change the claim.",
     "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
-    "7) Apply Creator Style as surface register — not a fixed template. Register follows this post's character (editorial mode), not a single global ending.",
+    "7) Apply Creator Style as surface tendency — not a template. 말투 is inferred from Creator DNA + engine + USER_DIRECT mix + this 3-day batch. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not copy the previous post's ending.",
     "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
-    "10) Sentence count follows THIS slot's LENGTH band. Casual: one short sentence. Informative: one finished sentence is enough. Compare/opinion/experience: a second sentence is allowed when it adds contrast or how the tension resolved. Do not make every post the same length. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
-    "LENGTH: " + lengthBandForMode(editorialMode),
-    "VARIETY: 말투 and length follow THIS slot's editorial mode. One creator identity, not one template. Do not copy the previous post's ending or character count.",
-    "INFORMATIVE/COMPARE register: polite 해요/존칭. Do not use 음슴체 on information posts.",
+    "10) LENGTH follows the reader-entry move and thought order, not an editorial-mode quota. There is no 'one sentence is enough'. Write until the move is complete. Stop when it is complete. Do not pad. Do not copy the previous post's length. Do not stop mid-token. No grand thesis tail.",
+    "VARIETY: One creator identity, many surfaces across the 3-day set. Infer. Do not standardize 해요 or length because the slot is informational.",
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
     "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
     "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
@@ -484,13 +505,13 @@ export async function callChatGptWriter(
   const userMsg = [
     "Write the final Korean X post now. Statement only. No question mark.",
     "Situation: " + subject.slice(0, 160),
-    ...writerMechanismConstraintLines(ctx).slice(0, 4),
+    ...writerMechanismConstraintLines(ctx).slice(0, 5),
     tension
       ? "Optional angle (not required): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "One finished sentence is OK. Do not pad. Do not invent lived experience. Use the reader-entry move so the post has a recognizable angle, not a generic news line and not a question.",
+    "Write until the reader-entry move is complete. Sentence count follows that move, not a quota. Do not invent lived experience. Not a generic news line and not a question.",
     s(options.retry_hint)
-      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as a finished observation. One sentence is enough. Do not stutter. Do not restate the subject as the whole post."
+      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as the reader-entry move until that move is complete. Do not stutter. Do not restate the subject as the whole post. Do not shrink to one sentence because a quota said so."
       : "",
     "Respond with post text only.",
   ].filter(Boolean).join("\n");

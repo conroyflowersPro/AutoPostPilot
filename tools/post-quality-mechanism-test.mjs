@@ -62,7 +62,7 @@ ok("Q16. seed-scope exports hasExpertJargon", /export function hasExpertJargon/.
 const everydayBlock = (rsp.match(/const everydayIds: MechanismId\[\] = \[([\s\S]*?)\];/) || [])[1] || "";
 ok("Q17. M9 is not the everyday fallback", /M4_LIFE_PATTERN_EXPOSURE/.test(everydayBlock) && !/M9_/.test(everydayBlock));
 ok("Q18. writer user message is statement only", /Statement only\. No question mark/.test(wr));
-ok("Q19. 말투/length follow this slot not one batch template", /VARIETY:/.test(wr) && /Do not make every post the same length/.test(wr));
+ok("Q19. length follows the mechanism move, not one-sentence quota", /HOW FAR THE MOVE RUNS/.test(wr) && /There is no 'one sentence is enough'/.test(wr));
 
 console.log("========================================");
 console.log(`POST QUALITY: ${pass} PASS / ${fail} FAIL`);
