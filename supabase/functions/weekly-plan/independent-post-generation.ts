@@ -2,8 +2,8 @@
  * ORDER 7B — Independent Per-Post Generation
  * One DeepGenerationContext in → one IndependentPostResult out.
  * Batch transport allowed; batch reasoning forbidden.
- * Production default = ChatGPT (OpenAI) writer when OPENAI_API_KEY present.
- * Seed quota/expand stay on Grok (xAI). dry_run = explicit test/diagnostics only.
+ * Production default = Grok 4.6 writer when XAI_API_KEY present.
+ * Quota/expand also Grok. No OpenAI. dry_run = explicit test/diagnostics only.
  */
 import type {
   DeepGenerationContext,
@@ -18,7 +18,7 @@ import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writingStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { writerWeekStructureConstraintLines } from "./structural-signature.ts";
 
-export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
+export const ORDER7B_VERSION = "independent_post_generation_v1_grok_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
 export const ORDER7B_BATCH_TRANSPORT_NOT_REASONING = true as const;
 export const ORDER7B_NO_CROSS_POST_CONTAMINATION = true as const;
@@ -39,9 +39,10 @@ export const ORDER7B_MECHANISM_NOT_TEMPLATE = true as const;
 export const ORDER7B_RAIL_NOT_TEMPLATE = true as const;
 export const ORDER7B_HUMOR_NONE_ALLOWED = true as const;
 export const ORDER7B_SILENT_SLOT_DROP_FORBIDDEN = true as const;
-export const ORDER7B_LIVE_CHATGPT_WRITER = true as const;
+export const ORDER7B_LIVE_GROK_WRITER = true as const;
 export const ORDER7B_PRODUCTION_DEFAULT_LIVE = true as const;
 export const ORDER7B_NO_FAKE_FALLBACK_TEXT = true as const;
+export const ORDER7B_THOUGHT_FIRST = true as const;
 
 export type IndependentGenerationStatus =
   | "GENERATED"
@@ -51,7 +52,7 @@ export type IndependentGenerationStatus =
   | "GENERATION_SEED_INSUFFICIENT"
   | "GENERATION_BOUNDARY_VIOLATION";
 
-export type WriterMode = "live_chatgpt" | "dry_run" | "no_key" | "none";
+export type WriterMode = "live_grok" | "dry_run" | "no_key" | "none";
 
 export type IndependentPostResult = {
   slot_id: string;
@@ -92,7 +93,7 @@ export type IndependentPostResult = {
 export type GenerateIndependentOptions = {
   /** Explicit only — production default is live when key present */
   dry_run?: boolean;
-  openai_key?: string | null;
+  xai_key?: string | null;
   model?: string;
   allow_one_retry?: boolean;
   timeout_ms?: number;
@@ -121,7 +122,8 @@ export const ORDER7B_GUARDS = {
   rail_not_template: ORDER7B_RAIL_NOT_TEMPLATE,
   humor_none_allowed: ORDER7B_HUMOR_NONE_ALLOWED,
   silent_slot_drop_forbidden: ORDER7B_SILENT_SLOT_DROP_FORBIDDEN,
-  live_chatgpt_writer: ORDER7B_LIVE_CHATGPT_WRITER,
+  live_grok_writer: ORDER7B_LIVE_GROK_WRITER,
+  thought_first: ORDER7B_THOUGHT_FIRST,
   production_default_live: ORDER7B_PRODUCTION_DEFAULT_LIVE,
   no_fake_fallback_text: ORDER7B_NO_FAKE_FALLBACK_TEXT,
 } as const;
@@ -216,10 +218,10 @@ export function buildWriterPlanMarkers(ctx: DeepGenerationContext): IndependentP
 }
 
 /**
- * Constraint-only system instructions for the live ChatGPT writer.
+ * Constraint-only system instructions for the live Grok 4.6 writer.
  * No finished examples, no templates, no CTA, no fabrication.
  */
-/** Operational mechanism lines for ChatGPT. Never a finished template. Never name M1–M9 in the post. */
+/** Optional delivery lines after the thought is closed. Never a finished template. Never name M1–M9 in the post. */
 const MECHANISM_WRITE_MOVES: Record<string, string> = {
   M1_SURPRISE_DEBATE_CHANGE:
     "Show one concrete change that is off from the usual expectation. Stop. The reader judges. Do not ask them.",
@@ -275,11 +277,11 @@ export function writerMechanismConstraintLines(ctx: DeepGenerationContext): stri
   const move = MECHANISM_WRITE_MOVES[id] || MECHANISM_WRITE_MOVES.M4_LIFE_PATTERN_EXPOSURE;
   const shape = MECHANISM_SHAPE_HINTS[id] || MECHANISM_SHAPE_HINTS.M4_LIFE_PATTERN_EXPOSURE;
   return [
-    "READER ENTRY MOVE (this IS the personality of the post; never name the mechanism; never write 메커니즘 or M1–M9):",
+    "OPTIONAL DELIVERY (after the thought is closed; never name the mechanism; never write 메커니즘 or M1–M9):",
     move,
-    "HOW FAR THE MOVE RUNS: " + shape,
-    "Personality is this entry move, not a slogan, not a generic news sentence, and not a sentence-count quota.",
-    "If the draft is a generic news line, a one-line memo that never used the move, or ends with a question, the mechanism was not used. Rewrite as this move.",
+    shape,
+    "Use this only if it helps deliver the thought you closed. If it would hide the creator's judgment or pick a different thought, ignore it. NONE is normal.",
+    "Personality is this creator's closed thought, not a slogan, not a generic news sentence, and not a sentence-count quota.",
   ];
 }
 
@@ -291,9 +293,10 @@ export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] 
     : "";
   if (!shape && !beats) return [];
   return [
-    "THOUGHT ORDER (not paragraph count; do not name the rail): " +
+    "OPTIONAL THOUGHT ORDER (prior, not required beats; do not name the rail): " +
       (shape || "observation") +
-      (beats ? " · " + beats : ""),
+      (beats ? " · optional beats: " + beats : ""),
+    "Use only if it fits the thought you closed. Do not force a rail that does not fit this seed.",
   ];
 }
 
@@ -373,14 +376,15 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
 
 function writerPhilosophyBlock(): string {
   return [
-    "WRITER ROLE: You are not here to write a clever AI post. You express an already-made thought in this creator's actual language.",
-    "You do not choose the topic. You do not invent the core judgment. Seed, thinking, core thought, mechanism, rail, and Creator DNA are already decided. Implement those decisions as one readable Korean post.",
-    "Do not get ahead of the thought. 문체 must not drag the thinking.",
-    "JOBS: preserve Core Thought; reflect Creator DNA; adjust rhythm and length; compose how THIS thought opens and unfolds (not an engagement-hook recipe); set expression difficulty; honor the humor decision; lower the reader entry barrier; do not over-explain; end naturally when the move is complete.",
-    "Vary surface strategy and discourse shape so the week does not converge on one structure. Diversity is not the goal. The goal is: same person's thought, not the same AI template.",
-    "Do not invent facts, experiences, emotions, or relationships he did not have.",
-    "Do not copy a previously successful sentence because it performed. Learn abstract expression and delivery only — never the wording.",
-    "WHY YOU EXIST: do not damage Planner + Thinking judgments. Make the post look like his own voice.",
+    "WRITER ROLE: You are Grok 4.6 writing one Korean X post for @Seung4680.",
+    "THOUGHT FIRST, STYLE FOLLOWS. Close what this creator would actually say about THIS seed. Then write that thought in his language. Everyday wording, 말투, humor, Mechanism, and Rail may help delivery. They must not choose the thought.",
+    "You do not choose the 3-day topic mix or quota. You DO close the central judgment for this Seed.",
+    "HARD BOUNDARY: Do not invent lived experience, private facts, emotions, or relationships. Do not copy a manual post or a previously successful sentence. Do not write Korea-only civic/housing life he does not live.",
+    "Do not paste prompt examples. Do not freeze topic→말투. 해요 and 음슴 are both allowed; pick the register that fits THIS thought.",
+    "Engagement-bait questions (어떻게 생각하세요 / 궁금한가요 as a closer) are forbidden. A genuine thinking question inside the thought is allowed.",
+    "Do not bolt on an unearned macro future/society conclusion. A long-horizon meaning is allowed when the seed's actual change earns it.",
+    "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording or chase a viral hook.",
+    "WHY YOU EXIST: same person's thought, not an AI template. Growth is Planner strategy plus clear delivery — not likes-recipe sentences.",
   ].join("\n");
 }
 
@@ -403,31 +407,25 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     writerPhilosophyBlock(),
     writerArchitectureLock(),
     writingStagePhilosophyBlock(),
-    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences, private facts, emotions, or relationships.",
     "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
     creatorDnaBlock(),
     "ENGINE RULES (operator will):",
     engineRulesAsWill(),
     "REASONING ORDER (internal only; do not output steps):",
-    "1) Confirm Seed meaning through Creator DNA vision: what would he notice first in this situation? A short keyword seed is valid. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies. Do not freeze always-short / always-twist / topic→말투.",
-    "2) Preserve Core Thought as writing intent — do not paste Core Thought labels as prose. Do not invent a new judgment.",
-    "3) Keep reader self-projection space. Never write a question. Never write CTA. Do not hard-assert the creator's opinion. Stop after the observation — that unfinished situation is the reply space.",
-    "4) The selected Reaction Mechanism is the personality of this post — a reader-entry STRUCTURE, not a question and not a slogan. Use the READER ENTRY MOVE below. Never name it.",
-    "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
-    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Do not paste a wording example from this prompt. NEVER swap a word if it would change the claim.",
+    "1) What is actually going on in this Seed? Use live X/web only as facts if needed. Do not copy tweet wording. A short keyword seed is valid. Do not paste hardcoded example posts.",
+    "2) Close ONE thought this creator would hold. Do not paste code labels (tension_around / judgment_axis) as prose. Those labels are not the thought.",
+    "3) Write that thought in his language. Style, 말투, humor, Mechanism, and Rail follow. They must not change the thought.",
+    "4) Audience is readers, not followers and not a Tesla club. Everyday words when they keep the claim. Low entry barrier is wording AND the range of wording. NEVER swap a word if it would change the claim. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9.",
     "PLACE: Creator lives in California. Write Korean. Infer US/CA daily situations from Creator DNA. Do not invent Korea-only civic or housing life the creator does not live.",
-    "7) Apply Creator Style as surface tendency — not a template. The planner chooses 해요/음슴/other for THIS slot from DNA + engine + the 3-day set so far. No frozen mix ratio. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not copy the previous post's ending.",
-    "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
-    "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
-    "10) LENGTH follows the reader-entry move and thought order, not an editorial-mode quota. There is no 'one sentence is enough'. Write until the move is complete. Stop when it is complete. Do not pad. Do not copy the previous post's length. Do not stop mid-token. No grand thesis tail.",
-    "VARIETY: Vary surface strategy and discourse shape so posts do not converge. Diversity is not the goal. Same person's thought, not the same AI template. Do not copy a winning sentence.",
+    "REGISTER: 해요 and 음슴 are both allowed. Pick the one that fits THIS closed thought. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not freeze topic→말투. Do not copy the previous post's ending.",
+    "Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — optional. If NONE, do not force jokes, ㅋㅋ, or punchlines."),
+    "QUALITY: a finished thought about a specific situation. A snag is optional. Do not stop at the keyword name. Do not pad. Stop when the thought is complete. Length follows the thought, not a sentence quota and not a mechanism beat count.",
+    "VARIETY: same person's thought, not the same AI template. Do not copy a winning sentence. No frozen mix ratio. Planner decides mix.",
     ...writerWeekStructureConstraintLines((ctx as any).week_structural_signatures),
-    "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
-    "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
-    "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
-    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, questions (?, 까요, 나요, 을까), CTA, expert jargon (레이어/L2/스택), AI/report conclusions.",
-    s((ctx as any).voice_register?.constraint_line) ||
-      "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
+    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, engagement-bait closers, CTA, expert jargon (레이어/L2/스택), unearned AI/report conclusions.",
+    s((ctx as any).voice_register?.constraint_line)
+      ? "ANTI-REPEAT SIGNAL (not a command): " + s((ctx as any).voice_register?.constraint_line)
+      : "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a bait question for the algorithm.",
     ...writerMechanismConstraintLines(ctx),
     ...writerRailConstraintLines(ctx),
     ...writerEverydayConstraintLines(ctx),
@@ -435,9 +433,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     ...writerBoundaryConstraintLines(ctx),
     ...writerHumorConstraintLines(ctx),
     "SEED SUBJECT: " + subject.slice(0, 200),
-    "CORE AXIS (not literal sentence): " + s(core?.primary_claim).slice(0, 120),
-    "TENSION HINT: " + s(core?.tension).slice(0, 100),
-    "READER MEANING HINT: " + s(core?.reader_relevant_meaning).slice(0, 100),
+    "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 120),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "limited first-person allowed only if already grounded" : "no fabricated first-person experience"),
     s((ctx as any).cite_episode_hint)
       ? "CITE RELATED: You MAY mention the prior lived episode named in the evidence hint. Write a NEW related observation. FORBIDDEN: the same events, punchline, wording, or 동일 내용. Do not copy a prompt example."
@@ -451,9 +447,13 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
       ? "ADJACENT RING: mass-public daily life for new readers. Infer the situation. Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone, prompt-example subjects."
       : "",
-    "LEAVE_INFERENCE_OPEN: " + String(leaveOpen),
-    "PUNCHLINE_STOP: " + String(punchStop),
-    "OUTPUT: Korean post text only. No JSON. No step labels. No English meta.",
+    "OPTIONAL SIGNALS (ignore if they fight the thought you closed): leave_inference_open=" +
+      String(leaveOpen) +
+      " punchline_stop=" +
+      String(punchStop) +
+      " compression=" +
+      comp,
+    "OUTPUT: Korean post text only. No JSON. No step labels. No English meta. No chain-of-thought.",
   ].join("\n");
 }
 
@@ -509,50 +509,56 @@ export type WriterCallResult = {
 };
 
 /**
- * ChatGPT /v1/chat/completions writer — one slot, constraint-only, no shared history.
- * Seed expand/quota stay on Grok. This function writes the original post body only.
+ * Grok 4.6 /v1/chat/completions writer — one slot, thought-first, no shared history.
+ * Quota/expand also Grok. No OpenAI.
  */
-export async function callChatGptWriter(
+export async function callGrokWriter(
   ctx: DeepGenerationContext,
-  openaiKey: string,
+  xaiKey: string,
   options: { model?: string; timeout_ms?: number; retry_hint?: string; temperature?: number } = {},
 ): Promise<WriterCallResult> {
   const system = buildConstraintOnlyWriterInstructions(ctx);
   const subject = subjectFromCtx(ctx);
   const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
   const userMsg = [
-    "Write the final Korean X post now. Statement only. No question mark.",
+    "Close the thought for this Seed, then write the Korean X post. Thought first. Style follows.",
     "Situation: " + subject.slice(0, 160),
     ...writerMechanismConstraintLines(ctx).slice(0, 5),
     tension
-      ? "Optional angle (not required): " + tension.slice(0, 140)
+      ? "Seed material (not the closed thought): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "Write until the reader-entry move is complete. Do not invent a new core judgment. Do not invent lived experience. Not a generic news line and not a question. Do not copy a previously successful sentence.",
+    "Do not invent lived experience. Not a generic news line. Do not copy a previously successful sentence. Do not copy tweet wording from live search.",
     s(options.retry_hint)
-      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as the reader-entry move until that move is complete. Do not stutter. Do not restate the subject as the whole post. Do not shrink to one sentence because a quota said so."
+      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Close the thought again and rewrite. Do not stutter. Do not restate the subject as the whole post."
       : "",
     "Respond with post text only.",
   ].filter(Boolean).join("\n");
 
   const controller = new AbortController();
-  const timeoutMs = options.timeout_ms ?? 25000;
+  const timeoutMs = options.timeout_ms ?? 32000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.x.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
+        Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: options.model || "gpt-4o",
+        model: options.model || "grok-4.6",
         messages: [
           { role: "system", content: system },
           { role: "user", content: userMsg },
         ],
         temperature: options.temperature ?? 0.7,
         max_tokens: 1400,
+        reasoning_effort: "low",
+        search_parameters: {
+          mode: "auto",
+          return_citations: false,
+          sources: [{ type: "x" }, { type: "web" }],
+        },
       }),
       signal: controller.signal,
     });
@@ -561,7 +567,7 @@ export async function callChatGptWriter(
       return {
         ok: false,
         text: "",
-        error: `openai_http_${response.status}:${rawText.slice(0, 180)}`,
+        error: `xai_http_${response.status}:${rawText.slice(0, 180)}`,
         attempted: true,
       };
     }
@@ -569,11 +575,11 @@ export async function callChatGptWriter(
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      return { ok: false, text: "", error: "openai_json_parse_failed", attempted: true };
+      return { ok: false, text: "", error: "xai_json_parse_failed", attempted: true };
     }
     const content = s(parsed?.choices?.[0]?.message?.content);
     if (!content || content.length < 4) {
-      return { ok: false, text: "", error: "openai_empty_content", attempted: true };
+      return { ok: false, text: "", error: "xai_empty_content", attempted: true };
     }
     let text = content
       .replace(/^```[\s\S]*?```$/g, (m) => m.replace(/```\w*\n?/g, "").replace(/```/g, ""))
@@ -581,7 +587,7 @@ export async function callChatGptWriter(
       .trim();
     return { ok: true, text, error: null, attempted: true };
   } catch (e: any) {
-    const msg = e?.name === "AbortError" ? "openai_timeout" : s(e?.message, "openai_fetch_error").slice(0, 160);
+    const msg = e?.name === "AbortError" ? "xai_timeout" : s(e?.message, "xai_fetch_error").slice(0, 160);
     return { ok: false, text: "", error: msg, attempted: true };
   } finally {
     clearTimeout(timer);
@@ -745,9 +751,7 @@ export function isGenericThesis(text: string): boolean {
 export function isQuestionCloser(text: string): boolean {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (!t) return false;
-  if (/[?？]/.test(t)) return true;
-  if (/(까요|나요|을까|ㄹ까|는가|인가|실까요|할까요)\s*[.…]?$/.test(t)) return true;
-  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨/.test(t)) return true;
+  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨|궁금하(신)?가요/.test(t)) return true;
   return false;
 }
 
@@ -797,10 +801,10 @@ function blockedResult(
 }
 
 /**
- * Primary entry: one context → one independent result (async for live ChatGPT).
+ * Primary entry: one context → one independent result (async for live Grok).
  * Never accepts sibling contexts or recent drafts.
- * Production default: live ChatGPT when OPENAI_API_KEY present; dry_run only if explicit.
- * API failure → empty final_text + GENERATION_RETRY_REQUIRED (no fake text).
+ * Production default: live Grok 4.6 when XAI_API_KEY present; dry_run only if explicit.
+ * Production path require live Grok. API failure → empty final_text + GENERATION_RETRY_REQUIRED (no fake text).
  */
 export async function generateIndependentPost(
   ctx: DeepGenerationContext | null | undefined,
@@ -818,13 +822,13 @@ export async function generateIndependentPost(
   if (!subject || subject.length < 2) {
     return blockedResult(ctx, "GENERATION_SEED_INSUFFICIENT", ["no_seed_subject"]);
   }
-  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED" || ctx.core_thought?.status === "CORE_THOUGHT_HOLD") {
+  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED") {
     return blockedResult(ctx, "GENERATION_BLOCKED", ["core_thought_blocked"]);
   }
 
   const markers = buildWriterPlanMarkers(ctx);
   const explicitDry = options.dry_run === true;
-  const key = s(options.openai_key);
+  const key = s(options.xai_key);
 
   // Explicit dry_run: constrained offline only (tests / diagnostics)
   if (explicitDry) {
@@ -876,17 +880,17 @@ export async function generateIndependentPost(
     };
   }
 
-  // Production path: require live ChatGPT when key present; no silent offline fake fallback
+  // Production path: live Grok 4.6 when XAI_API_KEY present; no silent offline fake fallback
   if (!key) {
-    return blockedResult(ctx, "GENERATION_RETRY_REQUIRED", ["openai_key_missing"], {
+    return blockedResult(ctx, "GENERATION_RETRY_REQUIRED", ["xai_key_missing"], {
       writer_mode: "no_key",
       writer_call_attempted: false,
       writer_call_succeeded: false,
-      writer_error: "OPENAI_API_KEY_missing",
+      writer_error: "XAI_API_KEY_missing",
     });
   }
 
-  let call = await callChatGptWriter(ctx, key, {
+  let call = await callGrokWriter(ctx, key, {
     model: options.model,
     timeout_ms: options.timeout_ms,
     retry_hint: options.retry_hint,
@@ -895,7 +899,7 @@ export async function generateIndependentPost(
   let v = call.ok && call.text ? validateOutput(call.text, ctx, markers) : null;
   if ((!call.ok || !call.text || (v && !v.ok)) && options.allow_one_retry !== false) {
     const why = (v?.reasons || [call.error || "empty"]).filter(Boolean).join(",");
-    call = await callChatGptWriter(ctx, key, {
+    call = await callGrokWriter(ctx, key, {
       model: options.model,
       timeout_ms: options.timeout_ms,
       retry_hint: why,
@@ -909,7 +913,7 @@ export async function generateIndependentPost(
       "writer_call_failed",
       call.error || "empty",
     ], {
-      writer_mode: "live_chatgpt",
+      writer_mode: "live_grok",
       writer_call_attempted: call.attempted,
       writer_call_succeeded: false,
       writer_error: call.error,
@@ -937,7 +941,7 @@ export async function generateIndependentPost(
       block_reasons: v?.reasons || ["writer_call_failed"],
       order7b_version: ORDER7B_VERSION,
       order7a_context_version: ORDER7A_VERSION,
-      writer_mode: "live_chatgpt",
+      writer_mode: "live_grok",
       writer_call_attempted: true,
       writer_call_succeeded: true,
       writer_error: null,
@@ -962,7 +966,7 @@ export async function generateIndependentPost(
     block_reasons: [],
     order7b_version: ORDER7B_VERSION,
     order7a_context_version: ORDER7A_VERSION,
-    writer_mode: "live_chatgpt",
+    writer_mode: "live_grok",
     writer_call_attempted: true,
     writer_call_succeeded: true,
     writer_error: null,

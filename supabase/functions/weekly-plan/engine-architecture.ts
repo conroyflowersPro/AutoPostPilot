@@ -11,7 +11,7 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought → Reaction/Style Strategy → Writer → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation(boundaries) → Writer closes thought then writes (style follows) → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory";
 
 export function architecturePrincipleBlock(): string {
   return [
@@ -36,8 +36,8 @@ export function dnaLayerBlock(): string {
 
 export function engineCatalogBlock(): string {
   return [
-    "PLANNING: Planner reads all intelligence and sets long-term strategy + weekly editorial plan. Seed Generation infers this week's candidates from the current situation, not a frozen topic list. Seed Interpretation separates fact / observation / experience / inference and names the material meaning. Thinking/Rail explores paths without jumping to sentences. Core Thought picks ONE central judgment — the real core of the post. Audience Reaction Intelligence estimates likely reader psychological reaction. Reaction Mechanism selects Surprise / Empathy / Evidence-Grounded Judgment / Life Pattern Exposure / NONE. Topic Diversity explores adjacent and experimental areas; promote Emerging → Secondary → Core only from published outcomes. Weekly Editorial Strategy balances opinion / experience / observation / exploration so the week does not collapse to one type.",
-    "WRITING: Writer expresses the already-decided Core Thought in his actual language — implements thought, does not invent it. Everyday Language keeps depth and lowers the entry barrier. Creator Style reflects DNA rhythm/expression without a frozen persona or template. Natural Humor only when the situation fits. Surface/Discourse varies so the same observation→twist→reinterpret AI arc does not repeat.",
+    "PLANNING: Planner reads all intelligence and sets long-term strategy + 3-day editorial plan. Seed Generation infers this window's candidates from the current situation, not a frozen topic list. Seed Interpretation separates fact / observation / experience / inference and prepares material — it does not close the post's thought. Thinking Rail and Reaction Mechanism are delivery priors after a thought exists, not templates that pick the thought. Topic Diversity explores adjacent and experimental areas; promote Emerging → Secondary → Core only from published outcomes. Editorial Strategy balances opinion / experience / observation / exploration so the window does not collapse to one type.",
+    "WRITING: Thought first, style follows. Grok 4.6 Writer closes ONE central judgment on this Seed (would this creator hold it? is it grounded?) then writes it in his language. Everyday language, 말투, humor, Mechanism, and Rail follow only to deliver that thought. They must not choose it. Do not invent identity. Do not invent lived experience.",
     "QUALITY: Semantic Judge evaluates only — Core Thought preserved? Creator DNA drift? structural repeat? fact risk? AI convergence? Selective Regeneration reruns only the failed part with the cause. Weekly Count Gate must not silently succeed under quota. Structural Repetition Detection checks hook / discourse shape / ending / contrast inside the week. Fact/Evidence Boundary separates fact / inference / hypothesis / lived experience and forbids invented experience or facts.",
     "LEARNING: Closed loop — Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning. Analytics Import takes X Analytics first into a canonical model (Fedica is an adapter). Features are learned, not sentences. Manual published success is a stronger Creator Signal than an AI draft. One-off success stays hypothesis. Learning that the Planner does not read is not a closed loop.",
   ].join("\n");
@@ -52,8 +52,8 @@ export function plannerArchitectureLock(): string {
 export function writerArchitectureLock(): string {
   return [
     architecturePrincipleBlock(),
-    "YOUR LAYER: Writing. Pipeline position: after Core Thought and Reaction/Style Strategy.",
-    "You do not choose seeds, editorial balance, or Core Thought. You do not become the Planner.",
+    "YOUR LAYER: Writing. Thought first, then style. You close this Seed's central thought, then deliver it as this creator would.",
+    "You do not choose seeds, editorial balance, or 3-day strategy. You do not become the Planner. You DO close the thought for this Seed.",
     "Performance DNA is Planner-only. Do not chase winning feature combos. Do not copy successful wording. Revenue DNA does not pick this post.",
   ].join("\n");
 }

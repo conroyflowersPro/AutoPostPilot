@@ -61,7 +61,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.7.0";
+const APP_VERSION = "11.8.0";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -146,7 +146,6 @@ Deno.serve(async (req) => {
       ? Math.round(Number(body.required_slots))
       : postsPerDay * daysCount;
     const xaiKey = (Deno.env.get("XAI_API_KEY") || "").trim();
-    const openaiKey = (Deno.env.get("OPENAI_API_KEY") || "").trim();
     const t0 = Date.now();
 
     if (phase === "job_start") {
@@ -173,7 +172,7 @@ Deno.serve(async (req) => {
     if (phase === "job_tick") {
       const jobId = String(body.job_id || "");
       if (!jobId) return json({ success: false, error: "job_id required", phase: "job_tick" }, 400);
-      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey, openaiKey });
+      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey });
       return json({ ...job, phase: "job_tick", app_version: APP_VERSION, timing: { total_ms: Date.now() - t0 } });
     }
 
@@ -720,7 +719,7 @@ Deno.serve(async (req) => {
           order8d_functional_restore: true,
           order8d_cors_methods: true,
           order0b_manual_leakage_separation: true,
-          order8d_note: "v11 write phase uses ORDER 7B ChatGPT writer; Grok is quota/seeds only; generate-post is not the write path",
+          order8d_note: "v11 write phase uses Grok 4.6 writer; quota/seeds also Grok; no OpenAI; generate-post is not the write path",
           soft_daily_cap: softDailyCap(postsPerDay),
           max_daily_topic: redistributed.max_daily_topic,
           topic_distribution: topicDistributionReport(redistributed.days),
@@ -744,7 +743,7 @@ Deno.serve(async (req) => {
         .limit(400);
       const posts = await writeSlotBatch({
         slots,
-        openaiKey: openaiKey || null,
+        xaiKey: xaiKey || null,
         dryRun,
         voiceRows: (voiceActs || []) as any,
         audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
@@ -756,11 +755,11 @@ Deno.serve(async (req) => {
         engine: WEEKLY_ENGINE_VERSION,
         writer_model: V11_WRITER_MODEL,
         system_origin_class: "AP_PIPELINE",
-        chatgpt_writer_attempted: posts.some((p) => p.writer_call_attempted),
+        grok_writer_attempted: posts.some((p) => p.writer_call_attempted),
         xai_usage: {
           seed_expansion: false,
           external_supplement: false,
-          creator_generation: false,
+          creator_generation: true,
         },
         timing: { total_ms: Date.now() - t0 },
       });

@@ -173,12 +173,12 @@ const FORCED_CTA_PATTERNS = [
 ];
 
 const FORCED_QUESTION_PATTERNS = [
-  /[?？]/,
   /어떻게\s*생각하/,
   /어떠신가요/,
   /보이시나요/,
   /있으신가요/,
-  /(까요|나요|을까|ㄹ까)\s*[.…]?$/,
+  /해보셨/,
+  /궁금하(신)?가요/,
 ];
 
 const EXPERIENCE_FABRICATION_PATTERNS = [

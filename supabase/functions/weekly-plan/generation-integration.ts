@@ -121,7 +121,7 @@ export async function integrateSlotGeneration(
   attempts = 1;
   last = await generateIndependentPost(ctx, {
     dry_run: options.dry_run === true,
-    openai_key: options.openai_key,
+    xai_key: options.xai_key,
     model: options.model,
     allow_one_retry: false,
     timeout_ms: options.timeout_ms,
@@ -133,7 +133,7 @@ export async function integrateSlotGeneration(
   }
 
   // Same-request retry doubles writer wall time. writeOneSlot allows one retry
-  // (2 parallel slots × 16s × 2 attempts ≈ 32s, under the Edge ~60s budget).
+  // (1 slot × 32s × 2 attempts can exceed Safari ~55s — job ticks skip extra retry).
   // Second attempt gets a quality rewrite hint from the first failure.
   if (attempts < ORDER7C_MAX_GENERATION_ATTEMPTS && options.allow_one_retry !== false) {
     attempts = 2;
@@ -141,7 +141,7 @@ export async function integrateSlotGeneration(
     recoveryType = "same_seed_retry";
     last = await generateIndependentPost(ctx, {
       dry_run: options.dry_run === true,
-      openai_key: options.openai_key,
+      xai_key: options.xai_key,
       model: options.model,
       allow_one_retry: false,
       timeout_ms: options.timeout_ms,

@@ -37,7 +37,7 @@ ok("C21. index diagnostics order7c", /order7c_generation_integration/.test(idx))
 ok("C22. index calls integrateSlotGeneration", /await integrateSlotGeneration/.test(idx));
 ok("C23. index still DeepGenerationContext", /buildDeepGenerationContext/.test(idx));
 ok("C24. index still independent module", /independent-post-generation/.test(idx));
-ok("C25. 7B ChatGPT writer present", /callChatGptWriter/.test(ind) && /chatgpt_writer/.test(ind));
+ok("C25. 7B Grok writer present", /callGrokWriter/.test(ind) && /ORDER7B_LIVE_GROK_WRITER/.test(ind));
 ok("C26. 7A deep context still present", /buildDeepGenerationContext/.test(dgc));
 ok("C27. no filter final_text drop pattern in 7C module", !/\.filter\(\s*[a-z]+\s*=>\s*[a-z]+\.final_text\s*\)/.test(mod));
 ok("C28. pad blocked preserves count", /ensureSlotCountPreserved|silent_drop_detected/.test(mod + idx));

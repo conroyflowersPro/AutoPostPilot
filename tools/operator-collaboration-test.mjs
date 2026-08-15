@@ -32,7 +32,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Operator collaboration contract (v11.7.0)");
+console.log("Operator collaboration contract (v11.8.0)");
 
 ok("C1. version lock", /operator-collaboration-v1\.1/.test(collab));
 ok(
@@ -86,7 +86,7 @@ ok(
     /GROK_DEVELOPMENT_INTENT_PROTOCOL/.test(dir)
 );
 ok(
-  "C9. NOT injected into ChatGPT writer",
+  "C9. NOT injected into Grok writer",
   !/operatorCollaborationBlock/.test(wr) &&
     !/operator-collaboration/.test(wr) &&
     !/OPERATOR COLLABORATION/.test(wr) &&
@@ -105,8 +105,8 @@ ok(
     !/operator-collaboration-v1/.test(dna)
 );
 ok(
-  "C12. shipping 11.7.0",
-  /APP_VERSION = "11.7.0"/.test(ver) && /APP_VERSION = "11.7.0"/.test(ix)
+  "C12. shipping 11.8.0",
+  /APP_VERSION = "11.8.0"/.test(ver) && /APP_VERSION = "11.8.0"/.test(ix)
 );
 ok(
   "C13. AGENTS.md forbids leaking into post prompts",

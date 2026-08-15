@@ -1,8 +1,8 @@
 /**
- * Operator ↔ Cursor-agent collaboration lock (v11.7.0).
+ * Operator ↔ Cursor-agent collaboration lock (v11.8.0).
  * This is how the coding agent talks and works with @Seung4680.
  * It is NOT Creator DNA, NOT Writer voice, NOT a post prompt.
- * Do not inject this block into Grok quota/seed or ChatGPT writer.
+ * Do not inject this block into Grok quota/seed or Grok writer.
  */
 export const OPERATOR_COLLABORATION_VERSION = "operator-collaboration-v1.1";
 

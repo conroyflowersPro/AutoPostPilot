@@ -1,7 +1,7 @@
 /**
- * v11 write path: Planner/Seeds/Thinking/Core Thought/Style → ChatGPT Writer → Semantic Judge.
- * Writer does not become Planner. Judge does not rewrite.
- * Paid xAI: seed expand + quota only. Original post body is ChatGPT.
+ * v11 write path: Planner/Seeds → Grok 4.6 closes thought then writes → Semantic Judge.
+ * Thought first, style follows. Writer does not become Planner. Judge does not rewrite.
+ * Paid xAI: quota, seed expand, and original post body. No OpenAI.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
 import { selectReactionMechanism } from "./reader-self-projection.ts";
@@ -33,12 +33,12 @@ import {
   type VoiceRegister,
 } from "./user-direct-voice-window.ts";
 
-/** Seed quota + expand stay on Grok. */
+/** Seed quota + expand stay on Grok. Original post body is also Grok 4.6. */
 export const V11_SEED_MODEL = "grok-4.6";
-/** Original post body is ChatGPT (OpenAI). */
-export const V11_WRITER_MODEL = "gpt-4o";
+/** Original post body is Grok 4.6 (xAI). No OpenAI. */
+export const V11_WRITER_MODEL = "grok-4.6";
 export const V11_WRITE_CONCURRENCY = 2;
-export const V11_WRITER_TIMEOUT_MS = 16000;
+export const V11_WRITER_TIMEOUT_MS = 32000;
 
 export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode): SeedInterpretation {
   return interpretSeed({
@@ -63,7 +63,7 @@ export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode):
 
 export async function writeOneSlot(args: {
   seed: Record<string, unknown>;
-  openaiKey: string | null;
+  xaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
@@ -72,7 +72,7 @@ export async function writeOneSlot(args: {
   recentEndingCounts?: Record<string, number> | null;
   lastEnding?: string | null;
   weekSignatures?: Array<Record<string, unknown>>;
-  /** Weekly job ticks: one ChatGPT call per slot. Judge reject does not start a second write. */
+  /** Weekly job ticks: one Grok writer call per slot. Judge reject does not start a second write. */
   skipSelectiveRegen?: boolean;
 }): Promise<{
   slotId: string;
@@ -230,7 +230,7 @@ export async function writeOneSlot(args: {
 
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
-    openai_key: args.openaiKey,
+    xai_key: args.xaiKey,
     model: V11_WRITER_MODEL,
     timeout_ms: V11_WRITER_TIMEOUT_MS,
     seed_id: seed.seed_id,
@@ -301,7 +301,7 @@ export async function writeOneSlot(args: {
           weekly_context: weeklyContext,
           genOpts: {
             dry_run: args.dryRun === true,
-            openai_key: args.openaiKey,
+            xai_key: args.xaiKey,
             model: V11_WRITER_MODEL,
             timeout_ms: V11_WRITER_TIMEOUT_MS,
             allow_one_retry: false,
@@ -346,7 +346,7 @@ export async function writeOneSlot(args: {
 
 export async function writeSlotBatch(args: {
   slots: Record<string, unknown>[];
-  openaiKey: string | null;
+  xaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
   audienceSignals?: AudienceBarrierSignals | null;
@@ -363,7 +363,7 @@ export async function writeSlotBatch(args: {
   for (const seed of slots) {
     const p = await writeOneSlot({
       seed,
-      openaiKey: args.openaiKey,
+      xaiKey: args.xaiKey,
       dryRun: args.dryRun,
       voiceRows: args.voiceRows,
       recentMechanismUsage: recent.slice(-12),

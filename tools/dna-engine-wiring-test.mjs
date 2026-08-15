@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Full audit: Creator DNA + ORDER engines must reach the live job path
- * (quota → expand → select → write → ChatGPT). Orphans that are review-only stay off this loop.
+ * (quota → expand → select → write → Grok). Orphans that are review-only stay off this loop.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -41,10 +41,10 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.7.0)");
+console.log("DNA + engine live-path wiring (v11.8.0)");
 
-ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
-ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
+ok("D1. Grok writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
+ok("D2. Grok writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
 ok("D3. Writer does not use Performance DNA as writing input",
   /writerArchitectureLock/.test(wr) &&
   /Performance DNA is Planner-only/.test(arch) &&
@@ -91,7 +91,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.7.0", /APP_VERSION = "11.7.0"/.test(ver) && /APP_VERSION = "11.7.0"/.test(ix));
+ok("D28. version 11.8.0", /APP_VERSION = "11.8.0"/.test(ver) && /APP_VERSION = "11.8.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
@@ -119,8 +119,8 @@ ok("D33. Architecture lock: no engine replaces the Creator",
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
 ok("D34. Pipeline order is locked",
-  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(arch) &&
-  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(libArch) &&
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(arch) &&
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(libArch) &&
   /No engine replaces the Creator/.test(dna));
 ok("D35. Forbidden mixes named",
   /Writer must not become Planner/.test(arch) &&

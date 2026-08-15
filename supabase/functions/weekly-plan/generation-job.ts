@@ -324,7 +324,6 @@ export async function tickWeeklyJob(args: {
   userId: string;
   jobId: string;
   xaiKey: string;
-  openaiKey?: string;
 }): Promise<JobPublic> {
   const { data: row, error } = await args.supabase
     .from("generation_jobs")
@@ -346,7 +345,7 @@ export async function tickWeeklyJob(args: {
     else if (row.step === "expand") await stepExpand(args.supabase, args.xaiKey, row);
     else if (row.step === "judge") await stepJudge(row);
     else if (row.step === "select") await stepSelect(args.supabase, row);
-    else if (row.step === "write") await stepWrite(args.supabase, args.openaiKey || "", args.userId, row);
+    else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey || "", args.userId, row);
     else {
       row.status = "done";
       row.label_ko = `완료: ${row.saved_count}개 draft 저장`;
@@ -578,7 +577,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     st.compact_next = false;
     if (st.write_started && !canKeepExpanding(st)) {
       row.step = "write";
-      row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+      row.label_ko = `초안 생성 ${row.saved_count}/${row.required_slots || (st.write_flat || []).length}…`;
       return;
     }
     if (placeable >= required && (st.gated || []).length > 0) {
@@ -696,7 +695,7 @@ async function stepJudge(row: any) {
       return;
     }
     row.step = "write";
-    row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+    row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
     return;
   }
   if (eligibleN < required && st.topup < st.max_topup) {
@@ -760,7 +759,7 @@ async function stepSelect(supabase: any, row: any) {
     });
     appendEligibleSeedsToWrite(st, fresh, required, postsPerDay);
     row.step = "write";
-    row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+    row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
     return;
   }
   const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;
@@ -940,7 +939,7 @@ async function stepSelect(supabase: any, row: any) {
       (short ? " · 할당량이 찰 때까지 이어서 추론" : ""),
   ].filter(Boolean).join("\n");
   row.step = "write";
-  row.label_ko = `초안 생성 0/${st.write_flat.length}…`;
+  row.label_ko = `초안 생성 0/${row.required_slots || st.write_flat.length}…`;
 }
 
 function attachCountLedger(row: any) {
@@ -971,10 +970,11 @@ function attachCountLedger(row: any) {
   }
 }
 
-async function stepWrite(supabase: any, openaiKey: string, userId: string, row: any) {
+async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
   const i = Number(st.write_index || 0);
+  const required = Number(row.required_slots) || 0;
   if (i >= flat.length) {
     attachCountLedger(row);
     row.status = row.saved_count > 0 ? "done" : "error";
@@ -994,7 +994,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     .limit(400);
   const posts = await writeSlotBatch({
     slots: chunk,
-    openaiKey: openaiKey || null,
+    xaiKey: xaiKey || null,
     voiceRows: (voiceActs || []) as any,
     audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
     weekSignatures: st.weekly_signatures || [],
@@ -1022,10 +1022,6 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     }
     if (!text) {
       st.write_errors = [...(st.write_errors || []), `${p.slotId || "slot"} 빈 초안`];
-      const subj = String((chunk[k] as any)?.concrete_subject || "");
-      if (!(chunk[k] as any)?._write_retry && !isFrozenHumorClone(subj)) {
-        st.write_flat = [...(st.write_flat || []), { ...chunk[k], _write_retry: true }];
-      }
       continue;
     }
     let ins = await supabase.from("SeungContent").insert({
@@ -1037,7 +1033,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
       strategy_json: {
         system_origin_class: "AP_PIPELINE",
         slotId: p.slotId || null,
-        writer_model: "gpt-4o",
+        writer_model: "grok-4.6",
         engine: "v11_inferred_quota_fill",
         job_id: row.id,
       },
@@ -1050,14 +1046,17 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
         user_id: userId,
       });
     }
-    if (!ins.error) row.saved_count = Number(row.saved_count || 0) + 1;
+    if (!ins.error) {
+      row.saved_count = Number(row.saved_count || 0) + 1;
+      if (chunk[k]) (chunk[k] as any)._saved = true;
+    }
   }
   st.write_index = i + chunk.length;
-  const planned = (st.write_flat || []).length;
-  row.label_ko = `초안 생성 ${row.saved_count}/${planned}…`;
-  if (st.write_index >= planned) {
-    const required = Number(row.required_slots) || 0;
+  row.label_ko = `초안 생성 ${row.saved_count}/${required || (st.write_flat || []).length}…`;
+  if (st.write_index >= (st.write_flat || []).length) {
     if (row.saved_count < required && Number(st.write_fill_rounds || 0) < WRITE_FILL_MAX) {
+      st.write_flat = (st.write_flat || []).filter((p: any) => p && p._saved);
+      st.write_index = st.write_flat.length;
       st.write_started = true;
       st.write_fill_rounds = Number(st.write_fill_rounds || 0) + 1;
       st.humor_fill = true;
@@ -1073,8 +1072,8 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     if (row.saved_count < required) {
       if (row.saved_count > 0) {
         row.status = "done";
-        row.error = null;
-        row.label_ko = `리뷰: ${row.saved_count}개 저장 · 할당 ${row.saved_count}/${required}`;
+        row.error = `할당 미달 ${row.saved_count}/${required}`;
+        row.label_ko = `할당 미달: ${row.saved_count}/${required} 저장`;
       } else {
         row.status = "error";
         row.error = `초안 ${row.saved_count}/${required}만 저장됨. ${(st.write_errors || []).slice(0, 3).join(" · ")}`;

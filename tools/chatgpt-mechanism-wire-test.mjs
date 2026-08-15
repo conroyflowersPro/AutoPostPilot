@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * ChatGPT must consume the selected reaction mechanism.
- * Mass everyday seeds still get a reader-entry move — personality is not a slogan.
+ * Grok writer may consume the selected reaction mechanism as optional delivery.
+ * Mass everyday seeds still get a reader-entry move — personality is the closed thought, not a slogan.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -37,9 +37,9 @@ function isEverydayPublicScene(text) {
   );
 }
 
-console.log("ChatGPT mechanism wiring");
+console.log("Grok writer mechanism wiring");
 ok("M1. writer exports mechanism constraint helper", /export function writerMechanismConstraintLines/.test(wr));
-ok("M2. writer instructions include READER ENTRY MOVE", /READER ENTRY MOVE/.test(wr) && /Personality is this entry move/.test(wr));
+ok("M2. writer instructions treat mechanism as optional delivery", /OPTIONAL DELIVERY/.test(wr) && /Personality is this creator's closed thought/.test(wr));
 ok("M3. live user message uses mechanism lines", /writerMechanismConstraintLines\(ctx\)/.test(wr));
 ok("M4. deep context reads selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(dgc) && /getMechanismById/.test(dgc));
 ok("M5. deep context copies reader_entry_point", /reader_entry_point: s\(mech\.reader_entry_point/.test(dgc));
