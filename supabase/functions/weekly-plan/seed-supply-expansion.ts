@@ -49,6 +49,7 @@ export async function expandSeedSupplyWithXai(args: {
     seed_rule?: string;
     validated_performance_patterns?: number;
   };
+  compactRetry?: boolean;
   intelligence?: PlannerIntelligenceBlocks | null;
   model?: string;
   timeoutMs?: number;
@@ -66,6 +67,7 @@ export async function expandSeedSupplyWithXai(args: {
     userDirectN: args.userDirectN,
     adjacentRing: args.adjacentRing,
     humorRing: args.humorRing,
+    compactRetry: args.compactRetry,
     learning: args.learning,
     intelligence: args.intelligence || null,
     model: args.model,

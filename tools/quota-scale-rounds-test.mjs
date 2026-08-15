@@ -42,7 +42,7 @@ function ok(name, cond) {
 console.log("Quota scale: more slots → more rounds, not fatter requests");
 ok("Q1. X anti-dump max 8/day", /QUOTA_PER_DAY_MAX = 8/.test(qi) && /MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX \* QUOTA_DAYS/.test(scale));
 ok("Q2. Edge expand batch stays 6 at any quota", /const EXPAND_BATCH = 6/.test(ix) && /export const EXPAND_BATCH = 6/.test(scale));
-ok("Q3. write chunk stays 2", /export const WRITE_CHUNK = 2/.test(scale) && /const WRITE_CHUNK = 2/.test(job));
+ok("Q3. write chunk stays 1", /export const WRITE_CHUNK = 1/.test(scale) && /const WRITE_CHUNK = 1/.test(job));
 ok("Q4. 28-slot budget exceeds frozen 12", expandRoundBudget(28) > 12);
 ok("Q5. 56-slot fill at ~3 seeds/round", expandRoundBudget(56) >= Math.ceil((56 * 1.2) / 3));
 ok("Q6. 56-slot topup > frozen 4", topupRoundBudget(56) > 4);

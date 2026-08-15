@@ -30,8 +30,8 @@ ok("J1. generation_jobs table", /create table if not exists public\.generation_j
 ok("J2. RLS own rows", /auth\.uid\(\) = user_id/.test(sql));
 ok("J3. Edge job_start / job_tick / job_status", /phase === "job_start"/.test(ix) && /phase === "job_tick"/.test(ix) && /phase === "job_status"/.test(ix));
 ok("J4. ticks are one step", /if \(row\.step === "quota"\)/.test(job) && /else if \(row\.step === "expand"\)/.test(job) && /else if \(row\.step === "write"\)/.test(job));
-ok("J5. expand timeout 32s on job tick", /timeoutMs: 32000/.test(job));
-ok("J6. write chunk 2", /const WRITE_CHUNK = 2/.test(job));
+ok("J5. expand timeout 32s on job tick", /timeoutMs: compact \? 20000 : 32000/.test(job));
+ok("J6. write chunk 1", /const WRITE_CHUNK = 1/.test(job));
 ok("J7. drafts insert on write tick", /from\("SeungContent"\)\.insert/.test(job) && /job_id: row\.id/.test(job));
 ok("J8. empty drafts are not saved", /if \(!text\)/.test(job) && /빈 초안/.test(job));
 ok("J9. no template fill on empty expand", /템플릿으로 채우지 않습니다/.test(job));
@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.5.6", /const APP_VERSION = "11.5.6"/.test(ix));
+ok("J15. shipping 11.5.7", /const APP_VERSION = "11.5.7"/.test(ix));
 ok("J24. empty write retries once then uses planned length", /_write_retry/.test(job) && /const planned = \(st\.write_flat/.test(job));
 ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
@@ -54,7 +54,7 @@ ok("J17. migration apply workflow", existsSync(wf));
 ok("J18. learning line on quota tick", /학습:/.test(job));
 ok("J19. job connects lived experience cite-seeds", /buildRecentExperienceCandidates/.test(job));
 ok("J20. humor fill does not abort short weeks", /유머·관심 시드로 할당량 보충/.test(job) && !/할당량을 채운 뒤에만 저장합니다/.test(job));
-ok("J21. shortfall fills with humor not empty review", /유머/.test(job) && /localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
+ok("J21. shortfall keeps Grok humor expand not frozen keywords", /유머/.test(job) && !/localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
 ok("J22. leftover selectable seeds fill quota holes", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("J23. experience-without-evidence remints to INFORMATIVE", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 

@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.5.6)");
+console.log("Writer quality + leftover seeds (v11.5.7)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -80,12 +80,12 @@ ok("W8. one finished sentence is allowed", !isFragmentOriginal("충전 중에 �
 ok("W9. 140+ observation is not a fragment", !isFragmentOriginal("충전 중 알림이 겹쳐 보이면 어느 화면이 위인지 손으로 확인하게 된다. ".repeat(3)));
 ok("W10. writer does not lock every post to one length", /Write until the move is complete/.test(wr) && !/At least two sentences/.test(wr) && !/one finished sentence is enough/.test(wr));
 ok("W11. validateOutput hard-fails stutter/fragment/restate", /reasons\.includes\("token_stutter"\)/.test(wr) && /subject_restate/.test(wr) && /generic_thesis/.test(wr));
-ok("W12. writer retries once", /allow_one_retry !== false/.test(wr) && /allow_one_retry:\s*true/.test(ow));
+ok("W12. writer retries once unless job skipSelectiveRegen", /allow_one_retry !== false/.test(wr) && /allow_one_retry: args\.skipSelectiveRegen \? false : true/.test(ow));
 ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.5.6", /APP_VERSION = "11.5.6"/.test(ver) && /APP_VERSION = "11.5.6"/.test(ix));
+ok("W17. version lockstep 11.5.7", /APP_VERSION = "11.5.7"/.test(ver) && /APP_VERSION = "11.5.7"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));

@@ -33,7 +33,7 @@ ok("R4. expand abort labeled xai_timeout", /xai_timeout/.test(cr));
 ok("R5. quota fallback keeps grok_error", /grok_error/.test(qu) && /quota_grok_error/.test(ix));
 ok("R6. expand cause is kept on the job", /last_expand_error/.test(job) && /원인:/.test(job));
 ok("R7. still no template fill", /템플릿으로 채우지 않습니다/.test(job));
-ok("R9. expand max_tokens room for JSON", /max_tokens: 8192/.test(cr));
+ok("R9. expand max_tokens room for JSON", /max_tokens: compact \? 4096 : 8192/.test(cr));
 ok("R10. seed list accepts alternate JSON keys", /seedListFromParsed/.test(cr));
 
 console.log("========================================");

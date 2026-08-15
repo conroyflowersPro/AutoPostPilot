@@ -83,7 +83,7 @@ ok("A7. other days still accept adjacent", pickDay(days, 4, 3) > 0);
 ok("A8. job requests humorRing expand", /humorRing: humorFill \|\| massAtCap/.test(job));
 ok("A9. job does not abort 22/28", !/할당량을 채운 뒤에만 저장합니다/.test(job));
 ok("A10. leftover adjacent respects per-day max", /pickDayForAdjacent/.test(job) && /enforceAdjacentPerDay/.test(job));
-ok("A11. shortfall fills with humor keywords", /localHumorKeywordSeeds/.test(job) && /유머/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
+ok("A11. shortfall keeps Grok humor expand, never a frozen keyword list", /humor_fill = true/.test(job) && /유머·관심 시드로 할당량 보충/.test(job) && !/localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
 ok("A12. Grok adjacent prompt is mass sectors not EV/space", /mass public sectors/.test(adjSrc) && /DAILY_AI/.test(adjSrc) && /adjacentRingPromptLines/.test(cr) && !/electric-vehicle industry/.test(adjSrc));
 ok("A13. writer forbids lived Tesla on adjacent", /ADJACENT RING/.test(wr) && /FORBIDDEN: first-person Tesla/.test(wr));
 ok("A14. generate page keeps review copy", /리뷰하세요/.test(gen));
@@ -122,14 +122,21 @@ ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", ((
   const placeable = personal + Math.min(mass, 3);
   return personal === 6 && mass === 0 && placeable === 6 && placeable < 12;
 })());
-ok("A34. empty Grok expand injects DNA keyword seeds instead of stalling",
-  /localHumorKeywordSeeds\(required - placeable/.test(job) && /DNA 관심 키워드/.test(job));
-ok("A35. select fills keywords before bouncing to expand",
-  /totalAfterLocal/.test(job) && /adjacent_rounds \|\| 0\) < 2/.test(job));
+ok("A34. empty Grok expand uses compactRetry next tick, never DNA keyword inject",
+  /compactRetry: compact/.test(job) && /시드 짧게 재추론/.test(job) && !/DNA 관심 키워드/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A35. select bounces to Grok expand when short, does not fill frozen keywords",
+  /adjacent_rounds \|\| 0\) < 2/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A36. humorRing remaps OBSERVATION cluster onto DNA interests",
   /inferPersonalCluster/.test(cr) && /humorRing cluster MUST/.test(cr));
 ok("A37. FSD keyword with OBSERVATION cluster is still personal",
   /inferPersonalCluster/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-scope.ts"), "utf8")));
+const humor = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8");
+ok("A38. frozen 11.5.6 keyword list is a clone-guard not a seed injector",
+  /export function isFrozenHumorClone/.test(humor) && /사이버트럭 사이드미러/.test(humor) && !/export function localHumorKeywordSeeds/.test(humor));
+ok("A39. Grok drops frozen clone subjects",
+  /isFrozenHumorClone/.test(cr) && /isFrozenHumorClone/.test(job));
+ok("A40. job lock covers a write tick", /JOB_LOCK_MS = 90000/.test(job));
+ok("A41. write is one slot per tick so Safari can continue past 2/12", /const WRITE_CHUNK = 1/.test(job) && /skipSelectiveRegen: true/.test(job));
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);

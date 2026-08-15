@@ -10,7 +10,7 @@ export const MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX * QUOTA_DAYS;
 
 /** Keep in lockstep with weekly-plan EXPAND_BATCH — one Grok call per Edge invoke. */
 export const EXPAND_BATCH = 6;
-export const WRITE_CHUNK = 2;
+export const WRITE_CHUNK = 1;
 export const JUDGE_BATCH = 16;
 
 /** Grok may return fewer than EXPAND_BATCH. Budget as if ~3 usable seeds per round. */

@@ -72,6 +72,8 @@ export async function writeOneSlot(args: {
   recentEndingCounts?: Record<string, number> | null;
   lastEnding?: string | null;
   weekSignatures?: Array<Record<string, unknown>>;
+  /** Weekly job ticks: one ChatGPT call per slot. Judge reject does not start a second write. */
+  skipSelectiveRegen?: boolean;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -232,7 +234,7 @@ export async function writeOneSlot(args: {
     model: V11_WRITER_MODEL,
     timeout_ms: V11_WRITER_TIMEOUT_MS,
     seed_id: seed.seed_id,
-    allow_one_retry: true,
+    allow_one_retry: args.skipSelectiveRegen ? false : true,
   });
 
   let finalText = String(integrated.final_text || "").trim();
@@ -274,7 +276,12 @@ export async function writeOneSlot(args: {
     if (isJudgeReject(judged)) {
       const decision = decideRegenerationRoute(judged, { semantic_regen_attempts: 0 });
       regenRoutes.push(decision.route);
-      if (decision.route !== "BLOCK" && decision.route !== "NO_ACTION" && decision.route !== "ACCEPT_WITH_CONCERNS") {
+      if (
+        !args.skipSelectiveRegen &&
+        decision.route !== "BLOCK" &&
+        decision.route !== "NO_ACTION" &&
+        decision.route !== "ACCEPT_WITH_CONCERNS"
+      ) {
         const snapshot = snapshotFromSlotParts({
           slot_id: slotId,
           context_id: deep.context_id,
@@ -344,6 +351,7 @@ export async function writeSlotBatch(args: {
   voiceRows?: VoiceActivityRow[];
   audienceSignals?: AudienceBarrierSignals | null;
   weekSignatures?: Array<Record<string, unknown>>;
+  skipSelectiveRegen?: boolean;
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
@@ -364,6 +372,7 @@ export async function writeSlotBatch(args: {
       recentEndingCounts: { ...endingCounts },
       lastEnding,
       weekSignatures: signatures,
+      skipSelectiveRegen: args.skipSelectiveRegen,
     });
     if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
     if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;

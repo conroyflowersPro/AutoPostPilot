@@ -11,7 +11,7 @@ import { planningStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
 import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
-import { humorRingPromptLines } from "./humor-fill.ts";
+import { humorRingPromptLines, isFrozenHumorClone } from "./humor-fill.ts";
 import {
   inferPersonalCluster,
   isForbiddenDefaultSubject,
@@ -55,6 +55,8 @@ export type CreatorSeedReasoningInput = {
   adjacentRing?: boolean;
   /** Personal-interest observational humor to fill quota holes. */
   humorRing?: boolean;
+  /** Short DNA-only retry when the full prompt returned zero usable seeds. */
+  compactRetry?: boolean;
   intelligence?: PlannerIntelligenceBlocks | null;
 };
 
@@ -137,6 +139,7 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
   // Reject invented lived-experience claims at seed level
   if (/어제\s*내가|오늘\s*직접|방금\s*테스트했/i.test(subject)) return null;
   if (/관찰·판단 축|차원 기반 신규 각도/.test(subject)) return null;
+  if (isFrozenHumorClone(subject)) return null;
   const cluster = clean(x?.cluster, 40) || "OBSERVATION";
   const dimension = clean(x?.dimension, 60) || "CREATOR_REASONED";
   const angle = clean(x?.idea_angle_family, 80) || `${cluster}|${dimension}|${i + 1}`;
@@ -239,7 +242,21 @@ export async function reasonCreatorSeeds(
     : defaultPerformanceHints()).map((p) => clean(p, 120)).slice(0, 8);
   const intent = clean(args.explicitCreatorIntent, 180);
 
-  const system = [
+  const compact = !!args.compactRetry;
+  const system = compact
+    ? [
+      "You infer X direction seeds for @Seung4680 (Korean track, California life).",
+      "Return DIRECTION seeds only — never finished posts, never example prose.",
+      "Infer NEW situations from Creator DNA interests: FSD, Cybertruck, Tesla product, LAFC, gaming. Mix; do not rotate one list.",
+      "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
+      "Do NOT copy DIMENSION labels. Do NOT emit a frozen keyword list.",
+      "FORBIDDEN clone subjects: 사이버트럭 사이드미러, 차선 합류 망설임, FSD 감독 화면, 테슬라 앱 알림 겹침, LAFC 홈 경기, 게임 매치메이킹, 사이버트럭 충전 줄, 한 판 큐 대기, 경기장 입구 줄, 테슬라 앱 화면 가림.",
+      "Each concrete_subject is a distinct writable situation (≥8 Korean chars), different from already_held and recent_published.",
+      "cluster MUST be one of FSD, CYBERTRUCK, TESLA, LAFC, GAMING. At most 1 mass-public seed in this batch.",
+      "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
+      'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
+    ].join("\n")
+    : [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
     plannerPhilosophyBlock(),
     plannerArchitectureLock(),
@@ -262,6 +279,7 @@ export async function reasonCreatorSeeds(
     "At most 1 mass-public daily-life seed per day of quota. Remaining seeds MUST be personal-interest (FSD/Cybertruck/LAFC/gaming/lived Tesla product). Do not invent lived episodes.",
     "If this batch asks for 6 seeds, return at most 1 mass + 5 personal. Do not return a mass-only list.",
     "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",
+    "Do not reuse frozen clone subjects: 사이버트럭 사이드미러, 차선 합류 망설임, FSD 감독 화면, 테슬라 앱 알림 겹침, LAFC 홈 경기, 게임 매치메이킹.",
     "cluster_weights inform the personal mix. Mass public is the 1/day entry slot, not the week's center.",
     "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
@@ -279,7 +297,16 @@ export async function reasonCreatorSeeds(
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
 
-  const user = JSON.stringify({
+  const user = compact
+    ? JSON.stringify({
+      requested_seed_count: requested,
+      creator_dna: creatorDnaBlock(),
+      already_held_seeds: existingAbstract,
+      recent_published_angles_avoid_repeat: recent,
+      weekly_goal_note:
+        "Return requested_seed_count NEW inferred personal-interest direction seeds. No frozen keyword list. No last-week clones. No invented experience.",
+    })
+    : JSON.stringify({
     requested_seed_count: requested,
     creator_dna: creatorDnaBlock(),
     engine_rules_are_the_will: engineRulesAsWill(),
@@ -329,7 +356,7 @@ export async function reasonCreatorSeeds(
       body: JSON.stringify({
         model: args.model || "grok-4.6",
         temperature: 0.85,
-        max_tokens: 8192,
+        max_tokens: compact ? 4096 : 8192,
         reasoning_effort: "low",
         response_format: { type: "json_object" },
         messages: [
@@ -352,7 +379,7 @@ export async function reasonCreatorSeeds(
     const rawList = seedListFromParsed(parsed);
     const seeds: ConcreteSeed[] = [];
     const seen = new Set<string>();
-    const maxMass = args.humorRing
+    const maxMass = args.humorRing || args.compactRetry
       ? 0
       : args.adjacentRing
         ? Math.max(1, MASS_PER_DAY_MAX * QUOTA_DAYS)
