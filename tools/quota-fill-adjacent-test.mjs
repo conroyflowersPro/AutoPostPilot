@@ -80,17 +80,17 @@ days[0].posts = [{ source_type: "ADJACENT_EXPANSION" }, { source_type: "ADJACENT
 ok("A6. day with 3 adjacent is full", pickDay(days, 4, 3) !== 0);
 ok("A7. other days still accept adjacent", pickDay(days, 4, 3) > 0);
 
-ok("A8. job requests adjacentRing expand", /adjacentRing: adjacentFill/.test(job));
+ok("A8. job requests humorRing expand", /humorRing: humorFill \|\| massAtCap/.test(job));
 ok("A9. job does not abort 22/28", !/할당량을 채운 뒤에만 저장합니다/.test(job));
 ok("A10. leftover adjacent respects per-day max", /pickDayForAdjacent/.test(job) && /enforceAdjacentPerDay/.test(job));
-ok("A11. shortfall writes then review", /리뷰:/.test(job) && /빈 칸은 작성하지 않음/.test(job));
+ok("A11. shortfall fills with humor keywords", /localHumorKeywordSeeds/.test(job) && /유머/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
 ok("A12. Grok adjacent prompt is mass sectors not EV/space", /mass public sectors/.test(adjSrc) && /DAILY_AI/.test(adjSrc) && /adjacentRingPromptLines/.test(cr) && !/electric-vehicle industry/.test(adjSrc));
 ok("A13. writer forbids lived Tesla on adjacent", /ADJACENT RING/.test(wr) && /FORBIDDEN: first-person Tesla/.test(wr));
 ok("A14. generate page keeps review copy", /리뷰하세요/.test(gen));
 ok("A15. mix EXPERIENCE capped to supply", /expSupply/.test(job));
 ok("A16. leftover pool fill after adjacent", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("A17. experience without evidence stays selectable as INFORMATIVE", /onlyMissingLived/.test(job));
-ok("A18. personal cap is 1/day", /PERSONAL_PER_DAY_MAX = 1/.test(scopeSrc) && /enforcePersonalPerDay/.test(job));
+ok("A18. mass cap is 1/day", /MASS_PER_DAY_MAX = 1/.test(scopeSrc) && /enforceMassPerDay/.test(job));
 ok("A19. seed prompt forbids Elon/Tesla as default", /Tesla\/Elon\/Robotaxi-news are not the default/.test(cr));
 ok("A20. writer mass slot forbids Tesla subject", /MASS PUBLIC SLOT/.test(wr) && /do not name Elon, Tesla, FSD/.test(wr));
 
@@ -102,7 +102,7 @@ personalDays[0].posts = [
 ];
 personalDays[1].posts = [{ concrete_subject: "구독 수수료", cluster: "LIVING_COST" }];
 ok("A21. day 0 has two personal before cap", countPersonal(personalDays[0].posts) === 2);
-ok("A22. expand uses placeable count not raw 6-batch", /placeableSeedCount/.test(job) && /대중 시드 보충/.test(job));
+ok("A22. expand uses placeable count not raw 6-batch", /placeableSeedCount/.test(job) && /유머·관심 시드로 할당량 보충/.test(job));
 ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
 ok("A25. Korea-only civic is forbidden default", /isKoreaOnlySituation/.test(scopeSrc) && /이중\\s\*주차/.test(scopeSrc));
 ok("A26. 이중주차 is Korea-only", /이중\\s\*주차/.test(scopeSrc) && /관리사무소/.test(scopeSrc) && /배민/.test(scopeSrc));
@@ -115,12 +115,12 @@ const KOREA_ONLY_RE =
 ok("A31. 이중 주차 is Korea-only", KOREA_ONLY_RE.test("단지 이중 주차"));
 ok("A32. CA street parking is not Korea-only", !KOREA_ONLY_RE.test("빨간 연석 옆 길가 주차"));
 ok("A33. 배민 is Korea-only, drive-through is not", KOREA_ONLY_RE.test("배민 쿠폰") && !KOREA_ONLY_RE.test("드라이브스루 대기줄"));
-ok("A24. six Tesla seeds are all personal so a 28-week is still short", (() => {
+ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", (() => {
   const seeds = Array.from({ length: 6 }, (_, i) => ({ concrete_subject: `야간 FSD 보행자 ${i}`, cluster: "FSD" }));
   const personal = seeds.filter((s) => isPersonal(s.concrete_subject, s.cluster)).length;
   const mass = seeds.length - personal;
-  const placeable = Math.min(personal, 7) + mass;
-  return personal === 6 && mass === 0 && placeable === 6 && placeable < 28;
+  const placeable = personal + Math.min(mass, 3);
+  return personal === 6 && mass === 0 && placeable === 6 && placeable < 12;
 })());
 
 console.log("========================================");

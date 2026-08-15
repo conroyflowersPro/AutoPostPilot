@@ -17,7 +17,7 @@ export function buildCreatorDnaPlannerBlock(): {
 } {
   const lines: string[] = [
     `${CREATOR_DNA_RUNTIME_VERSION} (Archive/Historical learning — offline validated structure)`,
-    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Lived FSD/product observation is ONE daily personal slot, not the week's center. Plural interests (gaming, daily, LAFC) retained inside that cap. Daily life is US/CA, not Korea civic housing.",
+    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Personal-interest originals (FSD/product, gaming, LAFC) are the center of the 3-day plan. Mass public daily life is at most one slot per day. Daily life is US/CA, not Korea civic housing.",
     "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: two-speed; media often; informational → polite intentional (존칭); light-opinion 음슴체 = RECENTLY_EMERGING preference (not long-archive dominant).",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
@@ -25,7 +25,7 @@ export function buildCreatorDnaPlannerBlock(): {
     "REPOST: manual by Creator only; system may store/learn metadata; no auto-repost; REPOST text excluded from Writing DNA",
     "ARTICLES: quality-first; not default weekly pipeline",
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
-    "CONTENT STANCE: do not default to Elon/Tesla ticker/Robotaxi news. Personal Tesla lived stays in the 1/day cap. Not short-term stock price chatter",
+    "CONTENT STANCE: personal Tesla/FSD/product observation is the main mix. Do not default to Elon/ticker/Robotaxi news. Not short-term stock price chatter",
     "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
   ];
 

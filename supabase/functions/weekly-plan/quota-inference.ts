@@ -5,10 +5,8 @@
 import type { CadenceSignal, ClusterWeight, LearningState } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
-export const QUOTA_DAYS = 7;
-/** X anti-dump ceiling — strategy reference, not a content template. */
+export const QUOTA_DAYS = 3;
 export const QUOTA_PER_DAY_MAX = 8;
-/** Floor so a 7-day generate is still a growth week, not a 1-post drip. */
 export const QUOTA_PER_DAY_MIN = 3;
 export const QUOTA_INFERENCE_VERSION = "weekly_quota_v1";
 
@@ -82,7 +80,7 @@ export async function inferWeeklyQuota(args: {
     "this_run_note is an optional overlay, not the will.",
     "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise; same-author decay per For You refresh), 48-hour For You freshness, start 14:00 America/Los_Angeles, even-spread inside 14:00–22:00 PT, mix, whether higher volume linked to growth.",
     "X ranking weights multiply predicted viewer-action probabilities on Home-served posts, not raw engagement counts and not author DMs of own links. They do not write posts and do not pick the last sentence.",
-    "Days are 7 because 7-day generate is the engine action.",
+    "Days are 3 because 3-day generate is the engine action.",
     `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Prefer 4/day. 5 fills the 14:00–22:00 PT window. Not a frozen 5. Do not freeze 6 as a default.`,
     "Thin or missing learned evidence is expected (cold start). Still infer posts_per_day from DNA + cadence within bounds. Do not refuse. Do not wait for validated performance patterns.",
     "If handmade cadence is healthy and the 14:00–22:00 PT window has room, 5 is enough. Go to 6–8 only if dumping is unlikely. If dumping likely hurt reach, stay at 3–4.",

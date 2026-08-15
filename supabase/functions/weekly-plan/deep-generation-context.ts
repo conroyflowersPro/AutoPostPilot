@@ -348,7 +348,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
         ? (seed.allowed_facts as unknown[])
         : [],
     experience_boundaries: expBound,
-    cite_episode_hint: s((seed as any).cite_episode_hint || (seed as any).point_or_tension),
+    cite_episode_hint: s((seed as any).cite_episode_hint),
     source_type: s((seed as any).source_type || (seed as any).source_kind || seed.primary_source),
     source_kind: s((seed as any).source_kind),
     reader_self_projection: {

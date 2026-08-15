@@ -1,10 +1,13 @@
 /**
- * Seed scope: new readers first.
- * One personal-interest original per Pacific day. Rest are mass public sectors.
- * Tesla/Elon are not the default neighborhood.
+ * Seed scope: personal-interest originals fill the 3-day plan.
+ * Mass public daily life is at most one original per Pacific day.
+ * Elon/ticker/Robotaxi news is still not a default subject.
+ * Do not invent lived experience — DNA/engine bounds only.
  */
 
-export const PERSONAL_PER_DAY_MAX = 1;
+export const MASS_PER_DAY_MAX = 1;
+/** Personal-interest originals are the main mix; no 1/day cap. */
+export const PERSONAL_PER_DAY_MAX = 99;
 
 export const MASS_SECTORS = [
   "DAILY_AI",
@@ -49,11 +52,11 @@ export function countPersonalOnDay(
   ).length;
 }
 
-/** How many originals we can actually place: 1 personal/day + all mass seeds. */
+/** How many originals we can actually place: all personal + 1 mass/day. */
 export function placeableSeedCount(
   seeds: Array<{ cluster?: string; concrete_subject?: string; topic_cluster?: string }>,
-  days = 7,
-  maxPersonal = PERSONAL_PER_DAY_MAX,
+  days = 3,
+  maxMass = MASS_PER_DAY_MAX,
 ): number {
   let personal = 0;
   let mass = 0;
@@ -64,7 +67,7 @@ export function placeableSeedCount(
       mass += 1;
     }
   }
-  return Math.min(personal, days * maxPersonal) + mass;
+  return personal + Math.min(mass, days * maxMass);
 }
 
 export function massSectorFromText(text: string): MassSector {
@@ -107,6 +110,34 @@ export function pickDayForPersonal(
   return best;
 }
 
+export function countMassOnDay(
+  posts: Array<{ cluster?: string; concrete_subject?: string; topic_cluster?: string }>,
+): number {
+  return (posts || []).filter((p) =>
+    !isPersonalInterestSubject(String(p.concrete_subject || ""), String(p.cluster || p.topic_cluster || "")),
+  ).length;
+}
+
+export function pickDayForMass(
+  days: Array<{ posts: Array<{ cluster?: string; concrete_subject?: string; topic_cluster?: string }> }>,
+  postsPerDay: number,
+  maxMass = MASS_PER_DAY_MAX,
+): number {
+  let best = -1;
+  let bestScore = 1e9;
+  for (let d = 0; d < days.length; d++) {
+    const posts = days[d].posts || [];
+    if (posts.length >= postsPerDay) continue;
+    if (countMassOnDay(posts) >= maxMass) continue;
+    const score = countMassOnDay(posts) * 10 + posts.length;
+    if (score < bestScore) {
+      bestScore = score;
+      best = d;
+    }
+  }
+  return best;
+}
+
 /** EXPERIENCE only on the personal-interest slot. Mass posts demote to INFORMATIVE. */
 export function demoteExperienceOnMassSlots<
   T extends { editorial_mode?: string; cluster?: string; concrete_subject?: string; topic_cluster?: string },
@@ -122,8 +153,45 @@ export function demoteExperienceOnMassSlots<
 }
 
 /**
- * At most one personal-interest original per day. Extra personal posts
- * swap with a mass post on a day that has none.
+ * At most one mass-public daily-life original per day. Extra mass posts
+ * swap onto a day that has none.
+ */
+export function enforceMassPerDay<
+  T extends { cluster?: string; concrete_subject?: string; topic_cluster?: string },
+>(days: Array<{ posts: T[] }>, maxMass = MASS_PER_DAY_MAX): void {
+  for (let d = 0; d < days.length; d++) {
+    for (;;) {
+      const posts = days[d].posts || [];
+      const massIdx = posts
+        .map((p, i) => (isPersonalInterestSubject(String(p.concrete_subject || ""), String(p.cluster || p.topic_cluster || "")) ? -1 : i))
+        .filter((i) => i >= 0);
+      if (massIdx.length <= maxMass) break;
+      const extraI = massIdx[massIdx.length - 1];
+      let dest = -1;
+      let swapPersonal = -1;
+      for (let j = 0; j < days.length; j++) {
+        if (j === d) continue;
+        if (countMassOnDay(days[j].posts || []) >= maxMass) continue;
+        dest = j;
+        swapPersonal = (days[j].posts || []).findIndex(
+          (p) => isPersonalInterestSubject(String(p.concrete_subject || ""), String(p.cluster || p.topic_cluster || "")),
+        );
+        break;
+      }
+      if (dest < 0) break;
+      const extra = posts.splice(extraI, 1)[0];
+      if (swapPersonal >= 0) {
+        const personal = days[dest].posts.splice(swapPersonal, 1)[0];
+        days[d].posts.push(personal);
+      }
+      days[dest].posts.push(extra);
+    }
+  }
+}
+
+/**
+ * Legacy helper kept for tests: extra personal posts swap with a mass post
+ * on a day that has none. Callers that want the live mix should use enforceMassPerDay.
  */
 export function enforcePersonalPerDay<
   T extends { cluster?: string; concrete_subject?: string; topic_cluster?: string },

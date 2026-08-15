@@ -148,6 +148,10 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
     },
   });
+  const humorFill = String(seed.source_type || seed.source_kind || "").toUpperCase().includes("HUMOR");
+  const humorForCtx = humorFill
+    ? { ...natural_humor, humor_compatible: true, humor_strength: "LIGHT", humor_grounded: true }
+    : natural_humor;
 
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
@@ -159,7 +163,7 @@ export async function writeOneSlot(args: {
     thinking_rail: thinking_rail as any,
     everyday_language: everyday_language as any,
     creator_style: creator_style as any,
-    natural_humor: natural_humor as any,
+    natural_humor: humorForCtx as any,
     editorial_mode: mode,
     voice_register: voicePayload,
   });

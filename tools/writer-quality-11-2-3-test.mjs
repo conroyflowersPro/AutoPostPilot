@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.3.4)");
+console.log("Writer quality + leftover seeds (v11.4.0)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,8 +85,8 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.3.4", /APP_VERSION = "11.3.4"/.test(ver) && /APP_VERSION = "11.3.4"/.test(ix));
-ok("W18. Korean summary names ChatGPT writer and new readers", /ChatGPT/.test(ver) && /새 독자/.test(ver) && /하루 관심사/.test(ver));
+ok("W17. version lockstep 11.4.0", /APP_VERSION = "11.4.0"/.test(ver) && /APP_VERSION = "11.4.0"/.test(ix));
+ok("W18. Korean summary names ChatGPT writer and personal mix", /ChatGPT/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
@@ -114,8 +114,8 @@ ok("W42. writer mix for bookmarks not archive-only", /do not write only keep-wor
 ok("W43. writer has no copy-link weight numbers", !/ShareViaCopyLink/.test(wr) && !/weight 20/.test(wr) && !/가중치 20/.test(wr));
 ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시/.test(ver));
 ok("W45. write phase does not credit Grok for ChatGPT originals", /chatgpt_writer_attempted/.test(ix) && /phase === "write"/.test(ix) && /creator_generation: false/.test(ix));
-ok("W46. DNA new readers first, Tesla not default", /NEW READERS/.test(dna) && /Tesla\/Elon are not the default/.test(dna));
-ok("W47. DNA personal cap 1/day", /PERSONAL CAP/.test(dna) && /at most one personal-interest original per day/.test(dna));
+ok("W46. DNA one mass slot per day, Tesla ticker not default", /NEW READERS/.test(dna) && /Tesla\/Elon ticker\/Robotaxi-news are not the default/.test(dna));
+ok("W47. DNA mass cap 1/day, personal fills the rest", /MASS CAP/.test(dna) && /at most one mass-public daily-life original per day/.test(dna));
 ok("W48. DNA length bands", /informative ~50-110/.test(dna) && /experience ~70-160/.test(dna));
 ok("W49. writer length band helper", /lengthBandForMode/.test(wr) && /LENGTH: /.test(wr));
 ok("W50. prefer 4/day not frozen 5", /Prefer 4\/day/.test(dna) && /POSTS_TARGET = 4/.test(ix));
@@ -130,6 +130,8 @@ ok("W57. writer gets rail thought order", /writerRailConstraintLines/.test(wr) &
 ok("W58. deep context maps selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/deep-generation-context.ts"), "utf8")));
 ok("W59. everyday public still gets a mechanism", /everyday_public_reader_entry/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 ok("W60. write batch passes recent mechanisms", /recentMechanismUsage/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
+ok("W62. ChatGPT writer consumes Creator DNA and engine rules", /creatorDnaBlock\(\)/.test(wr) && /engineRulesAsWill\(\)/.test(wr) && /CREATOR DNA/.test(wr));
+ok("W63. 3-day generate on client", /GENERATION_DAYS = 3/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);
