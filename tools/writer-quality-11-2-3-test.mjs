@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.8.0)");
+console.log("Writer quality + leftover seeds (v11.8.1)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.8.0", /APP_VERSION = "11.8.0"/.test(ver) && /APP_VERSION = "11.8.0"/.test(ix));
+ok("W17. version lockstep 11.8.1", /APP_VERSION = "11.8.1"/.test(ver) && /APP_VERSION = "11.8.1"/.test(ix));
 ok("W18. Korean summary names Grok writer and personal mix", /Grok 4\.6/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -121,7 +121,7 @@ ok("W49. writer length follows the thought not a mode band", /Length follows the
 ok("W50. prefer 4/day not frozen 5", /Prefer 4\/day/.test(dna) && /POSTS_TARGET = 4/.test(ix));
 ok("W51. DNA PLACE is California Korean, Korea-only gated in code", /Creator lives in California/.test(dna) && /Language is Korean/.test(dna) && /Do not invent Korea-only/.test(dna) && /isKoreaOnlySituation/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-scope.ts"), "utf8")));
 ok("W52. writer PLACE forbids Korea-only civic without example list", /PLACE: Creator lives in California/.test(wr) && /Do not invent Korea-only/.test(wr) && !/이중주차, 관리사무소/.test(wr) && !/Use 알림\/화면\/겹침\/가림/.test(wr));
-ok("W53. empty draft is not padded; bounce expand fills saved-only", /_saved/.test(job) && /write_fill_rounds/.test(job) && /할당 미달/.test(job) && !/_write_retry/.test(job));
+ok("W53. empty draft is not padded; job keeps filling until quota", /keepOnlySavedWriteSlots/.test(job) && /bounceToFillQuota/.test(job) && /quotaFilled/.test(job) && !/할당 미달/.test(job) && !/_write_retry/.test(job));
 ok("W54. job expand batch is 10", /const EXPAND_BATCH = 10/.test(job));
 ok("W55. client follows 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
 ok("W61. Safari Load failed resumes the job", /isTransientEdgeError/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")) && /Load failed/.test(readFileSync(path.join(ROOT, "lib/transient-edge-error.ts"), "utf8")));
