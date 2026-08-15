@@ -52,7 +52,7 @@ ok("Q6. humor fill has no 레이어 seed", !/레이어/.test(humor));
 ok("Q7. humor fill does not number leftover keywords", !/suffix \+ 1/.test(humor) && !/\$\{base\.concrete_subject\} \$\{/.test(humor));
 ok("Q8. writer has operational mechanism moves", /MECHANISM_WRITE_MOVES/.test(wr) && /Compress a repeated everyday behavior/.test(wr));
 ok("Q9. writer no longer asks for a judgment-gap question", !/leave a judgment gap so a reader can add/.test(wr));
-ok("Q10. default mechanism is observation personality", /default_observation_personality/.test(rsp) && !/self_projection_none_informative_ok/.test(rsp));
+ok("Q10. mechanism NONE is normal", /none_is_normal/.test(rsp) && /MECHANISM_NONE_IS_NORMAL/.test(rsp) && !/default_observation_personality/.test(rsp));
 ok("Q11. AP voice never allows question ending", /question_ending_allowed = false/.test(voice));
 ok("Q12. judge hard-fails question closer", /hard\.push\("question_closer"\)/.test(sj));
 ok("Q13. judge hard-fails 레이어 jargon", /hard\.push\("expert_jargon"\)/.test(sj));

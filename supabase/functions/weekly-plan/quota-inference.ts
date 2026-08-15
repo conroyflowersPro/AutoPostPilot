@@ -5,6 +5,7 @@
 import type { CadenceSignal, ClusterWeight, LearningState } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
 import { plannerArchitectureLock } from "./engine-architecture.ts";
+import { weeklyEditorialPhilosophyBlock } from "./engine-stage-philosophy.ts";
 
 export const QUOTA_DAYS = 3;
 export const QUOTA_PER_DAY_MAX = 8;
@@ -79,6 +80,7 @@ export async function inferWeeklyQuota(args: {
     "You infer the weekly ORIGINAL post quota for X account @Seung4680.",
     plannerPhilosophyBlock(),
     plannerArchitectureLock(),
+    weeklyEditorialPhilosophyBlock(),
     "Will is already in Creator DNA + engine rules. Do not wait for a typed slogan.",
     "this_run_note is an optional overlay, not the will.",
     "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise; same-author decay per For You refresh), 48-hour For You freshness, start 14:00 America/Los_Angeles, even-spread inside 14:00–22:00 PT, mix, whether higher volume linked to growth.",

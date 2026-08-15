@@ -7,6 +7,16 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.4.9 — 2026-08-15
+
+- Seed는 고정 주제 목록이 아니라 이번 주 사고 재료입니다. 키워드가 곧 포스트 주제가 되지 않습니다
+- Seed Interpretation은 사실·관찰·경험·가설·의견 경계를 나눕니다
+- Thinking은 익숙한 문장으로 바로 가지 않습니다. Rail은 주제 템플릿이 아닙니다
+- Core Thought는 한 줄 요약이 아니라 이 글의 판단입니다. 공개할 가치가 없으면 보류합니다
+- Mechanism은 공식이 아닙니다. NONE이 정상입니다
+- 유머는 반응이 필요할 때만. Quality는 매끈한 편집기가 아니라 마지막 방어선입니다
+- 구조 반복이 심하면 경고로 끝내지 않고 탈락시킵니다
+
 ## 11.4.8 — 2026-08-15
 
 - 엔진은 Creator를 대신하지 않습니다. Planner·Writer·Judge·DNA 역할이 섞이면 안 됩니다

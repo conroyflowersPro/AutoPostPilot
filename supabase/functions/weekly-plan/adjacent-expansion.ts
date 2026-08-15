@@ -1,5 +1,5 @@
-/**
- * Quota-hole fill: mass public sectors (new readers), not Tesla/Elon.
+ * Quota-hole fill starts adjacent to existing interests, not random new topics.
+ * Promotion path: Exploration → Emerging → Secondary → Core, by published outcomes.
  * Max 3 mass-fill posts per day. Mix is not a frozen ratio.
  */
 import { isPersonalInterestSubject, MASS_SECTORS, massSectorFromText } from "./seed-scope.ts";
@@ -7,6 +7,13 @@ import { isPersonalInterestSubject, MASS_SECTORS, massSectorFromText } from "./s
 export const ADJACENT_PER_DAY_MAX = 3;
 export const ADJACENT_SOURCE_TYPE = "ADJACENT_EXPANSION";
 export const ADJACENT_CLUSTERS = MASS_SECTORS;
+/** Promote only from published outcomes, not from a random topic dump. */
+export const INTEREST_PROMOTION_PATH = [
+  "exploration",
+  "emerging",
+  "secondary",
+  "core",
+] as const;
 
 const MASS_RE =
   /번역|초안|요약|음성|알림|휴대폰|화면|주차|와이퍼|구독|수수료|대기|줄|날씨|외출|길찾기|요금|업데이트 미루/i;

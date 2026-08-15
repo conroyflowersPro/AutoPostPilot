@@ -32,6 +32,17 @@ export const ORDER6B_NO_FABRICATE_EXPERIENCE = true as const;
 export const ORDER6B_NO_FABRICATE_FACTS = true as const;
 export const ORDER6B_NO_FORCED_JOKE = true as const;
 export const ORDER6B_RAW_TEXT_BLOCKED = true as const;
+/** Context-chosen families. NONE is normal. Not an engagement device. */
+export const HUMOR_FAMILIES = [
+  "MOCK_FORMAL_DEADPAN",
+  "SELF_DEPRECATION",
+  "PRAGMATIC_OVERSHARING",
+  "OBSERVED_CONSEQUENCE",
+  "WORDPLAY",
+  "HIDDEN_CONTEXT",
+  "NONE",
+] as const;
+export type HumorFamily = (typeof HUMOR_FAMILIES)[number];
 
 export type HumorStatus =
   | "HUMOR_UNSUPPORTED"

@@ -1,6 +1,6 @@
-/**
  * ORDER 4 — Audience Reaction Intelligence
- * Evidence layer only. Learn structured audience behavior from published X reactions.
+ * Not a "will people like this" predictor.
+ * Understands likely psychological reaction. Does not manipulate reaction.
  * NEVER: few-shot wording, copy comments, topic→mechanism map, Creator DNA from audience text.
  * NEVER: silent paid X API. Unpublished AI drafts are not evidence.
  */

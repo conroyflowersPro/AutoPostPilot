@@ -15,6 +15,7 @@ import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-
 import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
 import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
+import { writingStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -400,6 +401,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "You write one Korean X post for creator @Seung4680.",
     writerPhilosophyBlock(),
     writerArchitectureLock(),
+    writingStagePhilosophyBlock(),
     "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences, private facts, emotions, or relationships.",
     "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
     creatorDnaBlock(),
@@ -814,7 +816,7 @@ export async function generateIndependentPost(
   if (!subject || subject.length < 2) {
     return blockedResult(ctx, "GENERATION_SEED_INSUFFICIENT", ["no_seed_subject"]);
   }
-  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED") {
+  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED" || ctx.core_thought?.status === "CORE_THOUGHT_HOLD") {
     return blockedResult(ctx, "GENERATION_BLOCKED", ["core_thought_blocked"]);
   }
 

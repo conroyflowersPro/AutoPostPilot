@@ -1,7 +1,6 @@
-/**
- * Weekly Editorial Mix — Planner-only allocation (ORDER 1/3)
- * Does NOT touch Seed Engine / Semantic Judge / Creator DNA / Performance DNA.
- * HUMOR is excluded from weekly (Daily Wild Card only).
+ * Weekly Editorial Mix — Planner-only allocation.
+ * The week is one editorial object. DEFAULT_EDITORIAL_RATIO is a fallback prior,
+ * not a frozen weekly quota. Do not invent forced balance.
  */
 
 export const EDITORIAL_MODES = [
@@ -14,6 +13,7 @@ export const EDITORIAL_MODES = [
 
 export type EditorialMode = (typeof EDITORIAL_MODES)[number];
 
+/** Fallback prior only — not a frozen weekly quota. Planner may ignore. */
 export const DEFAULT_EDITORIAL_RATIO: Record<EditorialMode, number> = {
   INFORMATIVE: 35,
   COMPARE: 15,

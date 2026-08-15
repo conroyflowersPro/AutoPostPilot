@@ -1,7 +1,6 @@
-/**
- * ORDER 2 — Reader Self-Projection Reasoning + Reaction Mechanism Selection
- * After Seed Interpretation. Before Thinking Rail / Style / Humor / Writing.
- * NO topic→mechanism. NO style/rail. NO forced questions. ORDER 0B/1 preserved.
+ * ORDER 2 — Reader Self-Projection + Reaction Mechanism
+ * Mechanisms describe how a reader may receive an already-decided Core Thought.
+ * NONE is normal. No topic→mechanism. No forced questions, twists, or emotion.
  */
 import type { SeedInterpretation } from "./seed-interpretation.ts";
 import { REACTION_MECHANISMS, type MechanismId, type MechanismDefinition, getMechanismById } from "./reaction-mechanisms.ts";
@@ -10,6 +9,7 @@ export type SelfProjectionStrength = "STRONG" | "MODERATE" | "WEAK" | "NONE";
 export type BarrierLevel = "VERY_LOW" | "LOW" | "MEDIUM" | "HIGH";
 export type ComprehensionBarrier = "LOW" | "MEDIUM" | "HIGH";
 export type MechanismStatus = "MECHANISM_OK" | "MECHANISM_WEAK" | "NO_MECHANISM_NEEDED" | "MECHANISM_BLOCKED";
+export const MECHANISM_NONE_IS_NORMAL = true as const;
 export type SelfProjectionType =
   | "personal_experience" | "behavior_compare" | "similar_case" | "disagree_or_judge"
   | "shared_pattern" | "easy_answer" | "memory" | "community_identity"
@@ -220,15 +220,20 @@ export function selectReactionMechanism(input: SelectMechanismInput): MechanismS
         "M5_SHARED_TENSION_REVERSAL",
         "M3_EVIDENCE_JUDGMENT",
       ];
-      const everydayTop = candidates.find((c) => everydayIds.includes(c.mechanism_id) && c.score >= 0) ||
-        candidates.find((c) => everydayIds.includes(c.mechanism_id));
-      selected = (everydayTop?.mechanism_id || "M4_LIFE_PATTERN_EXPOSURE") as MechanismId;
-      status = "MECHANISM_WEAK";
-      selection_reason = "everyday_public_reader_entry";
+      const everydayTop = candidates.find((c) => everydayIds.includes(c.mechanism_id) && c.score > 0);
+      if (everydayTop && everydayTop.score > 0) {
+        selected = everydayTop.mechanism_id;
+        status = "MECHANISM_WEAK";
+        selection_reason = "everyday_public_reader_entry";
+      } else {
+        selected = "NONE";
+        status = "NO_MECHANISM_NEEDED";
+        selection_reason = "none_is_normal";
+      }
     } else {
-      selected = "M4_LIFE_PATTERN_EXPOSURE";
-      status = "MECHANISM_WEAK";
-      selection_reason = "default_observation_personality";
+      selected = "NONE";
+      status = "NO_MECHANISM_NEEDED";
+      selection_reason = "none_is_normal";
     }
   } else if (top.score >= 3) {
     selected = top.mechanism_id; status = "MECHANISM_OK"; selection_reason = top.fit_reasons.join(",") || "best_candidate";

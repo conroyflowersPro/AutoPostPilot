@@ -7,6 +7,7 @@
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
 import { plannerArchitectureLock } from "./engine-architecture.ts";
+import { planningStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines } from "./humor-fill.ts";
 import {
@@ -139,6 +140,10 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
   const wording = clean(x?.wording_note, 80);
   const tension = clean(x?.point_or_tension, 140) ||
     (entry ? `진입: ${entry}` : "관찰·판단 각도");
+  const exploration = clean(x?.exploration_value, 24).toLowerCase();
+  const exploration_value = /^(core|secondary|emerging|exploration)$/.test(exploration)
+    ? exploration
+    : "";
   return {
     seed_id: `creator-reason-${i + 1}`,
     cluster,
@@ -146,6 +151,13 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
     concrete_subject: subject,
     subject_signature: subjectSignature(subject),
     point_or_tension: tension,
+    topic: clean(x?.topic, 60) || cluster,
+    subtopic: clean(x?.subtopic, 80) || dimension,
+    why_now: clean(x?.why_now, 140),
+    creator_relevance: clean(x?.creator_relevance, 140),
+    audience_relevance: clean(x?.audience_relevance, 140),
+    evidence_basis: clean(x?.evidence_basis, 140),
+    exploration_value,
     primary_source: "CREATOR_SEED_REASONING",
     supporting_sources: ["CREATOR_DNA", "RECENT_PUBLISHED", "XAI_REASONING"].concat(
       wording ? ["WORDING_INTENT"] : [],
@@ -227,13 +239,14 @@ export async function reasonCreatorSeeds(
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
     plannerPhilosophyBlock(),
     plannerArchitectureLock(),
-    "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs.",
+    planningStagePhilosophyBlock(),
+    "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
     "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
-    "A short keyword subject is valid. Infer a public-agreeable situation through Creator DNA vision. Never emit hardcoded example seed bodies or example post prose.",
+    "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
     "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Everyday words only. FORBIDDEN seed jargon: 레이어, 레이어2, L2, 스택, 프로토콜. Prefer 알림 겹침 / 화면 가림.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
@@ -250,7 +263,7 @@ export async function reasonCreatorSeeds(
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
     ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
-    'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
+    'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
 
   const user = JSON.stringify({

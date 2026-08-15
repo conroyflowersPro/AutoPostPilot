@@ -35,7 +35,8 @@ export type GenerationStatus =
   | "GENERATION_CONTEXT_MINIMAL"
   | "GENERATION_CONTEXT_BLOCKED"
   | "INSUFFICIENT_GROUNDING"
-  | "CORE_THOUGHT_WEAK";
+  | "CORE_THOUGHT_WEAK"
+  | "CORE_THOUGHT_HOLD";
 
 export type CompressionTarget =
   | "VERY_COMPRESSED"
@@ -47,6 +48,7 @@ export type CompressionTarget =
 export type CoreThoughtStatus =
   | "CORE_THOUGHT_READY"
   | "CORE_THOUGHT_WEAK"
+  | "CORE_THOUGHT_HOLD"
   | "CORE_THOUGHT_BLOCKED"
   | "CORE_THOUGHT_INSUFFICIENT_SEED";
 
@@ -58,6 +60,8 @@ export type CoreThought = {
   useful_implication: string;
   reader_relevant_meaning: string;
   confidence: number;
+  fact_confidence: number;
+  opinion_confidence: number;
   evidence_dependency: "none" | "factual" | "experience" | "both";
   experience_dependency: boolean;
   source_meaning_separated: boolean;
@@ -168,8 +172,9 @@ function clamp01(n: number): number {
 }
 
 /**
- * Core Thought: structured point of the post — NOT finished prose, NOT hook, NOT punchline.
- * Derived only from current Seed + Interpretation + boundaries.
+ * Core Thought: the judgment this post actually wants to make — NOT a one-line summary,
+ * NOT a hook, NOT a punchline, NOT picked for novelty or viral chance.
+ * HOLD when the judgment is not worth publishing.
  */
 export function buildCoreThought(
   interp: Record<string, unknown> | null | undefined,
@@ -193,6 +198,8 @@ export function buildCoreThought(
       useful_implication: "",
       reader_relevant_meaning: "",
       confidence: 0,
+      fact_confidence: 0,
+      opinion_confidence: 0,
       evidence_dependency: "none",
       experience_dependency: false,
       source_meaning_separated: true,
@@ -214,9 +221,17 @@ export function buildCoreThought(
   const interpStatus = s((interp as any)?.status);
   let status: CoreThoughtStatus = "CORE_THOUGHT_READY";
   let confidence = 0.7;
+  const block_reasons: string[] = [];
+  const fact_confidence = hasFacts ? 0.7 : 0.2;
+  const opinion_confidence = why ? 0.6 : 0.25;
   if (interpStatus === "INTERPRETATION_BLOCKED") {
     status = "CORE_THOUGHT_BLOCKED";
     confidence = 0.1;
+    block_reasons.push("interpretation_blocked");
+  } else if (!tension && !why && !hasFacts && !experienced) {
+    status = "CORE_THOUGHT_HOLD";
+    confidence = 0.2;
+    block_reasons.push("not_worth_publishing");
   } else if (interpStatus === "INTERPRETATION_WEAK" || !tension) {
     status = "CORE_THOUGHT_WEAK";
     confidence = 0.4;
@@ -229,11 +244,13 @@ export function buildCoreThought(
     useful_implication: human ? `reader_bridge:${human.slice(0, 100)}` : `reader_bridge:open_inference`,
     reader_relevant_meaning: String(human || why || subject).slice(0, 120),
     confidence: clamp01(confidence),
+    fact_confidence: clamp01(fact_confidence),
+    opinion_confidence: clamp01(opinion_confidence),
     evidence_dependency,
     experience_dependency: experienced && !expBound.must_not_claim_first_person,
     source_meaning_separated: true,
     from_current_seed: true,
-    block_reasons: [],
+    block_reasons,
     order7a_version: ORDER7A_VERSION,
   };
 }
@@ -299,6 +316,8 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
   let generation_status: GenerationStatus = "GENERATION_CONTEXT_READY";
   if (core.status === "CORE_THOUGHT_BLOCKED" || core.status === "CORE_THOUGHT_INSUFFICIENT_SEED") {
     generation_status = "GENERATION_CONTEXT_BLOCKED";
+  } else if (core.status === "CORE_THOUGHT_HOLD") {
+    generation_status = "CORE_THOUGHT_HOLD";
   } else if (core.status === "CORE_THOUGHT_WEAK") {
     generation_status = "CORE_THOUGHT_WEAK";
   } else if (s(interp.status) === "INTERPRETATION_WEAK") {

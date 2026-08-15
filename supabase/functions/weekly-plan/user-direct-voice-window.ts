@@ -1,7 +1,6 @@
-/**
- * Rolling USER_DIRECT 말투 / 문체 window.
- * Source: recent ORIGINALS he posted on X. Not archive. Not AP_PIPELINE. Not replies.
- * Stats only — never finished-post examples.
+ * Rolling USER_DIRECT 말투 / 문체 window + slot surface.
+ * Discourse-shape variety is judged on the whole unfold (hook, order, ending),
+ * not by blacklisting conjunctions. Stats only — never finished-post examples.
  */
 export type VoiceActivityRow = {
   text_body?: string | null;
