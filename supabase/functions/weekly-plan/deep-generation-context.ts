@@ -120,6 +120,8 @@ export type DeepGenerationContext = {
   prohibited_claims: string[];
   prohibited_copy_sources: string[];
   recent_repetition_risk: string;
+  /** Abstract week signatures only — no prior post wording. */
+  week_structural_signatures?: Array<Record<string, unknown>>;
   generation_status: GenerationStatus;
   voice_register?: {
     n: number;
@@ -160,6 +162,7 @@ export type BuildDeepGenerationInput = {
     question_ending_allowed: boolean;
     constraint_line: string;
   } | null;
+  week_structural_signatures?: Array<Record<string, unknown>> | null;
 };
 
 function s(v: unknown, d = ""): string {
@@ -468,6 +471,9 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
     prohibited_claims,
     prohibited_copy_sources,
     recent_repetition_risk: s(style.recent_style_repetition_risk || humor.recent_humor_repetition_risk, "low"),
+    week_structural_signatures: Array.isArray(input.week_structural_signatures)
+      ? input.week_structural_signatures
+      : [],
     generation_status,
     voice_register: input.voice_register || null,
     invariants: {

@@ -56,7 +56,7 @@ export function topicDiversityPhilosophyBlock(): string {
   return [
     "TOPIC DIVERSITY / EXPLORATION: An account that only repeats currently-winning topics weakens over months. Random new topics also break identity.",
     "Expand from adjacent areas of existing interests. Validate by real reaction and long-term value.",
-    "JOBS: track recent topic distribution and skew. Create Adjacent / Experimental exploration. Promote or drop by outcomes and repeat signals: Exploration → Emerging Interest → Secondary Interest → Core Interest.",
+    "JOBS: track recent topic distribution and skew. Create Adjacent / Experimental exploration. Promote or drop by outcomes and repeat signals: Exploration → Emerging Interest → Secondary Interest → Core Interest. One published success does not promote. Need repeated follower / profile-visit / bookmark / meaningful-reply signals across analyze cycles.",
   ].join("\n");
 }
 

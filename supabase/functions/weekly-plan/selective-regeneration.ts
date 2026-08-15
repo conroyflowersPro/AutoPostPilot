@@ -163,8 +163,12 @@ export async function executeSelectiveRegeneration(args: {
   snapshot: UpstreamSnapshot;
   decision: RegenerationDecision;
   genOpts?: GenerateIndependentOptions;
+  weekly_context?: {
+    other_post_structural_signatures?: Array<Record<string, unknown>>;
+    recent_generated_signatures?: Array<Record<string, unknown>>;
+  };
 }): Promise<SelectiveRegenResult> {
-  const { snapshot, decision, genOpts } = args;
+  const { snapshot, decision, genOpts, weekly_context } = args;
   const reset = decision.reset_stage || "writer";
   const toRecompute = new Set(stagesFromEarliest(reset));
   const frozen = stagesFrozenFor(reset);
@@ -271,10 +275,13 @@ export async function executeSelectiveRegeneration(args: {
       creator_style: style as any,
       natural_humor: humor as any,
       editorial_mode: mode as any,
+      week_structural_signatures: weekly_context?.other_post_structural_signatures || [],
     } as any;
     deep = fns.buildDeepGenerationContext(buildInput);
     stages_recomputed.push("core_thought", "context_build");
     context_rebuilt = true;
+  } else if (deep && weekly_context?.other_post_structural_signatures) {
+    deep.week_structural_signatures = weekly_context.other_post_structural_signatures;
   }
 
   // Constraint hints only — never prior final_text
@@ -283,6 +290,7 @@ export async function executeSelectiveRegeneration(args: {
     xai_key: (genOpts as any)?.xai_key ?? null,
     openai_key: (genOpts as any)?.openai_key ?? null,
     allow_one_retry: false,
+    retry_hint: hints.join(" ").slice(0, 220),
   } as any);
   stages_recomputed.push("writer");
 
@@ -294,7 +302,7 @@ export async function executeSelectiveRegeneration(args: {
     ];
   }
 
-  const judge = fns.judgeIndependentResult(deep as DeepGenerationContext, independent, undefined, {
+  const judge = fns.judgeIndependentResult(deep as DeepGenerationContext, independent, weekly_context, {
     xai_key: (genOpts as any)?.xai_key ?? null,
     openai_key: (genOpts as any)?.openai_key ?? null,
   } as any);

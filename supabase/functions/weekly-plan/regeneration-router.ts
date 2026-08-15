@@ -162,6 +162,7 @@ function mapHardReason(r: string): RejectionCode {
   if (s.includes("core_thought")) return "CORE_THOUGHT_LOSS";
   if (s.includes("manual")) return "MANUAL_LEAKAGE";
   if (s.includes("empty")) return "EMPTY_OUTPUT";
+  if (s.includes("structural")) return "STRUCTURAL_REPETITION";
   return "UNKNOWN";
 }
 
@@ -328,6 +329,9 @@ export function decideRegenerationRoute(
     }
     return baseDecision("REWRITE_ONLY", "writer", hard, soft, "core_loss_writer");
   }
+  if (hard.includes("STRUCTURAL_REPETITION")) {
+    return baseDecision("REWRITE_ONLY", "writer", hard, soft, "structural_week_repeat");
+  }
   if (hard.length > 0) {
     return baseDecision("REWRITE_ONLY", "writer", hard, soft, "hard_generic_writer");
   }
@@ -408,6 +412,14 @@ export function buildRegenConstraintHints(decision: RegenerationDecision): strin
   }
   if (decision.force_humor_none) {
     hints.push("Humor must be NONE — no forced ㅋㅋ or punchline.");
+  }
+  if (
+    decision.rejection_codes.includes("STRUCTURAL_REPETITION") ||
+    decision.soft_concern_codes.includes("STRUCTURAL_REPETITION")
+  ) {
+    hints.push(
+      "Previous draft repeated this week's hook/unfold/ending. Change discourse shape. Do not use 관찰→반전→재해석 if already used. Do not copy prior wording.",
+    );
   }
   for (const c of decision.rejection_codes) hints.push("Rejection code: " + c);
   for (const c of decision.soft_concern_codes.slice(0, 4)) hints.push("Concern code: " + c);

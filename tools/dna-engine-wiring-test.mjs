@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.5.1)");
+console.log("DNA + engine live-path wiring (v11.5.2)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -91,12 +91,9 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.5.1", /APP_VERSION = "11.5.1"/.test(ver) && /APP_VERSION = "11.5.1"/.test(ix));
+ok("D28. version 11.5.2", /APP_VERSION = "11.5.2"/.test(ver) && /APP_VERSION = "11.5.2"/.test(ix));
 
-ok("D29. review engines stay off generate job",
-  !/from "\.\/selective-regeneration\.ts"/.test(job) &&
-  !/from "\.\/regeneration-router\.ts"/.test(job) &&
-  !/from "\.\/weekly-count-ledger\.ts"/.test(job) &&
+ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
 ok("D30. deep context stores protected_meaning and politeness",
   /protected_meaning:/.test(dgc) && /politeness_level:/.test(dgc));
@@ -179,6 +176,25 @@ ok("D47. Operator collaboration is chat-only, not Writer",
   /Not a being that thinks instead of the operator/.test(read("lib/intelligence/operator-collaboration.ts")) &&
   !/operator-collaboration/.test(wr) &&
   !/operatorCollaborationBlock/.test(wr));
+ok("D48. Writer+Judge get week structural signatures",
+  /writerWeekStructureConstraintLines/.test(wr) &&
+  /week_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /weekStructureHardReasons/.test(judge) &&
+  /other_post_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
+ok("D49. Rejected slot runs selective regen then re-judge",
+  /executeSelectiveRegeneration/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /decideRegenerationRoute/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /from "\.\/selective-regeneration\.ts"/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
+ok("D50. Job uses weekly-count-ledger as completion gate",
+  /from "\.\/weekly-count-ledger\.ts"/.test(job) &&
+  /evaluateOrder8cCompletionGate/.test(job) &&
+  /attachCountLedger/.test(job) &&
+  /planned/.test(job) && /regenerated/.test(job) && /blocked/.test(job));
+ok("D51. Interest promotion needs repeated cycles, not one hit",
+  /CYCLES_TO_PROMOTE = 2/.test(read("lib/learning/interest-promotion.ts")) &&
+  /promoteInterestLadder/.test(read("app/api/learning/analyze/route.ts")) &&
+  /INTEREST LADDER/.test(read("supabase/functions/weekly-plan/planner-intelligence.ts")) &&
+  /One published success does not promote/.test(stage));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

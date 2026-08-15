@@ -23,6 +23,7 @@ import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
 import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_SEED_MODEL } from "./order-write-pipeline.ts";
+import { evaluateOrder8cCompletionGate } from "./weekly-count-ledger.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
 import { loadPlannerIntelligence } from "./planner-intelligence.ts";
 import {
@@ -815,6 +816,8 @@ async function stepSelect(supabase: any, row: any) {
   st.days = redistributed.days;
   st.write_flat = redistributed.days.flatMap((d) => d.posts || []);
   st.write_index = 0;
+  st.weekly_signatures = [];
+  st.write_outcomes = [];
   const short = totalFilled < required;
   row.summary = [
     row.summary,
@@ -826,11 +829,40 @@ async function stepSelect(supabase: any, row: any) {
   row.label_ko = `초안 생성 0/${st.write_flat.length}…`;
 }
 
+function attachCountLedger(row: any) {
+  const st = row.state || {};
+  const outcomes = Array.isArray(st.write_outcomes) ? st.write_outcomes : [];
+  const required = Number(row.required_slots) || outcomes.length;
+  const gate = evaluateOrder8cCompletionGate({
+    requested_slots: Math.max(required, outcomes.length),
+    slots: outcomes,
+  });
+  st.count_ledger = {
+    planned: required,
+    generated: outcomes.filter((s: any) => String(s.final_text || "").trim()).length,
+    judged: outcomes.filter((s: any) => String(s.judge_status || "")).length,
+    accepted: gate.ledger.publishable_slots,
+    regenerated: gate.ledger.regenerated_pass_slots,
+    blocked: gate.ledger.blocked_slots,
+    count_integrity_pass: gate.ledger.missing_slots === 0 && gate.ledger.duplicate_slot_ids.length === 0,
+    missing_slots: gate.ledger.missing_slots,
+    duplicate_slot_ids: gate.ledger.duplicate_slot_ids,
+  };
+  const L = st.count_ledger;
+  const line =
+    `개수: planned ${L.planned} · generated ${L.generated} · judged ${L.judged} · accepted ${L.accepted} · regenerated ${L.regenerated} · blocked ${L.blocked}`;
+  row.summary = [row.summary, line].filter(Boolean).join("\n");
+  if (!L.count_integrity_pass) {
+    row.summary += `\n개수 검증 실패: missing ${L.missing_slots}`;
+  }
+}
+
 async function stepWrite(supabase: any, openaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
   const i = Number(st.write_index || 0);
   if (i >= flat.length) {
+    attachCountLedger(row);
     row.status = row.saved_count > 0 ? "done" : "error";
     row.step = "done";
     row.label_ko = row.saved_count > 0
@@ -851,10 +883,28 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     openaiKey: openaiKey || null,
     voiceRows: (voiceActs || []) as any,
     audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
+    weekSignatures: st.weekly_signatures || [],
   });
+  st.write_outcomes = Array.isArray(st.write_outcomes) ? st.write_outcomes : [];
+  st.weekly_signatures = Array.isArray(st.weekly_signatures) ? st.weekly_signatures : [];
   for (let k = 0; k < posts.length; k++) {
     const p = posts[k];
     const text = String(p.final_text || p.content || "").trim();
+    st.write_outcomes.push({
+      slotId: p.slotId,
+      slot_id: p.slotId,
+      final_text: text,
+      generation_status: p.generation_status,
+      judge_status: p.judge_status || "",
+      semantic_regen_attempts: p.semantic_regen_attempts || 0,
+      slot_final_state: p.slot_final_state || (text ? "ACCEPTED_PASS" : "BLOCKED"),
+      regeneration_route_history: p.regeneration_route_history || [],
+      writer_call_attempted: p.writer_call_attempted,
+      block_reasons: p.block_reasons || [],
+    });
+    if (text && p.structural_signature) {
+      st.weekly_signatures.push(p.structural_signature);
+    }
     if (!text) {
       st.write_errors = [...(st.write_errors || []), `${p.slotId || "slot"} 빈 초안`];
       if (!(chunk[k] as any)?._write_retry) {
@@ -904,6 +954,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
       }
     }
     row.step = "done";
+    attachCountLedger(row);
     if (row.saved_count < required) {
       if (row.saved_count > 0) {
         row.status = "done";

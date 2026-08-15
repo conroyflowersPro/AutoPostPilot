@@ -9,6 +9,7 @@ import {
   buildRevenueDna,
 } from "@/lib/learning/score";
 import { extractFeatures } from "@/lib/learning/features";
+import { promoteInterestLadder, interestLadderPromptLines } from "@/lib/learning/interest-promotion";
 import type { NormalizedPostMetrics, MetricOrigin } from "@/lib/learning/types";
 
 export const maxDuration = 26;
@@ -107,6 +108,20 @@ export async function POST(req: NextRequest) {
     const audienceDna = buildAudienceDnaHint(scored);
     const performanceDna = buildPerformanceDna(scored);
     const revenueDna = buildRevenueDna(scored);
+
+    const { data: prevAudience } = await supabase
+      .from("audience_dna")
+      .select("data")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const prevLadder = Array.isArray((prevAudience?.[0] as any)?.data?.interestLadder)
+      ? (prevAudience[0] as any).data.interestLadder
+      : [];
+    audienceDna.interestLadder = promoteInterestLadder(prevLadder, scored);
+    const ladderLines = interestLadderPromptLines(audienceDna.interestLadder);
+    if (ladderLines.length) {
+      audienceDna.summaryKo = [audienceDna.summaryKo, ladderLines[0]].filter(Boolean).join(" ");
+    }
 
     const { count: memCount } = await supabase
       .from("planner_memory")

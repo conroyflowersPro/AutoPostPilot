@@ -43,20 +43,30 @@ async function latest(
 
 function audienceBlock(row: Record<string, unknown> | null): string {
   if (!row) {
-    return `AUDIENCE DNA (current): ${UNKNOWN}. Primary source is X Analytics; Fedica is auxiliary. Do not invent interest. Do not overwrite Creator DNA. Do not chase popularity.`;
+    return `AUDIENCE DNA (current): ${UNKNOWN}. Primary source is X Analytics; Fedica is auxiliary. Do not invent interest. Do not overwrite Creator DNA. Do not chase popularity. INTEREST LADDER: ${UNKNOWN}. Do not promote a topic from one result.`;
   }
   const summary = compact(row.summary_ko, 220) || UNKNOWN;
   const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
+  const ladder = Array.isArray(data.interestLadder) ? (data.interestLadder as Array<Record<string, unknown>>) : [];
+  const ladderLine = ladder.length
+    ? "INTEREST LADDER (repeat cycles only, one step): " +
+      ladder
+        .slice(0, 10)
+        .map((e) => `${compact(e.topic, 24)}:${compact(e.stage, 16)}`)
+        .join(" · ")
+    : `INTEREST LADDER: ${UNKNOWN}. Do not promote from one post.`;
   const bits = [
     compact(data.summaryKo, 160),
     Array.isArray(data.interestGraph) ? `interests: ${(data.interestGraph as string[]).slice(0, 6).join(", ")}` : "",
     Array.isArray(data.topicMovement) ? `movement: ${(data.topicMovement as string[]).slice(0, 5).join(", ")}` : "",
+    ladderLine,
   ].filter(Boolean);
   return [
     "AUDIENCE DNA (current, X Analytics primary, Fedica auxiliary):",
     summary,
     ...bits,
     "Use for Seed + editorial balance. Must not overwrite Creator DNA. Must not become popularity chasing.",
+    "Promote Exploration → Emerging → Secondary → Core only after repeated follower/profile/bookmark/reply signals across cycles.",
   ].join("\n");
 }
 

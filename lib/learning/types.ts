@@ -90,6 +90,7 @@ export type AudienceDnaPayload = {
   topicMovement: string[];
   followerInterests: string[];
   summaryKo: string;
+  interestLadder?: Array<{ topic: string; stage: string; signalCycles: number }>;
 };
 
 export type PerformanceDnaPayload = {

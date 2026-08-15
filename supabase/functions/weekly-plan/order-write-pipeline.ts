@@ -14,7 +14,13 @@ import {
   integrateSlotGeneration,
   type IntegratedSlotResult,
 } from "./generation-integration.ts";
-import { judgeIndependentResult, isJudgeReject } from "./semantic-judge.ts";
+import { judgeIndependentResult, isJudgeReject, isJudgePass } from "./semantic-judge.ts";
+import { extractStructuralSignature } from "./structural-signature.ts";
+import { decideRegenerationRoute } from "./regeneration-router.ts";
+import {
+  executeSelectiveRegeneration,
+  snapshotFromSlotParts,
+} from "./selective-regeneration.ts";
 import type { ConcreteSeed } from "./seed-engine.ts";
 import type { EditorialMode } from "./editorial-mix.ts";
 import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
@@ -65,6 +71,7 @@ export async function writeOneSlot(args: {
   recentStyleCounts?: Record<string, number> | null;
   recentEndingCounts?: Record<string, number> | null;
   lastEnding?: string | null;
+  weekSignatures?: Array<Record<string, unknown>>;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -79,6 +86,10 @@ export async function writeOneSlot(args: {
   style_family?: string | null;
   ending_kind?: string | null;
   system_origin_class: "AP_PIPELINE";
+  semantic_regen_attempts: number;
+  slot_final_state: string;
+  regeneration_route_history: string[];
+  structural_signature: Record<string, unknown> | null;
 }> {
   const seed = args.seed as ConcreteSeed & Record<string, unknown>;
   const mode = String(seed.editorial_mode || "INFORMATIVE").toUpperCase() as EditorialMode;
@@ -193,6 +204,12 @@ export async function writeOneSlot(args: {
     ? { ...natural_humor, humor_compatible: true, humor_strength: "LIGHT", humor_grounded: true }
     : natural_humor;
 
+  const weekSignatures = Array.isArray(args.weekSignatures) ? args.weekSignatures : [];
+  const weeklyContext = {
+    other_post_structural_signatures: weekSignatures,
+    recent_generated_signatures: weekSignatures,
+  };
+
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
     day_offset: dayOffset,
@@ -206,6 +223,7 @@ export async function writeOneSlot(args: {
     natural_humor: humorForCtx as any,
     editorial_mode: mode,
     voice_register: voicePayload,
+    week_structural_signatures: weekSignatures,
   });
 
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
@@ -220,45 +238,103 @@ export async function writeOneSlot(args: {
   let finalText = String(integrated.final_text || "").trim();
   let status = String(integrated.generation_status || "BLOCKED");
   const reasons = [...(integrated.block_reasons || [])];
+  let judgeStatus: string | undefined;
+  let regenAttempts = 0;
+  const regenRoutes: string[] = [];
+  let slotFinal = "BLOCKED";
+  let signature: Record<string, unknown> | null = null;
+  let writerAttempted = !!integrated.writer_call_attempted;
 
-  if (finalText && integrated.independent) {
-    const judged = judgeIndependentResult(deep, integrated.independent);
-    if (isJudgeReject(judged)) {
-      status = "BLOCKED";
-      reasons.push(...(judged.hard_fail_reasons || []).map(String));
-      finalText = "";
-    }
-    return {
-      slotId,
-      primaryTopic: String(seed.concrete_subject || seed.primaryTopic || ""),
-      concrete_subject: String(seed.concrete_subject || ""),
-      editorial_mode: mode,
-      final_text: finalText,
-      generation_status: status,
-      judge_status: judged.overall_status,
-      block_reasons: reasons,
-      writer_call_attempted: !!integrated.writer_call_attempted,
-      mechanism_id: selectedMechanismId,
-      style_family: String(creator_style.style_family || "") || null,
-      ending_kind: finalText ? endingKind(finalText) : surface.ending,
-      system_origin_class: "AP_PIPELINE",
-    };
-  }
-
-  return {
+  const pack = (extra: Partial<Awaited<ReturnType<typeof writeOneSlot>>> = {}) => ({
     slotId,
     primaryTopic: String(seed.concrete_subject || seed.primaryTopic || ""),
     concrete_subject: String(seed.concrete_subject || ""),
     editorial_mode: mode,
     final_text: finalText,
     generation_status: status,
+    judge_status: judgeStatus,
     block_reasons: reasons,
-    writer_call_attempted: !!integrated.writer_call_attempted,
+    writer_call_attempted: writerAttempted,
     mechanism_id: selectedMechanismId,
     style_family: String(creator_style.style_family || "") || null,
     ending_kind: finalText ? endingKind(finalText) : surface.ending,
-    system_origin_class: "AP_PIPELINE",
-  };
+    system_origin_class: "AP_PIPELINE" as const,
+    semantic_regen_attempts: regenAttempts,
+    slot_final_state: slotFinal,
+    regeneration_route_history: regenRoutes,
+    structural_signature: signature,
+    ...extra,
+  });
+
+  if (finalText && integrated.independent) {
+    let judged = judgeIndependentResult(deep, integrated.independent, weeklyContext);
+    judgeStatus = judged.overall_status;
+    signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+
+    if (isJudgeReject(judged)) {
+      const decision = decideRegenerationRoute(judged, { semantic_regen_attempts: 0 });
+      regenRoutes.push(decision.route);
+      if (decision.route !== "BLOCK" && decision.route !== "NO_ACTION" && decision.route !== "ACCEPT_WITH_CONCERNS") {
+        const snapshot = snapshotFromSlotParts({
+          slot_id: slotId,
+          context_id: deep.context_id,
+          seed: seed as Record<string, unknown>,
+          editorial_mode: mode,
+          interpretation: seed_interpretation,
+          reaction_mechanism: reaction_mechanism as any,
+          thinking_rail: thinking_rail as any,
+          everyday_language: everyday_language as any,
+          creator_style: creator_style as any,
+          natural_humor: humorForCtx as any,
+          deep_context: deep,
+        });
+        const regen = await executeSelectiveRegeneration({
+          snapshot,
+          decision,
+          weekly_context: weeklyContext,
+          genOpts: {
+            dry_run: args.dryRun === true,
+            openai_key: args.openaiKey,
+            model: V11_WRITER_MODEL,
+            timeout_ms: V11_WRITER_TIMEOUT_MS,
+            allow_one_retry: false,
+          },
+        });
+        regenAttempts = 1;
+        writerAttempted = writerAttempted || regen.diagnostics.writer_called;
+        judged = regen.judge;
+        judgeStatus = judged.overall_status;
+        const regenText = String(regen.independent?.final_text || "").trim();
+        if (regenText && isJudgePass(judged)) {
+          finalText = regenText;
+          status = "GENERATED";
+          signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+          slotFinal = "REGENERATED_PASS";
+          return pack();
+        }
+        reasons.push(...(judged.hard_fail_reasons || []).map(String));
+        reasons.push("selective_regen_rejected");
+        finalText = "";
+        status = "BLOCKED";
+        slotFinal = "BLOCKED";
+        signature = null;
+        return pack();
+      }
+      reasons.push(...(judged.hard_fail_reasons || []).map(String));
+      finalText = "";
+      status = "BLOCKED";
+      slotFinal = "BLOCKED";
+      signature = null;
+      return pack();
+    }
+
+    slotFinal = judged.overall_status === "PASS_WITH_CONCERNS" ? "ACCEPTED_WITH_CONCERNS" : "ACCEPTED_PASS";
+    return pack();
+  }
+
+  slotFinal = finalText ? "ACCEPTED_PASS" : "BLOCKED";
+  if (finalText) signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+  return pack();
 }
 
 export async function writeSlotBatch(args: {
@@ -267,6 +343,7 @@ export async function writeSlotBatch(args: {
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
   audienceSignals?: AudienceBarrierSignals | null;
+  weekSignatures?: Array<Record<string, unknown>>;
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
@@ -274,32 +351,28 @@ export async function writeSlotBatch(args: {
   const styleCounts: Record<string, number> = {};
   const endingCounts: Record<string, number> = {};
   let lastEnding: string | null = null;
-  for (let i = 0; i < slots.length; i += V11_WRITE_CONCURRENCY) {
-    const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
-    const part = await Promise.all(
-      chunk.map((seed) =>
-        writeOneSlot({
-          seed,
-          openaiKey: args.openaiKey,
-          dryRun: args.dryRun,
-          voiceRows: args.voiceRows,
-          recentMechanismUsage: recent.slice(-12),
-          audienceSignals: args.audienceSignals || null,
-          recentStyleCounts: { ...styleCounts },
-          recentEndingCounts: { ...endingCounts },
-          lastEnding,
-        })
-      )
-    );
-    for (const p of part) {
-      if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
-      if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;
-      if (p.ending_kind) {
-        endingCounts[p.ending_kind] = (endingCounts[p.ending_kind] || 0) + 1;
-        lastEnding = p.ending_kind;
-      }
+  const signatures: Array<Record<string, unknown>> = [...(args.weekSignatures || [])];
+  for (const seed of slots) {
+    const p = await writeOneSlot({
+      seed,
+      openaiKey: args.openaiKey,
+      dryRun: args.dryRun,
+      voiceRows: args.voiceRows,
+      recentMechanismUsage: recent.slice(-12),
+      audienceSignals: args.audienceSignals || null,
+      recentStyleCounts: { ...styleCounts },
+      recentEndingCounts: { ...endingCounts },
+      lastEnding,
+      weekSignatures: signatures,
+    });
+    if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
+    if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;
+    if (p.ending_kind) {
+      endingCounts[p.ending_kind] = (endingCounts[p.ending_kind] || 0) + 1;
+      lastEnding = p.ending_kind;
     }
-    out.push(...part);
+    if (p.final_text && p.structural_signature) signatures.push(p.structural_signature);
+    out.push(p);
   }
   return out;
 }

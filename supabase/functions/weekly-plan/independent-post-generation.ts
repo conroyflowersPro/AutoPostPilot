@@ -16,6 +16,7 @@ import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
 import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writingStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { writerWeekStructureConstraintLines } from "./structural-signature.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -420,6 +421,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
     "10) LENGTH follows the reader-entry move and thought order, not an editorial-mode quota. There is no 'one sentence is enough'. Write until the move is complete. Stop when it is complete. Do not pad. Do not copy the previous post's length. Do not stop mid-token. No grand thesis tail.",
     "VARIETY: Vary surface strategy and discourse shape so posts do not converge. Diversity is not the goal. Same person's thought, not the same AI template. Do not copy a winning sentence.",
+    ...writerWeekStructureConstraintLines((ctx as any).week_structural_signatures),
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
     "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
     "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
