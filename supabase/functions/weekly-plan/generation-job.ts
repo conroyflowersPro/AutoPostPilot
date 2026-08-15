@@ -39,6 +39,7 @@ import {
   pickDayForPersonal,
   enforcePersonalPerDay,
   demoteExperienceOnMassSlots,
+  placeableSeedCount,
 } from "./seed-scope.ts";
 import {
   ARCHIVE_EXPERIENCE_FALLBACK,
@@ -406,7 +407,10 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     row.summary = [row.summary, `경험시드: ${experienceSeeds.length} · 인용 후속 · 동일 내용 금지`].filter(Boolean).join("\n");
   }
   const candidates: any[] = [...experienceSeeds, ...(gated.passed || [])];
-  const adjacentFill = !!st.adjacent_fill;
+  const personalAtCap = ((st.gated || []) as any[]).filter((s: any) =>
+    isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || "")),
+  ).length >= QUOTA_DAYS * PERSONAL_PER_DAY_MAX;
+  const adjacentFill = !!st.adjacent_fill || personalAtCap;
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
     needed: Math.max(Math.min(EXPAND_BATCH, remaining), 1),
@@ -447,6 +451,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   }
   st.prior_subjects = priorSubjects.slice(-priorSubjectCap(required));
   st.last_expand_error = xaiRes.error || "";
+  const placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, PERSONAL_PER_DAY_MAX);
   if (added.length <= 0) {
     st.empty_streak = Number(st.empty_streak || 0) + 1;
     if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
@@ -457,18 +462,24 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.summary = [row.summary, st.last_expand_error ? `expand: ${st.last_expand_error}` : ""].filter(Boolean).join("\n");
       return;
     }
-    if (adjacentFill && (st.gated || []).length > 0) {
+    if (adjacentFill && placeable >= required && (st.gated || []).length > 0) {
       row.step = "select";
       row.label_ko = "주간 배치…";
+      return;
+    }
+    if (placeable < required && st.dim_batch < st.max_expand) {
+      st.adjacent_fill = true;
+      row.label_ko = `대중 시드 보충 ${placeable}/${required}…`;
       return;
     }
   } else {
     st.empty_streak = 0;
   }
   row.label_ko = adjacentFill
-    ? `인접 확장 ${st.gated.length}/${required}…`
-    : `시드 추론 ${st.gated.length}/${required}…`;
-  if (st.gated.length >= required || st.dim_batch >= st.max_expand || adjacentFill) {
+    ? `대중 시드 ${placeable}/${required}…`
+    : `시드 추론 ${placeable}/${required}…`;
+  const filled = required > 0 && placeable >= required;
+  if (filled || st.dim_batch >= st.max_expand) {
     if (st.gated.length < 1) {
       row.status = "error";
       row.error = `시드 ${st.gated.length}/${required}. 할당량을 채우지 못해 중단합니다.`;
@@ -476,6 +487,8 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     }
     row.step = "judge";
     row.label_ko = "시드 판정…";
+  } else if (placeable < required) {
+    st.adjacent_fill = true;
   }
 }
 
@@ -711,7 +724,7 @@ async function stepSelect(supabase: any, row: any) {
     (s, d) => s + (d.posts || []).filter((p: any) => isAdjacentExpansionSeed(p)).length,
     0,
   );
-  if (totalAfter < required && Number(st.adjacent_rounds || 0) < 3) {
+  if (totalAfter < required && Number(st.adjacent_rounds || 0) < 8) {
     st.adjacent_rounds = Number(st.adjacent_rounds || 0) + 1;
     st.adjacent_fill = true;
     row.step = "expand";

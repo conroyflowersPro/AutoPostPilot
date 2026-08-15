@@ -102,6 +102,15 @@ personalDays[0].posts = [
 ];
 personalDays[1].posts = [{ concrete_subject: "구독 수수료", cluster: "LIVING_COST" }];
 ok("A21. day 0 has two personal before cap", countPersonal(personalDays[0].posts) === 2);
+ok("A22. expand uses placeable count not raw 6-batch", /placeableSeedCount/.test(job) && /대중 시드 보충/.test(job));
+ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
+ok("A24. six Tesla seeds are all personal so a 28-week is still short", (() => {
+  const seeds = Array.from({ length: 6 }, (_, i) => ({ concrete_subject: `야간 FSD 보행자 ${i}`, cluster: "FSD" }));
+  const personal = seeds.filter((s) => isPersonal(s.concrete_subject, s.cluster)).length;
+  const mass = seeds.length - personal;
+  const placeable = Math.min(personal, 7) + mass;
+  return personal === 6 && mass === 0 && placeable === 6 && placeable < 28;
+})());
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);
