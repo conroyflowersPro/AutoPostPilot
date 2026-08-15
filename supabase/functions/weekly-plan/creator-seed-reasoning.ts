@@ -13,11 +13,14 @@ import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines, isFrozenHumorClone } from "./humor-fill.ts";
 import {
+  buildOpenSlots,
   inferPersonalCluster,
   isForbiddenDefaultSubject,
   isPersonalInterestSubject,
+  isSlotTypeLabel,
   massSectorFromText,
   MASS_PER_DAY_MAX,
+  type OpenSeedSlot,
 } from "./seed-scope.ts";
 import { QUOTA_DAYS } from "./quota-inference.ts";
 
@@ -57,6 +60,8 @@ export type CreatorSeedReasoningInput = {
   humorRing?: boolean;
   /** Short DNA-only retry when the full prompt returned zero usable seeds. */
   compactRetry?: boolean;
+  /** Typed empty cells. If omitted, built from needed + existing. */
+  openSlots?: OpenSeedSlot[];
   intelligence?: PlannerIntelligenceBlocks | null;
 };
 
@@ -140,6 +145,7 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
   if (/어제\s*내가|오늘\s*직접|방금\s*테스트했/i.test(subject)) return null;
   if (/관찰·판단 축|차원 기반 신규 각도/.test(subject)) return null;
   if (isFrozenHumorClone(subject)) return null;
+  if (isSlotTypeLabel(subject)) return null;
   const cluster = clean(x?.cluster, 40) || "OBSERVATION";
   const dimension = clean(x?.dimension, 60) || "CREATOR_REASONED";
   const angle = clean(x?.idea_angle_family, 80) || `${cluster}|${dimension}|${i + 1}`;
@@ -243,6 +249,16 @@ export async function reasonCreatorSeeds(
   const intent = clean(args.explicitCreatorIntent, 180);
 
   const compact = !!args.compactRetry;
+  const openSlots = (args.openSlots?.length
+    ? args.openSlots
+    : buildOpenSlots({
+      needed: requested,
+      existing: args.existing,
+      days: QUOTA_DAYS,
+      maxMass: MASS_PER_DAY_MAX,
+    })).slice(0, requested);
+  const slotFillRule =
+    "open_slots are typed empty cells. Fill each concrete_subject by inferring from Creator DNA + engine rules. Leave no cell empty. Do not copy slot_kind, cluster_bound, editorial_mode, or cluster enum names into concrete_subject. Do not write example sentences or sample phrases. Infer a NEW situation per cell.";
   const system = compact
     ? [
       "You infer X direction seeds for @Seung4680 (Korean track, California life).",
@@ -250,7 +266,7 @@ export async function reasonCreatorSeeds(
       "Infer NEW situations from Creator DNA interest domains this run. Mix the domains. Do not rotate a canned list.",
       "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
       "Do NOT copy DIMENSION labels. Do NOT emit a canned keyword list. Do not copy already_held or recent_published.",
-      "Do not write example phrases from this prompt into concrete_subject. Infer a NEW situation this run.",
+      slotFillRule,
       "Each concrete_subject is a distinct writable situation (≥8 Korean chars), different from already_held and recent_published.",
       "cluster MUST be one of FSD, CYBERTRUCK, TESLA, LAFC, GAMING. At most 1 mass-public seed in this batch.",
       "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
@@ -269,13 +285,14 @@ export async function reasonCreatorSeeds(
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Do not dump CLUSTER + DIMENSION labels as concrete_subject. Code drops registry-label bodies.",
+    slotFillRule,
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
     "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
     "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Everyday words only. FORBIDDEN seed jargon: 레이어, 레이어2, L2, 스택, 프로토콜. Wording examples in Performance DNA are for posts, not this week's concrete_subject.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "NEW READERS FIRST via one mass-public slot per day. Personal-interest originals fill the rest. Tesla/Elon/Robotaxi-news are not the default seed subject.",
-    "Creator lives in California. Seeds are Korean words about US/CA daily life. FORBIDDEN invented subjects: 이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약, Korea subway/apartment-complex civic life.",
+    "Creator lives in California. Seeds are Korean words about US/CA daily life. Do not invent Korea-only civic or housing situations the creator does not live. Code drops those.",
     "At most 1 mass-public daily-life seed per day of quota. Remaining seeds MUST be personal-interest (FSD/Cybertruck/LAFC/gaming/lived Tesla product). Do not invent lived episodes.",
     "If this batch asks for 6 seeds, return at most 1 mass + 5 personal. Do not return a mass-only list.",
     "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",
@@ -300,14 +317,16 @@ export async function reasonCreatorSeeds(
   const user = compact
     ? JSON.stringify({
       requested_seed_count: requested,
+      open_slots: openSlots,
       creator_dna: creatorDnaBlock(),
       already_held_seeds: existingAbstract,
       recent_published_angles_avoid_repeat: recent,
       weekly_goal_note:
-        "Return requested_seed_count NEW inferred personal-interest direction seeds. No frozen keyword list. No last-week clones. No invented experience.",
+        "Fill every open_slot.concrete_subject by inference. Return requested_seed_count seeds. No frozen keyword list. No last-week clones. No invented experience. No example sentences.",
     })
     : JSON.stringify({
     requested_seed_count: requested,
+    open_slots: openSlots,
     creator_dna: creatorDnaBlock(),
     engine_rules_are_the_will: engineRulesAsWill(),
     performance_dna: performanceDnaBlock(),
@@ -335,12 +354,12 @@ export async function reasonCreatorSeeds(
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
     weekly_goal_note: args.humorRing
-      ? "Fill quota holes with personal-interest CASUAL/OPINION humor from Creator DNA. No invented lived experience. Return requested_seed_count seeds."
+      ? "Fill every open_slot.concrete_subject by inference from Creator DNA. Personal-interest CASUAL/OPINION humor. No invented lived experience. Return requested_seed_count seeds."
       : args.adjacentRing
-      ? "Fill leftover mass-public slots only (max 1/day). Rest of the hole fill is personal. Return requested_seed_count seeds."
-      : "Fill the inferred 3-day quota. Personal-interest originals are the main mix. At most 1 mass-public daily-life seed per day. No invented experience. Return requested_seed_count seeds.",
+      ? "Fill leftover mass-public open_slots only (max 1/day). Rest of the hole fill is personal. Return requested_seed_count seeds."
+      : "Fill every open_slot.concrete_subject. Fill the inferred 3-day quota. Personal-interest originals are the main mix. At most 1 mass-public daily-life seed per day. No invented experience. Return requested_seed_count seeds.",
     requirement:
-      "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
+      "Fill typed empty cells by inference. No example sentences. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
 
   try {

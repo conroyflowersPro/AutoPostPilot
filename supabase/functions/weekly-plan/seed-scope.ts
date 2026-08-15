@@ -29,6 +29,63 @@ export const PERSONAL_CLUSTERS = [
   "GAMING",
 ] as const;
 
+/** Slot type labels are bounds, not seed bodies. Grok must not copy these as concrete_subject. */
+export function isSlotTypeLabel(subject: string): boolean {
+  const raw = String(subject || "").trim();
+  const compact = raw.replace(/\s+/g, "").toUpperCase();
+  if (!compact) return true;
+  if ((PERSONAL_CLUSTERS as readonly string[]).includes(compact)) return true;
+  if ((MASS_SECTORS as readonly string[]).includes(compact)) return true;
+  if (/^(MASS_PUBLIC|PERSONAL_INTEREST|PERSONAL_DNA_INTEREST|MASS_PUBLIC_DAILY|OBSERVATION|HUMOR|CASUAL|INFORMATIVE|CASUALOBSERVATION)$/.test(compact)) {
+    return true;
+  }
+  return /관찰·판단\s*축|DIMENSION_REGISTRY|PERSONAL_DNA_INTEREST|MASS_PUBLIC_DAILY|slot_kind|cluster_bound/.test(raw);
+}
+
+export type OpenSeedSlot = {
+  slot_id: string;
+  slot_kind: "PERSONAL_INTEREST" | "MASS_PUBLIC";
+  cluster_bound: "PERSONAL_DNA_INTEREST" | "MASS_PUBLIC_DAILY";
+  editorial_mode: string;
+  concrete_subject: "";
+};
+
+const PERSONAL_SLOT_MODES = ["INFORMATIVE", "CASUAL_OBSERVATION", "OPINION", "COMPARE", "EXPERIENCE"] as const;
+const MASS_SLOT_MODES = ["INFORMATIVE", "CASUAL_OBSERVATION", "OPINION", "COMPARE"] as const;
+
+/** Typed empty cells. concrete_subject stays empty until Grok infers a situation. */
+export function buildOpenSlots(args: {
+  needed: number;
+  existing?: Array<{ cluster?: string; concrete_subject?: string }>;
+  days?: number;
+  maxMass?: number;
+}): OpenSeedSlot[] {
+  const needed = Math.max(0, Math.min(64, Math.ceil(Number(args.needed) || 0)));
+  const days = Math.max(1, Math.round(Number(args.days) || 3) || 3);
+  const maxMass = args.maxMass ?? MASS_PER_DAY_MAX;
+  const massCap = days * maxMass;
+  let massHeld = 0;
+  for (const s of args.existing || []) {
+    if (!isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))) {
+      massHeld += 1;
+    }
+  }
+  const massInBatch = massHeld < massCap ? 1 : 0;
+  const slots: OpenSeedSlot[] = [];
+  for (let i = 0; i < needed; i++) {
+    const mass = i < massInBatch;
+    const modes = mass ? MASS_SLOT_MODES : PERSONAL_SLOT_MODES;
+    slots.push({
+      slot_id: `open-${i + 1}`,
+      slot_kind: mass ? "MASS_PUBLIC" : "PERSONAL_INTEREST",
+      cluster_bound: mass ? "MASS_PUBLIC_DAILY" : "PERSONAL_DNA_INTEREST",
+      editorial_mode: modes[i % modes.length],
+      concrete_subject: "",
+    });
+  }
+  return slots;
+}
+
 const PERSONAL_RE =
   /tesla|테슬라|elon|musk|일론|머스크|cybertruck|사이버트럭|\bfsd\b|hw3|v14|오토파일럿|로보택시|robotaxi|모델\s*[3sy]|플래드|plaid|lafc|축구|직관|\b게임\b|스팀|매치메이킹|\bgrok\b|그록|충전|슈퍼차저|supercharger/i;
 

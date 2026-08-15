@@ -27,7 +27,7 @@ export function buildPerformanceDnaPlannerBlock(): {
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion. Stop after the observation. Do not ask a question to make a reply slot.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
     "NEW READERS: one mass-public daily-life slot per day. Infer the situation from place bounds. Personal-interest originals fill the rest. Tesla/Elon ticker/Robotaxi-news are not the default seed subject.",
-    "PLACE: Creator lives in California (America/Los_Angeles). Write Korean. Daily situations are US/CA life he actually lives — infer them, do not copy a situation menu from this prompt. FORBIDDEN as invented default: Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
+    "PLACE: Creator lives in California (America/Los_Angeles). Write Korean. Daily situations are US/CA life he actually lives — infer them, do not copy a situation menu from this prompt. Do not invent Korea-only civic or housing life the creator does not live.",
     "MASS CAP: at most one mass-public daily-life original per day. Personal-interest originals fill the rest. Keep EXPERIENCE when evidence exists. Do not invent lived episodes.",
     "OON FOR YOU: originals only; new situation inside 48 hours. The unfinished situation is the reply space. Do not end with a question.",
     "LENGTH: not a mode quota. Follow the selected reader-entry move and thought order until the observation is complete. Mix lengths across the 3-day set. Do not collapse to one sentence because a slot is informational. Do not pad. No thesis tail.",

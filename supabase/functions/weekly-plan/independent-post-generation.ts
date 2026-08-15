@@ -313,7 +313,7 @@ export function writerEverydayConstraintLines(ctx: DeepGenerationContext): strin
     s(everyday.compression_preference) ? "Compression: " + s(everyday.compression_preference) : "",
     protectedMeaning.length ? "Do not dilute: " + protectedMeaning.join("; ") : "",
     forbidden.length ? "Do not simplify into: " + forbidden.join("; ") : "",
-    "FORBIDDEN jargon: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Use 알림/화면/겹침/가림.",
+    "FORBIDDEN jargon: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘.",
   ].filter(Boolean);
 }
 
@@ -415,7 +415,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "4) The selected Reaction Mechanism is the personality of this post — a reader-entry STRUCTURE, not a question and not a slogan. Use the READER ENTRY MOVE below. Never name it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
     "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Do not paste a wording example from this prompt. NEVER swap a word if it would change the claim.",
-    "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
+    "PLACE: Creator lives in California. Write Korean. Infer US/CA daily situations from Creator DNA. Do not invent Korea-only civic or housing life the creator does not live.",
     "7) Apply Creator Style as surface tendency — not a template. The planner chooses 해요/음슴/other for THIS slot from DNA + engine + the 3-day set so far. No frozen mix ratio. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not copy the previous post's ending.",
     "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",

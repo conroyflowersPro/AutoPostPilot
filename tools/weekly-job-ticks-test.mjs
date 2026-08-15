@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.5.9", /const APP_VERSION = "11.5.9"/.test(ix));
+ok("J15. shipping 11.6.0", /const APP_VERSION = "11.6.0"/.test(ix));
 ok("J24. empty write retries once then uses planned length", /_write_retry/.test(job) && /const planned = \(st\.write_flat/.test(job));
 ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
@@ -57,6 +57,9 @@ ok("J20. humor fill does not abort short weeks", /유머·관심 시드로 할�
 ok("J21. shortfall keeps Grok humor expand not frozen keywords", /유머/.test(job) && !/localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
 ok("J22. leftover selectable seeds fill quota holes", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("J23. experience-without-evidence remints to INFORMATIVE", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
+ok("J32. write shortfall bounces to expand and appends", /write_fill_rounds/.test(job) && /write_started/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /할당량 이어서 추론/.test(job));
+ok("J33. select bounce uses max_topup not two rounds", /adjacent_rounds \|\| 0\) < Number\(st\.max_topup/.test(job));
+ok("J34. expand hard cap 36 before giving up", /EXPAND_HARD_CAP = 36/.test(job) && /canKeepExpanding/.test(job));
 
 console.log("========================================");
 console.log(`JOB TICKS: ${pass} PASS / ${fail} FAIL`);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Quota holes fill from mass public sectors (max 3/day).
- * Still-short weeks write what exists and go to review. Never abort 22/28.
+ * Quota holes fill from inferred personal/mass slots.
+ * Keep inferring until quota is filled. Never abort 22/28. Never a frozen keyword list.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -68,7 +68,7 @@ function countPersonal(posts) {
   return posts.filter((p) => isPersonal(p.concrete_subject, p.cluster || p.topic_cluster)).length;
 }
 
-console.log("Quota fill via mass public sectors (max 3/day) then review");
+console.log("Quota fill via inferred typed slots; always fill quota");
 ok("A1. module exports mass-sector adjacent helpers", /export const ADJACENT_PER_DAY_MAX = 3/.test(adjSrc) && /DAILY_AI/.test(adjSrc) && /PHONE_NOTIFY/.test(adjSrc) && !/EV_INDUSTRY/.test(adjSrc));
 ok("A2. Tesla night FSD is personal not mass-fill", isPersonal("야간 FSD 보행자 대기", "FSD") && !isAdjacentSeed({ concrete_subject: "야간 FSD 보행자 대기", cluster: "FSD" }));
 ok("A3. phone alerts are mass", isAdjacentSeed({ concrete_subject: "휴대폰 알림이 겹쳐 어느 레이어가 위인지", cluster: "PHONE_NOTIFY" }));
@@ -107,7 +107,7 @@ ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.jo
 ok("A25. Korea-only civic is forbidden default", /isKoreaOnlySituation/.test(scopeSrc) && /이중\\s\*주차/.test(scopeSrc));
 ok("A26. 이중주차 is Korea-only", /이중\\s\*주차/.test(scopeSrc) && /관리사무소/.test(scopeSrc) && /배민/.test(scopeSrc));
 ok("A27. adjacent infers mass situation, no street-parking menu", /Infer a NEW mass-public situation/.test(adjSrc) && !/street \/ structure \/ red curb/.test(adjSrc) && /이중\\s\*주차/.test(scopeSrc));
-ok("A28. seed prompt lives in California", /Creator lives in California/.test(cr) && /FORBIDDEN invented subjects: 이중주차/.test(cr));
+ok("A28. seed prompt lives in California, no Korea example list", /Creator lives in California/.test(cr) && /Do not invent Korea-only/.test(cr) && !/FORBIDDEN invented subjects: 이중주차/.test(cr));
 ok("A29. job skips Korea-only on expand and select", /isKoreaOnlySituation/.test(job));
 ok("A30. expand batch 10 on job path", /const EXPAND_BATCH = 10/.test(job));
 const KOREA_ONLY_RE =
@@ -124,8 +124,8 @@ ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", ((
 })());
 ok("A34. empty Grok expand uses compactRetry next tick, never DNA keyword inject",
   /compactRetry: compact/.test(job) && /시드 짧게 재추론/.test(job) && !/DNA 관심 키워드/.test(job) && !/localHumorKeywordSeeds/.test(job));
-ok("A35. select bounces to Grok expand when short, does not fill frozen keywords",
-  /adjacent_rounds \|\| 0\) < 2/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A35. select bounces to Grok expand until max_topup, does not fill frozen keywords",
+  /adjacent_rounds \|\| 0\) < Number\(st\.max_topup/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A36. humorRing remaps OBSERVATION cluster onto DNA interests",
   /inferPersonalCluster/.test(cr) && /humorRing cluster MUST/.test(cr));
 ok("A37. FSD keyword with OBSERVATION cluster is still personal",
@@ -143,6 +143,16 @@ ok("A43. seed philosophy is infer, not prompt examples",
   /Infer\. Do not paste examples/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")) &&
   /Never emit a prompt example/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8")) &&
   !/night FSD pedestrian wait/.test(cr) && !/e\.g\. 돈 not 자산/.test(cr));
+ok("A44. typed empty slots: type only, concrete_subject empty",
+  /export function buildOpenSlots/.test(scopeSrc) && /open_slots: openSlots/.test(cr) && /concrete_subject: ""/.test(scopeSrc) && /slotFillRule/.test(cr));
+ok("A45. type labels are dropped as seed bodies",
+  /export function isSlotTypeLabel/.test(scopeSrc) && /isSlotTypeLabel/.test(cr) && /isSlotTypeLabel/.test(job));
+ok("A46. expand raises to hard cap instead of writing short",
+  /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /canKeepExpanding\(st\)/.test(job));
+ok("A47. write shortfall appends inferred slots, never frozen list",
+  /write_fill_rounds/.test(job) && /WRITE_FILL_MAX = 8/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /write_started/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A48. Grok/writer prompts have no fill-in example sentences",
+  !/Use 알림\/화면\/겹침\/가림/.test(wr) && !/이중주차, 관리사무소/.test(cr) && !/이중주차, 관리사무소/.test(wr));
 
 console.log("========================================");
 console.log(`ADJACENT FILL: ${pass} PASS / ${fail} FAIL`);
