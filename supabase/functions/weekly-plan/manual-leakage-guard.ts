@@ -150,9 +150,11 @@ export function scoreSemanticOverlap(
       matched = r.source_id;
     }
   }
-  if (best >= 0.55) return { level: "HIGH", matched_source_id: matched, score: best };
-  if (best >= 0.35) return { level: "MEDIUM", matched_source_id: matched, score: best };
-  if (best >= 0.18) return { level: "LOW", matched_source_id: matched, score: best };
+  // HIGH means practical same-event/same-conclusion reuse. Shared Creator
+  // interests and vocabulary are not enough to delete a new Seed.
+  if (best >= 0.72) return { level: "HIGH", matched_source_id: matched, score: best };
+  if (best >= 0.45) return { level: "MEDIUM", matched_source_id: matched, score: best };
+  if (best >= 0.25) return { level: "LOW", matched_source_id: matched, score: best };
   return { level: "NONE", score: best };
 }
 

@@ -425,6 +425,28 @@ export function conceptualDiversityScore(candidate: Partial<ConcreteSeed>, selec
   return worst;
 }
 
+/**
+ * Structured xAI Seed judgment used by the Planner at selection time.
+ * This is ranking, never a safety gate. Missing cold-start evidence is UNKNOWN,
+ * not zero and not a reason to delete a candidate.
+ */
+export function seedSelectionValueScore(seed: Partial<ConcreteSeed>): number {
+  const rawPriority = Number(seed.seed_priority);
+  const priority = Math.max(0, Math.min(100, Number.isFinite(rawPriority) ? rawPriority : 50)) / 100;
+  const whyNow = String(seed.why_now || "").trim();
+  const creator = String(seed.creator_relevance || "").trim();
+  const audience = String(seed.audience_relevance || "").trim();
+  const evidence = String(seed.evidence_basis || "").trim();
+  const exploration = String(seed.exploration_value || "").toLowerCase();
+  const explorationScore =
+    exploration === "core" ? 1 :
+    exploration === "secondary" ? 0.8 :
+    exploration === "emerging" ? 0.7 :
+    exploration === "exploration" ? 0.6 : 0.5;
+  const judgments = [whyNow, creator, audience, evidence].filter((x) => x.length >= 4).length / 4;
+  return Math.max(0, Math.min(1, priority * 0.5 + judgments * 0.3 + explorationScore * 0.2));
+}
+
 export function conceptualRepetitionLevel(candidate: Partial<ConcreteSeed>, selected: Array<Partial<ConcreteSeed>>): ConceptualRepetition {
   const div = conceptualDiversityScore(candidate, selected);
   if (div >= 0.65) return "LOW";

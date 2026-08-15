@@ -265,24 +265,15 @@ const MECHANISM_SHAPE_HINTS: Record<string, string> = {
     "Name the missing piece inside the observation. Complete the situation. Not a question.",
 };
 
-export function writerMechanismConstraintLines(ctx: DeepGenerationContext): string[] {
-  const mech = ((ctx as any).reaction_mechanism || {}) as Record<string, unknown>;
-  const id = s(mech.selected_mechanism_id || mech.selected_mechanism);
-  const status = s(mech.status);
-  if (!id || id === "NONE" || status === "MECHANISM_BLOCKED") {
-    return [
-      "READER ENTRY MOVE: write a finished observation of a specific situation. Do not ask a question to create a reply slot. The unfinished situation is the entry.",
-    ];
-  }
-  const move = MECHANISM_WRITE_MOVES[id] || MECHANISM_WRITE_MOVES.M4_LIFE_PATTERN_EXPOSURE;
-  const shape = MECHANISM_SHAPE_HINTS[id] || MECHANISM_SHAPE_HINTS.M4_LIFE_PATTERN_EXPOSURE;
-  return [
-    "OPTIONAL DELIVERY (after the thought is closed; never name the mechanism; never write 메커니즘 or M1–M9):",
-    move,
-    shape,
-    "Use this only if it helps deliver the thought you closed. If it would hide the creator's judgment or pick a different thought, ignore it. NONE is normal.",
-    "Personality is this creator's closed thought, not a slogan, not a generic news sentence, and not a sentence-count quota.",
-  ];
+/**
+ * Delivery catalog after a thought exists. Not injected into the live writer prompt.
+ * NONE is normal. Do not use these lines to pick the thought.
+ */
+export function writerMechanismConstraintLines(_ctx: DeepGenerationContext): string[] {
+  void _ctx;
+  void MECHANISM_WRITE_MOVES;
+  void MECHANISM_SHAPE_HINTS;
+  return [];
 }
 
 export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] {
@@ -350,9 +341,7 @@ export function writerBoundaryConstraintLines(ctx: DeepGenerationContext): strin
   const claims = Array.isArray(ctx.prohibited_claims)
     ? ctx.prohibited_claims.map((x) => s(x)).filter(Boolean).slice(0, 6)
     : [];
-  const lines = [
-    ctx.compression_target ? "COMPRESSION TARGET: " + s(ctx.compression_target) : "",
-  ];
+  const lines: string[] = [];
   if (prohibitedInvent.length) lines.push("FACTUAL DO-NOT-INVENT: " + prohibitedInvent.join("; "));
   if (claims.length) lines.push("PROHIBITED CLAIMS: " + claims.join("; "));
   return lines.filter(Boolean);
@@ -382,6 +371,7 @@ function writerPhilosophyBlock(): string {
     "HARD BOUNDARY: Do not invent lived experience, private facts, emotions, or relationships. Do not copy a manual post or a previously successful sentence. Do not write Korea-only civic/housing life he does not live.",
     "Do not paste prompt examples. Do not freeze topic→말투. 해요 and 음슴 are both allowed; pick the register that fits THIS thought.",
     "Engagement-bait questions (어떻게 생각하세요 / 궁금한가요 as a closer) are forbidden. A genuine thinking question inside the thought is allowed.",
+    "Never name the mechanism or rail in the post. Never write 메커니즘 or M1–M9.",
     "Do not bolt on an unearned macro future/society conclusion. A long-horizon meaning is allowed when the seed's actual change earns it.",
     "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording or chase a viral hook.",
     "WHY YOU EXIST: same person's thought, not an AI template. Growth is Planner strategy plus clear delivery — not likes-recipe sentences.",
@@ -392,7 +382,6 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
   const mode = humorMode(ctx);
-  const comp = ctx.compression_target || "NATURAL";
   const leaveOpen = !!ctx.stop_condition?.leave_inference_open;
   const punchStop = !!ctx.stop_condition?.punchline_stop_ok;
   const expBound = ctx.experience_boundaries || {};
@@ -414,7 +403,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "REASONING ORDER (internal only; do not output steps):",
     "1) What is actually going on in this Seed? Use live X/web only as facts if needed. Do not copy tweet wording. A short keyword seed is valid. Do not paste hardcoded example posts.",
     "2) Close ONE thought this creator would hold. Do not paste code labels (tension_around / judgment_axis) as prose. Those labels are not the thought.",
-    "3) Write that thought in his language. Style, 말투, humor, Mechanism, and Rail follow. They must not change the thought.",
+    "3) Write that thought in his language. Style, 말투, humor, Mechanism, and Rail follow the closed thought. They are not chosen before it. They must not change it.",
     "4) Audience is readers, not followers and not a Tesla club. Everyday words when they keep the claim. Low entry barrier is wording AND the range of wording. NEVER swap a word if it would change the claim. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9.",
     "PLACE: Creator lives in California. Write Korean. Infer US/CA daily situations from Creator DNA. Do not invent Korea-only civic or housing life the creator does not live.",
     "REGISTER: 해요 and 음슴 are both allowed. Pick the one that fits THIS closed thought. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not freeze topic→말투. Do not copy the previous post's ending.",
@@ -424,14 +413,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     ...writerWeekStructureConstraintLines((ctx as any).week_structural_signatures),
     "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, engagement-bait closers, CTA, expert jargon (레이어/L2/스택), unearned AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line)
-      ? "ANTI-REPEAT SIGNAL (not a command): " + s((ctx as any).voice_register?.constraint_line)
-      : "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a bait question for the algorithm.",
-    ...writerMechanismConstraintLines(ctx),
-    ...writerRailConstraintLines(ctx),
-    ...writerEverydayConstraintLines(ctx),
-    ...writerStyleConstraintLines(ctx),
+      ? "ANTI-REPEAT SIGNAL (not a command; ignore if it fights the closed thought): " + s((ctx as any).voice_register?.constraint_line)
+      : "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a bait question for the algorithm. Pick 해요 or 음슴 after the thought is closed.",
     ...writerBoundaryConstraintLines(ctx),
-    ...writerHumorConstraintLines(ctx),
     "SEED SUBJECT: " + subject.slice(0, 200),
     "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 120),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "limited first-person allowed only if already grounded" : "no fabricated first-person experience"),
@@ -447,12 +431,10 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
       ? "ADJACENT RING: mass-public daily life for new readers. Infer the situation. Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone, prompt-example subjects."
       : "",
-    "OPTIONAL SIGNALS (ignore if they fight the thought you closed): leave_inference_open=" +
+    "OPTIONAL SIGNALS (ignore if they fight the thought you closed; they do not pick the thought): leave_inference_open=" +
       String(leaveOpen) +
       " punchline_stop=" +
-      String(punchStop) +
-      " compression=" +
-      comp,
+      String(punchStop),
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta. No chain-of-thought.",
   ].join("\n");
 }
@@ -523,7 +505,6 @@ export async function callGrokWriter(
   const userMsg = [
     "Close the thought for this Seed, then write the Korean X post. Thought first. Style follows.",
     "Situation: " + subject.slice(0, 160),
-    ...writerMechanismConstraintLines(ctx).slice(0, 5),
     tension
       ? "Seed material (not the closed thought): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",

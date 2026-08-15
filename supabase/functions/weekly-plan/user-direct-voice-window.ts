@@ -245,7 +245,7 @@ export function voiceRegisterConstraintLine(
   surface?: InferredSurface | null,
 ): string {
   const inferred = surface?.constraint_line ||
-    "THIS POST SURFACE: planner decides 해요/음슴/other for this slot from DNA + engine + this 3-day set. No frozen mix ratio. Editorial mode is not a 말투 table.";
+    "THIS POST SURFACE: pick 해요 or 음슴 after the thought is closed. Do not lock 말투 before the thought. No frozen mix ratio. Editorial mode is not a 말투 table.";
   if (!reg || reg.n <= 0) {
     return [
       "USER_DIRECT REGISTER: none in window — planner still decides this slot from Creator DNA two-speed + engine (no single global tone). No archive endings. No example posts. No frozen mix percentage.",

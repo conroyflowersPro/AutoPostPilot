@@ -41,7 +41,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.8.1)");
+console.log("DNA + engine live-path wiring (v11.10.0)");
 
 ok("D1. Grok writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. Grok writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -57,18 +57,19 @@ ok("D7. deep context maps why_it_might_matter_to_creator", /why_it_might_matter_
 ok("D8. deep context maps concrete_human_element", /concrete_human_element/.test(dgc));
 ok("D9. core thought maps why_it_might_matter_to_creator", /buildCoreThought[\s\S]*why_it_might_matter_to_creator/.test(dgc));
 
-ok("D10. writer everyday language lines", /writerEverydayConstraintLines/.test(wr) && /EVERYDAY LANGUAGE/.test(wr));
-ok("D11. writer style lines", /writerStyleConstraintLines/.test(wr) && /CREATOR STYLE/.test(wr));
-ok("D12. writer factual boundaries", /writerBoundaryConstraintLines/.test(wr) && /FACTUAL DO-NOT-INVENT/.test(wr));
-ok("D13. writer humor decision lines", /writerHumorConstraintLines/.test(wr) && /HUMOR DECISION/.test(wr));
-ok("D14. constraint builder concatenates everyday+style+boundary+humor",
-  /writerEverydayConstraintLines\(ctx\)/.test(wr) &&
-  /writerStyleConstraintLines\(ctx\)/.test(wr) &&
-  /writerBoundaryConstraintLines\(ctx\)/.test(wr) &&
-  /writerHumorConstraintLines\(ctx\)/.test(wr));
+ok("D10. everyday language philosophy reaches Writer, not a pre-chosen strategy", /writingStagePhilosophyBlock/.test(wr) && /Easy must not mean shallow/.test(stage) && !/\.\.\.writerEverydayConstraintLines/.test(wr));
+ok("D11. creator style philosophy reaches Writer, not a pre-chosen family", /writingStagePhilosophyBlock/.test(wr) && /CREATOR STYLE/.test(stage) && !/\.\.\.writerStyleConstraintLines/.test(wr));
+ok("D12. writer factual boundaries", /writerBoundaryConstraintLines/.test(wr) && /FACTUAL DO-NOT-INVENT/.test(wr) && /\.\.\.writerBoundaryConstraintLines/.test(wr));
+ok("D13. humor is standing philosophy, not a pre-chosen decision in the live prompt", /writingStagePhilosophyBlock/.test(wr) && /NONE is normal/.test(stage) && !/\.\.\.writerHumorConstraintLines/.test(wr));
+ok("D14. live writer concatenates fact boundaries only, not delivery engines",
+  /\.\.\.writerBoundaryConstraintLines\(ctx\)/.test(wr) &&
+  !/\.\.\.writerEverydayConstraintLines/.test(wr) &&
+  !/\.\.\.writerStyleConstraintLines/.test(wr) &&
+  !/\.\.\.writerHumorConstraintLines/.test(wr) &&
+  !/\.\.\.writerMechanismConstraintLines/.test(wr));
 
-ok("D15. pipeline passes audienceSignals into everyday language", /audience_signals: args\.audienceSignals/.test(pipe));
-ok("D16. pipeline passes creator_dna into style", /creator_dna: \{/.test(pipe) && /decideCreatorStyle/.test(pipe));
+ok("D15. pipeline records audienceSignals after thought, not as a thought picker", /audience_signals: args\.audienceSignals/.test(pipe) && /selectDeliveryAfterThought/.test(pipe));
+ok("D16. pipeline records creator_dna style after thought", /creator_dna: \{/.test(pipe) && /decideCreatorStyle/.test(pipe) && /selectDeliveryAfterThought/.test(pipe));
 ok("D17. pipeline keeps USER_DIRECT voice", /inferSlotVoice/.test(pipe) && /from "\.\/user-direct-voice-window\.ts"/.test(pipe));
 ok("D18. job write passes audienceBarrierSignalsFromActivityMeta",
   /audienceBarrierSignalsFromActivityMeta/.test(job) && /writeSlotBatch\(/.test(job));
@@ -91,7 +92,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.8.1", /APP_VERSION = "11.8.1"/.test(ver) && /APP_VERSION = "11.8.1"/.test(ix));
+ok("D28. version 11.10.0", /APP_VERSION = "11.10.0"/.test(ver) && /APP_VERSION = "11.10.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
@@ -118,9 +119,11 @@ ok("D33. Architecture lock: no engine replaces the Creator",
   /plannerArchitectureLock/.test(seedReason) &&
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
-ok("D34. Pipeline order is locked",
+ok("D34. Pipeline order is locked in docs and in writeOneSlot",
   /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(arch) &&
   /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(libArch) &&
+  /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
+  /selectDeliveryAfterThought/.test(pipe) &&
   /No engine replaces the Creator/.test(dna));
 ok("D35. Forbidden mixes named",
   /Writer must not become Planner/.test(arch) &&
@@ -132,7 +135,8 @@ ok("D36. Planner Memory stores abstract patterns, not wording",
   /추상 패턴만 저장/.test(score) &&
   !/const snip = s\.contentSnippet/.test(score));
 ok("D37. Seed generation philosophy reaches Grok expand",
-  /planningStagePhilosophyBlock/.test(seedReason) &&
+  /seedCandidatePhilosophyBlock/.test(seedReason) &&
+  /EXPLORE MANY/.test(stage) &&
   /A seed starts thinking/.test(stage) &&
   /not yet a post topic/.test(stage));
 ok("D38. Core Thought is a judgment, can HOLD",

@@ -21,6 +21,8 @@ export type XaiSeedExpansionResult = {
   error: string | null;
   requested: number;
   returned: number;
+  raw_returned: number;
+  reject_reasons: Record<string, number>;
   reasoning_version?: string;
   used_creator_dna?: boolean;
   used_dimension_registry_as_seed_body?: boolean;
@@ -80,6 +82,8 @@ export async function expandSeedSupplyWithXai(args: {
     error: res.error,
     requested: res.requested,
     returned: res.returned,
+    raw_returned: res.raw_returned,
+    reject_reasons: res.reject_reasons,
     reasoning_version: res.version,
     used_creator_dna: res.used_creator_dna,
     used_dimension_registry_as_seed_body: res.used_dimension_registry_as_seed_body,

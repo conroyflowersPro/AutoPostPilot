@@ -39,8 +39,8 @@ function isEverydayPublicScene(text) {
 
 console.log("Grok writer mechanism wiring");
 ok("M1. writer exports mechanism constraint helper", /export function writerMechanismConstraintLines/.test(wr));
-ok("M2. writer instructions treat mechanism as optional delivery", /OPTIONAL DELIVERY/.test(wr) && /Personality is this creator's closed thought/.test(wr));
-ok("M3. live user message uses mechanism lines", /writerMechanismConstraintLines\(ctx\)/.test(wr));
+ok("M2. mechanism helper does not pick the thought", /writerMechanismConstraintLines/.test(wr) && /Not injected into the live writer prompt/.test(wr) && /NONE is normal/.test(wr));
+ok("M3. live user message does not inject mechanism lines", /callGrokWriter/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 ok("M4. deep context reads selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(dgc) && /getMechanismById/.test(dgc));
 ok("M5. deep context copies reader_entry_point", /reader_entry_point: s\(mech\.reader_entry_point/.test(dgc));
 ok("M6. NONE string is not treated as human text", /none\|low/.test(rsp) && /hasText/.test(rsp));
@@ -52,7 +52,7 @@ ok("M11. abstract ticker is not everyday public", !isEverydayPublicScene("macro 
 ok("M12. NONE is not meaningful human text", !hasMeaningful("NONE") && hasMeaningful("daily time / effort / choice friction"));
 ok("M13. write batch anti-repeats mechanisms", /recentMechanismUsage/.test(pipe) && /recent\.push/.test(pipe));
 ok("M14. human element sees 알림/주차/구독", /알림\|화면\|주차\|구독/.test(se));
-ok("M15. writer still forbids naming mechanism in the post", /never name the mechanism/.test(wr) && /M1–M9/.test(wr));
+ok("M15. writer still forbids naming mechanism in the post", /never name the mechanism/i.test(wr) && /M1–M9/.test(wr));
 
 console.log("========================================");
 console.log(`MECHANISM WIRE: ${pass} PASS / ${fail} FAIL`);

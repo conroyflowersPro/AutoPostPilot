@@ -12,6 +12,8 @@ import {
   evaluateEditorialSeedQuality,
   conceptualDiversityScore,
   conceptualRepetitionLevel,
+  seedSelectionValueScore,
+  isUsableKeywordSubject,
   ideaAngleKey,
   parseEditorialMode,
   type ConcreteSeed,
@@ -36,7 +38,6 @@ import {
   isPersonalInterestSubject,
   isKoreaOnlySituation,
   isSlotTypeLabel,
-  hasExpertJargon,
   pickDayForMass,
   enforceMassPerDay,
   demoteExperienceOnMassSlots,
@@ -66,6 +67,9 @@ const COLLISION_DAYS = 30;
 const JOB_LOCK_MS = 90000;
 const EXPAND_HARD_CAP = 36;
 const WRITE_FILL_MAX = 8;
+const CANDIDATE_POOL_MULTIPLIER = 2;
+const CANDIDATE_RESERVE_MIN = 6;
+const EXPECTED_SEED_YIELD = 0.55;
 
 export type JobStep = "quota" | "expand" | "judge" | "select" | "write" | "done";
 
@@ -94,9 +98,22 @@ function quotaFilled(row: any): boolean {
 }
 
 function canKeepExpanding(st: any): boolean {
-  if (Number(st.dim_batch || 0) < Number(st.max_expand || 0)) return true;
-  st.max_expand = Number(st.max_expand || 0) + 8;
-  return true;
+  return Number(st.dim_batch || 0) < Number(st.max_expand || 0);
+}
+
+function candidatePoolTarget(requiredSlots: number): number {
+  const required = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
+  return Math.max(required + CANDIDATE_RESERVE_MIN, Math.ceil(required * CANDIDATE_POOL_MULTIPLIER));
+}
+
+function refillRequestCount(deficit: number): number {
+  const missing = Math.max(1, Math.ceil(Number(deficit) || 1));
+  return Math.min(EXPAND_BATCH, Math.max(4, Math.ceil(missing / EXPECTED_SEED_YIELD)));
+}
+
+function bumpReason(bag: Record<string, number>, reason: string, n = 1): void {
+  if (!reason || n <= 0) return;
+  bag[reason] = Number(bag[reason] || 0) + n;
 }
 
 /** Drop unsaved candidates. Keep saved drafts. Rebuild days so new seeds can fill holes. */
@@ -122,9 +139,38 @@ function bounceToFillQuota(st: any, row: any, required: number): void {
   keepOnlySavedWriteSlots(st);
   st.write_started = true;
   st.write_fill_rounds = Number(st.write_fill_rounds || 0) + 1;
+  if (st.write_fill_rounds > WRITE_FILL_MAX) {
+    row.status = "error";
+    row.error = `작성 교체 한도 후 ${row.saved_count}/${required}. 저장된 초안은 보존했습니다.`;
+    row.label_ko = "작성 후보 소진";
+    return;
+  }
+  const attempted = new Set((st.attempted_seed_subjects || []).map((s: string) => subjectKey(s)));
+  const reserve = eligibleOf(st.judged || []).filter((s: any) => {
+    const key = subjectKey(String(s.concrete_subject || ""));
+    return key && !attempted.has(key);
+  }).sort((a: ConcreteSeed, b: ConcreteSeed) => seedSelectionValueScore(b) - seedSelectionValueScore(a));
+  const postsPerDay = Math.min(
+    QUOTA_PER_DAY_MAX,
+    Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 4),
+  );
+  const addedFromReserve = appendEligibleSeedsToWrite(st, reserve, required, postsPerDay);
+  if (addedFromReserve > 0) {
+    row.step = "write";
+    row.status = "running";
+    row.error = null;
+    row.label_ko = `예비 Seed로 즉시 교체 ${row.saved_count}/${required}…`;
+    row.summary = [row.summary, `예비 Seed ${addedFromReserve}개 사용 · 새 API 탐색 없음`].filter(Boolean).join("\n");
+    return;
+  }
+  if (!canKeepExpanding(st)) {
+    row.status = "error";
+    row.error = `Seed 탐색 한도 후 ${row.saved_count}/${required}. 저장된 초안은 보존했습니다.`;
+    row.label_ko = "Seed 예비 후보 소진";
+    return;
+  }
   st.humor_fill = true;
   st.compact_next = false;
-  canKeepExpanding(st);
   row.step = "expand";
   row.status = "running";
   row.error = null;
@@ -151,8 +197,8 @@ function appendEligibleSeedsToWrite(
   for (const seed of seeds || []) {
     if (flat.length >= required) break;
     const subj = String(seed.concrete_subject || "");
-    if (subj.length < 8) continue;
-    if (isSlotTypeLabel(subj) || isKoreaOnlySituation(subj) || hasExpertJargon(subj) || isFrozenHumorClone(subj)) continue;
+    if (!isUsableKeywordSubject(subj)) continue;
+    if (isSlotTypeLabel(subj) || isKoreaOnlySituation(subj) || isFrozenHumorClone(subj)) continue;
     const key = subjectKey(subj);
     if (!key || seen.has(key)) continue;
     const personal = isPersonalInterestSubject(subj, String(seed.cluster || ""));
@@ -289,6 +335,14 @@ export async function startWeeklyJob(args: {
     gated: [] as any[],
     judged: [] as any[],
     prior_subjects: [] as string[],
+    attempted_seed_subjects: [] as string[],
+    seed_metrics: {
+      requested: 0,
+      raw_returned: 0,
+      normalized_returned: 0,
+      accepted: 0,
+      rejected_by_reason: {} as Record<string, number>,
+    },
     dim_batch: 0,
     empty_streak: 0,
     last_expand_error: "",
@@ -498,7 +552,15 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     return;
   }
   const priorSubjects: string[] = st.prior_subjects || [];
-  const remaining = Math.max(0, Math.max(required, Math.ceil(required * 1.15)) - priorSubjects.length);
+  const poolTarget = candidatePoolTarget(required);
+  const eligibleBefore = eligibleOf(st.judged || []).length;
+  const refillDeficit = st.write_started
+    ? Math.max(1, required - Number(row.saved_count || 0))
+    : Math.max(1, required - eligibleBefore);
+  const discoveryRemaining = Math.max(0, poolTarget - (st.gated || []).length);
+  const requestedNow = st.write_started || Number(st.topup || 0) > 0
+    ? refillRequestCount(refillDeficit)
+    : Math.max(1, Math.min(EXPAND_BATCH, discoveryRemaining));
   const existingHeld: ConcreteSeed[] = priorSubjects.map((s: string, i: number) => ({
     seed_id: `prior-${i + 1}`,
     cluster: "HELD",
@@ -539,14 +601,11 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     row.summary = [row.summary, `경험시드: ${experienceSeeds.length} · 인용 후속 · 동일 내용 금지`].filter(Boolean).join("\n");
   }
   const candidates: any[] = [...experienceSeeds, ...(gated.passed || [])];
-  const massAtCap = ((st.gated || []) as any[]).filter((s: any) =>
-    !isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || "")),
-  ).length >= QUOTA_DAYS * MASS_PER_DAY_MAX;
   const humorFill = !!st.humor_fill || !!st.adjacent_fill;
   const compact = !!st.compact_next;
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
-    needed: Math.max(Math.min(EXPAND_BATCH, remaining), 1),
+    needed: requestedNow,
     existing: [...candidates, ...existingHeld] as ConcreteSeed[],
     explicitCreatorIntent: intentText || undefined,
     recentPublishedAngles: [...learned.recent_angle_labels, ...published].slice(0, 30),
@@ -557,19 +616,43 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     learning: learned.learning,
     intelligence,
     adjacentRing: false,
-    humorRing: humorFill || massAtCap || compact,
+    humorRing: humorFill || compact,
     compactRetry: compact,
     model: V11_SEED_MODEL,
     timeoutMs: compact ? 20000 : 32000,
   });
+  const metrics = st.seed_metrics || (st.seed_metrics = {
+    requested: 0,
+    raw_returned: 0,
+    normalized_returned: 0,
+    accepted: 0,
+    rejected_by_reason: {},
+  });
+  metrics.requested += Number(xaiRes.requested || 0);
+  metrics.raw_returned += Number(xaiRes.raw_returned || 0);
+  metrics.normalized_returned += Number(xaiRes.returned || 0);
+  for (const [reason, n] of Object.entries(xaiRes.reject_reasons || {})) {
+    bumpReason(metrics.rejected_by_reason, reason, Number(n) || 0);
+  }
   st.dim_batch = Number(st.dim_batch || 0) + 1;
   const grokAdded: any[] = [];
+  const globallySeen = new Set(
+    [...(st.gated || []), ...existingHeld].map((s: any) => subjectKey(String(s.concrete_subject || ""))),
+  );
   for (const s of xaiRes.seeds || []) {
-    if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
-    if (isSlotTypeLabel(String(s.concrete_subject || ""))) continue;
-    if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
-    if (hasExpertJargon(String(s.concrete_subject || ""))) continue;
-    if (isFrozenHumorClone(String(s.concrete_subject || ""))) continue;
+    const subject = String(s.concrete_subject || "");
+    let rejectReason = "";
+    if (/관찰·판단 축/.test(subject)) rejectReason = "ENGINE_LABEL_BODY";
+    else if (isSlotTypeLabel(subject)) rejectReason = "SLOT_LABEL_BODY";
+    else if (isKoreaOnlySituation(subject)) rejectReason = "KOREA_ONLY";
+    else if (isFrozenHumorClone(subject)) rejectReason = "FROZEN_CLONE";
+    else if (!isUsableKeywordSubject(subject)) rejectReason = "WEAK_SUBJECT";
+    else if (globallySeen.has(subjectKey(subject))) rejectReason = "GLOBAL_DUPLICATE";
+    if (rejectReason) {
+      bumpReason(metrics.rejected_by_reason, rejectReason);
+      continue;
+    }
+    globallySeen.add(subjectKey(subject));
     const rowSeed = humorFill
       ? {
         ...s,
@@ -585,6 +668,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       };
     grokAdded.push(rowSeed);
   }
+  metrics.accepted += grokAdded.length;
   const added: any[] = [...experienceSeeds, ...grokAdded];
   if (humorFill) {
     st.humor_fill = false;
@@ -596,6 +680,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   }
   st.prior_subjects = priorSubjects.slice(-priorSubjectCap(required));
   st.last_expand_error = xaiRes.error || "";
+  const candidateCount = (st.gated || []).length;
   let placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, MASS_PER_DAY_MAX);
   if (grokAdded.length <= 0) {
     st.empty_streak = Number(st.empty_streak || 0) + 1;
@@ -621,12 +706,12 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.label_ko = `초안 생성 ${row.saved_count}/${row.required_slots || (st.write_flat || []).length}…`;
       return;
     }
-    if (placeable >= required && (st.gated || []).length > 0) {
+    if (candidateCount >= poolTarget && (st.gated || []).length > 0) {
       row.step = "judge";
       row.label_ko = "시드 판정…";
       return;
     }
-    if (placeable < required && canKeepExpanding(st)) {
+    if (candidateCount < poolTarget && canKeepExpanding(st)) {
       st.humor_fill = true;
       row.label_ko = `유머·관심 시드로 할당량 보충 ${placeable}/${required}…`;
       if (st.last_expand_error) {
@@ -639,9 +724,9 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     st.compact_next = false;
   }
   row.label_ko = humorFill
-    ? `유머 시드 ${placeable}/${required}…`
-    : `시드 추론 ${placeable}/${required}…`;
-  const filled = required > 0 && placeable >= required;
+    ? `보충 후보 ${candidateCount}/${poolTarget}…`
+    : `시드 후보 탐색 ${candidateCount}/${poolTarget}…`;
+  const filled = required > 0 && candidateCount >= poolTarget;
   if (st.write_started && grokAdded.length > 0) {
     row.step = "judge";
     row.label_ko = "시드 판정…";
@@ -684,9 +769,17 @@ async function stepJudge(row: any) {
       experience_required: !!b.experience_required,
       primary_source: b.primary_source ? String(b.primary_source) : undefined,
       evidence_source_ids: Array.isArray(b.evidence_source_ids) ? b.evidence_source_ids.map(String) : undefined,
+      relationship_evidence_ids: Array.isArray(b.relationship_evidence_ids) ? b.relationship_evidence_ids.map(String) : undefined,
+      runtime_joint_context_id: b.runtime_joint_context_id ? String(b.runtime_joint_context_id) : undefined,
+      verified_locations: Array.isArray(b.verified_locations) ? b.verified_locations.map(String) : undefined,
+      verified_entities: Array.isArray(b.verified_entities) ? b.verified_entities.map(String) : undefined,
+      verified_events: Array.isArray(b.verified_events) ? b.verified_events.map(String) : undefined,
     });
     if (!g.pass) {
-      judged.push({ ...b, status: "REJECTED", editorial_fit: "POOR" });
+      const rejectionReasons = g.provenance.reasons || ["GROUNDING_REJECTED"];
+      const metrics = st.seed_metrics || (st.seed_metrics = { rejected_by_reason: {} });
+      for (const reason of rejectionReasons) bumpReason(metrics.rejected_by_reason, String(reason));
+      judged.push({ ...b, status: "REJECTED", editorial_fit: "POOR", seed_reject_reasons: rejectionReasons });
       continue;
     }
     const q = evaluateEditorialSeedQuality(b, mode);
@@ -703,7 +796,9 @@ async function stepJudge(row: any) {
         });
         continue;
       }
-      judged.push({ ...b, status: "HOLD", editorial_fit: "POOR" });
+      const metrics = st.seed_metrics || (st.seed_metrics = { rejected_by_reason: {} });
+      for (const reason of q.reasons) bumpReason(metrics.rejected_by_reason, String(reason));
+      judged.push({ ...b, status: "HOLD", editorial_fit: "POOR", seed_reject_reasons: q.reasons });
       continue;
     }
     judged.push({
@@ -720,9 +815,11 @@ async function stepJudge(row: any) {
     return;
   }
   const eligibleN = eligibleOf(judged).length;
+  if (st.seed_metrics) st.seed_metrics.eligible = eligibleN;
   if (st.write_started) {
     const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 4));
     const seen = new Set((st.write_flat || []).map((p: any) => subjectKey(p.concrete_subject)));
+    for (const subject of st.attempted_seed_subjects || []) seen.add(subjectKey(String(subject)));
     const fresh = eligibleOf(judged).filter((s: any) => {
       const key = subjectKey(s.concrete_subject);
       return key && !seen.has(key);
@@ -736,9 +833,14 @@ async function stepJudge(row: any) {
     if (!quotaFilled(row)) {
       st.humor_fill = true;
       st.compact_next = false;
-      canKeepExpanding(st);
-      row.step = "expand";
-      row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${required}…`;
+      if (canKeepExpanding(st)) {
+        row.step = "expand";
+        row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${required}…`;
+      } else {
+        row.status = "error";
+        row.error = `Seed 탐색 한도 후 ${row.saved_count}/${required}. 저장된 초안은 보존했습니다.`;
+        row.label_ko = "Seed 후보 소진";
+      }
       return;
     }
     row.step = "write";
@@ -747,9 +849,14 @@ async function stepJudge(row: any) {
   }
   if (eligibleN < required) {
     st.topup = Number(st.topup || 0) + 1;
-    canKeepExpanding(st);
-    row.step = "expand";
-    row.label_ko = `할당량 보충 ${eligibleN}/${required}…`;
+    if (canKeepExpanding(st)) {
+      row.step = "expand";
+      row.label_ko = `할당량 보충 ${eligibleN}/${required}…`;
+    } else {
+      row.status = "error";
+      row.error = `Seed 탐색 한도 후 판정 통과 ${eligibleN}/${required}. 저장된 후보와 사유를 남겼습니다.`;
+      row.label_ko = "Seed 후보 부족";
+    }
     return;
   }
   if (eligibleN < 1) {
@@ -772,6 +879,13 @@ async function stepSelect(supabase: any, row: any) {
     .gte("published_at", since)
     .limit(500);
   const recentManualSelect: RecentManualPost[] = (acts || [])
+    .filter((r: any) => {
+      const origin = String(r.system_origin_class || "").toUpperCase();
+      const postType = String(r.post_type || r.action_type || "").toUpperCase();
+      if (origin && !/USER_DIRECT|MANUAL/.test(origin)) return false;
+      if (/REPLY|REPOST|RETWEET/.test(postType)) return false;
+      return !postType || /ORIGINAL|QUOTE|UNKNOWN/.test(postType);
+    })
     .map((r: any) => ({
       text: String(r.text_body || "").trim(),
       source_id: r.x_post_id,
@@ -779,12 +893,22 @@ async function stepSelect(supabase: any, row: any) {
       post_type: String(r.post_type || r.action_type || ""),
     }))
     .filter((r: RecentManualPost) => r.text.length >= 12);
+  const selectRejected: Record<string, number> = {};
   let pool: ConcreteSeed[] = [];
   for (const s of st.judged || []) {
-    if (!s?.concrete_subject) continue;
-    if (!isSelectableStatus(s.status)) continue;
+    if (!s?.concrete_subject) {
+      bumpReason(selectRejected, "MISSING_SUBJECT");
+      continue;
+    }
+    if (!isSelectableStatus(s.status)) {
+      bumpReason(selectRejected, `STATUS_${String(s.status || "UNKNOWN")}`);
+      continue;
+    }
     const role = (s.source_role as SourceRole) || "SEED_SOURCE";
-    if (!isSeedEligibleRole(role)) continue;
+    if (!isSeedEligibleRole(role)) {
+      bumpReason(selectRejected, "ROLE_NOT_SEED_ELIGIBLE");
+      continue;
+    }
     const g = guardCandidateAgainstManualLeakage({
       source_role: role,
       concrete_subject: String(s.concrete_subject || ""),
@@ -792,13 +916,29 @@ async function stepSelect(supabase: any, row: any) {
       recent_manual: recentManualSelect,
       user_explicit: role === "USER_EXPLICIT_SEED",
     });
-    if (!g.allow_as_seed) continue;
-    if (isKoreaOnlySituation(String(s.concrete_subject || ""))) continue;
-    if (isSlotTypeLabel(String(s.concrete_subject || ""))) continue;
-    if (hasExpertJargon(String(s.concrete_subject || ""))) continue;
-    if (isFrozenHumorClone(String(s.concrete_subject || ""))) continue;
+    if (!g.allow_as_seed) {
+      bumpReason(selectRejected, `LEAKAGE_${g.reason}`);
+      continue;
+    }
+    if (isKoreaOnlySituation(String(s.concrete_subject || ""))) {
+      bumpReason(selectRejected, "KOREA_ONLY");
+      continue;
+    }
+    if (isSlotTypeLabel(String(s.concrete_subject || ""))) {
+      bumpReason(selectRejected, "SLOT_LABEL_BODY");
+      continue;
+    }
+    if (isFrozenHumorClone(String(s.concrete_subject || ""))) {
+      bumpReason(selectRejected, "FROZEN_CLONE");
+      continue;
+    }
     pool.push(s);
   }
+  st.seed_select_metrics = {
+    input: (st.judged || []).length,
+    selectable_pool: pool.length,
+    rejected_by_reason: selectRejected,
+  };
   if (st.write_started) {
     const seen = new Set((st.write_flat || []).map((p: any) => subjectKey(p.concrete_subject)));
     const fresh = pool.filter((s) => {
@@ -834,7 +974,11 @@ async function stepSelect(supabase: any, row: any) {
       if (w?.cluster) clusterMix[w.cluster] = Number(w.n) || 0;
     }
     const cands = pool
-      .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
+      .map((s, i) => {
+        const div = conceptualDiversityScore(s, selectedWeekly);
+        const value = seedSelectionValueScore(s);
+        return { s, i, div, value, score: value * 0.55 + div * 0.45 };
+      })
       .filter(({ s }) => {
         if (!canServeEditorialMode(s, mode) || isAdjacentExpansionSeed(s)) return false;
         if (mode === "EXPERIENCE") {
@@ -843,7 +987,7 @@ async function stepSelect(supabase: any, row: any) {
         return true;
       })
       .sort((a, b) => {
-        const d = b.div - a.div;
+        const d = b.score - a.score;
         if (d !== 0) return d;
         return clusterPriorityFromMix(clusterMix, String(b.s.cluster || "")) -
           clusterPriorityFromMix(clusterMix, String(a.s.cluster || ""));
@@ -953,10 +1097,15 @@ async function stepSelect(supabase: any, row: any) {
     st.humor_fill = true;
     st.compact_next = false;
     st.adjacent_fill = false;
-    canKeepExpanding(st);
-    row.step = "expand";
-    row.label_ko = `유머·관심 시드로 할당량 보충 ${totalAfter}/${required}…`;
-    row.summary = [row.summary, `계획 ${totalAfter}/${required} → Grok이 관심 시드를 더 추론`].filter(Boolean).join("\n");
+    if (canKeepExpanding(st)) {
+      row.step = "expand";
+      row.label_ko = `선택 후보 보충 ${totalAfter}/${required}…`;
+      row.summary = [row.summary, `계획 ${totalAfter}/${required} → xAI가 부족 영역 후보를 묶어서 추론`].filter(Boolean).join("\n");
+    } else {
+      row.status = "error";
+      row.error = `Seed 탐색 한도 후 계획 ${totalAfter}/${required}. 낮은 품질로 채우지 않습니다.`;
+      row.label_ko = "Seed 선택 후보 부족";
+    }
     return;
   }
   const totalFilled = redistributed.days.reduce((s, d) => s + d.posts.length, 0);
@@ -983,6 +1132,9 @@ async function stepSelect(supabase: any, row: any) {
     `expand_seeds: ${(st.gated || []).length} · judged: ${(st.judged || []).length} · planned: ${totalFilled}/${required}` +
       (adjacentPlanned ? ` · 대중 ${adjacentPlanned}(하루 최대 ${MASS_PER_DAY_MAX})` : "") +
       (short ? " · 할당량이 찰 때까지 이어서 추론" : ""),
+    st.seed_metrics
+      ? `Seed 계측: 요청 ${st.seed_metrics.requested || 0} · raw ${st.seed_metrics.raw_returned || 0} · 정규화 ${st.seed_metrics.normalized_returned || 0} · 후보 ${st.seed_metrics.accepted || 0} · eligible ${st.seed_metrics.eligible || 0}`
+      : "",
   ].filter(Boolean).join("\n");
   row.step = "write";
   row.label_ko = `초안 생성 0/${row.required_slots || st.write_flat.length}…`;
@@ -1040,6 +1192,11 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     return;
   }
   const chunk = flat.slice(i, i + WRITE_CHUNK);
+  st.attempted_seed_subjects = Array.isArray(st.attempted_seed_subjects) ? st.attempted_seed_subjects : [];
+  for (const slot of chunk) {
+    const subject = String(slot?.concrete_subject || slot?.primaryTopic || "");
+    if (subject && !st.attempted_seed_subjects.includes(subject)) st.attempted_seed_subjects.push(subject);
+  }
   const voiceSince = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
   const { data: voiceActs } = await supabase
     .from("account_activities")

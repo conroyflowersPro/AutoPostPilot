@@ -44,8 +44,12 @@ export function isSlotTypeLabel(subject: string): boolean {
 
 export type OpenSeedSlot = {
   slot_id: string;
-  slot_kind: "PERSONAL_INTEREST" | "MASS_PUBLIC";
-  cluster_bound: "PERSONAL_DNA_INTEREST" | "MASS_PUBLIC_DAILY";
+  /**
+   * Candidate discovery is deliberately unbounded by the final publish mix.
+   * The Planner applies personal/mass balance when it selects and places posts.
+   */
+  slot_kind: "OPEN_DISCOVERY";
+  cluster_bound: "CREATOR_DNA_OR_ADJACENT";
   editorial_mode: string;
   concrete_subject: "";
 };
@@ -61,24 +65,13 @@ export function buildOpenSlots(args: {
   maxMass?: number;
 }): OpenSeedSlot[] {
   const needed = Math.max(0, Math.min(64, Math.ceil(Number(args.needed) || 0)));
-  const days = Math.max(1, Math.round(Number(args.days) || 3) || 3);
-  const maxMass = args.maxMass ?? MASS_PER_DAY_MAX;
-  const massCap = days * maxMass;
-  let massHeld = 0;
-  for (const s of args.existing || []) {
-    if (!isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))) {
-      massHeld += 1;
-    }
-  }
-  const massInBatch = massHeld < massCap ? 1 : 0;
   const slots: OpenSeedSlot[] = [];
   for (let i = 0; i < needed; i++) {
-    const mass = i < massInBatch;
-    const modes = mass ? MASS_SLOT_MODES : PERSONAL_SLOT_MODES;
+    const modes = [...PERSONAL_SLOT_MODES, ...MASS_SLOT_MODES];
     slots.push({
       slot_id: `open-${i + 1}`,
-      slot_kind: mass ? "MASS_PUBLIC" : "PERSONAL_INTEREST",
-      cluster_bound: mass ? "MASS_PUBLIC_DAILY" : "PERSONAL_DNA_INTEREST",
+      slot_kind: "OPEN_DISCOVERY",
+      cluster_bound: "CREATOR_DNA_OR_ADJACENT",
       editorial_mode: modes[i % modes.length],
       concrete_subject: "",
     });
@@ -102,8 +95,8 @@ export function inferPersonalCluster(text: string, cluster?: string): string {
   return c;
 }
 
-const ELON_TESLA_DEFAULT_RE =
-  /elon|musk|일론|머스크|테슬라\s*주가|tsla\b|로보택시\s*뉴스|robotaxi news/i;
+const GENERIC_TICKER_NEWS_RE =
+  /테슬라\s*주가|tsla\b|로보택시\s*뉴스|robotaxi news/i;
 
 /** Korea-only civic/housing/daily situations the CA-based creator does not live. */
 const KOREA_ONLY_RE =
@@ -120,7 +113,7 @@ export function isPersonalInterestSubject(text: string, cluster?: string): boole
 }
 
 export function isForbiddenDefaultSubject(text: string): boolean {
-  return ELON_TESLA_DEFAULT_RE.test(String(text || "")) || isKoreaOnlySituation(text);
+  return GENERIC_TICKER_NEWS_RE.test(String(text || "")) || isKoreaOnlySituation(text);
 }
 
 export function countPersonalOnDay(

@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.8.1)");
+console.log("Writer quality + leftover seeds (v11.10.0)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.8.1", /APP_VERSION = "11.8.1"/.test(ver) && /APP_VERSION = "11.8.1"/.test(ix));
+ok("W17. version lockstep 11.10.0", /APP_VERSION = "11.10.0"/.test(ver) && /APP_VERSION = "11.10.0"/.test(ix));
 ok("W18. Korean summary names Grok writer and personal mix", /Grok 4\.6/.test(ver) && /개인 관심/.test(ver) && /대중 생활/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -98,7 +98,7 @@ ok("W26. short keyword subject is usable", /export function isUsableKeywordSubje
 ok("W27. writer infers keyword via vision, no example posts", /short keyword seed is valid/.test(wr) && /hardcoded example posts/.test(wr));
 ok("W28. info posts do not lock 해요 / forbid 음슴", /Editorial mode is not a 말투 table/.test(wr) && /Information posts may use 음슴/.test(wr) && !/Do not use 음슴체 on information posts/.test(wr));
 ok("W29. public words must not distort the claim", /NEVER swap a word if it would change the claim/.test(wr));
-ok("W30. pipeline planner decides surface, not mode as 해요 lock", /planSlotSurface/.test(ow) && /voiceRegisterConstraintLine\(voice, surface\)/.test(ow) && !/voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
+ok("W30. pipeline does not lock 해요/음슴 before the thought", !/planSlotSurface/.test(ow) && /voiceRegisterConstraintLine\(voice\)/.test(ow) && /THOUGHT_FIRST_RUNTIME/.test(ow));
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
 ok("W32. original body uses Grok 4.6 on xAI", /api\.x\.ai\/v1\/chat\/completions/.test(wr) && /grok-4\.6/.test(wr) && !/OPENAI_API_KEY/.test(ix) && !/api\.openai\.com/.test(wr));
 ok("W33. writer calls xAI with live search and low reasoning", /api\.x\.ai/.test(wr) && /reasoning_effort:\s*"low"/.test(wr) && /search_parameters/.test(wr));
@@ -125,27 +125,36 @@ ok("W53. empty draft is not padded; job keeps filling until quota", /keepOnlySav
 ok("W54. job expand batch is 10", /const EXPAND_BATCH = 10/.test(job));
 ok("W55. client follows 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
 ok("W61. Safari Load failed resumes the job", /isTransientEdgeError/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")) && /Load failed/.test(readFileSync(path.join(ROOT, "lib/transient-edge-error.ts"), "utf8")));
-ok("W56. writer gets optional mechanism delivery lines", /writerMechanismConstraintLines/.test(wr) && /OPTIONAL DELIVERY/.test(wr));
-ok("W57. writer gets rail thought order", /writerRailConstraintLines/.test(wr) && /THOUGHT ORDER/.test(wr));
+ok("W56. live writer does not inject pre-chosen mechanism moves", /writerMechanismConstraintLines/.test(wr) && !/READER ENTRY MOVE/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
+ok("W57. live writer does not inject pre-chosen rail beats", /writerRailConstraintLines/.test(wr) && !/\.\.\.writerRailConstraintLines/.test(wr));
 ok("W58. deep context maps selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/deep-generation-context.ts"), "utf8")));
 ok("W59. everyday public still gets a mechanism", /everyday_public_reader_entry/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 ok("W60. write batch passes recent mechanisms", /recentMechanismUsage/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
 ok("W62. Grok writer consumes Creator DNA and engine rules", /creatorDnaBlock\(\)/.test(wr) && /engineRulesAsWill\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("W63. 3-day generate on client", /GENERATION_DAYS = 3/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
-ok("W64. writer everyday language reaches Grok", /writerEverydayConstraintLines/.test(wr) && /EVERYDAY LANGUAGE/.test(wr));
-ok("W65. writer style reaches Grok", /writerStyleConstraintLines/.test(wr) && /CREATOR STYLE/.test(wr));
+ok("W64. everyday language is standing philosophy, not a pre-chosen strategy in the live prompt", /writingStagePhilosophyBlock/.test(wr) && /Easy must not mean shallow/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")) && !/\.\.\.writerEverydayConstraintLines/.test(wr));
+ok("W65. creator style is standing philosophy, not a pre-chosen family in the live prompt", /writingStagePhilosophyBlock/.test(wr) && /CREATOR STYLE/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")) && !/\.\.\.writerStyleConstraintLines/.test(wr));
 ok("W66. writer factual do-not-invent reaches Grok", /FACTUAL DO-NOT-INVENT/.test(wr));
 ok("W67. 14d intent overlays cluster weights on the job", /overlayClusterWeightsWithIntent14d/.test(job));
 ok("W68. engagement-bait questions fail, not every question mark", /isQuestionCloser/.test(wr) && /question_closer/.test(wr) && /어떻게\\s\*생각/.test(wr) && !/if \(\/\[\?？\]\/\.test\(t\)\) return true/.test(wr));
 ok("W69. expert jargon is a hard fail", /expert_jargon/.test(wr) && /레이어2/.test(wr));
-ok("W70. mechanism write move is operational not a question gap", /MECHANISM_WRITE_MOVES/.test(wr) && /A question is not a mechanism/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8")));
+ok("W70. mechanism write catalog is not injected into the live writer", /MECHANISM_WRITE_MOVES/.test(wr) && /A question is not a mechanism/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8")) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
 ok("W72. mechanism NONE is normal, not a forced observation personality", /none_is_normal/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")) && !/default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
-ok("W73. variety: planner decides 말투 per slot, no frozen mix", /VARIETY:/.test(wr) && /No frozen mix ratio/.test(wr) && /planSlotSurface/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")) && /recentEndingCounts/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
+ok("W73. variety: 말투 follows the closed thought, no frozen mix, no pre-locked surface", /VARIETY:/.test(wr) && /No frozen mix ratio/.test(wr) && !/planSlotSurface/.test(ow) && /lastEnding/.test(ow));
 ok("W74. writer closes this seed's thought then writes it", /WRITER ROLE/.test(wr) && /You DO close the central judgment/.test(wr) && /Do not copy a previously successful sentence/.test(wr) && /THOUGHT FIRST/.test(wr));
 ok("W75. writer is not Planner and does not ingest Performance DNA", /writerArchitectureLock/.test(wr) && /You do not become the Planner/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-architecture.ts"), "utf8")) && !/performanceDnaBlock\(\)/.test(wr));
 ok("W76. writer gets stage philosophy 14-17", /writingStagePhilosophyBlock/.test(wr) && /Easy must not mean shallow/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-stage-philosophy.ts"), "utf8")));
 ok("W77. writer receives week structure helper", /writerWeekStructureConstraintLines/.test(wr));
+const writeFn = ow.slice(ow.indexOf("export async function writeOneSlot"), ow.indexOf("export async function writeSlotBatch"));
+const iInterp = writeFn.indexOf("interpretConcreteSeed");
+const iWrite = writeFn.indexOf("integrateSlotGeneration");
+const iDelivery = writeFn.indexOf("selectDeliveryAfterThought");
+ok("W78. runtime interprets before write", iInterp >= 0 && iInterp < iWrite);
+ok("W79. runtime delivery is after write", iDelivery > iWrite && /DELIVERY_AFTER_THOUGHT/.test(ow));
+ok("W80. writeOneSlot does not select mechanism/rail/style before the writer", !/selectReactionMechanism/.test(writeFn) && !/selectThinkingRail/.test(writeFn) && !/decideCreatorStyle/.test(writeFn) && !/decideNaturalHumor/.test(writeFn) && !/decideEverydayLanguage/.test(writeFn));
+ok("W81. live Grok user message does not inject mechanism lines", /callGrokWriter/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
+ok("W82. NONE mechanism does not force an observation personality", !/READER ENTRY MOVE/.test(wr) && /They are not chosen before it/.test(wr));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);
