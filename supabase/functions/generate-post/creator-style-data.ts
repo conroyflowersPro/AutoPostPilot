@@ -111,7 +111,7 @@ const DNA_VOICE: CreatorDnaVoiceSnapshot = {
     "Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC) retained.",
   why_write: ["inform/explain", "share experience", "light opinion", "observation"],
   how_publishing:
-    "Two-speed mix. 해요 and 음슴 are both publishing surfaces. Infer per post. Editorial mode is not a 말투 table.",
+    "Preserve how he sees/thinks/expresses. Not a template. Planner chooses surface per slot. No frozen mix. AP drafts do not rewrite DNA.",
   how_reply: "Short, communicative; ㅋㅋ when thread funny — REPLY DNA separate, not used for ORIGINAL generation.",
   not_this: [
     "stock-daytrade primary",
@@ -120,6 +120,11 @@ const DNA_VOICE: CreatorDnaVoiceSnapshot = {
     "personal experience mandatory every post",
     "pure 반말",
     "inventing tests",
+    "content template",
+    "문체 copier",
+    "always short",
+    "always add a twist",
+    "topic→말투 map",
   ],
   register_by_intent: {
     INFORMATIVE: "infer 해요/음슴/other from DNA + engine + handmade mix; not a mode table",

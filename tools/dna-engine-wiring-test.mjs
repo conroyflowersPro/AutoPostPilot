@@ -36,7 +36,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.4.4)");
+console.log("DNA + engine live-path wiring (v11.4.5)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
@@ -83,7 +83,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.4.4", /APP_VERSION = "11.4.4"/.test(ver) && /APP_VERSION = "11.4.4"/.test(ix));
+ok("D28. version 11.4.5", /APP_VERSION = "11.4.5"/.test(ver) && /APP_VERSION = "11.4.5"/.test(ix));
 
 ok("D29. review engines stay off generate job",
   !/from "\.\/selective-regeneration\.ts"/.test(job) &&
@@ -92,6 +92,13 @@ ok("D29. review engines stay off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
 ok("D30. deep context stores protected_meaning and politeness",
   /protected_meaning:/.test(dgc) && /politeness_level:/.test(dgc));
+ok("D31. Creator DNA is how he sees/thinks/expresses, not a template",
+  /PURPOSE: Preserve how this person sees/.test(dna) &&
+  /NOT A TEMPLATE/.test(dna) &&
+  /What would he notice first/.test(dna) &&
+  /AP_PIPELINE drafts must not rewrite Creator DNA/.test(dna) &&
+  /PURPOSE: Preserve how this person sees/.test(libDna) &&
+  /Ask what he would notice first/.test(dna));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);
