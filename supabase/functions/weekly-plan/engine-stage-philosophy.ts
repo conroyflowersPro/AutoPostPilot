@@ -31,9 +31,9 @@ export function thinkingPhilosophyBlock(): string {
 
 export function coreThoughtPhilosophyBlock(): string {
   return [
-    "CORE THOUGHT: Not a one-line summary of the post. It is the judgment this post actually wants to make.",
+    "CORE THOUGHT: Not a one-line summary and not a code-assembled label. It is the judgment this post actually wants to make. Grok Writer closes it from the Seed + Creator DNA + fact/experience boundaries.",
     "Do not pick it because it is new or because it might go viral. Ask: would this creator actually hold this judgment? Is there grounding? Does it mean something to a reader?",
-    "JOBS: choose ONE central judgment from Thinking results. Mechanism, Rail, Style, and Writer must not damage it. Separate confidence in fact from confidence in opinion. HOLD a judgment that is not worth publishing.",
+    "JOBS: close ONE central judgment. Mechanism, Rail, and Style follow that thought — they must not choose it. Separate confidence in fact from confidence in opinion. HOLD a judgment that is not worth publishing.",
   ].join("\n");
 }
 
@@ -47,9 +47,9 @@ export function audienceReactionPhilosophyBlock(): string {
 
 export function reactionMechanismPhilosophyBlock(): string {
   return [
-    "REACTION MECHANISM: Surprise, Empathy, Evidence-Grounded Judgment, Life Pattern Exposure, NONE are not formulas for making a post. They describe how a reader may receive an already-decided Core Thought.",
-    "A mechanism is not required. NONE is normal.",
-    "JOBS: pick the reaction structure that is natural for this Core Thought and this post's character — or NONE. Avoid forced twist, forced question, forced emotion. Do not lock a topic to a mechanism.",
+    "REACTION MECHANISM: Surprise, Empathy, Evidence-Grounded Judgment, Life Pattern Exposure, NONE are delivery intelligence after the thought is closed. They are not formulas that pick the thought.",
+    "A mechanism is not required. NONE is normal. Do not run mechanism before the thought exists.",
+    "JOBS: after the thought is closed, offer a natural delivery structure — or NONE. Avoid forced twist, forced engagement-bait question, forced emotion. Do not lock a topic to a mechanism.",
   ].join("\n");
 }
 
@@ -122,13 +122,14 @@ export function planningStagePhilosophyBlock(): string {
   ].join("\n");
 }
 
-/** Writer ChatGPT: stages 14–17. Quality is Judge, not Writer. */
+/** Writer Grok 4.6: close thought, then style follows. Quality is Judge, not Writer. */
 export function writingStagePhilosophyBlock(): string {
   return [
+    "THOUGHT FIRST: Close what this creator would actually say about THIS seed. Style, 말투, humor, everyday wording, Mechanism, and Rail follow that thought. They do not choose it.",
     everydayLanguagePhilosophyBlock(),
     creatorStylePhilosophyBlock(),
     naturalHumorPhilosophyBlock(),
     surfaceDiscoursePhilosophyBlock(),
-    "QUALITY is the Judge's job, not yours. Do not smooth the post into average AI. Preserve Core Thought and Creator DNA.",
+    "QUALITY is the Judge's job, not yours. Do not smooth the post into average AI. Preserve the thought you closed and Creator DNA.",
   ].join("\n");
 }

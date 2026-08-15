@@ -150,8 +150,8 @@ export function inferSlotVoice(args: {
   if (pool !== posts) notes.push(`comparable cluster ${cluster} n=${pool.length}`);
   notes.push(
     q > 0
-      ? "handmade questions exist as stats only — AP drafts still must not end as a question"
-      : "do not end with a question; never for algorithm",
+      ? "handmade questions exist as stats only — do not install an engagement-bait closer"
+      : "do not install a question for the algorithm; a genuine thinking question inside the thought is allowed",
   );
   const kk = pool.filter((p) => hasKk(p.text)).length;
   if (kk / Math.max(pool.length, 1) < 0.2) notes.push("ㅋㅋ not typical in comparable handmade");
@@ -250,8 +250,8 @@ export function voiceRegisterConstraintLine(
     return [
       "USER_DIRECT REGISTER: none in window — planner still decides this slot from Creator DNA two-speed + engine (no single global tone). No archive endings. No example posts. No frozen mix percentage.",
       inferred,
-      "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
-      "median_chars is a handmade statistic, not this post's target. Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.",
+      "Do not copy handmade wording. A question is not a mechanism and not a participation trick. Engagement-bait closers (어떻게 생각하세요 / 궁금한가요) are forbidden. A genuine thinking question inside the closed thought is allowed.",
+      "median_chars is a handmade statistic, not this post's target. Length follows the closed thought until it is complete. Not a character quota. Not one sentence because the slot is informational.",
     ].join("\n");
   }
   return [
@@ -260,7 +260,7 @@ export function voiceRegisterConstraintLine(
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,
     inferred,
-    "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
-    "median_chars is a handmade statistic, not this post's target. Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.",
+    "Do not copy handmade wording. A question is not a mechanism and not a participation trick. Engagement-bait closers (어떻게 생각하세요 / 궁금한가요) are forbidden. A genuine thinking question inside the closed thought is allowed.",
+    "median_chars is a handmade statistic, not this post's target. Length follows the closed thought until it is complete. Not a character quota. Not one sentence because the slot is informational.",
   ].join("\n");
 }

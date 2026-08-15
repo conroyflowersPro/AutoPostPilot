@@ -88,12 +88,48 @@ function expandRoundBudget(requiredSlots: number): number {
   return Math.min(EXPAND_HARD_CAP, Math.max(16, fill + 8));
 }
 
+function quotaFilled(row: any): boolean {
+  const required = Number(row.required_slots) || 0;
+  return required > 0 && Number(row.saved_count || 0) >= required;
+}
+
 function canKeepExpanding(st: any): boolean {
   if (Number(st.dim_batch || 0) < Number(st.max_expand || 0)) return true;
-  const cur = Number(st.max_expand || 0);
-  if (cur >= EXPAND_HARD_CAP) return false;
-  st.max_expand = Math.min(EXPAND_HARD_CAP, cur + 8);
+  st.max_expand = Number(st.max_expand || 0) + 8;
   return true;
+}
+
+/** Drop unsaved candidates. Keep saved drafts. Rebuild days so new seeds can fill holes. */
+function keepOnlySavedWriteSlots(st: any): void {
+  const saved = (st.write_flat || []).filter((p: any) => p && p._saved);
+  const days = Array.from({ length: QUOTA_DAYS }, (_, i) => ({ dayOffset: i, posts: [] as any[] }));
+  for (const p of saved) {
+    const d = Math.max(0, Math.min(QUOTA_DAYS - 1, Number(p.dayOffset) || 0));
+    days[d].posts.push(p);
+  }
+  for (let di = 0; di < days.length; di++) {
+    days[di].posts.forEach((p: any, si: number) => {
+      p.dayOffset = di;
+      p.slotId = `D${di + 1}P${si + 1}`;
+    });
+  }
+  st.days = days;
+  st.write_flat = days.flatMap((d) => d.posts || []);
+  st.write_index = st.write_flat.length;
+}
+
+function bounceToFillQuota(st: any, row: any, required: number): void {
+  keepOnlySavedWriteSlots(st);
+  st.write_started = true;
+  st.write_fill_rounds = Number(st.write_fill_rounds || 0) + 1;
+  st.humor_fill = true;
+  st.compact_next = false;
+  canKeepExpanding(st);
+  row.step = "expand";
+  row.status = "running";
+  row.error = null;
+  row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${required}…`;
+  row.summary = [row.summary, `작성 ${row.saved_count}/${required} → 빈 칸을 추론으로 채움`].filter(Boolean).join("\n");
 }
 
 function subjectKey(subject: string): string {
@@ -324,7 +360,6 @@ export async function tickWeeklyJob(args: {
   userId: string;
   jobId: string;
   xaiKey: string;
-  openaiKey?: string;
 }): Promise<JobPublic> {
   const { data: row, error } = await args.supabase
     .from("generation_jobs")
@@ -346,10 +381,15 @@ export async function tickWeeklyJob(args: {
     else if (row.step === "expand") await stepExpand(args.supabase, args.xaiKey, row);
     else if (row.step === "judge") await stepJudge(row);
     else if (row.step === "select") await stepSelect(args.supabase, row);
-    else if (row.step === "write") await stepWrite(args.supabase, args.openaiKey || "", args.userId, row);
-    else {
+    else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey || "", args.userId, row);
+    else if (quotaFilled(row)) {
       row.status = "done";
-      row.label_ko = `완료: ${row.saved_count}개 draft 저장`;
+      row.step = "done";
+      row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
+    } else {
+      row.step = "expand";
+      row.status = "running";
+      row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${row.required_slots}…`;
     }
   } catch (e: any) {
     row.status = "error";
@@ -578,7 +618,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     st.compact_next = false;
     if (st.write_started && !canKeepExpanding(st)) {
       row.step = "write";
-      row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+      row.label_ko = `초안 생성 ${row.saved_count}/${row.required_slots || (st.write_flat || []).length}…`;
       return;
     }
     if (placeable >= required && (st.gated || []).length > 0) {
@@ -688,19 +728,26 @@ async function stepJudge(row: any) {
       return key && !seen.has(key);
     });
     appendEligibleSeedsToWrite(st, fresh, required, postsPerDay);
-    if ((st.write_flat || []).length < required && canKeepExpanding(st)) {
+    if ((st.write_flat || []).length > Number(st.write_index || 0)) {
+      row.step = "write";
+      row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
+      return;
+    }
+    if (!quotaFilled(row)) {
       st.humor_fill = true;
       st.compact_next = false;
+      canKeepExpanding(st);
       row.step = "expand";
-      row.label_ko = `할당량 이어서 추론 ${(st.write_flat || []).length}/${required}…`;
+      row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${required}…`;
       return;
     }
     row.step = "write";
-    row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+    row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
     return;
   }
-  if (eligibleN < required && st.topup < st.max_topup) {
+  if (eligibleN < required) {
     st.topup = Number(st.topup || 0) + 1;
+    canKeepExpanding(st);
     row.step = "expand";
     row.label_ko = `할당량 보충 ${eligibleN}/${required}…`;
     return;
@@ -760,7 +807,7 @@ async function stepSelect(supabase: any, row: any) {
     });
     appendEligibleSeedsToWrite(st, fresh, required, postsPerDay);
     row.step = "write";
-    row.label_ko = `초안 생성 ${row.saved_count}/${(st.write_flat || []).length}…`;
+    row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
     return;
   }
   const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;
@@ -901,14 +948,12 @@ async function stepSelect(supabase: any, row: any) {
     (s, d) => s + (d.posts || []).filter((p: any) => isAdjacentExpansionSeed(p)).length,
     0,
   );
-  if (totalAfter < required && (
-    Number(st.adjacent_rounds || 0) < Number(st.max_topup || 6) ||
-    canKeepExpanding(st)
-  )) {
+  if (totalAfter < required) {
     st.adjacent_rounds = Number(st.adjacent_rounds || 0) + 1;
     st.humor_fill = true;
     st.compact_next = false;
     st.adjacent_fill = false;
+    canKeepExpanding(st);
     row.step = "expand";
     row.label_ko = `유머·관심 시드로 할당량 보충 ${totalAfter}/${required}…`;
     row.summary = [row.summary, `계획 ${totalAfter}/${required} → Grok이 관심 시드를 더 추론`].filter(Boolean).join("\n");
@@ -940,7 +985,7 @@ async function stepSelect(supabase: any, row: any) {
       (short ? " · 할당량이 찰 때까지 이어서 추론" : ""),
   ].filter(Boolean).join("\n");
   row.step = "write";
-  row.label_ko = `초안 생성 0/${st.write_flat.length}…`;
+  row.label_ko = `초안 생성 0/${row.required_slots || st.write_flat.length}…`;
 }
 
 function attachCountLedger(row: any) {
@@ -971,18 +1016,27 @@ function attachCountLedger(row: any) {
   }
 }
 
-async function stepWrite(supabase: any, openaiKey: string, userId: string, row: any) {
+async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
   const i = Number(st.write_index || 0);
-  if (i >= flat.length) {
+  const required = Number(row.required_slots) || 0;
+  if (quotaFilled(row)) {
     attachCountLedger(row);
-    row.status = row.saved_count > 0 ? "done" : "error";
+    row.status = "done";
     row.step = "done";
-    row.label_ko = row.saved_count > 0
-      ? `완료: ${row.saved_count}개 draft 저장`
-      : "초안이 저장되지 않았습니다.";
-    if (row.status === "error") row.error = (st.write_errors || []).slice(0, 3).join(" · ") || "작성 실패";
+    row.error = null;
+    row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
+    return;
+  }
+  if (!String(xaiKey || "").trim()) {
+    row.status = "error";
+    row.error = "XAI_API_KEY가 없어 초안을 만들 수 없습니다.";
+    row.label_ko = "작성 키 없음";
+    return;
+  }
+  if (i >= flat.length) {
+    bounceToFillQuota(st, row, required);
     return;
   }
   const chunk = flat.slice(i, i + WRITE_CHUNK);
@@ -994,7 +1048,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     .limit(400);
   const posts = await writeSlotBatch({
     slots: chunk,
-    openaiKey: openaiKey || null,
+    xaiKey: xaiKey || null,
     voiceRows: (voiceActs || []) as any,
     audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
     weekSignatures: st.weekly_signatures || [],
@@ -1022,10 +1076,6 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     }
     if (!text) {
       st.write_errors = [...(st.write_errors || []), `${p.slotId || "slot"} 빈 초안`];
-      const subj = String((chunk[k] as any)?.concrete_subject || "");
-      if (!(chunk[k] as any)?._write_retry && !isFrozenHumorClone(subj)) {
-        st.write_flat = [...(st.write_flat || []), { ...chunk[k], _write_retry: true }];
-      }
       continue;
     }
     let ins = await supabase.from("SeungContent").insert({
@@ -1037,7 +1087,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
       strategy_json: {
         system_origin_class: "AP_PIPELINE",
         slotId: p.slotId || null,
-        writer_model: "gpt-4o",
+        writer_model: "grok-4.6",
         engine: "v11_inferred_quota_fill",
         job_id: row.id,
       },
@@ -1050,39 +1100,22 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
         user_id: userId,
       });
     }
-    if (!ins.error) row.saved_count = Number(row.saved_count || 0) + 1;
+    if (!ins.error) {
+      row.saved_count = Number(row.saved_count || 0) + 1;
+      if (chunk[k]) (chunk[k] as any)._saved = true;
+    }
   }
   st.write_index = i + chunk.length;
-  const planned = (st.write_flat || []).length;
-  row.label_ko = `초안 생성 ${row.saved_count}/${planned}…`;
-  if (st.write_index >= planned) {
-    const required = Number(row.required_slots) || 0;
-    if (row.saved_count < required && Number(st.write_fill_rounds || 0) < WRITE_FILL_MAX) {
-      st.write_started = true;
-      st.write_fill_rounds = Number(st.write_fill_rounds || 0) + 1;
-      st.humor_fill = true;
-      st.compact_next = false;
-      canKeepExpanding(st);
-      row.step = "expand";
-      row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${required}…`;
-      row.summary = [row.summary, `작성 ${row.saved_count}/${required} → 빈 칸을 추론으로 채움`].filter(Boolean).join("\n");
-      return;
-    }
-    row.step = "done";
+  row.label_ko = `초안 생성 ${row.saved_count}/${required || (st.write_flat || []).length}…`;
+  if (quotaFilled(row)) {
     attachCountLedger(row);
-    if (row.saved_count < required) {
-      if (row.saved_count > 0) {
-        row.status = "done";
-        row.error = null;
-        row.label_ko = `리뷰: ${row.saved_count}개 저장 · 할당 ${row.saved_count}/${required}`;
-      } else {
-        row.status = "error";
-        row.error = `초안 ${row.saved_count}/${required}만 저장됨. ${(st.write_errors || []).slice(0, 3).join(" · ")}`;
-        row.label_ko = row.error;
-      }
-    } else {
-      row.status = "done";
-      row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
-    }
+    row.status = "done";
+    row.step = "done";
+    row.error = null;
+    row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
+    return;
+  }
+  if (st.write_index >= (st.write_flat || []).length) {
+    bounceToFillQuota(st, row, required);
   }
 }

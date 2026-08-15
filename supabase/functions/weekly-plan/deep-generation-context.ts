@@ -231,10 +231,15 @@ export function buildCoreThought(
     status = "CORE_THOUGHT_BLOCKED";
     confidence = 0.1;
     block_reasons.push("interpretation_blocked");
-  } else if (!tension && !why && !hasFacts && !experienced) {
+  } else if (s((interp as any)?.not_worth_publishing) === "true" || s((interp as any)?.hold_reason) === "not_worth_publishing") {
+    // HOLD is a judgment after a thought exists. Empty labels are not a HOLD.
     status = "CORE_THOUGHT_HOLD";
     confidence = 0.2;
     block_reasons.push("not_worth_publishing");
+  } else if (!tension && !why && !hasFacts && !experienced) {
+    status = "CORE_THOUGHT_WEAK";
+    confidence = 0.35;
+    block_reasons.push("thin_seed_material");
   } else if (interpStatus === "INTERPRETATION_WEAK" || !tension) {
     status = "CORE_THOUGHT_WEAK";
     confidence = 0.4;
@@ -494,7 +499,8 @@ export function isGenerationContextWritable(ctx: DeepGenerationContext): boolean
   return (
     ctx.generation_status === "GENERATION_CONTEXT_READY" ||
     ctx.generation_status === "GENERATION_CONTEXT_MINIMAL" ||
-    ctx.generation_status === "CORE_THOUGHT_WEAK"
+    ctx.generation_status === "CORE_THOUGHT_WEAK" ||
+    ctx.generation_status === "CORE_THOUGHT_HOLD"
   );
 }
 

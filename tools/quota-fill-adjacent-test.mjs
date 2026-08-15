@@ -124,8 +124,8 @@ ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", ((
 })());
 ok("A34. empty Grok expand uses compactRetry next tick, never DNA keyword inject",
   /compactRetry: compact/.test(job) && /시드 짧게 재추론/.test(job) && !/DNA 관심 키워드/.test(job) && !/localHumorKeywordSeeds/.test(job));
-ok("A35. select bounces to Grok expand until max_topup, does not fill frozen keywords",
-  /adjacent_rounds \|\| 0\) < Number\(st\.max_topup/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A35. select bounces to Grok expand until quota, does not fill frozen keywords",
+  /if \(totalAfter < required\)/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A36. humorRing remaps OBSERVATION cluster onto DNA interests",
   /inferPersonalCluster/.test(cr) && /humorRing cluster MUST/.test(cr));
 ok("A37. FSD keyword with OBSERVATION cluster is still personal",
@@ -147,10 +147,10 @@ ok("A44. typed empty slots: type only, concrete_subject empty",
   /export function buildOpenSlots/.test(scopeSrc) && /open_slots: openSlots/.test(cr) && /concrete_subject: ""/.test(scopeSrc) && /slotFillRule/.test(cr));
 ok("A45. type labels are dropped as seed bodies",
   /export function isSlotTypeLabel/.test(scopeSrc) && /isSlotTypeLabel/.test(cr) && /isSlotTypeLabel/.test(job));
-ok("A46. expand raises to hard cap instead of writing short",
-  /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /canKeepExpanding\(st\)/.test(job));
-ok("A47. write shortfall appends inferred slots, never frozen list",
-  /write_fill_rounds/.test(job) && /WRITE_FILL_MAX = 8/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /write_started/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A46. expand raises budget instead of writing short",
+  /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /canKeepExpanding\(st\)/.test(job) && /function quotaFilled/.test(job));
+ok("A47. write shortfall appends inferred slots, never frozen list, never underfill done",
+  /write_fill_rounds/.test(job) && /WRITE_FILL_MAX = 8/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /write_started/.test(job) && /bounceToFillQuota/.test(job) && !/할당 미달/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A48. Grok/writer prompts have no fill-in example sentences",
   !/Use 알림\/화면\/겹침\/가림/.test(wr) && !/이중주차, 관리사무소/.test(cr) && !/이중주차, 관리사무소/.test(wr));
 

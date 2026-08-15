@@ -36,17 +36,15 @@ function hasExpertJargon(text) {
 function isQuestionCloser(text) {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   if (!t) return false;
-  if (/[?？]/.test(t)) return true;
-  if (/(까요|나요|을까|ㄹ까|는가|인가|실까요|할까요)\s*[.…]?$/.test(t)) return true;
-  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨/.test(t)) return true;
+  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨|궁금하(신)?가요/.test(t)) return true;
   return false;
 }
 
 console.log("Post quality: mechanism vs question vs jargon");
 ok("Q1. 레이어2 is jargon", hasExpertJargon("테슬라 앱 레이어 2"));
 ok("Q2. 알림 겹침 is not jargon", !hasExpertJargon("테슬라 앱 알림이 겹친다"));
-ok("Q3. question mark is a closer", isQuestionCloser("이 화면이 맞나요?"));
-ok("Q4. 까요 closer", isQuestionCloser("이 알림이 위일까요"));
+ok("Q3. engagement-bait is a closer", isQuestionCloser("이 화면 어떻게 생각하세요"));
+ok("Q4. genuine thinking question is not bait", !isQuestionCloser("이 알림이 위일까요"));
 ok("Q5. finished observation is not a question", !isQuestionCloser("충전 중 알림이 겹치면 어느 화면이 위인지 손으로 확인하게 된다."));
 ok("Q6. humor fill has no 레이어 seed", !/레이어/.test(humor));
 ok("Q7. humor fill does not number leftover keywords", !/suffix \+ 1/.test(humor) && !/\$\{base\.concrete_subject\} \$\{/.test(humor));
@@ -61,8 +59,8 @@ ok("Q15. DNA wording forbids 레이어2", /레이어2/.test(dna) && /Do not ask 
 ok("Q16. seed-scope exports hasExpertJargon", /export function hasExpertJargon/.test(scope));
 const everydayBlock = (rsp.match(/const everydayIds: MechanismId\[\] = \[([\s\S]*?)\];/) || [])[1] || "";
 ok("Q17. M9 is not the everyday fallback", /M4_LIFE_PATTERN_EXPOSURE/.test(everydayBlock) && !/M9_/.test(everydayBlock));
-ok("Q18. writer user message is statement only", /Statement only\. No question mark/.test(wr));
-ok("Q19. length follows the mechanism move, not one-sentence quota", /HOW FAR THE MOVE RUNS/.test(wr) && /There is no 'one sentence is enough'/.test(wr));
+ok("Q18. writer allows a genuine thinking question, forbids bait", /Engagement-bait questions/.test(wr) && /genuine thinking question/.test(wr));
+ok("Q19. length follows the closed thought, not a sentence quota", /Length follows the thought/.test(wr) && /Stop when the thought is complete/.test(wr));
 
 console.log("========================================");
 console.log(`POST QUALITY: ${pass} PASS / ${fail} FAIL`);

@@ -166,7 +166,7 @@ export function hasExpertJargon(text: string): boolean {
 }
 
 export function lengthBandForMode(_mode: string): string {
-  return "Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.";
+  return "Length follows the closed thought until it is complete. Not a character quota. Not one sentence because the slot is informational.";
 }
 
 export function pickDayForPersonal(
