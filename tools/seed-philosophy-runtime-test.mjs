@@ -32,7 +32,7 @@ ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.t
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));
 ok("P4. short usable keywords survive normalize", /isUsableKeywordSubject\(subject\)/.test(seed) && !/subject\.length < 8/.test(seed));
 ok("P5. candidate generation has no maxMass hard drop", !/const maxMass/.test(seed) && !/massN >= maxMass/.test(seed));
-ok("P6. Elon mention alone is not forbidden", !/elon\|musk\|일론\|머스크/.test(scope) && /테슬라\\s\*주가/.test(scope));
+ok("P6. Elon mention alone is not forbidden", !/ELON_TESLA_DEFAULT_RE/.test(scope) && /GENERIC_TICKER_NEWS_RE/.test(scope));
 ok("P7. cross-interest is hypothesis-only, not reject", /CROSS_INTEREST_HYPOTHESIS_ONLY/.test(grounding) && !/CROSS_INTEREST_WITHOUT_RELATIONSHIP/.test(grounding));
 ok("P8. jargon remains a post gate, not a Seed deletion gate", !/hasExpertJargon/.test(job) && /hasExpertJargon\(text\)/.test(writer));
 ok("P9. duplicate comparison is USER_DIRECT originals only", /USER_DIRECT\|MANUAL/.test(job) && /REPLY\|REPOST\|RETWEET/.test(job));
