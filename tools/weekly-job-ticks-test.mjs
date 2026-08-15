@@ -41,8 +41,8 @@ ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen)
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
 ok("J15. shipping 11.11.0", /const APP_VERSION = "11.11.0"/.test(ix));
-ok("J24. empty write preserves saved drafts and never reports a short success", /keepOnlySavedWriteSlots/.test(job) && /bounceToFillQuota/.test(job) && /quotaFilled/.test(job) && !/할당 미달/.test(job) && !/_write_retry/.test(job));
-ok("J25. HIGH skip only after half the week", /selectedWeekly\.length >= Math\.ceil\(required \* 0\.5\)/.test(job));
+ok("J24. empty write returns to Planner and never reports a short success", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job));
+ok("J25. live Planner has no local HIGH repetition gate", !/conceptualRepetitionLevel/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
 ok("J27. Load failed is treated as resume not a hard stop", /isTransientEdgeError/.test(gen) && /Load failed/i.test(readFileSync(path.join(ROOT, "lib/transient-edge-error.ts"), "utf8")));
 ok("J28. followJob resumes on Safari drop not only Korean timeout", /if \(!isTransientEdgeError\(e\)\) throw e/.test(gen) && /사파리 연결이 잠깐 끊겼습니다/.test(gen));
@@ -53,13 +53,13 @@ ok("J16. video not implemented", /Video is out of scope/.test(job) && !/job_type
 ok("J17. migration apply workflow", existsSync(wf));
 ok("J18. learning line on quota tick", /학습:/.test(job));
 ok("J19. job connects lived experience cite-seeds", /buildRecentExperienceCandidates/.test(job));
-ok("J20. humor fill does not abort short weeks", /유머·관심 시드로 할당량 보충/.test(job) && !/할당량을 채운 뒤에만 저장합니다/.test(job));
-ok("J21. shortfall keeps Grok humor expand not frozen keywords", /유머/.test(job) && !/localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
-ok("J22. leftover selectable seeds fill quota holes", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
-ok("J23. experience-without-evidence remints to INFORMATIVE", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
-ok("J32. write shortfall uses reserve before bounded expand", /write_fill_rounds/.test(job) && /addedFromReserve/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /새 API 탐색 없음/.test(job));
-ok("J33. select never ships a short week", /if \(totalAfter < required\)/.test(job) && /canKeepExpanding\(st\)/.test(job));
-ok("J34. expand is bounded; only saved quota can complete", /EXPAND_HARD_CAP = 36/.test(job) && /return Number\(st\.dim_batch/.test(job) && /function quotaFilled/.test(job) && /Seed 탐색 한도/.test(job));
+ok("J20. Planner-targeted exploration replaces random humor fill", /Planner 지정 분야 Seed 추가 탐색/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("J21. Seed shortage returns to Planner field direction", /planner_exploration_direction/.test(job) && /planner_missing_count/.test(job));
+ok("J22. Planner recovery receives existing Seed Pool first", /availableSeedPool: pool/.test(job));
+ok("J23. unsupported experience remains a Writer evidence boundary", /verification_requirements/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
+ok("J32. write shortfall uses Planner recovery", /pending_recovery/.test(job) && /recoverRejectedPlannerSlot/.test(job));
+ok("J33. Planner never completes an underfilled selection", /Planner 배차 무결성 실패/.test(job));
+ok("J34. expand/recovery are bounded; only saved quota can complete", /EXPAND_HARD_CAP = 36/.test(job) && /pending\.attempts > 4/.test(job) && /function quotaFilled/.test(job));
 
 console.log("========================================");
 console.log(`JOB TICKS: ${pass} PASS / ${fail} FAIL`);
