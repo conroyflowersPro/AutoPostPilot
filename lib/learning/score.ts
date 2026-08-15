@@ -1,3 +1,10 @@
+/**
+ * Learning scores → Intelligence payloads.
+ * Planner Memory stores abstract validated patterns only — never post wording.
+ * Performance DNA must not overwrite Creator DNA.
+ * Revenue DNA must not dominate Planner.
+ * Manual published successes are a higher-value signal than AI drafts.
+ */
 import {
   METRIC_WEIGHTS,
   type NormalizedPostMetrics,
@@ -67,31 +74,44 @@ export function buildPlannerMemory(
 ): PlannerMemoryPayload {
   const successes = scored
     .filter((s) => s.isSuccess)
-    .sort((a, b) => b.weightedScore - a.weightedScore)
+    .sort((a, b) => {
+      const boostA = a.origin === "manual" ? 1000 : 0;
+      const boostB = b.origin === "manual" ? 1000 : 0;
+      return b.weightedScore + boostB - (a.weightedScore + boostA);
+    })
     .slice(0, 12);
 
   const patterns: string[] = [];
   for (const s of successes) {
     const bits: string[] = [];
-    if (s.followersGained > 0) bits.push(`팔로워+${s.followersGained}`);
-    if (s.profileVisits > 0) bits.push(`프로필 ${s.profileVisits}`);
-    if (s.bookmarks > 0) bits.push(`북마크 ${s.bookmarks}`);
-    if (s.replies > 0) bits.push(`답글 ${s.replies}`);
-    if (s.detailExpands > 0) bits.push(`상세열람 ${s.detailExpands}`);
-    if (s.revenue > 0) bits.push(`수익 ${s.revenue}`);
+    if (s.origin === "manual") bits.push("MANUAL_PREMIUM");
+    if (s.followersGained > 0) bits.push("팔로워증가");
+    if (s.profileVisits > 0) bits.push("프로필방문");
+    if (s.bookmarks > 0) bits.push("북마크");
+    if (s.replies > 0) bits.push("댓글");
+    if (s.detailExpands > 0) bits.push("상세열람");
+    if (s.revenue > 0) bits.push("수익");
     const feat = s.features
-      ? `${s.features.topicGuess}/${s.features.lengthBucket}`
-      : "";
-    const snip = s.contentSnippet.replace(/\s+/g, " ").slice(0, 90);
+      ? [
+          s.features.topicGuess,
+          s.features.subtopic,
+          s.features.lengthBucket,
+          s.features.hookStyle,
+          s.features.writingApproach,
+          s.features.mediaType,
+        ]
+          .filter(Boolean)
+          .join("/")
+      : "feature?";
     patterns.push(
-      `[${s.weightedScore.toFixed(1)}] (${bits.join(", ") || "eng"}) ${feat} ${snip}`
+      `[${s.weightedScore.toFixed(1)}] (${bits.join(", ") || "eng"}) ${feat}`
     );
   }
 
   const summaryKo =
     successes.length === 0
       ? "이번 주기 검증된 고성과 패턴이 거의 없음 — 기존 DNA 유지."
-      : `검증 고성과 ${successes.length}건. 팔로워·프로필·수익·북마크·토론 신호 우선 반영.`;
+      : `검증 고성과 ${successes.length}건의 추상 패턴만 저장. 문장 원문은 기억하지 않음. 직접 쓴 성공은 AI 초안보다 높은 학습 신호.`;
 
   return {
     patterns,
@@ -104,57 +124,69 @@ export function buildPlannerMemory(
 export function buildCreatorDnaHint(
   scored: ScoredPostMetrics[]
 ): CreatorDnaPayload {
-  const successes = scored.filter((s) => s.isSuccess);
-  const manualBoost = successes.filter((s) => s.origin === "manual");
-  const topicPreference: string[] = [];
+  const manualWins = scored.filter(
+    (s) => s.isSuccess && s.origin === "manual"
+  );
   const structures: string[] = [];
-
-  for (const s of successes.slice(0, 8)) {
-    if (s.features?.topicGuess && s.features.topicGuess !== "reply")
-      topicPreference.push(s.features.topicGuess);
-    if (s.replies >= 3) structures.push("토론 유발형 관찰");
-    if (s.bookmarks >= 2) structures.push("저장 가치 실용 팁");
-    if (s.features?.lengthBucket === "long") structures.push("장문 분석");
-    if (s.features?.lengthBucket === "short") structures.push("짧은 실사용 메모");
-    if (s.features?.hasNumbers) structures.push("구체 숫자 포함");
-    if (s.detailExpands >= 20) structures.push("상세 열람 유도 구조");
+  if (manualWins.length > 0) {
+    structures.push(
+      "USER_DIRECT success is a higher-value learning signal than AI drafts"
+    );
   }
-  if (manualBoost.length > 0) structures.push("수동 작성 고성과 — premium");
 
   return {
-    writingRhythm: "해요체 중심 자연 믹스",
-    tone: "솔직한 실소유·필드 체감",
-    hookStyle: "패턴 반복 금지",
-    observationStyle: "구체 숫자·장면 중심",
-    analysisStyle: "과장 없는 장기 비전",
-    humorStyle: "가벼운 ㅋㅋ 수준",
-    topicPreference: [...new Set(topicPreference)].slice(0, 8),
-    successfulStructures: [...new Set(structures)].slice(0, 8),
+    writingRhythm: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    tone: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    hookStyle: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    observationStyle: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    analysisStyle: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    humorStyle: "UNCHANGED — Performance DNA must not overwrite Creator DNA",
+    topicPreference: [],
+    successfulStructures: structures,
     summaryKo:
-      successes.length > 0
-        ? `고성과 ${successes.length}건 기준 Creator DNA (수동 ${manualBoost.length})`
-        : "성과 부족 — 기존 Creator DNA 유지",
+      manualWins.length > 0
+        ? `직접 쓴 고성과 ${manualWins.length}건은 높은 가치 신호. Creator DNA는 천천히. AP 성과는 Performance DNA로.`
+        : "성과는 Performance DNA / Planner Memory로만. Creator DNA는 덮어쓰지 않음.",
   };
 }
 
 export function buildAudienceDnaHint(
   scored: ScoredPostMetrics[]
 ): AudienceDnaPayload {
-  const successes = scored.filter((s) => s.isSuccess);
-  const interests = successes
-    .map((s) => s.features?.topicGuess || s.contentSnippet.slice(0, 30))
-    .filter((t) => t && t !== "reply")
-    .slice(0, 10);
-
+  const published = scored.filter((s) => !s.features?.isReply);
+  if (published.length === 0) {
+    return {
+      interestGraph: [],
+      sentiment: "unknown",
+      topicMovement: [],
+      followerInterests: [],
+      summaryKo:
+        "Audience DNA: UNKNOWN / insufficient evidence. Primary source is X Analytics. Do not invent interest.",
+    };
+  }
+  const topicScore: Record<string, number> = {};
+  for (const s of published) {
+    const t = s.features?.topicGuess;
+    if (!t || t === "reply") continue;
+    topicScore[t] =
+      (topicScore[t] || 0) +
+      (s.followersGained > 0 ? 4 : 0) +
+      (s.profileVisits > 0 ? 3 : 0) +
+      (s.bookmarks > 0 ? 2 : 0) +
+      (s.replies > 0 ? 2 : 0);
+  }
+  const ranked = Object.entries(topicScore)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => k);
   return {
-    interestGraph: [...new Set(interests)],
+    interestGraph: ranked.slice(0, 10),
     sentiment: "unknown",
-    topicMovement: [...new Set(interests)].slice(0, 5),
-    followerInterests: [...new Set(interests)],
+    topicMovement: ranked.slice(0, 5),
+    followerInterests: ranked.slice(0, 8),
     summaryKo:
-      successes.length > 0
-        ? `고성과 주제 ${[...new Set(interests)].length}개를 Audience 신호로 반영`
-        : "Audience DNA는 Fedica 관심 신호 우선 유지",
+      ranked.length > 0
+        ? `Audience DNA: X Analytics 주제 반응 ${ranked.length}개. Fedica는 보조. Creator DNA를 덮지 않음. 문장 원문 없음.`
+        : "Audience DNA: UNKNOWN / insufficient evidence. Primary source is X Analytics.",
   };
 }
 
@@ -182,9 +214,8 @@ export function buildPerformanceDna(
     if (s.replies >= 3) reasons.push("토론");
     if (s.features?.hasNumbers) reasons.push("숫자 근거");
     if (s.features && !s.features.isReply) reasons.push("원글");
-    const snip = s.contentSnippet.replace(/\s+/g, " ").slice(0, 70);
     whyPatterns.push(
-      `${reasons.join("+") || "engagement"} | ${s.features?.topicGuess || "?"} | ${snip}`
+      `${reasons.join("+") || "engagement"} | ${s.features?.topicGuess || "?"} | ${s.features?.hookStyle || "hook?"} | ${s.origin === "manual" ? "MANUAL_PREMIUM" : s.origin}`
     );
     if (s.features?.lengthBucket) lengthWins.push(s.features.lengthBucket);
     if (s.features?.topicGuess && s.features.topicGuess !== "reply")
@@ -236,21 +267,39 @@ export function buildPerformanceDna(
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k}×${v}`),
     summaryKo:
-      successes.length > 0
-        ? `Performance DNA: 고성과 ${successes.length}건에서 성공 요인 추출`
-        : "Performance DNA: 이번 주기 고성과 부족",
+      successes.length >= 2
+        ? `Performance DNA: 반복 가능 신호 ${successes.length}건. 해석 순서는 팔로워→프로필→수익→북마크→댓글. Creator DNA를 덮어쓰지 않음.`
+        : successes.length === 1
+        ? "Performance DNA: 단일 고성과는 hypothesis. 반복 사이클 전까지 검증된 패턴이 아님."
+        : "Performance DNA: UNKNOWN / insufficient evidence. 빈 값을 성공으로 쓰지 않음.",
   };
 }
 
 export function buildRevenueDna(
-  scored: ScoredPostMetrics[]
+  scored: ScoredPostMetrics[],
+  accountPayout?: { amountUsd: number; period?: string; nextPayout?: string } | null
 ): RevenueDnaPayload {
   const withRev = scored.filter((s) => s.revenue > 0);
   if (withRev.length === 0) {
+    if (accountPayout && accountPayout.amountUsd > 0) {
+      return {
+        revenueByTopic: [],
+        notes: [
+          `계정 지급 ${accountPayout.amountUsd} USD (${accountPayout.period || "window"}). 글 단위 수익은 UNKNOWN.`,
+          ...(accountPayout.nextPayout ? [`다음 지급 ${accountPayout.nextPayout}.`] : []),
+          "영상 Estimated Revenue 0은 이 지급액이 아님.",
+          "진정성·장기 신뢰보다 우선하지 않음. 한 슬라이스로 할당량을 올리지 않음. 글에 금액을 쓰지 않음.",
+        ],
+        summaryKo: `Revenue DNA: 계정 지급 ${accountPayout.amountUsd} USD부터 시작. 글 단위는 UNKNOWN. 전략을 지배하지 않음.`,
+      };
+    }
     return {
       revenueByTopic: [],
-      notes: ["현재 수익 데이터 0 — Revenue DNA 대기"],
-      summaryKo: "Revenue DNA: 수익 신호 없음 (구조만 유지)",
+      notes: [
+        "현재 수익 데이터 0 — Revenue DNA 대기",
+        "진정성·장기 신뢰보다 우선하지 않음. Planner 최상위 목적을 침범하지 않음.",
+      ],
+      summaryKo: "Revenue DNA: UNKNOWN / insufficient evidence. 빈 수익을 성공 패턴으로 쓰지 않음. 전략을 지배하지 않음.",
     };
   }
   const byTopic: Record<string, number> = {};
@@ -258,11 +307,20 @@ export function buildRevenueDna(
     const t = s.features?.topicGuess || "other";
     byTopic[t] = (byTopic[t] || 0) + s.revenue;
   }
+  const trustWarn = withRev.some(
+    (s) => s.revenue > 0 && s.followersGained <= 0 && s.profileVisits <= 0 && s.bookmarks <= 0
+  );
   return {
     revenueByTopic: Object.entries(byTopic)
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k}: ${v}`),
-    notes: [`수익 포스트 ${withRev.length}건`],
-    summaryKo: `Revenue DNA: ${withRev.length}건 수익 신호 반영`,
+    notes: [
+      `수익 포스트 ${withRev.length}건`,
+      "진정성·장기 신뢰보다 우선하지 않음. Planner 최상위 목적을 침범하지 않음.",
+      ...(trustWarn
+        ? ["WARNING: 수익은 있으나 팔로워·프로필·북마크 신호가 약함 — 단기 수익이 신뢰/품질을 해칠 수 있음"]
+        : []),
+    ],
+    summaryKo: `Revenue DNA: ${withRev.length}건 수익 신호. 전략을 지배하지 않음.`,
   };
 }

@@ -3,7 +3,11 @@
  * Will is not a generate-box sentence. Bounds exist only as X anti-dump safety.
  */
 import type { CadenceSignal, ClusterWeight, LearningState } from "./seed-engine.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
+import { plannerArchitectureLock } from "./engine-architecture.ts";
+import { weeklyEditorialPhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
+import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 
 export const QUOTA_DAYS = 3;
 export const QUOTA_PER_DAY_MAX = 8;
@@ -68,6 +72,7 @@ export async function inferWeeklyQuota(args: {
   performanceHints?: string[];
   learning?: LearningState;
   explicitCreatorIntent?: string;
+  intelligence?: PlannerIntelligenceBlocks | null;
   model?: string;
   timeoutMs?: number;
 }): Promise<WeeklyQuota> {
@@ -76,6 +81,12 @@ export async function inferWeeklyQuota(args: {
 
   const system = [
     "You infer the weekly ORIGINAL post quota for X account @Seung4680.",
+    plannerPhilosophyBlock(),
+    plannerArchitectureLock(),
+    weeklyEditorialPhilosophyBlock(),
+    dnaIntelligencePhilosophyBlock(),
+    learningLoopPhilosophyBlock(),
+    "You MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory in the user JSON. Missing layers are UNKNOWN — not zero, not a reason to refuse.",
     "Will is already in Creator DNA + engine rules. Do not wait for a typed slogan.",
     "this_run_note is an optional overlay, not the will.",
     "Reference the X algorithm for STRATEGY only: anti-dump (stacked originals become noise; same-author decay per For You refresh), 48-hour For You freshness, start 14:00 America/Los_Angeles, even-spread inside 14:00–22:00 PT, mix, whether higher volume linked to growth.",
@@ -93,6 +104,11 @@ export async function inferWeeklyQuota(args: {
     creator_dna: creatorDnaBlock(),
     engine_rules_are_the_will: engineRulesAsWill(),
     performance_dna: performanceDnaBlock(),
+    audience_dna_current: args.intelligence?.audience_dna || null,
+    performance_dna_learned: args.intelligence?.performance_learned || null,
+    revenue_dna_current: args.intelligence?.revenue_dna || null,
+    planner_memory: args.intelligence?.planner_memory || null,
+    current_x_context: args.intelligence?.current_x_context || null,
     this_run_note_overlay_only: args.explicitCreatorIntent || null,
     user_direct_n: args.userDirectN,
     cadence: args.cadence,

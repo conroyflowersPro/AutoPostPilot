@@ -9,6 +9,7 @@ import {
   CREATOR_SEED_REASONING_VERSION,
   type ViralCandidate,
 } from "./creator-seed-reasoning.ts";
+import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 
 export const SEED_SUPPLY_HOTFIX_VERSION = "seed_supply_creator_reasoning_v1";
 export { CREATOR_SEED_REASONING_VERSION };
@@ -48,6 +49,7 @@ export async function expandSeedSupplyWithXai(args: {
     seed_rule?: string;
     validated_performance_patterns?: number;
   };
+  intelligence?: PlannerIntelligenceBlocks | null;
   model?: string;
   timeoutMs?: number;
 }): Promise<XaiSeedExpansionResult> {
@@ -65,6 +67,7 @@ export async function expandSeedSupplyWithXai(args: {
     adjacentRing: args.adjacentRing,
     humorRing: args.humorRing,
     learning: args.learning,
+    intelligence: args.intelligence || null,
     model: args.model,
     timeoutMs: args.timeoutMs,
   });

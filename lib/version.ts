@@ -1,8 +1,8 @@
 /** Single source of truth for AutoPostPilot product version (UI badges + package + weekly-plan). */
-export const APP_VERSION = "11.4.1";
+export const APP_VERSION = "11.5.4";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 export const BUILD_STAMP = APP_VERSION;
 
 /** One Korean line the operator can read in the app after a bump. */
 export const VERSION_SUMMARY_KO =
-  "원글은 ChatGPT. 개인 관심 원글이 중심. 대중 생활은 하루 1개. 3일 생성. DNA·엔진이 시드와 작성에 같이 붙습니다. 할당량은 유머로라도 채웁니다. 경험은 DNA·엔진만, 날조 금지. 아이폰 사파리에서 연결이 끊겨도 작업은 이어집니다. 생활은 캘리포니아, 글은 한국어. 발행은 태평양시 오후 2시부터 For You 간격.";
+  "이번 구간 성과는 후보. 문장 복사 금지. 수익은 계정 지급부터 시작, 글마다 나누지 않음. 3일 Planner가 Audience·성과·수익·현재 X·Memory를 읽음. 학습은 게시+Analytics만. 원글은 ChatGPT. 개인 관심 중심, 대중 생활 하루 1개. 3일 생성. 아이폰 사파리. 생활은 캘리포니아, 글은 한국어. 발행은 태평양시 오후 2시부터.";

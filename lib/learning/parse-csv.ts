@@ -1,9 +1,12 @@
 import type { MetricOrigin, NormalizedPostMetrics } from "./types";
 import { extractFeatures } from "./features";
 
+/** X Analytics Content CSV adapter. Canonical internal model stays stable; other providers add adapters. */
+export const ANALYTICS_PRIMARY_ADAPTER = "x_analytics_csv";
+
 /** Flexible header aliases — X Analytics Content CSV first priority */
 const ALIASES: Record<string, string[]> = {
-  postId: ["post_id", "postid", "id", "tweet_id", "tweetid"],
+  postId: ["post_id", "postid", "id", "tweet_id", "tweetid", "post id"],
   content: [
     "post_text", "posttext", "content", "text", "post", "message", "tweet",
     "본문", "내용", "포스트", "게시물",
@@ -127,6 +130,123 @@ function findHeaderRow(rows: string[][]): number {
     }
   }
   return 0;
+}
+
+export function detectAnalyticsKind(text: string): "content" | "account_overview" | "video_overview" | "unknown" {
+  const rows = splitCsv(text);
+  const head = rows
+    .slice(0, 8)
+    .map((r) => r.map(normHeader).join("|"))
+    .join("\n");
+  if (head.includes("post_text") || head.includes("post_link") || /\bpost_id\b/.test(head)) {
+    return "content";
+  }
+  if (
+    head.includes("video_overview") ||
+    head.includes("watch_time") ||
+    head.includes("video_id") ||
+    head.includes("your_videos")
+  ) {
+    return "video_overview";
+  }
+  if (head.includes("impressions") && (head.includes("new_follows") || head.includes("unfollows")) && !head.includes("post_text")) {
+    return "account_overview";
+  }
+  return "unknown";
+}
+
+export type DailyAccountPulse = {
+  date: string;
+  impressions: number;
+  likes: number;
+  newFollows: number;
+  unfollows: number;
+  profileVisits: number;
+  bookmarks: number;
+};
+
+function parseDailyOverview(text: string): DailyAccountPulse[] {
+  const rows = splitCsv(text);
+  const headerIdx = findHeaderRow(rows);
+  const headers = rows[headerIdx] || [];
+  const col = {
+    date: findCol(headers, ALIASES.date),
+    impressions: findCol(headers, ALIASES.impressions),
+    likes: findCol(headers, ALIASES.likes),
+    followersGained: findCol(headers, ALIASES.followersGained),
+    unfollows: findCol(headers, ["unfollows", "unfollow"]),
+    profileVisits: findCol(headers, ALIASES.profileVisits),
+    bookmarks: findCol(headers, ALIASES.bookmarks),
+  };
+  const out: DailyAccountPulse[] = [];
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const cells = rows[r];
+    const get = (idx: number) => (idx >= 0 ? cells[idx] ?? "" : "");
+    const date = String(get(col.date) || "").trim();
+    if (!date || /^your_videos/i.test(normHeader(date))) break;
+    out.push({
+      date,
+      impressions: parseNum(get(col.impressions)),
+      likes: parseNum(get(col.likes)),
+      newFollows: parseNum(get(col.followersGained)),
+      unfollows: parseNum(get(col.unfollows)),
+      profileVisits: parseNum(get(col.profileVisits)),
+      bookmarks: parseNum(get(col.bookmarks)),
+    });
+  }
+  return out;
+}
+
+function parseVideoEstimatedRevenueSum(text: string): number {
+  const rows = splitCsv(text);
+  let sum = 0;
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const joined = rows[i].map(normHeader).join("|");
+    if (joined.includes("estimated_revenue") && joined.includes("date")) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx < 0) return 0;
+  const headers = rows[headerIdx];
+  const revCol = findCol(headers, ALIASES.revenue);
+  if (revCol < 0) return 0;
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const first = String(rows[r][0] || "").trim();
+    if (!first || /^your videos/i.test(first) || /^uploaded on/i.test(first)) break;
+    sum += parseNum(rows[r][revCol]);
+  }
+  return sum;
+}
+
+export function parseXAnalyticsExport(
+  text: string,
+  origin: MetricOrigin = "unknown"
+): {
+  kind: ReturnType<typeof detectAnalyticsKind>;
+  posts: NormalizedPostMetrics[];
+  daily: DailyAccountPulse[];
+  videoEstimatedRevenueSum: number;
+} {
+  const kind = detectAnalyticsKind(text);
+  if (kind === "account_overview") {
+    return { kind, posts: [], daily: parseDailyOverview(text), videoEstimatedRevenueSum: 0 };
+  }
+  if (kind === "video_overview") {
+    return {
+      kind,
+      posts: [],
+      daily: [],
+      videoEstimatedRevenueSum: parseVideoEstimatedRevenueSum(text),
+    };
+  }
+  return {
+    kind: kind === "content" ? "content" : "unknown",
+    posts: parseMetricsCsv(text, origin),
+    daily: [],
+    videoEstimatedRevenueSum: 0,
+  };
 }
 
 export function parseMetricsCsv(

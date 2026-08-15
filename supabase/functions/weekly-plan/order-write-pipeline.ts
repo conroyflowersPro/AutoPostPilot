@@ -1,5 +1,6 @@
 /**
- * v11 write path: local ORDER 1–6 + 7A context → ORDER 7C/7B ChatGPT writer → ORDER 8A judge.
+ * v11 write path: Planner/Seeds/Thinking/Core Thought/Style → ChatGPT Writer → Semantic Judge.
+ * Writer does not become Planner. Judge does not rewrite.
  * Paid xAI: seed expand + quota only. Original post body is ChatGPT.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
@@ -13,13 +14,21 @@ import {
   integrateSlotGeneration,
   type IntegratedSlotResult,
 } from "./generation-integration.ts";
-import { judgeIndependentResult, isJudgeReject } from "./semantic-judge.ts";
+import { judgeIndependentResult, isJudgeReject, isJudgePass } from "./semantic-judge.ts";
+import { extractStructuralSignature } from "./structural-signature.ts";
+import { decideRegenerationRoute } from "./regeneration-router.ts";
+import {
+  executeSelectiveRegeneration,
+  snapshotFromSlotParts,
+} from "./selective-regeneration.ts";
 import type { ConcreteSeed } from "./seed-engine.ts";
 import type { EditorialMode } from "./editorial-mix.ts";
 import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
 import {
   inferSlotVoice,
+  planSlotSurface,
   voiceRegisterConstraintLine,
+  endingKind,
   type VoiceActivityRow,
   type VoiceRegister,
 } from "./user-direct-voice-window.ts";
@@ -59,6 +68,10 @@ export async function writeOneSlot(args: {
   voiceRows?: VoiceActivityRow[];
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
   audienceSignals?: AudienceBarrierSignals | null;
+  recentStyleCounts?: Record<string, number> | null;
+  recentEndingCounts?: Record<string, number> | null;
+  lastEnding?: string | null;
+  weekSignatures?: Array<Record<string, unknown>>;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -70,7 +83,13 @@ export async function writeOneSlot(args: {
   block_reasons: string[];
   writer_call_attempted: boolean;
   mechanism_id?: string | null;
+  style_family?: string | null;
+  ending_kind?: string | null;
   system_origin_class: "AP_PIPELINE";
+  semantic_regen_attempts: number;
+  slot_final_state: string;
+  regeneration_route_history: string[];
+  structural_signature: Record<string, unknown> | null;
 }> {
   const seed = args.seed as ConcreteSeed & Record<string, unknown>;
   const mode = String(seed.editorial_mode || "INFORMATIVE").toUpperCase() as EditorialMode;
@@ -82,12 +101,19 @@ export async function writeOneSlot(args: {
     cluster: String(seed.cluster || seed.topic_cluster || ""),
     editorial_mode: mode,
   });
+  const surface = planSlotSurface({
+    voice,
+    recentEndingCounts: args.recentEndingCounts || null,
+    lastEnding: args.lastEnding || null,
+    slotIndex: slot,
+    seedKey: String(seed.concrete_subject || seed.seed_id || slotId),
+  });
   const voicePayload = {
     n: voice.n,
     window_days: voice.window_days,
     median_chars: voice.median_chars,
     question_ending_allowed: voice.question_ending_allowed,
-    constraint_line: voiceRegisterConstraintLine(voice, mode),
+    constraint_line: voiceRegisterConstraintLine(voice, surface),
   };
 
   const seed_interpretation = interpretConcreteSeed(seed, mode);
@@ -128,20 +154,20 @@ export async function writeOneSlot(args: {
   const creator_style = decideCreatorStyle({
     context: {
       creator_dna: {
-        prefers_compression: true,
+        prefers_compression: false,
         prefers_conversational: true,
-        prefers_reflective: mode === "EXPERIENCE" || mode === "OPINION",
+        prefers_reflective: null,
         allows_technical_density: true,
         community_native_ok: true,
-        longform_selective_ok: false,
-        politeness_default: mode === "INFORMATIVE" || mode === "COMPARE" ? "polite" : "mixed",
+        longform_selective_ok: true,
+        politeness_default: "mixed",
         identity_stable: true,
       },
       everyday_language_status: everyday_language.status,
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
       everyday_precision_conflict: everyday_language.precision_conflict,
       rail_compression_preference: thinking_rail?.compression_preference || everyday_language.compression_preference,
-      prefer_short: mode === "CASUAL_OBSERVATION",
+      prefer_short: false,
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
       mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
@@ -153,6 +179,7 @@ export async function writeOneSlot(args: {
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
       editorial_mode: mode,
       topic_cluster: seed.cluster,
+      recent_style_counts: args.recentStyleCounts || null,
     },
   });
   const natural_humor = decideNaturalHumor({
@@ -167,7 +194,7 @@ export async function writeOneSlot(args: {
       style_dialogue_compatible: creator_style.dialogue_compatible,
       style_conversational_level: creator_style.conversational_level,
       style_family: creator_style.style_family,
-      prefer_short: mode === "CASUAL_OBSERVATION",
+      prefer_short: false,
       has_lived_experience_grounding: !!seed.creator_evidence_available,
       has_factual_grounding: Array.isArray((seed as any).allowed_facts) ? (seed as any).allowed_facts.length > 0 : true,
     },
@@ -176,6 +203,12 @@ export async function writeOneSlot(args: {
   const humorForCtx = humorFill
     ? { ...natural_humor, humor_compatible: true, humor_strength: "LIGHT", humor_grounded: true }
     : natural_humor;
+
+  const weekSignatures = Array.isArray(args.weekSignatures) ? args.weekSignatures : [];
+  const weeklyContext = {
+    other_post_structural_signatures: weekSignatures,
+    recent_generated_signatures: weekSignatures,
+  };
 
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
@@ -190,6 +223,7 @@ export async function writeOneSlot(args: {
     natural_humor: humorForCtx as any,
     editorial_mode: mode,
     voice_register: voicePayload,
+    week_structural_signatures: weekSignatures,
   });
 
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
@@ -204,41 +238,103 @@ export async function writeOneSlot(args: {
   let finalText = String(integrated.final_text || "").trim();
   let status = String(integrated.generation_status || "BLOCKED");
   const reasons = [...(integrated.block_reasons || [])];
+  let judgeStatus: string | undefined;
+  let regenAttempts = 0;
+  const regenRoutes: string[] = [];
+  let slotFinal = "BLOCKED";
+  let signature: Record<string, unknown> | null = null;
+  let writerAttempted = !!integrated.writer_call_attempted;
 
-  if (finalText && integrated.independent) {
-    const judged = judgeIndependentResult(deep, integrated.independent);
-    if (isJudgeReject(judged)) {
-      status = "BLOCKED";
-      reasons.push(...(judged.hard_fail_reasons || []).map(String));
-      finalText = "";
-    }
-    return {
-      slotId,
-      primaryTopic: String(seed.concrete_subject || seed.primaryTopic || ""),
-      concrete_subject: String(seed.concrete_subject || ""),
-      editorial_mode: mode,
-      final_text: finalText,
-      generation_status: status,
-      judge_status: judged.overall_status,
-      block_reasons: reasons,
-      writer_call_attempted: !!integrated.writer_call_attempted,
-      mechanism_id: selectedMechanismId,
-      system_origin_class: "AP_PIPELINE",
-    };
-  }
-
-  return {
+  const pack = (extra: Partial<Awaited<ReturnType<typeof writeOneSlot>>> = {}) => ({
     slotId,
     primaryTopic: String(seed.concrete_subject || seed.primaryTopic || ""),
     concrete_subject: String(seed.concrete_subject || ""),
     editorial_mode: mode,
     final_text: finalText,
     generation_status: status,
+    judge_status: judgeStatus,
     block_reasons: reasons,
-    writer_call_attempted: !!integrated.writer_call_attempted,
+    writer_call_attempted: writerAttempted,
     mechanism_id: selectedMechanismId,
-    system_origin_class: "AP_PIPELINE",
-  };
+    style_family: String(creator_style.style_family || "") || null,
+    ending_kind: finalText ? endingKind(finalText) : surface.ending,
+    system_origin_class: "AP_PIPELINE" as const,
+    semantic_regen_attempts: regenAttempts,
+    slot_final_state: slotFinal,
+    regeneration_route_history: regenRoutes,
+    structural_signature: signature,
+    ...extra,
+  });
+
+  if (finalText && integrated.independent) {
+    let judged = judgeIndependentResult(deep, integrated.independent, weeklyContext);
+    judgeStatus = judged.overall_status;
+    signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+
+    if (isJudgeReject(judged)) {
+      const decision = decideRegenerationRoute(judged, { semantic_regen_attempts: 0 });
+      regenRoutes.push(decision.route);
+      if (decision.route !== "BLOCK" && decision.route !== "NO_ACTION" && decision.route !== "ACCEPT_WITH_CONCERNS") {
+        const snapshot = snapshotFromSlotParts({
+          slot_id: slotId,
+          context_id: deep.context_id,
+          seed: seed as Record<string, unknown>,
+          editorial_mode: mode,
+          interpretation: seed_interpretation,
+          reaction_mechanism: reaction_mechanism as any,
+          thinking_rail: thinking_rail as any,
+          everyday_language: everyday_language as any,
+          creator_style: creator_style as any,
+          natural_humor: humorForCtx as any,
+          deep_context: deep,
+        });
+        const regen = await executeSelectiveRegeneration({
+          snapshot,
+          decision,
+          weekly_context: weeklyContext,
+          genOpts: {
+            dry_run: args.dryRun === true,
+            openai_key: args.openaiKey,
+            model: V11_WRITER_MODEL,
+            timeout_ms: V11_WRITER_TIMEOUT_MS,
+            allow_one_retry: false,
+          },
+        });
+        regenAttempts = 1;
+        writerAttempted = writerAttempted || regen.diagnostics.writer_called;
+        judged = regen.judge;
+        judgeStatus = judged.overall_status;
+        const regenText = String(regen.independent?.final_text || "").trim();
+        if (regenText && isJudgePass(judged)) {
+          finalText = regenText;
+          status = "GENERATED";
+          signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+          slotFinal = "REGENERATED_PASS";
+          return pack();
+        }
+        reasons.push(...(judged.hard_fail_reasons || []).map(String));
+        reasons.push("selective_regen_rejected");
+        finalText = "";
+        status = "BLOCKED";
+        slotFinal = "BLOCKED";
+        signature = null;
+        return pack();
+      }
+      reasons.push(...(judged.hard_fail_reasons || []).map(String));
+      finalText = "";
+      status = "BLOCKED";
+      slotFinal = "BLOCKED";
+      signature = null;
+      return pack();
+    }
+
+    slotFinal = judged.overall_status === "PASS_WITH_CONCERNS" ? "ACCEPTED_WITH_CONCERNS" : "ACCEPTED_PASS";
+    return pack();
+  }
+
+  slotFinal = finalText ? "ACCEPTED_PASS" : "BLOCKED";
+  if (finalText) signature = extractStructuralSignature(finalText) as unknown as Record<string, unknown>;
+  return pack();
 }
 
 export async function writeSlotBatch(args: {
@@ -247,28 +343,36 @@ export async function writeSlotBatch(args: {
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
   audienceSignals?: AudienceBarrierSignals | null;
+  weekSignatures?: Array<Record<string, unknown>>;
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
   const recent: Array<{ mechanism_id?: string }> = [];
-  for (let i = 0; i < slots.length; i += V11_WRITE_CONCURRENCY) {
-    const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
-    const part = await Promise.all(
-      chunk.map((seed) =>
-        writeOneSlot({
-          seed,
-          openaiKey: args.openaiKey,
-          dryRun: args.dryRun,
-          voiceRows: args.voiceRows,
-          recentMechanismUsage: recent.slice(-12),
-          audienceSignals: args.audienceSignals || null,
-        })
-      )
-    );
-    for (const p of part) {
-      if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
+  const styleCounts: Record<string, number> = {};
+  const endingCounts: Record<string, number> = {};
+  let lastEnding: string | null = null;
+  const signatures: Array<Record<string, unknown>> = [...(args.weekSignatures || [])];
+  for (const seed of slots) {
+    const p = await writeOneSlot({
+      seed,
+      openaiKey: args.openaiKey,
+      dryRun: args.dryRun,
+      voiceRows: args.voiceRows,
+      recentMechanismUsage: recent.slice(-12),
+      audienceSignals: args.audienceSignals || null,
+      recentStyleCounts: { ...styleCounts },
+      recentEndingCounts: { ...endingCounts },
+      lastEnding,
+      weekSignatures: signatures,
+    });
+    if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
+    if (p.style_family) styleCounts[p.style_family] = (styleCounts[p.style_family] || 0) + 1;
+    if (p.ending_kind) {
+      endingCounts[p.ending_kind] = (endingCounts[p.ending_kind] || 0) + 1;
+      lastEnding = p.ending_kind;
     }
-    out.push(...part);
+    if (p.final_text && p.structural_signature) signatures.push(p.structural_signature);
+    out.push(p);
   }
   return out;
 }

@@ -12,8 +12,11 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
-import { isPersonalInterestSubject, lengthBandForMode } from "./seed-scope.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
+import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
+import { writerArchitectureLock } from "./engine-architecture.ts";
+import { writingStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { writerWeekStructureConstraintLines } from "./structural-signature.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -143,6 +146,11 @@ const FORCED_CTA_PATTERNS = [
   /의견을\s*남겨/,
   /팔로우\s*해/,
   /리트윗\s*해/,
+  /어떻게\s*생각하/,
+  /어떠신가요/,
+  /보이시나요/,
+  /있으신가요/,
+  /해보셨/,
 ];
 
 const EXPERIENCE_FABRICATION_PATTERNS = [
@@ -212,33 +220,67 @@ export function buildWriterPlanMarkers(ctx: DeepGenerationContext): IndependentP
  * No finished examples, no templates, no CTA, no fabrication.
  */
 /** Operational mechanism lines for ChatGPT. Never a finished template. Never name M1–M9 in the post. */
+const MECHANISM_WRITE_MOVES: Record<string, string> = {
+  M1_SURPRISE_DEBATE_CHANGE:
+    "Show one concrete change that is off from the usual expectation. Stop. The reader judges. Do not ask them.",
+  M2_EXPERIENCE_EMPATHY:
+    "Show one lived-scene detail a stranger could also have had. Do not write 'anyone else?'.",
+  M3_EVIDENCE_JUDGMENT:
+    "Separate how it looks from what is going on. Do not deliver the verdict. Do not ask which side is right.",
+  M4_LIFE_PATTERN_EXPOSURE:
+    "Compress a repeated everyday behavior into one observation. Recognition is the entry. Do not ask if they do it too.",
+  M5_SHARED_TENSION_REVERSAL:
+    "Set a shared tension, then reverse it. Stop at the reverse. No question, no explanation.",
+  M6_SELF_REFERENTIAL_OBVIOUSNESS:
+    "What looks surprising from outside is ordinary here. State that. Do not ask.",
+  M7_GROUP_BEHAVIOR_DISCOVERY:
+    "Show people repeating the same small behavior. Leave why unfinished as a statement, not a question.",
+  M8_SELF_DEPRECATING_DISCLOSURE:
+    "Only if evidence exists: one small imperfect self-detail first. Never fake it. Never ask the reader to confess.",
+  M9_EVERYDAY_BLANK_FILLING:
+    "Name the small missing piece as a situation (which screen, which line). The blank is inside the observation. Do not put a question mark at the end.",
+};
+
+/** How far the move runs — not a character quota, not "one sentence is enough". */
+const MECHANISM_SHAPE_HINTS: Record<string, string> = {
+  M1_SURPRISE_DEBATE_CHANGE:
+    "Keep going until the off-expectation change is visible. Stop there. One sentence or more — whatever the change needs.",
+  M2_EXPERIENCE_EMPATHY:
+    "Keep the lived-scene detail until a stranger could have been there. Not a one-line memo.",
+  M3_EVIDENCE_JUDGMENT:
+    "Need both how it looks and what is going on. Two beats. Stop before the verdict.",
+  M4_LIFE_PATTERN_EXPOSURE:
+    "Compress the repeated behavior. Write a second beat only if the pattern is not visible yet.",
+  M5_SHARED_TENSION_REVERSAL:
+    "Set the shared tension, then reverse it. Stop at the reverse. No explanation after.",
+  M6_SELF_REFERENTIAL_OBVIOUSNESS:
+    "Show the outsider surprise and that it is ordinary here. Both beats.",
+  M7_GROUP_BEHAVIOR_DISCOVERY:
+    "Show the repeated group behavior. Leave why unfinished as a statement.",
+  M8_SELF_DEPRECATING_DISCLOSURE:
+    "One imperfect self-detail first, only with evidence. Then the observation.",
+  M9_EVERYDAY_BLANK_FILLING:
+    "Name the missing piece inside the observation. Complete the situation. Not a question.",
+};
+
 export function writerMechanismConstraintLines(ctx: DeepGenerationContext): string[] {
   const mech = ((ctx as any).reaction_mechanism || {}) as Record<string, unknown>;
   const id = s(mech.selected_mechanism_id || mech.selected_mechanism);
   const status = s(mech.status);
-  if (!id || id === "NONE" || status === "NO_MECHANISM_NEEDED" || status === "MECHANISM_BLOCKED") {
+  if (!id || id === "NONE" || status === "MECHANISM_BLOCKED") {
     return [
-      "READER ENTRY: no selected mechanism. Still leave a judgment gap so a reader can add their own case. Do not write a thesis closer.",
+      "READER ENTRY MOVE: write a finished observation of a specific situation. Do not ask a question to create a reply slot. The unfinished situation is the entry.",
     ];
   }
-  const entry = s(mech.reader_entry_point);
-  const intended = s(mech.intended_reaction);
-  const logic = s(mech.reasoning_logic);
-  const complete = s(mech.completion_style);
+  const move = MECHANISM_WRITE_MOVES[id] || MECHANISM_WRITE_MOVES.M4_LIFE_PATTERN_EXPOSURE;
+  const shape = MECHANISM_SHAPE_HINTS[id] || MECHANISM_SHAPE_HINTS.M4_LIFE_PATTERN_EXPOSURE;
   return [
-    "READER ENTRY MOVE (use this structure; never name the mechanism; never write 메커니즘 or M1–M9):",
-    intended ? "Intended reader reaction: " + intended : "",
-    entry ? "How the reader enters: " + entry : "",
-    logic ? "How the observation is built: " + logic : "",
-    complete === "open"
-      ? "Stop with the situation still open. Do not close with a verdict."
-      : complete === "partial"
-        ? "Separate impression from fact. Leave the judgment unfinished."
-        : complete === "closed"
-          ? "One finished observation is enough. Do not explain the joke or add a thesis tail."
-          : "Leave a gap the reader can fill.",
-    "Personality is this entry move, not a slogan and not a generic news sentence.",
-  ].filter(Boolean);
+    "READER ENTRY MOVE (this IS the personality of the post; never name the mechanism; never write 메커니즘 or M1–M9):",
+    move,
+    "HOW FAR THE MOVE RUNS: " + shape,
+    "Personality is this entry move, not a slogan, not a generic news sentence, and not a sentence-count quota.",
+    "If the draft is a generic news line, a one-line memo that never used the move, or ends with a question, the mechanism was not used. Rewrite as this move.",
+  ];
 }
 
 export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] {
@@ -258,7 +300,6 @@ export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] 
 export function writerEverydayConstraintLines(ctx: DeepGenerationContext): string[] {
   const everyday = ((ctx as any).everyday_language || {}) as Record<string, unknown>;
   const strategy = s(everyday.reader_entry_strategy);
-  if (!strategy || strategy === "NONE") return [];
   const protectedMeaning = Array.isArray(everyday.protected_meaning)
     ? (everyday.protected_meaning as unknown[]).map((x) => s(x)).filter(Boolean).slice(0, 4)
     : [];
@@ -267,11 +308,12 @@ export function writerEverydayConstraintLines(ctx: DeepGenerationContext): strin
     : [];
   return [
     "EVERYDAY LANGUAGE (keep thought depth; lower entry barrier; not a vocab list):",
-    "Entry strategy: " + strategy,
+    "Entry strategy: " + (strategy && strategy !== "NONE" ? strategy : "DIRECT_CONCRETE"),
     everyday.human_relevance_bridge ? "Bridge through a felt daily situation, not a lecture." : "",
     s(everyday.compression_preference) ? "Compression: " + s(everyday.compression_preference) : "",
     protectedMeaning.length ? "Do not dilute: " + protectedMeaning.join("; ") : "",
     forbidden.length ? "Do not simplify into: " + forbidden.join("; ") : "",
+    "FORBIDDEN jargon: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Use 알림/화면/겹침/가림.",
   ].filter(Boolean);
 }
 
@@ -329,6 +371,19 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
   ].filter(Boolean);
 }
 
+function writerPhilosophyBlock(): string {
+  return [
+    "WRITER ROLE: You are not here to write a clever AI post. You express an already-made thought in this creator's actual language.",
+    "You do not choose the topic. You do not invent the core judgment. Seed, thinking, core thought, mechanism, rail, and Creator DNA are already decided. Implement those decisions as one readable Korean post.",
+    "Do not get ahead of the thought. 문체 must not drag the thinking.",
+    "JOBS: preserve Core Thought; reflect Creator DNA; adjust rhythm and length; compose how THIS thought opens and unfolds (not an engagement-hook recipe); set expression difficulty; honor the humor decision; lower the reader entry barrier; do not over-explain; end naturally when the move is complete.",
+    "Vary surface strategy and discourse shape so the week does not converge on one structure. Diversity is not the goal. The goal is: same person's thought, not the same AI template.",
+    "Do not invent facts, experiences, emotions, or relationships he did not have.",
+    "Do not copy a previously successful sentence because it performed. Learn abstract expression and delivery only — never the wording.",
+    "WHY YOU EXIST: do not damage Planner + Thinking judgments. Make the post look like his own voice.",
+  ].join("\n");
+}
+
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
@@ -339,38 +394,38 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const expBound = ctx.experience_boundaries || {};
   const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
-  const editorialMode = s((ctx as any).seed_identity?.editorial_mode || (ctx as any).editorial_mode);
   const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
   const personal = isPersonalInterestSubject(subject, cluster);
   const humorFill = String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("HUMOR");
 
   return [
     "You write one Korean X post for creator @Seung4680.",
-    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences or private facts.",
-    "CREATOR DNA (identity / place / experience bounds — not sentences to copy):",
+    writerPhilosophyBlock(),
+    writerArchitectureLock(),
+    writingStagePhilosophyBlock(),
+    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences, private facts, emotions, or relationships.",
+    "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
     creatorDnaBlock(),
     "ENGINE RULES (operator will):",
     engineRulesAsWill(),
-    "PERFORMANCE DNA (strategy, not post prose):",
-    performanceDnaBlock(),
     "REASONING ORDER (internal only; do not output steps):",
-    "1) Confirm Seed meaning. A short keyword seed is valid — infer a public-agreeable situation through Creator DNA vision. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies.",
-    "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
-    "3) Keep reader self-projection space; never force questions or CTA. Do not hard-assert the creator's opinion — leave judgment to the reader so they can reply.",
-    "4) The selected Reaction Mechanism is the personality of this post — the reader-entry structure. Use it. Never name it or template it.",
+    "1) Confirm Seed meaning through Creator DNA vision: what would he notice first in this situation? A short keyword seed is valid. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies. Do not freeze always-short / always-twist / topic→말투.",
+    "2) Preserve Core Thought as writing intent — do not paste Core Thought labels as prose. Do not invent a new judgment.",
+    "3) Keep reader self-projection space. Never write a question. Never write CTA. Do not hard-assert the creator's opinion. Stop after the observation — that unfinished situation is the reply space.",
+    "4) The selected Reaction Mechanism is the personality of this post — a reader-entry STRUCTURE, not a question and not a slogan. Use the READER ENTRY MOVE below. Never name it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
-    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
+    "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Everyday words only. FORBIDDEN in the post: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘, M1–M9. Prefer 알림이 겹친다 / 화면이 가린다. NEVER swap a word if it would change the claim.",
     "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
-    "7) Apply Creator Style as surface register — not a fixed template. Register follows this post's character (editorial mode), not a single global ending.",
+    "7) Apply Creator Style as surface tendency — not a template. The planner chooses 해요/음슴/other for THIS slot from DNA + engine + the 3-day set so far. No frozen mix ratio. Editorial mode is not a 말투 table. Information posts may use 음슴. Casual posts may use 해요. Do not copy the previous post's ending.",
     "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
-    "10) One complete sentence is enough if the situation is delivered. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
-    "LENGTH: " + lengthBandForMode(editorialMode),
-    "INFORMATIVE/COMPARE register: polite 해요/존칭. Do not use 음슴체 on information posts.",
+    "10) LENGTH follows the reader-entry move and thought order, not an editorial-mode quota. There is no 'one sentence is enough'. Write until the move is complete. Stop when it is complete. Do not pad. Do not copy the previous post's length. Do not stop mid-token. No grand thesis tail.",
+    "VARIETY: Vary surface strategy and discourse shape so posts do not converge. Diversity is not the goal. Same person's thought, not the same AI template. Do not copy a winning sentence.",
+    ...writerWeekStructureConstraintLines((ctx as any).week_structural_signatures),
     "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
     "TENSION: if the seed has lived urgency, show the tension. If the situation also resolved, that can make the post informative. Do not preach a verdict.",
     "MIX: do not write only keep-worthy archive posts. Variety across the week is how bookmarks are sought.",
-    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, questions (?, 까요, 나요, 을까), CTA, expert jargon (레이어/L2/스택), AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     ...writerMechanismConstraintLines(ctx),
@@ -466,15 +521,15 @@ export async function callChatGptWriter(
   const subject = subjectFromCtx(ctx);
   const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
   const userMsg = [
-    "Write the final Korean X post now.",
+    "Write the final Korean X post now. Statement only. No question mark.",
     "Situation: " + subject.slice(0, 160),
-    ...writerMechanismConstraintLines(ctx).slice(0, 4),
+    ...writerMechanismConstraintLines(ctx).slice(0, 5),
     tension
       ? "Optional angle (not required): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "One finished sentence is OK. Do not pad. Do not invent lived experience. Use the reader-entry move so the post has a recognizable angle, not a generic news line.",
+    "Write until the reader-entry move is complete. Do not invent a new core judgment. Do not invent lived experience. Not a generic news line and not a question. Do not copy a previously successful sentence.",
     s(options.retry_hint)
-      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as a finished observation. One sentence is enough. Do not stutter. Do not restate the subject as the whole post."
+      ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as the reader-entry move until that move is complete. Do not stutter. Do not restate the subject as the whole post. Do not shrink to one sentence because a quota said so."
       : "",
     "Respond with post text only.",
   ].filter(Boolean).join("\n");
@@ -580,6 +635,8 @@ function validateOutput(
   if (isSubjectRestate(text, subject)) reasons.push("subject_restate");
   if (isGenericThesis(text)) reasons.push("generic_thesis");
   if (isTokenStutter(text)) reasons.push("token_stutter");
+  if (isQuestionCloser(text)) reasons.push("question_closer");
+  if (hasExpertJargon(text)) reasons.push("expert_jargon");
 
   for (const re of FORCED_CTA_PATTERNS) {
     if (re.test(text)) {
@@ -621,7 +678,9 @@ function validateOutput(
     reasons.includes("token_stutter") ||
     reasons.includes("too_short_original") ||
     reasons.includes("subject_restate") ||
-    reasons.includes("generic_thesis");
+    reasons.includes("generic_thesis") ||
+    reasons.includes("question_closer") ||
+    reasons.includes("expert_jargon");
 
   return {
     ok: !hardFail && seedOk && coreOk,
@@ -681,6 +740,15 @@ export function isSubjectRestate(text: string, subject: string): boolean {
 
 export function isGenericThesis(text: string): boolean {
   return GENERIC_THESIS_RE.test(String(text || ""));
+}
+
+export function isQuestionCloser(text: string): boolean {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  if (/[?？]/.test(t)) return true;
+  if (/(까요|나요|을까|ㄹ까|는가|인가|실까요|할까요)\s*[.…]?$/.test(t)) return true;
+  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨/.test(t)) return true;
+  return false;
 }
 
 function blockedResult(
@@ -750,7 +818,7 @@ export async function generateIndependentPost(
   if (!subject || subject.length < 2) {
     return blockedResult(ctx, "GENERATION_SEED_INSUFFICIENT", ["no_seed_subject"]);
   }
-  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED") {
+  if (ctx.core_thought?.status === "CORE_THOUGHT_BLOCKED" || ctx.core_thought?.status === "CORE_THOUGHT_HOLD") {
     return blockedResult(ctx, "GENERATION_BLOCKED", ["core_thought_blocked"]);
   }
 

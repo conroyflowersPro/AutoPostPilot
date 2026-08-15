@@ -81,12 +81,12 @@ const STYLE_INTEL: CreatorStyleIntelligence = {
   templates_stored: false,
   by_editorial_mode: {
     INFORMATIVE: {
-      note: "audience-facing polite when explaining",
-      register_hint: "해요체 intentional for inform/explain",
+      note: "explain when the seed is informational; 말투 still inferred",
+      register_hint: "infer 해요/음슴/other from DNA + engine + handmade mix",
     },
     OPINION: {
-      note: "light opinion may use 음슴체 (recent preference)",
-      register_hint: "음슴체 allowed for light opinion; not forced",
+      note: "light opinion; 말투 still inferred",
+      register_hint: "infer 해요/음슴/other from DNA + engine + handmade mix",
     },
     COMPARE: {
       note: "natural A/B axis, not textbook contrast essay",
@@ -97,8 +97,8 @@ const STYLE_INTEL: CreatorStyleIntelligence = {
       register_hint: "evidence-backed only",
     },
     CASUAL_OBSERVATION: {
-      note: "short concrete; 해요체+casual mix",
-      register_hint: "short lived observation",
+      note: "momentary observation; 말투 still inferred, length follows the move",
+      register_hint: "infer 해요/음슴/other from DNA + engine + handmade mix",
     },
   },
   note: "Deterministic corpus proxies. No sentence templates. Reply style separate.",
@@ -111,7 +111,7 @@ const DNA_VOICE: CreatorDnaVoiceSnapshot = {
     "Korean Tesla multi-vehicle owner-creator; real-world FSD/product observation primary; plural interests (gaming, daily, LAFC) retained.",
   why_write: ["inform/explain", "share experience", "light opinion", "observation"],
   how_publishing:
-    "Two-speed; media often; informational → polite intentional; light opinion eumseum = recent preference not long-archive dominant.",
+    "Preserve how he sees/thinks/expresses. Not a template. Planner chooses surface per slot. No frozen mix. AP drafts do not rewrite DNA.",
   how_reply: "Short, communicative; ㅋㅋ when thread funny — REPLY DNA separate, not used for ORIGINAL generation.",
   not_this: [
     "stock-daytrade primary",
@@ -120,13 +120,18 @@ const DNA_VOICE: CreatorDnaVoiceSnapshot = {
     "personal experience mandatory every post",
     "pure 반말",
     "inventing tests",
+    "content template",
+    "문체 copier",
+    "always short",
+    "always add a twist",
+    "topic→말투 map",
   ],
   register_by_intent: {
-    INFORMATIVE: "해요체·존칭 intentional (audience-facing polite)",
-    OPINION: "요즘 들어서 음슴체 가능 (RECENTLY_EMERGING; not forced)",
-    CASUAL_OBSERVATION: "short, concrete, 해요체+casual mix",
-    COMPARE: "clear A/B axis in natural speech, not textbook contrast essay",
-    EXPERIENCE: "only if evidence exists; first-person OK with known context only",
+    INFORMATIVE: "infer 해요/음슴/other from DNA + engine + handmade mix; not a mode table",
+    OPINION: "infer 해요/음슴/other from DNA + engine + handmade mix; not a mode table",
+    CASUAL_OBSERVATION: "infer 해요/음슴/other from DNA + engine + handmade mix; not a mode table",
+    COMPARE: "infer 해요/음슴/other from DNA + engine + handmade mix; not a mode table",
+    EXPERIENCE: "only if evidence exists; first-person OK with known context only; 말투 still inferred",
   },
   corpus_stats: {
     sample_n: 6954,

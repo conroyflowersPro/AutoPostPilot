@@ -5,7 +5,11 @@
  * Output = direction seeds only (no finished post prose).
  */
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock, plannerPhilosophyBlock } from "./engine-dna.ts";
+import { plannerArchitectureLock } from "./engine-architecture.ts";
+import { planningStagePhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { dnaIntelligencePhilosophyBlock, learningLoopPhilosophyBlock } from "./engine-learning-philosophy.ts";
+import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
 import { humorRingPromptLines } from "./humor-fill.ts";
 import {
@@ -50,6 +54,7 @@ export type CreatorSeedReasoningInput = {
   adjacentRing?: boolean;
   /** Personal-interest observational humor to fill quota holes. */
   humorRing?: boolean;
+  intelligence?: PlannerIntelligenceBlocks | null;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -138,6 +143,10 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
   const wording = clean(x?.wording_note, 80);
   const tension = clean(x?.point_or_tension, 140) ||
     (entry ? `진입: ${entry}` : "관찰·판단 각도");
+  const exploration = clean(x?.exploration_value, 24).toLowerCase();
+  const exploration_value = /^(core|secondary|emerging|exploration)$/.test(exploration)
+    ? exploration
+    : "";
   return {
     seed_id: `creator-reason-${i + 1}`,
     cluster,
@@ -145,6 +154,13 @@ function normalizeSeed(x: any, i: number): ConcreteSeed | null {
     concrete_subject: subject,
     subject_signature: subjectSignature(subject),
     point_or_tension: tension,
+    topic: clean(x?.topic, 60) || cluster,
+    subtopic: clean(x?.subtopic, 80) || dimension,
+    why_now: clean(x?.why_now, 140),
+    creator_relevance: clean(x?.creator_relevance, 140),
+    audience_relevance: clean(x?.audience_relevance, 140),
+    evidence_basis: clean(x?.evidence_basis, 140),
+    exploration_value,
     primary_source: "CREATOR_SEED_REASONING",
     supporting_sources: ["CREATOR_DNA", "RECENT_PUBLISHED", "XAI_REASONING"].concat(
       wording ? ["WORDING_INTENT"] : [],
@@ -224,15 +240,21 @@ export async function reasonCreatorSeeds(
 
   const system = [
     "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
-    "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs.",
+    plannerPhilosophyBlock(),
+    plannerArchitectureLock(),
+    planningStagePhilosophyBlock(),
+    dnaIntelligencePhilosophyBlock(),
+    learningLoopPhilosophyBlock(),
+    "You MUST read Audience DNA, Performance DNA, Revenue DNA, Current X Context, and Planner Memory. Use them for why-now and mix. Do not overwrite Creator DNA. Do not copy winning wording. Do not copy Current X Context into a seed body.",
+    "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
     "Each seed must be something @Seung4680 would hold — inferred from Creator DNA + engine rules + learned USER_DIRECT data.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
     "Forbidden concrete_subject form: 'FSD SUPERVISION 관찰·판단 축' or any CLUSTER DIMENSION label dump.",
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
-    "A short keyword subject is valid. Infer a public-agreeable situation through Creator DNA vision. Never emit hardcoded example seed bodies or example post prose.",
+    "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
-    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
+    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Everyday words only. FORBIDDEN seed jargon: 레이어, 레이어2, L2, 스택, 프로토콜. Prefer 알림 겹침 / 화면 가림.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "NEW READERS FIRST via one mass-public slot per day. Personal-interest originals fill the rest. Tesla/Elon/Robotaxi-news are not the default seed subject.",
     "Creator lives in California. Seeds are Korean words about US/CA daily life. FORBIDDEN invented subjects: 이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약, Korea subway/apartment-complex civic life.",
@@ -247,7 +269,7 @@ export async function reasonCreatorSeeds(
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
     ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
-    'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
+    'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","topic":"...","subtopic":"...","why_now":"...","creator_relevance":"...","audience_relevance":"...","evidence_basis":"...","exploration_value":"core|secondary|emerging|exploration","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
 
   const user = JSON.stringify({
@@ -255,6 +277,11 @@ export async function reasonCreatorSeeds(
     creator_dna: creatorDnaBlock(),
     engine_rules_are_the_will: engineRulesAsWill(),
     performance_dna: performanceDnaBlock(),
+    audience_dna_current: args.intelligence?.audience_dna || null,
+    performance_dna_learned: args.intelligence?.performance_learned || null,
+    revenue_dna_current: args.intelligence?.revenue_dna || null,
+    planner_memory: args.intelligence?.planner_memory || null,
+    current_x_context: args.intelligence?.current_x_context || null,
     user_direct_n: args.userDirectN ?? null,
     cluster_weights_from_user_direct: args.clusterInterestWeights?.length
       ? args.clusterInterestWeights

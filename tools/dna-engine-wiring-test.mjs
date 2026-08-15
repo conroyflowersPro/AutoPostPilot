@@ -15,6 +15,8 @@ const wr = read("supabase/functions/weekly-plan/independent-post-generation.ts")
 const dgc = read("supabase/functions/weekly-plan/deep-generation-context.ts");
 const pipe = read("supabase/functions/weekly-plan/order-write-pipeline.ts");
 const dna = read("supabase/functions/weekly-plan/engine-dna.ts");
+const arch = read("supabase/functions/weekly-plan/engine-architecture.ts");
+const libArch = read("lib/intelligence/engine-architecture.ts");
 const libDna = read("lib/intelligence/creator-dna-runtime.ts");
 const libPerf = read("lib/intelligence/performance-dna-runtime.ts");
 const intent = read("supabase/functions/weekly-plan/creator-intent-14d.ts");
@@ -22,6 +24,9 @@ const aud = read("supabase/functions/weekly-plan/audience-reaction-intelligence.
 const interp = read("supabase/functions/weekly-plan/seed-interpretation.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 const seedReason = read("supabase/functions/weekly-plan/creator-seed-reasoning.ts");
+const stage = read("supabase/functions/weekly-plan/engine-stage-philosophy.ts");
+const score = read("lib/learning/score.ts");
+const judge = read("supabase/functions/weekly-plan/semantic-judge.ts");
 const ver = read("lib/version.ts");
 
 let pass = 0;
@@ -36,11 +41,14 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.4.1)");
+console.log("DNA + engine live-path wiring (v11.5.4)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
-ok("D3. ChatGPT writer injects performance DNA", /performanceDnaBlock\(\)/.test(wr) && /PERFORMANCE DNA/.test(wr));
+ok("D3. Writer does not use Performance DNA as writing input",
+  /writerArchitectureLock/.test(wr) &&
+  /Performance DNA is Planner-only/.test(arch) &&
+  !/performanceDnaBlock\(\)/.test(wr));
 ok("D4. Grok quota gets DNA", /creatorDnaBlock\(\)/.test(quota) && /engineRulesAsWill\(\)/.test(quota));
 ok("D5. Grok seed expand gets DNA", /creatorDnaBlock\(\)/.test(seedReason) && /engineRulesAsWill\(\)/.test(seedReason));
 
@@ -83,15 +91,110 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.4.1", /APP_VERSION = "11.4.1"/.test(ver) && /APP_VERSION = "11.4.1"/.test(ix));
+ok("D28. version 11.5.4", /APP_VERSION = "11.5.4"/.test(ver) && /APP_VERSION = "11.5.4"/.test(ix));
 
-ok("D29. review engines stay off generate job",
-  !/from "\.\/selective-regeneration\.ts"/.test(job) &&
-  !/from "\.\/regeneration-router\.ts"/.test(job) &&
-  !/from "\.\/weekly-count-ledger\.ts"/.test(job) &&
+ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
 ok("D30. deep context stores protected_meaning and politeness",
   /protected_meaning:/.test(dgc) && /politeness_level:/.test(dgc));
+ok("D31. Creator DNA is how he sees/thinks/expresses, not a template",
+  /PURPOSE: Preserve how this person sees/.test(dna) &&
+  /NOT A TEMPLATE/.test(dna) &&
+  /What would he notice first/.test(dna) &&
+  /AP_PIPELINE drafts must not rewrite Creator DNA/.test(dna) &&
+  /PURPOSE: Preserve how this person sees/.test(libDna) &&
+  /Ask what he would notice first/.test(dna));
+ok("D32. Planner is strategy engine, planning before writing",
+  /plannerPhilosophyBlock/.test(quota) &&
+  /plannerPhilosophyBlock/.test(seedReason) &&
+  /PLANNER ROLE/.test(dna) &&
+  /not a writing engine/.test(dna) &&
+  /stronger months from now/.test(dna) &&
+  /Do not learn from unpublished AI drafts/.test(dna));
+ok("D33. Architecture lock: no engine replaces the Creator",
+  /No engine replaces the Creator/.test(arch) &&
+  /No engine replaces the Creator/.test(libArch) &&
+  /plannerArchitectureLock/.test(quota) &&
+  /plannerArchitectureLock/.test(seedReason) &&
+  /writerArchitectureLock/.test(wr) &&
+  /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
+ok("D34. Pipeline order is locked",
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(arch) &&
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(libArch) &&
+  /No engine replaces the Creator/.test(dna));
+ok("D35. Forbidden mixes named",
+  /Writer must not become Planner/.test(arch) &&
+  /Performance DNA must not overwrite Creator DNA/.test(arch) &&
+  /Revenue DNA must not dominate/.test(arch));
+ok("D36. Planner Memory stores abstract patterns, not wording",
+  /MANUAL_PREMIUM/.test(score) &&
+  /must not overwrite Creator DNA/.test(score) &&
+  /추상 패턴만 저장/.test(score) &&
+  !/const snip = s\.contentSnippet/.test(score));
+ok("D37. Seed generation philosophy reaches Grok expand",
+  /planningStagePhilosophyBlock/.test(seedReason) &&
+  /A seed starts thinking/.test(stage) &&
+  /not yet a post topic/.test(stage));
+ok("D38. Core Thought is a judgment, can HOLD",
+  /CORE_THOUGHT_HOLD/.test(read("supabase/functions/weekly-plan/deep-generation-context.ts")) &&
+  /not_worth_publishing/.test(read("supabase/functions/weekly-plan/deep-generation-context.ts")) &&
+  /fact_confidence/.test(read("supabase/functions/weekly-plan/deep-generation-context.ts")));
+ok("D39. Mechanism NONE is normal",
+  /none_is_normal/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")) &&
+  /MECHANISM_NONE_IS_NORMAL/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")) &&
+  !/default_observation_personality/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")));
+ok("D40. Quality last defense rejects high structural repeat",
+  /qualityPhilosophyBlock/.test(judge) &&
+  /hard\.push\("structural_repetition_high"\)/.test(judge));
+ok("D41. Writer gets everyday/style/humor/discourse philosophy",
+  /writingStagePhilosophyBlock/.test(wr) &&
+  /Easy must not mean shallow/.test(stage) &&
+  /NONE is normal/.test(stage));
+ok("D42. 3-day Planner loads Audience/Performance/Revenue/Memory/Current X",
+  /loadPlannerIntelligence/.test(job) &&
+  /loadPlannerIntelligence/.test(ix) &&
+  /intelligence/.test(quota) &&
+  /audience_dna_current/.test(seedReason) &&
+  /planner_memory/.test(seedReason) &&
+  /current_x_context/.test(seedReason));
+ok("D43. Audience DNA primary is X Analytics, not follow-the-followers",
+  /X Analytics primary/.test(arch) &&
+  /Primary source: X Analytics/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")) &&
+  /Must not overwrite Creator DNA/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")));
+ok("D44. Learning loop closes only when Planner reads",
+  /next 3-day Planner reads/.test(arch) &&
+  /LEARNING_CYCLE/.test(libArch) &&
+  /plannerMustRead/.test(read("app/api/learning/analyze/route.ts")));
+ok("D45. Performance DNA interpret order starts with followers gained",
+  /followersGained: 50/.test(read("lib/learning/types.ts")) &&
+  /Followers Gained → Profile Visits → Revenue/.test(dna));
+ok("D46. Missing intelligence is UNKNOWN not zero",
+  /UNKNOWN \/ insufficient evidence/.test(read("supabase/functions/weekly-plan/planner-intelligence.ts")) &&
+  /빈 값을 성공으로 쓰지 않음/.test(score));
+ok("D47. Operator collaboration is chat-only, not Writer",
+  /operator-collaboration-v1/.test(read("lib/intelligence/operator-collaboration.ts")) &&
+  /Not a being that thinks instead of the operator/.test(read("lib/intelligence/operator-collaboration.ts")) &&
+  !/operator-collaboration/.test(wr) &&
+  !/operatorCollaborationBlock/.test(wr));
+ok("D48. Writer+Judge get week structural signatures",
+  /writerWeekStructureConstraintLines/.test(wr) &&
+  /week_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /weekStructureHardReasons/.test(judge) &&
+  /other_post_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
+ok("D49. Rejected slot runs selective regen then re-judge",
+  /executeSelectiveRegeneration/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /decideRegenerationRoute/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
+  /from "\.\/selective-regeneration\.ts"/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
+ok("D50. Job uses weekly-count-ledger as completion gate",
+  /from "\.\/weekly-count-ledger\.ts"/.test(job) &&
+  /evaluateOrder8cCompletionGate/.test(job) &&
+  /attachCountLedger/.test(job) &&
+  /planned/.test(job) && /regenerated/.test(job) && /blocked/.test(job));
+ok("D51. Interest promotion needs repeated cycles, not one hit",
+  /CYCLES_TO_PROMOTE = 2/.test(read("lib/learning/interest-promotion.ts")) &&
+  /promoteInterestLadder/.test(read("app/api/learning/analyze/route.ts")) &&
+  /INTEREST LADDER/.test(read("supabase/functions/weekly-plan/planner-intelligence.ts")) &&
+  /One published success does not promote/.test(stage));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

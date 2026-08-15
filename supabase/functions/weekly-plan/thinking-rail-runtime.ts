@@ -1,12 +1,7 @@
-/**
- * ORDER 3 — Thinking Rail Runtime Integration
- * Pipeline position: Seed → Interpretation → Reader Self-Projection → Reaction Mechanism → Thinking Rail → generation
- *
- * Core: choose/derive creator-like reasoning flow for THIS seed after interpretation + mechanism.
- * NOT wording, tone, style, template, or topic→rail lookup.
- * Writing DNA and Style remain separate (style_decision stays null).
- * Reaction Mechanism remains independent — no fixed mechanism↔rail table.
- * ORDER 0B / 1 / 2 protections preserved.
+ * ORDER 3 — Thinking Rail Runtime
+ * Thinking explores several readings of one seed before any sentence.
+ * A Rail is an abstract path, not a topic→rail template.
+ * Pipeline: Seed → Interpretation → Reader Self-Projection → Reaction Mechanism → Thinking Rail
  */
 import type { SeedInterpretation } from "./seed-interpretation.ts";
 import type { MechanismSelectionResult } from "./reader-self-projection.ts";

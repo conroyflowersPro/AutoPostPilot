@@ -29,6 +29,8 @@ export type ContentFeatures = {
   ctaUsage?: boolean;
   mediaType?: string;
   mediaPresence?: boolean;
+  discourseShape?: string;
+  personalStoryLevel?: string;
   targetGrowthObjective?: string;
   strategySource?: "hypothesis" | "observed" | "unknown";
 };
@@ -88,6 +90,7 @@ export type AudienceDnaPayload = {
   topicMovement: string[];
   followerInterests: string[];
   summaryKo: string;
+  interestLadder?: Array<{ topic: string; stage: string; signalCycles: number }>;
 };
 
 export type PerformanceDnaPayload = {
@@ -107,16 +110,16 @@ export type RevenueDnaPayload = {
 };
 
 export const METRIC_WEIGHTS = {
-  replies: 40,
-  bookmarks: 30,
-  quotes: 20,
-  reposts: 15,
-  profileVisits: 8,
-  revenue: 8,
+  /** Performance DNA interpret order: Followers Gained → Profile Visits → Revenue → Bookmarks → Replies → Reposts → Quotes → Likes → Impressions */
+  followersGained: 50,
+  profileVisits: 40,
+  revenue: 30,
+  bookmarks: 24,
+  replies: 20,
+  reposts: 12,
+  quotes: 12,
+  detailExpands: 8,
+  shares: 2,
   likes: 2,
   impressions: 1,
-  detailExpands: 3,
-  shares: 2,
-  /** Lagging result. Out of strategy rank. */
-  followersGained: 0,
 } as const;

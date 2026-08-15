@@ -9,6 +9,8 @@ import {
   buildRevenueDna,
 } from "@/lib/learning/score";
 import { extractFeatures } from "@/lib/learning/features";
+import { promoteInterestLadder, interestLadderPromptLines } from "@/lib/learning/interest-promotion";
+import { OPERATOR_REVENUE_START } from "@/lib/learning/operator-revenue-start";
 import type { NormalizedPostMetrics, MetricOrigin } from "@/lib/learning/types";
 
 export const maxDuration = 26;
@@ -106,7 +108,32 @@ export async function POST(req: NextRequest) {
     const creatorDna = buildCreatorDnaHint(scored);
     const audienceDna = buildAudienceDnaHint(scored);
     const performanceDna = buildPerformanceDna(scored);
-    const revenueDna = buildRevenueDna(scored);
+    const { data: runRow } = await supabase
+      .from("learning_runs")
+      .select("raw_meta")
+      .eq("id", learningRunId)
+      .maybeSingle();
+    const meta = (runRow?.raw_meta && typeof runRow.raw_meta === "object") ? runRow.raw_meta as Record<string, unknown> : {};
+    const payoutUsd = Number(meta.payoutUsd) > 0 ? Number(meta.payoutUsd) : OPERATOR_REVENUE_START.amountUsd;
+    const revenueDna = buildRevenueDna(scored, {
+      amountUsd: payoutUsd,
+      period: String(meta.payoutPeriod || `${OPERATOR_REVENUE_START.periodFrom}..${OPERATOR_REVENUE_START.periodTo}`),
+      nextPayout: String(meta.nextPayout || OPERATOR_REVENUE_START.nextPayout),
+    });
+
+    const { data: prevAudience } = await supabase
+      .from("audience_dna")
+      .select("data")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const prevLadder = Array.isArray((prevAudience?.[0] as any)?.data?.interestLadder)
+      ? (prevAudience[0] as any).data.interestLadder
+      : [];
+    audienceDna.interestLadder = promoteInterestLadder(prevLadder, scored);
+    const ladderLines = interestLadderPromptLines(audienceDna.interestLadder);
+    if (ladderLines.length) {
+      audienceDna.summaryKo = [audienceDna.summaryKo, ladderLines[0]].filter(Boolean).join(" ");
+    }
 
     const { count: memCount } = await supabase
       .from("planner_memory")
@@ -167,6 +194,7 @@ export async function POST(req: NextRequest) {
         status: "analyzed",
         notes: memory.summaryKo,
         raw_meta: {
+          ...meta,
           successCount: memory.successCount,
           analyzedCount: memory.analyzedCount,
           performanceSummary: performanceDna.summaryKo,
@@ -189,6 +217,9 @@ export async function POST(req: NextRequest) {
         whyPatterns: performanceDna.whyPatterns.slice(0, 5),
       },
       revenueDna: { summaryKo: revenueDna.summaryKo },
+      plannerMustRead: true,
+      learningCycle:
+        "Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next 3-day Planner reads → new Planning",
       status: "analyzed",
     });
   } catch (err: any) {

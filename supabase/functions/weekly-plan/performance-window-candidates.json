@@ -1,27 +1,80 @@
 {
   "status": "CANDIDATE",
   "validated_patterns": 0,
-  "window": { "from": "2026-08-01", "to": "2026-08-14" },
+  "window": { "from": "2026-08-01", "to": "2026-08-15" },
   "payout": {
     "period": "2026-08-01/2026-08-15",
     "amount_usd": 42.29,
-    "note": "One 2-week RSP slice. Faster than the prior multi-month slice. Do not tweet the number. Do not raise daily quota from this one window."
+    "next_payout": "2026-08-28",
+    "source": "x_payouts_ui",
+    "note": "First Revenue DNA window. Account-level X payout, not per-post. Video estimated revenue in this export is 0 — that is not the payout. Do not tweet the number. Do not raise daily quota from this one window."
   },
   "volume": {
-    "originals": 87,
-    "replies": 315,
-    "note": "Reach sits on originals plus original media. Replies keep relationships and are not original seeds."
+    "originals": 84,
+    "replies": 321,
+    "content_posts": 405,
+    "note": "Content CSV Aug 2–15 2026. Reach sits on originals plus original media. Replies keep relationships and are not original seeds. Overview new-follows 72 vs content new-follows 26: missing ≠ 0, do not merge into one number."
+  },
+  "analysis": {
+    "status": "CANDIDATE",
+    "analyzed_at": "2026-08-15",
+    "content_layer": {
+      "posts": 405,
+      "originals": 84,
+      "replies": 321,
+      "original_follows": 21,
+      "reply_follows": 5,
+      "original_profile_visits": 191,
+      "reply_profile_visits": 66,
+      "original_bookmarks": 88,
+      "reply_bookmarks": 0,
+      "original_impressions": 241992,
+      "reply_impressions": 45605,
+      "originals_with_follows": 11,
+      "short_originals": 32,
+      "short_original_follows": 0,
+      "medium_originals": 51,
+      "medium_original_follows": 21
+    },
+    "overview_layer": {
+      "days": 14,
+      "impressions": 79900,
+      "new_follows": 72,
+      "unfollows": 20,
+      "net_follows": 52,
+      "profile_visits": 108,
+      "bookmarks": 30,
+      "note": "Different layer from content sums. missing ≠ 0. Do not average."
+    },
+    "video_layer": {
+      "clips": 30,
+      "views_sum": 57311,
+      "monetized": false,
+      "estimated_revenue": 0,
+      "library_ids_joined_to_content_posts": false,
+      "note": "Untitled clips. Estimated Revenue 0 is not the $42.29 payout. Do not invent a post join."
+    }
   },
   "patterns": [
-    "Lived FSD moment plus original clip → reader entry. Cite the episode; never clone that drive.",
-    "In-car or in-shop product friction the creator actually hit → related follow-up, not a recap.",
-    "Korea/US lived comparison from travel → related angle, not the same essay.",
-    "Household/daily lived beat can be CASUAL. Do not turn every day into FSD."
+    "Lived Korea/US comparison from actual travel (not invented Korea civic life) → this window's strongest original follower conversion. One post = hypothesis. Related angle only; never clone the essay.",
+    "Lived in-car FSD incident plus original clip → this window combined follows, profile visits, bookmarks, and replies. Cite the episode; never recap that drive.",
+    "In-car product friction the creator actually hit and traced → this window high bookmarks and profile, almost no follows. Utility/save is not follower conversion here.",
+    "Pointing to a community how-to (not the creator's own drive) → profile, bookmarks, replies, 0 follows this window. Useful, not a seed clone source.",
+    "Ultra-short originals: 32 posts, 0 follows this window. Medium completed observations held the original follows. Do not freeze always-medium as a template.",
+    "Replies: 321 posts, 5 follows, 0 bookmarks. Keep relationships. Do not promote replies into original seeds.",
+    "Honest late-night own-fault scene → this window profile curiosity without bookmarks or follows. Do not treat as a save pattern.",
+    "FSD originals carried discussion this window. Grok/xAI originals saved more than they converted. Do not raise FSD or Grok volume from one cycle."
   ],
   "forbidden": [
     "reuse winning post wording or punchline",
+    "clone the Korea/US travel essay or the in-car FSD incident",
+    "treat Grok-quota investigation as a follower engine",
     "raise quota because revenue jumped once",
     "promote replies into original seeds",
-    "impressions-only optimization"
+    "impressions-only optimization",
+    "spread 42.29 USD across posts",
+    "treat video estimated revenue 0 as the payout",
+    "average overview and content metrics",
+    "freeze always-medium length from this window"
   ]
 }

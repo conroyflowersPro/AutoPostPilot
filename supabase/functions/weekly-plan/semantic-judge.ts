@@ -2,9 +2,35 @@
  * ORDER 8A — Semantic Judge Foundation
  * Evaluate only. Never rewrite final_text, never generate alternatives.
  * Hard fail vs soft concern. Per-post isolation. generation_status ≠ judge_status.
+ * Architecture: Judge does not write. No engine replaces the Creator.
+ * Quality is the last defense: preserve intended thought and Creator identity,
+ * stay fact-safe, reject structural repeat. Soft warning is not enough when REJECT
+ * or selective regeneration is required.
  */
 import type { DeepGenerationContext, CoreThought, CompressionTarget } from "./deep-generation-context.ts";
 import type { IndependentPostResult } from "./independent-post-generation.ts";
+import {
+  ARCHITECTURE_JUDGE_DOES_NOT_WRITE,
+  ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR,
+} from "./engine-architecture.ts";
+import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
+import {
+  extractStructuralSignature,
+  weekStructureHardReasons,
+} from "./structural-signature.ts";
+
+export {
+  extractStructuralSignature,
+  weekStructureHardReasons,
+  writerWeekStructureConstraintLines,
+  inferDiscourseShape,
+  inferHookType,
+  DISCOURSE_TWIST_REINTERPRET,
+} from "./structural-signature.ts";
+
+export const ORDER8A_NO_ENGINE_REPLACES_CREATOR = ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR;
+export const ORDER8A_ARCHITECTURE_JUDGE_DOES_NOT_WRITE = ARCHITECTURE_JUDGE_DOES_NOT_WRITE;
+export const ORDER8A_QUALITY_PHILOSOPHY = qualityPhilosophyBlock();
 
 export const ORDER8A_VERSION = "semantic_judge_foundation_v1_order8a";
 export const ORDER8A_JUDGE_ONLY = true as const;
@@ -147,9 +173,12 @@ const FORCED_CTA_PATTERNS = [
 ];
 
 const FORCED_QUESTION_PATTERNS = [
-  /\?\s*$/m,
+  /[?？]/,
   /어떻게\s*생각하/,
-  /어떠신가요\s*\?/,
+  /어떠신가요/,
+  /보이시나요/,
+  /있으신가요/,
+  /(까요|나요|을까|ㄹ까)\s*[.…]?$/,
 ];
 
 const EXPERIENCE_FABRICATION_PATTERNS = [
@@ -282,28 +311,6 @@ function hasAnyToken(text: string, tokens: string[]): boolean {
 }
 
 /**
- * Structural signature for weekly repetition (no raw text).
- */
-export function extractStructuralSignature(text: string): Record<string, unknown> {
-  const lines = text.split(/\n/).filter((l) => l.trim().length > 0);
-  const hasQ = /\?/.test(text);
-  const hasPunch = /ㅋㅋ|ㅎㅎ|ㅋ\s*$/.test(text);
-  const firstPerson = /제가|나는|제가\s|우리\s/.test(text);
-  const opening = lines[0]?.slice(0, 24) || "";
-  const ending = lines[lines.length - 1]?.slice(0, 24) || "";
-  return {
-    paragraph_count: lines.length,
-    opening_type: opening.length > 0 ? (hasQ && lines.length === 1 ? "question" : "statement") : "empty",
-    ending_type: hasPunch ? "humor_tail" : hasQ ? "question" : "statement",
-    question_used: hasQ,
-    punchline_used: hasPunch,
-    first_person_used: firstPerson,
-    macro_conclusion_used: AI_REPORT_PATTERNS.some((re) => re.test(text)),
-    length_bucket: text.length < 80 ? "S" : text.length < 180 ? "M" : "L",
-  };
-}
-
-/**
  * Core rule-based semantic judge. Evaluation only.
  */
 export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeResult {
@@ -403,9 +410,12 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
       break;
     }
   }
-  if (FORCED_QUESTION_PATTERNS.some((re) => re.test(text)) && /생각|어떠|의견/.test(text)) {
+  if (FORCED_QUESTION_PATTERNS.some((re) => re.test(text))) {
     flags.forced_question = true;
-    soft.push("forced_question_bait");
+    hard.push("question_closer");
+  }
+  if (/레이어|\bL2\b|\bL1\b|프로토콜|엔드포인트|메커니즘/i.test(text)) {
+    hard.push("expert_jargon");
   }
 
   let aiHits = 0;
@@ -514,6 +524,12 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     ...(input.weekly_context?.recent_generated_signatures || []),
   ];
   const mine = extractStructuralSignature(text);
+  const weekHard = weekStructureHardReasons(mine, sigs);
+  if (weekHard.length) {
+    hard.push(...weekHard);
+    flags.template_like = true;
+    flags.conceptual_repetition = "HIGH";
+  }
   let sameOpening = 0;
   let sameEnding = 0;
   for (const sig of sigs) {
@@ -521,13 +537,13 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     if (sig && sig.ending_type === mine.ending_type && sig.punchline_used === mine.punchline_used) sameEnding++;
   }
   if (sameOpening >= 3 || sameEnding >= 3) {
-    soft.push("structural_repetition_high");
+    hard.push("structural_repetition_high");
     flags.template_like = true;
     flags.conceptual_repetition = "HIGH";
-  } else if (sameOpening >= 2 || sameEnding >= 2) {
+  } else if (!weekHard.length && (sameOpening >= 2 || sameEnding >= 2)) {
     soft.push("structural_repetition_medium");
     flags.conceptual_repetition = "MEDIUM";
-  } else {
+  } else if (!weekHard.length) {
     flags.conceptual_repetition = "LOW";
   }
   scores.novelty_fit = clamp01(

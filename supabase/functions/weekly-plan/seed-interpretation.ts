@@ -1,12 +1,21 @@
-/**
  * ORDER 1 — Independent Seed Interpretation Layer
- * Seed is NOT a sentence. Interpret meaning first (multiple candidates → select).
+ * Seed is NOT a sentence and NOT yet a post topic.
+ * This stage asks what can actually be thought from the material:
+ * Fact / Observation / Personal Experience / Hypothesis / Opinion.
+ * Not "how should we say this".
  * No reaction mechanism, thinking rail, style, humor, hook, or final writing decided here.
  * No topic/keyword → fixed interpretation mapping.
- * ORDER 0B leakage separation preserved.
  */
 export type InterpretationStatus = "INTERPRETATION_OK" | "INTERPRETATION_WEAK" | "INTERPRETATION_BLOCKED";
 export type FactualBoundaryItem = { item: string; status: "confirmed" | "inferred" | "unknown" | "prohibited_to_invent" };
+export type ClaimKind = "FACT" | "OBSERVATION" | "PERSONAL_EXPERIENCE" | "HYPOTHESIS" | "OPINION";
+export type ClaimBoundaryMap = {
+  fact: string[];
+  observation: string[];
+  personal_experience: string[];
+  hypothesis: string[];
+  opinion: string[];
+};
 export type ExperienceBoundary = {
   creator_experienced: boolean;
   evidence_supported: boolean;
@@ -24,6 +33,7 @@ export type SeedInterpretation = {
   concrete_human_element: string;
   possible_reader_connection: string;
   factual_boundaries: FactualBoundaryItem[];
+  claim_boundaries: ClaimBoundaryMap;
   experience_boundaries: ExperienceBoundary;
   uncertainty: string[];
   repetition_risk: "LOW" | "MEDIUM" | "HIGH";
@@ -82,6 +92,20 @@ function extractFactualBoundaries(seed: InterpretSeedInput): FactualBoundaryItem
     out.push({ item: "first-person lived experience of this exact event", status: "prohibited_to_invent" });
   }
   return out;
+}
+function buildClaimBoundaries(seed: InterpretSeedInput, factual: FactualBoundaryItem[], exp: ExperienceBoundary): ClaimBoundaryMap {
+  const fact = factual.filter((x) => x.status === "confirmed").map((x) => x.item).slice(0, 8);
+  const hypothesis = factual.filter((x) => x.status === "inferred" || x.status === "unknown").map((x) => x.item).slice(0, 6);
+  const observation: string[] = [];
+  const subject = clean(seed.concrete_subject);
+  if (subject) observation.push(subject.slice(0, 80));
+  const tension = clean(seed.point_or_tension);
+  if (tension) observation.push(tension.slice(0, 80));
+  const personal_experience = exp.creator_experienced && exp.evidence_supported
+    ? (seed.experience_facts || []).map(clean).filter(Boolean).slice(0, 6)
+    : [];
+  const opinion = (seed as { creator_opinion?: string[] }).creator_opinion?.map(clean).filter(Boolean).slice(0, 4) || [];
+  return { fact, observation, personal_experience, hypothesis, opinion };
 }
 function buildExperienceBoundaries(seed: InterpretSeedInput): ExperienceBoundary {
   const hasExp = !!(seed.creator_evidence_available || (seed.experience_facts && seed.experience_facts.length > 0));
@@ -199,7 +223,9 @@ export function interpretSeed(input: InterpretSeedInput): SeedInterpretation {
       seed_id, interpretation_id, status: "INTERPRETATION_BLOCKED", seed_subject: "unspecified",
       what_is_actually_happening: "seed meaning too vague", why_it_might_matter_to_creator: "cannot establish relevance",
       what_is_new_or_interesting: "none", concrete_human_element: "NONE", possible_reader_connection: "NONE",
-      factual_boundaries: extractFactualBoundaries(input), experience_boundaries: buildExperienceBoundaries(input),
+      factual_boundaries: extractFactualBoundaries(input),
+      claim_boundaries: { fact: [], observation: [], personal_experience: [], hypothesis: [], opinion: [] },
+      experience_boundaries: buildExperienceBoundaries(input),
       uncertainty: ["ambiguous meaning", "incomplete context"], repetition_risk: "LOW", candidate_count: 0,
       selected_candidate_index: -1, rejection_reasons: ["seed meaning too vague"], interpretation_confidence: 0.1,
       novelty_signal: "NONE", assumption_risk: "HIGH", possible_macro_implication: null,
@@ -207,6 +233,7 @@ export function interpretSeed(input: InterpretSeedInput): SeedInterpretation {
   }
   const factual_boundaries = extractFactualBoundaries(input);
   const experience_boundaries = buildExperienceBoundaries(input);
+  const claim_boundaries = buildClaimBoundaries(input, factual_boundaries, experience_boundaries);
   const repetition_risk = assessRepetitionRisk(input);
   const candidates = buildCandidates(input);
   const scores = candidates.map((c) => scoreCandidate(c, input, repetition_risk));
@@ -231,7 +258,7 @@ export function interpretSeed(input: InterpretSeedInput): SeedInterpretation {
     seed_id, interpretation_id, status, seed_subject: best.seed_subject,
     what_is_actually_happening: best.what_is_actually_happening, why_it_might_matter_to_creator: best.why_it_might_matter_to_creator,
     what_is_new_or_interesting: best.what_is_new_or_interesting, concrete_human_element: best.concrete_human_element,
-    possible_reader_connection: best.possible_reader_connection, factual_boundaries, experience_boundaries, uncertainty,
+    possible_reader_connection: best.possible_reader_connection, factual_boundaries, claim_boundaries, experience_boundaries, uncertainty,
     repetition_risk, interpretation_confidence: Math.max(0.15, Math.min(0.95, 0.4 + scores[bestIdx] * 0.1)),
     novelty_signal: detectNovelty(input).signal, assumption_risk: best.assumption_risk, candidate_count: candidates.length,
     selected_candidate_index: bestIdx, rejection_reasons: rejection_reasons.length ? rejection_reasons : undefined,

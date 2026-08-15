@@ -53,6 +53,7 @@ import {
   QUOTA_PER_DAY_MIN,
   QUOTA_PER_DAY_MAX,
 } from "./quota-inference.ts";
+import { loadPlannerIntelligence } from "./planner-intelligence.ts";
 import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job.ts";
 import { overlayClusterWeightsWithIntent14d } from "./creator-intent-14d.ts";
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
@@ -60,7 +61,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.4.1";
+const APP_VERSION = "11.5.4";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -217,6 +218,7 @@ Deno.serve(async (req) => {
         (actRows || []) as any[],
       );
       learned.cluster_weights = cluster_weights;
+      const intelligence = await loadPlannerIntelligence(supabase, learned.recent_angle_labels);
       const quota = xaiKey
         ? await inferWeeklyQuota({
           xaiKey,
@@ -225,6 +227,7 @@ Deno.serve(async (req) => {
           userDirectN: learned.user_direct_n,
           performanceHints: learned.performance_pattern_hints,
           learning: learned.learning,
+          intelligence,
           explicitCreatorIntent: intentText || undefined,
           model: V11_SEED_MODEL,
           timeoutMs: 18000,
@@ -301,6 +304,7 @@ Deno.serve(async (req) => {
         (actRows || []) as any[],
       );
       learned.cluster_weights = cluster_weights;
+      const intelligence = await loadPlannerIntelligence(supabase, [...learned.recent_angle_labels, ...published]);
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
       const targetSupply = Math.max(required_slots, Math.ceil(required_slots * 1.15));
@@ -408,6 +412,7 @@ Deno.serve(async (req) => {
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
             learning: learned.learning,
+            intelligence,
             model: V11_SEED_MODEL,
             timeoutMs: 32000,
           });
