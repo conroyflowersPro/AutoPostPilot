@@ -67,7 +67,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.2.5)");
+console.log("Writer quality + leftover seeds (v11.2.6)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -84,8 +84,8 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.2.5", /APP_VERSION = "11.2.5"/.test(ver) && /APP_VERSION = "11.2.5"/.test(ix));
-ok("W18. Korean summary names keyword infer", /키워드만 있어도/.test(ver));
+ok("W17. version lockstep 11.2.6", /APP_VERSION = "11.2.6"/.test(ver) && /APP_VERSION = "11.2.6"/.test(ix));
+ok("W18. Korean summary names ChatGPT writer", /ChatGPT가 씁니다/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
@@ -99,6 +99,8 @@ ok("W28. info posts forbid 음슴체", /Do not use 음슴체 on information post
 ok("W29. public words must not distort the claim", /NEVER swap a word if it would change the claim/.test(wr));
 ok("W30. pipeline passes editorial mode into voice", /voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
+ok("W32. original body uses OpenAI ChatGPT", /api\.openai\.com\/v1\/chat\/completions/.test(wr) && /OPENAI_API_KEY/.test(ix));
+ok("W33. writer does not call xAI", !/api\.x\.ai/.test(wr));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

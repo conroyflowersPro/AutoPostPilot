@@ -44,7 +44,7 @@ import {
   softDailyCap,
 } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
-import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
+import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
   inferWeeklyQuota,
   quotaFromCadence,
@@ -57,7 +57,7 @@ import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 6;
-const APP_VERSION = "11.2.5";
+const APP_VERSION = "11.2.6";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
       ? Math.round(Number(body.required_slots))
       : postsPerDay * daysCount;
     const xaiKey = (Deno.env.get("XAI_API_KEY") || "").trim();
+    const openaiKey = (Deno.env.get("OPENAI_API_KEY") || "").trim();
     const t0 = Date.now();
 
     if (phase === "job_start") {
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
     if (phase === "job_tick") {
       const jobId = String(body.job_id || "");
       if (!jobId) return json({ success: false, error: "job_id required", phase: "job_tick" }, 400);
-      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey });
+      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey, openaiKey });
       return json({ ...job, phase: "job_tick", app_version: APP_VERSION, timing: { total_ms: Date.now() - t0 } });
     }
 
@@ -217,7 +218,7 @@ Deno.serve(async (req) => {
           performanceHints: learned.performance_pattern_hints,
           learning: learned.learning,
           explicitCreatorIntent: intentText || undefined,
-          model: V11_WRITER_MODEL,
+          model: V11_SEED_MODEL,
           timeoutMs: 18000,
         })
         : quotaFromCadence(learned.cadence, intentText);
@@ -394,7 +395,7 @@ Deno.serve(async (req) => {
             registryInterestHints: learned.registry_interest_hints,
             userDirectN: learned.user_direct_n,
             learning: learned.learning,
-            model: V11_WRITER_MODEL,
+            model: V11_SEED_MODEL,
             timeoutMs: 32000,
           });
         let xaiRes = await runExpand();
@@ -444,7 +445,7 @@ Deno.serve(async (req) => {
         required_slots,
         key_present: !!xaiKey,
         key_len: xaiKey.length,
-        expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none",
+        expand_model: xai_seed_expansion.attempted ? V11_SEED_MODEL : "none",
         supply_low: cumulative < required_slots,
         diagnostics: {
           app_version: APP_VERSION,
@@ -454,7 +455,7 @@ Deno.serve(async (req) => {
           local_raw: local.length,
           local_passed: gated.passed.length,
           local_rejected: gated.local_gate_rejected,
-          expand_model: xai_seed_expansion.attempted ? V11_WRITER_MODEL : "none",
+          expand_model: xai_seed_expansion.attempted ? V11_SEED_MODEL : "none",
           evidence_activity_rows: (actRows || []).length,
           evidence_subjects: evidenceSubjects.length,
           published_evidence_rows: publishedEvidence.length,
@@ -723,7 +724,7 @@ Deno.serve(async (req) => {
         .limit(400);
       const posts = await writeSlotBatch({
         slots,
-        xaiKey: xaiKey || null,
+        openaiKey: openaiKey || null,
         dryRun,
         voiceRows: (voiceActs || []) as any,
       });

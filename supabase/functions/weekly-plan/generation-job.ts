@@ -22,7 +22,7 @@ import { guardCandidateAgainstManualLeakage, type RecentManualPost } from "./man
 import { isSeedEligibleRole, type SourceRole } from "./source-roles.ts";
 import { redistributeDailyTopics } from "./daily-topic-distribute.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
-import { writeSlotBatch, V11_WRITER_MODEL } from "./order-write-pipeline.ts";
+import { writeSlotBatch, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import { inferWeeklyQuota, quotaFromCadence, QUOTA_DAYS, QUOTA_PER_DAY_MIN, QUOTA_PER_DAY_MAX } from "./quota-inference.ts";
 import {
   ADJACENT_PER_DAY_MAX,
@@ -238,6 +238,7 @@ export async function tickWeeklyJob(args: {
   userId: string;
   jobId: string;
   xaiKey: string;
+  openaiKey?: string;
 }): Promise<JobPublic> {
   const { data: row, error } = await args.supabase
     .from("generation_jobs")
@@ -259,7 +260,7 @@ export async function tickWeeklyJob(args: {
     else if (row.step === "expand") await stepExpand(args.supabase, args.xaiKey, row);
     else if (row.step === "judge") await stepJudge(row);
     else if (row.step === "select") await stepSelect(args.supabase, row);
-    else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey, args.userId, row);
+    else if (row.step === "write") await stepWrite(args.supabase, args.openaiKey || "", args.userId, row);
     else {
       row.status = "done";
       row.label_ko = `완료: ${row.saved_count}개 draft 저장`;
@@ -325,7 +326,7 @@ async function stepQuota(supabase: any, xaiKey: string, row: any) {
       performanceHints: learned.performance_pattern_hints,
       learning: learned.learning,
       explicitCreatorIntent: intentText || undefined,
-      model: V11_WRITER_MODEL,
+      model: V11_SEED_MODEL,
       timeoutMs: 18000,
     })
     : quotaFromCadence(learned.cadence, intentText);
@@ -408,7 +409,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     userDirectN: learned.user_direct_n,
     learning: learned.learning,
     adjacentRing: adjacentFill,
-    model: V11_WRITER_MODEL,
+    model: V11_SEED_MODEL,
     timeoutMs: 32000,
   });
   st.dim_batch = Number(st.dim_batch || 0) + 1;
@@ -702,7 +703,7 @@ async function stepSelect(supabase: any, row: any) {
     : `초안 생성 0/${totalAfter}…`;
 }
 
-async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
+async function stepWrite(supabase: any, openaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
   const i = Number(st.write_index || 0);
@@ -724,7 +725,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     .limit(400);
   const posts = await writeSlotBatch({
     slots: chunk,
-    xaiKey: xaiKey || null,
+    openaiKey: openaiKey || null,
     voiceRows: (voiceActs || []) as any,
   });
   for (const p of posts) {
@@ -742,7 +743,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       strategy_json: {
         system_origin_class: "AP_PIPELINE",
         slotId: p.slotId || null,
-        writer_model: "grok-4.6",
+        writer_model: "gpt-4o",
         engine: "v11_inferred_quota_fill",
         job_id: row.id,
       },
