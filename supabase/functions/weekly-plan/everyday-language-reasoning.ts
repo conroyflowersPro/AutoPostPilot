@@ -38,7 +38,7 @@ export const ORDER5C_NO_EXPLANATORY_TAIL = true as const;
 /* Types                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export type BarrierLevel = "LOW" | "MODERATE" | "HIGH" | "UNKNOWN";
+export type BarrierLevel = "VERY_LOW" | "LOW" | "MODERATE" | "HIGH" | "UNKNOWN";
 
 export type LanguageStatus =
   | "LANGUAGE_OK"

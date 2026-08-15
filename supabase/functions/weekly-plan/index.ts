@@ -390,7 +390,7 @@ Deno.serve(async (req) => {
         return cannotInfer("SEED_INFERENCE_REQUIRES_XAI", { xai_seed_expansion });
       }
       if (remaining > 0 && xaiKey) {
-        const existingHeld: ConcreteSeed[] = priorSubjects.map((s, i) => ({
+        const existingHeld: ConcreteSeed[] = priorSubjects.map((s: string, i: number) => ({
           seed_id: `prior-${i + 1}`,
           cluster: "HELD",
           dimension: "PRIOR",

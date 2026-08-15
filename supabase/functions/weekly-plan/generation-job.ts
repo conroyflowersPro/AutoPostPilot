@@ -1497,7 +1497,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
   st.weekly_signatures = Array.isArray(st.weekly_signatures) ? st.weekly_signatures : [];
   for (let k = 0; k < posts.length; k++) {
     const p = posts[k];
-    const text = String(p.final_text || p.content || "").trim();
+    const text = String(p.final_text || "").trim();
     st.write_outcomes.push({
       slotId: p.slotId,
       slot_id: p.slotId,
