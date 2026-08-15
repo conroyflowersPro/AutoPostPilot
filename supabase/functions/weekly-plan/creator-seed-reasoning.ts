@@ -99,8 +99,10 @@ function seedListFromParsed(parsed: any): any[] {
 function defaultPerformanceHints(): string[] {
   return [
     "Practical investigation + real media → bookmarks/views candidate",
-    "Honest incident / observation with low entry barrier → replies candidate",
+    "Honest incident / observation with low entry barrier (wording AND wording range) → readers, not a Tesla club",
+    "Lived tension + how it resolved can be informative; do not hard-assert — leave judgment so readers can reply",
     "Everyday wording (e.g. 돈 not 자산) can raise attention without changing meaning",
+    "Do not write only keep-worthy posts; mix/diversity is how bookmarks are sought",
     "Do NOT reuse a past winning seed subject; transfer flow/entry/wording quality only",
   ];
 }
@@ -222,7 +224,7 @@ export async function reasonCreatorSeeds(
     "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
     "A short keyword subject is valid. Infer a public-agreeable situation through Creator DNA vision. Never emit hardcoded example seed bodies or example post prose.",
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
-    "INFORMATIVE seeds stay in public scope. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
+    "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "Mix follows observed cluster_weights. Tesla may dominate IF that is the data — still every Tesla seed must be a NEW angle, not the same axis recycled.",
     "If USER_DIRECT shows gaming, LAFC, daily, or AI, include those clusters in proportion. Do not zero them out to fill Tesla templates.",

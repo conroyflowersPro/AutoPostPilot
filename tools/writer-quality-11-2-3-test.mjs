@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.2.6)");
+console.log("Writer quality + leftover seeds (v11.2.7)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.2.6", /APP_VERSION = "11.2.6"/.test(ver) && /APP_VERSION = "11.2.6"/.test(ix));
+ok("W17. version lockstep 11.2.7", /APP_VERSION = "11.2.7"/.test(ver) && /APP_VERSION = "11.2.7"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and participation order", /ChatGPT/.test(ver) && /댓글/.test(ver) && /팔로워는 전략 1순위가 아닙니다/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -104,7 +104,15 @@ ok("W32. original body uses OpenAI ChatGPT", /api\.openai\.com\/v1\/chat\/comple
 ok("W33. writer does not call xAI", !/api\.x\.ai/.test(wr));
 ok("W34. DNA participation order replies bookmarks quotes reposts", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
 ok("W35. DNA says weights are probabilities not counts", /predicted action probabilities/.test(dna));
-ok("W36. DNA spacing 48h and same-author decay", /48 hours/.test(dna) && /Do not stack originals/.test(dna));
+ok("W36. DNA spacing 48h For You window 14-22 PT", /48 hours/.test(dna) && /14:00 America\/Los_Angeles/.test(dna) && /14:00–22:00 PT/.test(dna) && /Do not stack originals/.test(dna));
+ok("W37. DNA audience is readers not a Tesla club", /Audience is readers/.test(dna) && /not a Tesla club/.test(dna));
+ok("W38. DNA mix not keep-worthy-only", /do not write only keep-worthy/.test(dna));
+ok("W39. DNA copy-link is predicted Home viewer not author DM", /Author copying an original and DMing/.test(dna) && /Direct navigation/.test(dna));
+ok("W40. writer readers + wording range", /Audience is readers/.test(wr) && /wording AND the range of wording/.test(wr));
+ok("W41. writer tension can inform without preaching", /leave judgment to the reader/.test(wr) && /that can make the post informative/.test(wr));
+ok("W42. writer mix for bookmarks not archive-only", /do not write only keep-worthy archive posts/.test(wr));
+ok("W43. writer has no copy-link weight numbers", !/ShareViaCopyLink/.test(wr) && !/weight 20/.test(wr) && !/가중치 20/.test(wr));
+ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시/.test(ver));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

@@ -1,15 +1,24 @@
 /**
- * Korean track scheduling (America/Los_Angeles)
- * - Day anchor: 17:00 local
- * - If start day is today and past 17:00 → next full hour
- * - Min 3 hours between posts
- * - Max posts per calendar day (default 5)
+ * Korean track scheduling (America/Los_Angeles) — For You optimized.
+ * - Day starts 14:00 PT (2pm Pacific)
+ * - Planner even-spreads originals across the afternoon–evening For You window
+ * - Same-author originals in one refresh are decayed; do not stack
+ * - For You candidates drop after ~48 hours (spacing only; not a writer recipe)
  */
 
 const TZ = "America/Los_Angeles";
 const MODEL = "grok-4.6";
-const ANCHOR_HOUR = 17;
-const MIN_GAP_MS = 3 * 60 * 60 * 1000;
+
+/** First original of a Pacific calendar day. */
+export const FOR_YOU_START_HOUR = 14;
+/** Last original of a Pacific calendar day (US afternoon/evening For You). */
+export const FOR_YOU_END_HOUR = 22;
+/** Preferred gap so two originals are less likely to land in the same refresh. */
+export const FOR_YOU_PREFERRED_GAP_MS = 2 * 60 * 60 * 1000;
+/** Anti-burst floor when quota is dense inside the 14:00–22:00 window. */
+export const FOR_YOU_HARD_MIN_GAP_MS = 45 * 60 * 1000;
+
+const ANCHOR_HOUR = FOR_YOU_START_HOUR;
 
 export function getLAParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -74,8 +83,6 @@ function addCalendarDays(
   add: number
 ) {
   const d = new Date(Date.UTC(year, month - 1, day + add, 12, 0, 0));
-  const p = getLAParts(d);
-  // Use UTC date parts from noon UTC approx; better: format in LA
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
     year: "numeric",
@@ -88,6 +95,55 @@ function addCalendarDays(
     month: parseInt(get("month"), 10),
     day: parseInt(get("day"), 10),
   };
+}
+
+function dayStartMs(year: number, month: number, day: number, hour: number, minute = 0) {
+  return new Date(laWallTimeToISO(year, month, day, hour, minute)).getTime();
+}
+
+function clampHourToForYouWindow(hour: number): number {
+  if (hour < FOR_YOU_START_HOUR) return FOR_YOU_START_HOUR;
+  if (hour > FOR_YOU_END_HOUR) return FOR_YOU_END_HOUR;
+  return hour;
+}
+
+/** How many originals fit in [startMs, endMs] with the anti-burst floor. */
+export function forYouFitCount(startMs: number, endMs: number): number {
+  if (!(endMs >= startMs)) return 0;
+  return Math.floor((endMs - startMs) / FOR_YOU_HARD_MIN_GAP_MS) + 1;
+}
+
+/**
+ * Even-spread n originals from firstMs through endMs (inclusive).
+ * Prefers ~2h gaps; if quota is denser, still spreads instead of stacking at 14:00.
+ */
+export function evenSpreadInWindow(firstMs: number, endMs: number, count: number): string[] {
+  const n = Math.max(0, Math.floor(count));
+  if (n === 0) return [];
+  if (n === 1) return [new Date(firstMs).toISOString()];
+  const span = Math.max(0, endMs - firstMs);
+  const gap = span / (n - 1);
+  const slots: string[] = [];
+  for (let i = 0; i < n; i++) {
+    slots.push(new Date(Math.round(firstMs + gap * i)).toISOString());
+  }
+  return slots;
+}
+
+function evenSpreadForYouDay(
+  year: number,
+  month: number,
+  day: number,
+  count: number,
+  firstHour: number,
+  firstMinute = 0
+): string[] {
+  const startH = clampHourToForYouWindow(firstHour);
+  const firstMs = dayStartMs(year, month, day, startH, firstMinute);
+  const endMs = dayStartMs(year, month, day, FOR_YOU_END_HOUR, 0);
+  const fit = forYouFitCount(firstMs, endMs);
+  const n = Math.min(count, fit);
+  return evenSpreadInWindow(firstMs, endMs, n);
 }
 
 /** Start ISO for a given LA calendar date YYYY-MM-DD */
@@ -107,19 +163,9 @@ export function computeStartISOForDate(
     nowP.year === year && nowP.month === month && nowP.day === day;
 
   if (isToday) {
-    if (nowP.hour < ANCHOR_HOUR) {
-      return laWallTimeToISO(year, month, day, ANCHOR_HOUR, 0);
-    }
-    let hour = nowP.minute > 0 ? nowP.hour + 1 : nowP.hour;
-    if (nowP.minute === 0 && nowP.hour >= ANCHOR_HOUR) hour = nowP.hour;
-    if (hour >= 24) {
-      const next = addCalendarDays(year, month, day, 1);
-      return laWallTimeToISO(next.year, next.month, next.day, ANCHOR_HOUR, 0);
-    }
-    return laWallTimeToISO(year, month, day, hour, 0);
+    return computeKRBatchStartISO(now);
   }
 
-  // Future (or past) calendar day → 17:00 that day
   return laWallTimeToISO(year, month, day, ANCHOR_HOUR, 0);
 }
 
@@ -130,7 +176,7 @@ export function computeKRBatchStartISO(now = new Date()): string {
   }
   let hour = p.minute > 0 ? p.hour + 1 : p.hour;
   if (p.minute === 0 && p.hour >= ANCHOR_HOUR) hour = p.hour;
-  if (hour >= 24) {
+  if (hour > FOR_YOU_END_HOUR) {
     const next = addCalendarDays(p.year, p.month, p.day, 1);
     return laWallTimeToISO(next.year, next.month, next.day, ANCHOR_HOUR, 0);
   }
@@ -138,8 +184,9 @@ export function computeKRBatchStartISO(now = new Date()): string {
 }
 
 /**
- * Spread posts across days from startISO.
- * maxPerDay posts per LA calendar day, min 3h gap, new day starts 17:00.
+ * Spread posts across Pacific days from startISO.
+ * Planner even-spreads inside 14:00–22:00 PT. Extra posts that cannot
+ * keep the anti-burst floor roll to the next day at 14:00.
  */
 export function buildDaySpreadSlots(
   startISO: string,
@@ -148,38 +195,63 @@ export function buildDaySpreadSlots(
 ): string[] {
   if (count <= 0) return [];
   const slots: string[] = [];
-  let cursor = new Date(startISO).getTime();
-  let dayCount = 0;
-  let dayStartParts = getLAParts(new Date(cursor));
+  const start = new Date(startISO);
+  let parts = getLAParts(start);
+  let firstHour = parts.hour;
+  let firstMinute = parts.minute;
+  let remaining = count;
+  const cap = Math.min(8, Math.max(1, maxPerDay));
 
-  for (let i = 0; i < count; i++) {
-    if (dayCount >= maxPerDay) {
-      // next calendar day 17:00
-      const next = addCalendarDays(
-        dayStartParts.year,
-        dayStartParts.month,
-        dayStartParts.day,
-        1
-      );
-      cursor = new Date(
-        laWallTimeToISO(next.year, next.month, next.day, ANCHOR_HOUR, 0)
-      ).getTime();
-      dayStartParts = getLAParts(new Date(cursor));
-      dayCount = 0;
+  let guard = 0;
+  while (remaining > 0 && guard < 60) {
+    guard += 1;
+    const want = Math.min(remaining, cap);
+    const daySlots = evenSpreadForYouDay(
+      parts.year,
+      parts.month,
+      parts.day,
+      want,
+      firstHour,
+      firstMinute
+    );
+    if (daySlots.length === 0) {
+      const next = addCalendarDays(parts.year, parts.month, parts.day, 1);
+      parts = { ...next, hour: ANCHOR_HOUR, minute: 0 };
+      firstHour = ANCHOR_HOUR;
+      firstMinute = 0;
+      continue;
     }
-
-    if (i > 0 && dayCount > 0) {
-      cursor += MIN_GAP_MS;
-    }
-
-    slots.push(new Date(cursor).toISOString());
-    dayCount += 1;
+    slots.push(...daySlots);
+    remaining -= daySlots.length;
+    const next = addCalendarDays(parts.year, parts.month, parts.day, 1);
+    parts = { ...next, hour: ANCHOR_HOUR, minute: 0 };
+    firstHour = ANCHOR_HOUR;
+    firstMinute = 0;
   }
   return slots;
 }
 
 export function fallbackSlots(startISO: string, count: number): string[] {
   return buildDaySpreadSlots(startISO, count, 5);
+}
+
+function timesRespectForYou(times: string[], startISO: string, maxPerDay: number): boolean {
+  if (times.length === 0) return false;
+  const startMs = new Date(startISO).getTime();
+  let last = startMs - FOR_YOU_HARD_MIN_GAP_MS;
+  const perDay = new Map<string, number>();
+  for (const t of times) {
+    const ms = new Date(t).getTime();
+    if (isNaN(ms) || ms < startMs) return false;
+    if (ms < last + FOR_YOU_HARD_MIN_GAP_MS) return false;
+    const p = getLAParts(new Date(ms));
+    if (p.hour < FOR_YOU_START_HOUR || p.hour > FOR_YOU_END_HOUR) return false;
+    const key = `${p.year}-${p.month}-${p.day}`;
+    perDay.set(key, (perDay.get(key) || 0) + 1);
+    if ((perDay.get(key) || 0) > maxPerDay) return false;
+    last = ms;
+  }
+  return true;
 }
 
 export async function assignSlotsWithGrok(
@@ -190,14 +262,14 @@ export async function assignSlotsWithGrok(
 ): Promise<string[]> {
   if (posts.length === 0) return [];
 
-  // Prefer deterministic day-spread; Grok optional refinement kept light
   const base = buildDaySpreadSlots(startISO, posts.length, maxPerDay);
 
-  const system = `Assign X post times America/Los_Angeles.
-Rules: first at/after ${startISO}; min 3h gap; max ${maxPerDay} posts per calendar day; new day from 17:00.
+  const system = `Assign X post times for For You, timezone America/Los_Angeles.
+Rules: first at/after ${startISO}; day window 14:00–22:00 Pacific; even-spread so same-author originals are not stacked in one refresh; prefer ~2h gaps; never closer than 45 minutes; max ${maxPerDay} posts per calendar day; next day starts 14:00.
+Do not write captions. Times only.
 Return same order ISO UTC. JSON only: { "times": ["..."] }`;
 
-  const user = `Refine ${posts.length} times (keep day spread).
+  const user = `Refine ${posts.length} For You times (keep even day spread).
 Base suggestion:
 ${base.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
 
@@ -226,20 +298,8 @@ ${base.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
     const parsed = JSON.parse(match ? match[0] : raw);
     const times: string[] = parsed.times || [];
     if (times.length !== posts.length) return base;
-
-    const startMs = new Date(startISO).getTime();
-    const fixed: string[] = [];
-    let last = startMs - MIN_GAP_MS;
-
-    for (let i = 0; i < times.length; i++) {
-      let ms = new Date(times[i]).getTime();
-      if (isNaN(ms) || ms < startMs)
-        ms = Math.max(startMs, last + MIN_GAP_MS);
-      if (ms < last + MIN_GAP_MS) ms = last + MIN_GAP_MS;
-      fixed.push(new Date(ms).toISOString());
-      last = ms;
-    }
-    return fixed;
+    if (!timesRespectForYou(times, startISO, maxPerDay)) return base;
+    return times;
   } catch {
     return base;
   }

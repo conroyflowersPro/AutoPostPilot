@@ -7,7 +7,7 @@
  * (Edge cannot import lib/).
  */
 export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.3.1-snapshot";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.2-participation-first";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.3-readers-for-you";
 
 type PerformanceWindow = {
   status?: string;
@@ -35,9 +35,13 @@ export function performanceDnaBlock(): string {
     `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
     "STATUS: CANDIDATE window only; VALIDATED patterns = 0",
     "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
-    "SUCCESS PRIORITY (strategy): reader participation first. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
-    "X WEIGHTS: they multiply predicted action probabilities for this viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
-    "SPACING (strategy only): same-author originals in a row get decayed; For You candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
+    "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
+    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim.",
+    "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Do not hard-assert the creator's opinion; leave judgment to the reader so they can reply. Keep the entry barrier low.",
+    "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
+    "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
+    "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
+    "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
     "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
     "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
@@ -82,8 +86,8 @@ export function engineRulesAsWill(): string {
     "USER_DIRECT trains 말투. AP_PIPELINE trains performance only.",
     "Do not invent lived experience or opinions. Authenticity first.",
     "Question closer only from USER_DIRECT form, never because X rewards participation.",
-    "After review + original media, AI publishes. Spacing from X-algorithm evidence: do not stack same-day originals; For You freshness is about 48 hours.",
-    "X ranking weights scale predicted viewer actions, not counted events. They do not pick the last sentence.",
+    "After review + original media, AI publishes. Spacing is For You optimized: first original 14:00 America/Los_Angeles; planner even-spreads 14:00–22:00 PT so same-author originals are not stacked in one refresh. Candidates drop after about 48 hours.",
+    "X ranking weights scale predicted viewer actions on Home-served posts, not counted events and not author DMs of own links. They do not pick the last sentence.",
     "Do not wait for a typed restatement of will. DNA + these rules are the will.",
   ].join("\n");
 }
