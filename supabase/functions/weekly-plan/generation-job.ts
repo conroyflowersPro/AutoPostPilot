@@ -636,6 +636,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   }
   st.dim_batch = Number(st.dim_batch || 0) + 1;
   const grokAdded: any[] = [];
+  const roundPostRejected: Record<string, number> = {};
   const globallySeen = new Set(
     [...(st.gated || []), ...existingHeld].map((s: any) => subjectKey(String(s.concrete_subject || ""))),
   );
@@ -650,6 +651,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     else if (globallySeen.has(subjectKey(subject))) rejectReason = "GLOBAL_DUPLICATE";
     if (rejectReason) {
       bumpReason(metrics.rejected_by_reason, rejectReason);
+      bumpReason(roundPostRejected, rejectReason);
       continue;
     }
     globallySeen.add(subjectKey(subject));
@@ -683,6 +685,23 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const candidateCount = (st.gated || []).length;
   let placeable = placeableSeedCount(st.gated || [], QUOTA_DAYS, MASS_PER_DAY_MAX);
   if (grokAdded.length <= 0) {
+    const roundReasons: Record<string, number> = {};
+    for (const [reason, n] of Object.entries(xaiRes.reject_reasons || {})) {
+      bumpReason(roundReasons, reason, Number(n) || 0);
+    }
+    for (const [reason, n] of Object.entries(roundPostRejected)) {
+      bumpReason(roundReasons, reason, Number(n) || 0);
+    }
+    const reasonText = Object.entries(roundReasons)
+      .filter(([, n]) => Number(n) > 0)
+      .map(([reason, n]) => `${reason} ${n}`)
+      .join(", ");
+    row.summary = [
+      row.summary,
+      `Seed round: 요청 ${xaiRes.requested || 0} · raw ${xaiRes.raw_returned || 0} · 정규화 ${xaiRes.returned || 0} · 추가 0` +
+        (reasonText ? ` · 탈락 ${reasonText}` : "") +
+        (xaiRes.error ? ` · xAI ${xaiRes.error}` : ""),
+    ].filter(Boolean).join("\n");
     st.empty_streak = Number(st.empty_streak || 0) + 1;
     if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
       row.status = "error";
@@ -782,6 +801,10 @@ async function stepJudge(row: any) {
       judged.push({ ...b, status: "REJECTED", editorial_fit: "POOR", seed_reject_reasons: rejectionReasons });
       continue;
     }
+    b.grounding_status = g.provenance.grounding_status;
+    b.grounding_reasons = g.provenance.reasons;
+    b.claim_types = g.provenance.claim_types;
+    b.inference_type = g.provenance.inference_type;
     const q = evaluateEditorialSeedQuality(b, mode);
     if (!q.pass) {
       const onlyMissingLived = q.reasons.length === 1 && q.reasons[0] === "NO_CREATOR_EVIDENCE";

@@ -138,13 +138,18 @@ export function scoreSemanticOverlap(
   const candUnits = extractSemanticUnits(candidateText);
   const candTok = tokens(candidateText);
   let best = 0;
+  let bestClone = 0;
+  let bestContext = 0;
   let matched: string | undefined;
   for (const r of recent) {
     const ru = extractSemanticUnits(r.text);
     const u = unitOverlap(candUnits, ru);
     const t = jaccard(candTok, tokens(r.text));
     const c = eventClaimClusterScore(candidateText, r.text);
-    const score = Math.max(u, t * 0.85, c);
+    const cloneScore = Math.max(u, t * 0.85);
+    const score = Math.max(cloneScore, c);
+    bestClone = Math.max(bestClone, cloneScore);
+    bestContext = Math.max(bestContext, score);
     if (score > best) {
       best = score;
       matched = r.source_id;
@@ -152,8 +157,8 @@ export function scoreSemanticOverlap(
   }
   // HIGH means practical same-event/same-conclusion reuse. Shared Creator
   // interests and vocabulary are not enough to delete a new Seed.
-  if (best >= 0.72) return { level: "HIGH", matched_source_id: matched, score: best };
-  if (best >= 0.45) return { level: "MEDIUM", matched_source_id: matched, score: best };
+  if (bestClone >= 0.72) return { level: "HIGH", matched_source_id: matched, score: bestClone };
+  if (bestContext >= 0.45) return { level: "MEDIUM", matched_source_id: matched, score: bestContext };
   if (best >= 0.25) return { level: "LOW", matched_source_id: matched, score: best };
   return { level: "NONE", score: best };
 }

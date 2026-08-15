@@ -126,6 +126,9 @@ function seedToInterpretInput(seed: Record<string, unknown>, mode: string): Inte
     source_type: String(seed.source_type || seed.primary_source || ""),
     source_id: Array.isArray(seed.evidence_source_ids) ? String((seed.evidence_source_ids as unknown[])[0] || "") : undefined,
     point_or_tension: seed.point_or_tension != null ? String(seed.point_or_tension) : undefined,
+    verification_requirements: Array.isArray(seed.grounding_reasons)
+      ? (seed.grounding_reasons as unknown[]).map(String)
+      : [],
     creator_evidence_available: !!seed.creator_evidence_available,
     experience_required: String(mode || "").toUpperCase() === "EXPERIENCE",
   };

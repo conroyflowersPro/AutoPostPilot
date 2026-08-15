@@ -389,7 +389,6 @@ export function evaluateEditorialSeedQuality(seed: Partial<ConcreteSeed>, mode: 
   const reasons: string[] = [];
   if (!isUsableKeywordSubject(seed.concrete_subject)) reasons.push("WEAK_SUBJECT");
   if (mode === "EXPERIENCE" && !seed.creator_evidence_available) reasons.push("NO_CREATOR_EVIDENCE");
-  if (isAiTopicSeed(seed) && scoreAiSpecificity(seed) === "GENERIC") reasons.push("AI_GENERIC");
   return { pass: reasons.length === 0, reasons };
 }
 
@@ -444,7 +443,8 @@ export function seedSelectionValueScore(seed: Partial<ConcreteSeed>): number {
     exploration === "emerging" ? 0.7 :
     exploration === "exploration" ? 0.6 : 0.5;
   const judgments = [whyNow, creator, audience, evidence].filter((x) => x.length >= 4).length / 4;
-  return Math.max(0, Math.min(1, priority * 0.5 + judgments * 0.3 + explorationScore * 0.2));
+  const genericPenalty = isAiTopicSeed(seed) && scoreAiSpecificity(seed) === "GENERIC" ? 0.2 : 0;
+  return Math.max(0, Math.min(1, priority * 0.5 + judgments * 0.3 + explorationScore * 0.2 - genericPenalty));
 }
 
 export function conceptualRepetitionLevel(candidate: Partial<ConcreteSeed>, selected: Array<Partial<ConcreteSeed>>): ConceptualRepetition {

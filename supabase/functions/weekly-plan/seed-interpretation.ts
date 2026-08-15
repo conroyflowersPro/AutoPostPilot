@@ -66,6 +66,8 @@ export type InterpretSeedInput = {
   creator_interest_signals?: string[];
   recent_repetition_signals?: string[];
   audience_relevance_signals?: string[];
+  /** Seed-stage soft flags that Writer/final Judge must enforce. */
+  verification_requirements?: string[];
 };
 function clean(s: unknown): string { return String(s || "").replace(/\s+/g, " ").trim(); }
 function shortNeutralSubject(seed: InterpretSeedInput): string {
@@ -88,6 +90,11 @@ function extractFactualBoundaries(seed: InterpretSeedInput): FactualBoundaryItem
   }
   for (const g of ["exact version numbers without evidence", "specific performance numbers without evidence", "current price or policy without evidence", "exact dates of future events", "location claims without verified_locations"]) {
     out.push({ item: g, status: "prohibited_to_invent" });
+  }
+  for (const requirement of (seed.verification_requirements || []).map(clean).filter(Boolean).slice(0, 8)) {
+    if (!out.some((x) => x.item === requirement)) {
+      out.push({ item: requirement.slice(0, 100), status: "prohibited_to_invent" });
+    }
   }
   if (!(seed.experience_facts && seed.experience_facts.length) && !seed.creator_evidence_available) {
     out.push({ item: "first-person lived experience of this exact event", status: "prohibited_to_invent" });

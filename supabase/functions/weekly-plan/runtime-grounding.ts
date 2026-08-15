@@ -141,17 +141,9 @@ export function judgeSeedGrounding(input: GroundingInput): {
     const hasEvidence =
       !!input.creator_evidence_available || (input.evidence_source_ids?.length ?? 0) > 0;
     if (!hasEvidence) {
-      return {
-        pass: false,
-        provenance: {
-          source_type: String(input.primary_source || "UNKNOWN"),
-          source_id: input.evidence_source_ids?.[0],
-          claim_types,
-          inference_type: "UNKNOWN",
-          grounding_status: "CURRENT_CONTEXT_REQUIRED",
-          reasons: ["UNSUPPORTED_CURRENT_FACT", "XAI_WOULD_HAVE_BEEN_REQUIRED"],
-        },
-      };
+      // A Seed is thinking material, not a published factual claim. Preserve
+      // it with a boundary; xAI live search + final post Judge must verify it.
+      reasons.push("CURRENT_FACT_VERIFY_REQUIRED", "XAI_LIVE_FACT_CHECK_REQUIRED");
     }
   }
 
@@ -180,32 +172,7 @@ export function judgeSeedGrounding(input: GroundingInput): {
   const verifiedLoc = new Set((input.verified_locations || []).map((x) => String(x).toUpperCase()));
   for (const loc of claimedLocs) {
     if (!verifiedLoc.has(loc) && !verifiedLoc.has(loc.toUpperCase())) {
-      if (!(input.verified_locations || []).length) {
-        return {
-          pass: false,
-          provenance: {
-            source_type: String(input.primary_source || "UNKNOWN"),
-            source_id: input.evidence_source_ids?.[0],
-            claim_types,
-            inference_type: "UNKNOWN",
-            grounding_status: "REJECTED",
-            reasons: ["UNSUPPORTED_LOCATION", loc],
-          },
-        };
-      }
-      if (!verifiedLoc.has(loc)) {
-        return {
-          pass: false,
-          provenance: {
-            source_type: String(input.primary_source || "UNKNOWN"),
-            source_id: input.evidence_source_ids?.[0],
-            claim_types,
-            inference_type: "UNKNOWN",
-            grounding_status: "REJECTED",
-            reasons: ["LOCATION_NOT_IN_VERIFIED_SET", loc],
-          },
-        };
-      }
+      reasons.push(`LOCATION_VERIFY_REQUIRED:${loc}`);
     }
   }
 
@@ -243,34 +210,14 @@ export function judgeSeedGrounding(input: GroundingInput): {
     const hasEvidence =
       !!input.creator_evidence_available || (input.evidence_source_ids?.length ?? 0) > 0;
     if (!hasEvidence) {
-      return {
-        pass: false,
-        provenance: {
-          source_type: String(input.primary_source || "UNKNOWN"),
-          source_id: input.evidence_source_ids?.[0],
-          claim_types,
-          inference_type: "UNKNOWN",
-          grounding_status: "CURRENT_CONTEXT_REQUIRED",
-          reasons: ["UNSUPPORTED_CURRENT_CONTEXT", "XAI_WOULD_HAVE_BEEN_REQUIRED"],
-        },
-      };
+      reasons.push("CURRENT_CONTEXT_VERIFY_REQUIRED", "XAI_LIVE_FACT_CHECK_REQUIRED");
     }
   }
 
   const isAi =
     /ai|그록|grok|gpt|프롬프트/i.test(t) || String(input.cluster || "").toUpperCase() === "AI_TECH";
   if (isAi && GENERIC_AI.some((r) => r.test(t))) {
-    return {
-      pass: false,
-      provenance: {
-        source_type: String(input.primary_source || "UNKNOWN"),
-        source_id: input.evidence_source_ids?.[0],
-        claim_types,
-        inference_type: "UNKNOWN",
-        grounding_status: "REJECTED",
-        reasons: ["AI_GENERIC"],
-      },
-    };
+    reasons.push("AI_GENERIC_LOW_PRIORITY");
   }
 
   const inference_type =

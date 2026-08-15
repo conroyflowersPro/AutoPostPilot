@@ -30,7 +30,9 @@ function compactSubject(s: string): string {
 export function isFrozenHumorClone(subject: string): boolean {
   const t = compactSubject(subject);
   if (t.length < 6) return false;
-  return FORBIDDEN_FROZEN_HUMOR_SUBJECTS.some((s) => t.includes(compactSubject(s)) || compactSubject(s).includes(t));
+  // Hard reject only the frozen subject itself. A longer/new situation that
+  // shares Creator vocabulary is a candidate, not automatically a clone.
+  return FORBIDDEN_FROZEN_HUMOR_SUBJECTS.some((s) => t === compactSubject(s));
 }
 
 export function isHumorFillSeed(seed: { source_type?: string; source_kind?: string }): boolean {

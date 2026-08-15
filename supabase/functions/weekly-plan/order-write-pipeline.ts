@@ -61,6 +61,9 @@ export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode):
     source_type: seed.source_type || seed.primary_source,
     source_id: Array.isArray(seed.evidence_source_ids) ? String(seed.evidence_source_ids[0] || "") : undefined,
     point_or_tension: seed.point_or_tension,
+    verification_requirements: Array.isArray((seed as any).grounding_reasons)
+      ? (seed as any).grounding_reasons
+      : [],
     creator_evidence_available: !!seed.creator_evidence_available,
     experience_required: String(mode || "").toUpperCase() === "EXPERIENCE",
   });

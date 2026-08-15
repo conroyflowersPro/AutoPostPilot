@@ -129,7 +129,7 @@ export function seedCandidatePhilosophyBlock(): string {
     topicDiversityPhilosophyBlock(),
     weeklyEditorialPhilosophyBlock(),
     "EXPLORE MANY: generate a candidate pool larger than the publish quota. Structured relevance judgments rank candidates; they are not hard safety gates.",
-    "HARD REJECT only fabrication, unsupported current fact, clear clone, engine-label body, or worthless generic material. Wording difficulty, short usable keywords, cross-interest hypotheses, and final mix are not reasons to delete a candidate.",
+    "HARD REJECT only fabrication, an unusable/engine-label body, clear same-event/same-conclusion clone, or material with no thought at all. Current facts and locations stay as VERIFY_REQUIRED boundaries; AI-generic risk lowers rank. Wording difficulty, short usable keywords, cross-interest hypotheses, and final mix are not reasons to delete a candidate.",
     "Do not interpret the final post, close Core Thought, choose Mechanism/Rail, or write prose here.",
   ].join("\n");
 }

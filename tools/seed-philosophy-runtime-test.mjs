@@ -10,8 +10,11 @@ const scope = read("supabase/functions/weekly-plan/seed-scope.ts");
 const engine = read("supabase/functions/weekly-plan/seed-engine.ts");
 const grounding = read("supabase/functions/weekly-plan/runtime-grounding.ts");
 const leakage = read("supabase/functions/weekly-plan/manual-leakage-guard.ts");
+const humor = read("supabase/functions/weekly-plan/humor-fill.ts");
 const stage = read("supabase/functions/weekly-plan/engine-stage-philosophy.ts");
 const writer = read("supabase/functions/weekly-plan/independent-post-generation.ts");
+const writePipe = read("supabase/functions/weekly-plan/order-write-pipeline.ts");
+const interpretation = read("supabase/functions/weekly-plan/seed-interpretation.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 
 let pass = 0;
@@ -26,7 +29,7 @@ function ok(name, condition) {
   }
 }
 
-console.log("Seed philosophy runtime (v11.10.0)");
+console.log("Seed philosophy runtime (v11.10.1)");
 ok("P1. candidate pool is at least 2x quota", /CANDIDATE_POOL_MULTIPLIER = 2/.test(job) && /candidatePoolTarget/.test(job));
 ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));
@@ -45,6 +48,16 @@ ok("P15. expansion and write replacement are bounded", /return Number\(st\.dim_b
 ok("P16. live quota, seed, and writer external endpoints are xAI only",
   /api\.x\.ai/.test(quota) && /api\.x\.ai/.test(seed) && /api\.x\.ai/.test(writer) &&
   !/api\.openai\.com/.test(quota + seed + writer));
+ok("P17. current facts and locations survive as verify boundaries",
+  /CURRENT_FACT_VERIFY_REQUIRED/.test(grounding) && /LOCATION_VERIFY_REQUIRED/.test(grounding) &&
+  !/UNSUPPORTED_CURRENT_FACT/.test(grounding) && /verification_requirements/.test(writePipe) &&
+  /verification_requirements/.test(interpretation));
+ok("P18. AI generic risk lowers selection rank instead of holding Seed",
+  /genericPenalty/.test(engine) && !/reasons\.push\("AI_GENERIC"\)/.test(engine));
+ok("P19. zero-add rounds expose raw and rejection diagnostics",
+  /Seed round: 요청/.test(job) && /raw \$\{xaiRes\.raw_returned/.test(job) && /탈락 \$\{reasonText/.test(job));
+ok("P20. frozen Seed guard rejects exact title, not substring vocabulary",
+  /t === compactSubject\(s\)/.test(humor) && !/t\.includes\(compactSubject\(s\)\)/.test(humor));
 
 console.log("========================================");
 console.log(`SEED PHILOSOPHY: ${pass} PASS / ${fail} FAIL`);
