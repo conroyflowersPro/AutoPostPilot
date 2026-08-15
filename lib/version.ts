@@ -5,4 +5,4 @@ export const BUILD_STAMP = APP_VERSION;
 
 /** One Korean line the operator can read in the app after a bump. */
 export const VERSION_SUMMARY_KO =
-  "원글 문장은 ChatGPT가 씁니다. 시드·할당량은 그록입니다.";
+  "원글은 ChatGPT. 성공 순서는 댓글·북마크·인용·재게시. 팔로워는 전략 1순위가 아닙니다.";

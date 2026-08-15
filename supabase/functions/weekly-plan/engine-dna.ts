@@ -7,7 +7,7 @@
  * (Edge cannot import lib/).
  */
 export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.3.1-snapshot";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.1-aug2026-window-candidates";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.2-participation-first";
 
 type PerformanceWindow = {
   status?: string;
@@ -35,7 +35,9 @@ export function performanceDnaBlock(): string {
     `${PERFORMANCE_DNA_RUNTIME_VERSION}`,
     "STATUS: CANDIDATE window only; VALIDATED patterns = 0",
     "COLD START: missing validated patterns is expected. Still infer this week from Creator DNA + available USER_DIRECT. Do not wait for a thick evidence base. Do not refuse to emit quota or seeds.",
-    "SUCCESS PRIORITY (advisory): followers > profile visits > revenue > bookmarks > replies > reposts > quotes > likes > impressions",
+    "SUCCESS PRIORITY (strategy): reader participation first. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
+    "X WEIGHTS: they multiply predicted action probabilities for this viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
+    "SPACING (strategy only): same-author originals in a row get decayed; For You candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
     "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
     "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
@@ -80,7 +82,8 @@ export function engineRulesAsWill(): string {
     "USER_DIRECT trains 말투. AP_PIPELINE trains performance only.",
     "Do not invent lived experience or opinions. Authenticity first.",
     "Question closer only from USER_DIRECT form, never because X rewards participation.",
-    "After review + original media, AI publishes. Spacing from X-algorithm evidence.",
+    "After review + original media, AI publishes. Spacing from X-algorithm evidence: do not stack same-day originals; For You freshness is about 48 hours.",
+    "X ranking weights scale predicted viewer actions, not counted events. They do not pick the last sentence.",
     "Do not wait for a typed restatement of will. DNA + these rules are the will.",
   ].join("\n");
 }

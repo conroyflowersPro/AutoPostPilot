@@ -16,6 +16,7 @@ const cr = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/creator-
 const se = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-engine.ts"), "utf8");
 const gi = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/generation-integration.ts"), "utf8");
 const voice = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8");
+const dna = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8");
 const ver = readFileSync(path.join(ROOT, "lib/version.ts"), "utf8");
 const ix = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/index.ts"), "utf8");
 
@@ -85,7 +86,7 @@ ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
 ok("W17. version lockstep 11.2.6", /APP_VERSION = "11.2.6"/.test(ver) && /APP_VERSION = "11.2.6"/.test(ix));
-ok("W18. Korean summary names ChatGPT writer", /ChatGPT가 씁니다/.test(ver));
+ok("W18. Korean summary names ChatGPT writer and participation order", /ChatGPT/.test(ver) && /댓글/.test(ver) && /팔로워는 전략 1순위가 아닙니다/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
@@ -101,6 +102,9 @@ ok("W30. pipeline passes editorial mode into voice", /voiceRegisterConstraintLin
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
 ok("W32. original body uses OpenAI ChatGPT", /api\.openai\.com\/v1\/chat\/completions/.test(wr) && /OPENAI_API_KEY/.test(ix));
 ok("W33. writer does not call xAI", !/api\.x\.ai/.test(wr));
+ok("W34. DNA participation order replies bookmarks quotes reposts", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
+ok("W35. DNA says weights are probabilities not counts", /predicted action probabilities/.test(dna));
+ok("W36. DNA spacing 48h and same-author decay", /48 hours/.test(dna) && /Do not stack originals/.test(dna));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

@@ -267,6 +267,7 @@ export function collectLearnedSeedSignals(opts: {
   const performance_pattern_hints: string[] = [
     "Transfer entry/flow quality only — never reuse a past winning subject as this week's seed",
     "Likes are algorithm-layer for mix/spacing, not a sentence recipe",
+    "X weights multiply predicted actions, not raw counts — never copy weight numbers into a post",
     "Do not install a repeating punchline (e.g. 논란이 자산) across the week",
   ];
   for (const { cluster, n } of cluster_weights) {
