@@ -28,6 +28,7 @@ const stage = read("supabase/functions/weekly-plan/engine-stage-philosophy.ts");
 const score = read("lib/learning/score.ts");
 const judge = read("supabase/functions/weekly-plan/semantic-judge.ts");
 const ver = read("lib/version.ts");
+const planner = read("supabase/functions/weekly-plan/seven-day-planner.ts");
 
 let pass = 0;
 let fail = 0;
@@ -43,24 +44,24 @@ function ok(name, cond) {
 
 console.log("DNA + engine live-path wiring (v11.11.0)");
 
-ok("D1. Grok writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
-ok("D2. Grok writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
+ok("D1. Grok Writer gets Creator Intelligence", /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
+ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
 ok("D3. Writer does not use Performance DNA as writing input",
   /writerArchitectureLock/.test(wr) &&
   /Performance DNA is Planner-only/.test(arch) &&
   !/performanceDnaBlock\(\)/.test(wr));
-ok("D4. Grok quota gets DNA", /creatorDnaBlock\(\)/.test(quota) && /engineRulesAsWill\(\)/.test(quota));
-ok("D5. Grok seed expand gets DNA", /creatorDnaBlock\(\)/.test(seedReason) && /engineRulesAsWill\(\)/.test(seedReason));
+ok("D4. capacity recommendation is not Planner strategy", /operational seven-day candidate-capacity/.test(quota) && !/plannerArchitectureLock/.test(quota));
+ok("D5. Grok Seed gets Creator bounds without strategic intelligence", /creatorDnaBlock\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason));
 
 ok("D6. interpretSeed emits why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(interp));
 ok("D7. deep context maps why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(dgc));
 ok("D8. deep context maps concrete_human_element", /concrete_human_element/.test(dgc));
 ok("D9. core thought maps why_it_might_matter_to_creator", /buildCoreThought[\s\S]*why_it_might_matter_to_creator/.test(dgc));
 
-ok("D10. everyday language philosophy reaches Writer, not a pre-chosen strategy", /writingStagePhilosophyBlock/.test(wr) && /Easy must not mean shallow/.test(stage) && !/\.\.\.writerEverydayConstraintLines/.test(wr));
-ok("D11. creator style philosophy reaches Writer, not a pre-chosen family", /writingStagePhilosophyBlock/.test(wr) && /CREATOR STYLE/.test(stage) && !/\.\.\.writerStyleConstraintLines/.test(wr));
+ok("D10. everyday strategy is not pre-chosen for Writer", !/writingStagePhilosophyBlock\(\)/.test(wr) && !/\.\.\.writerEverydayConstraintLines/.test(wr));
+ok("D11. style family is not pre-chosen for Writer", !/writingStagePhilosophyBlock\(\)/.test(wr) && !/\.\.\.writerStyleConstraintLines/.test(wr));
 ok("D12. writer factual boundaries", /writerBoundaryConstraintLines/.test(wr) && /FACTUAL DO-NOT-INVENT/.test(wr) && /\.\.\.writerBoundaryConstraintLines/.test(wr));
-ok("D13. humor is standing philosophy, not a pre-chosen decision in the live prompt", /writingStagePhilosophyBlock/.test(wr) && /NONE is normal/.test(stage) && !/\.\.\.writerHumorConstraintLines/.test(wr));
+ok("D13. humor form is not enumerated or pre-chosen in live Writer", !/writingStagePhilosophyBlock\(\)/.test(wr) && !/\.\.\.writerHumorConstraintLines/.test(wr));
 ok("D14. live writer concatenates fact boundaries only, not delivery engines",
   /\.\.\.writerBoundaryConstraintLines\(ctx\)/.test(wr) &&
   !/\.\.\.writerEverydayConstraintLines/.test(wr) &&
@@ -82,13 +83,12 @@ ok("D21. 14d overlay helper exists", /overlayClusterWeightsWithIntent14d/.test(i
 ok("D22. job loadEvidence overlays 14d intent", /overlayClusterWeightsWithIntent14d/.test(job));
 ok("D23. index quota/expand overlay 14d intent",
   (ix.match(/overlayClusterWeightsWithIntent14d/g) || []).length >= 2);
-ok("D24. job select uses clusterPriorityFromMix", /clusterPriorityFromMix/.test(job));
+ok("D24. Planner xAI owns Seed selection without local rank", /selectSeedsForSevenDayPlan/.test(job) && !/clusterPriorityFromMix/.test(job));
 ok("D25. job keeps experience cite seeds",
   /buildRecentExperienceCandidates/.test(job) && /from "\.\/experience-evidence\.ts"/.test(job));
 
-ok("D26. Edge DNA MASS CAP matches lib intelligence",
-  /MASS CAP: at most one mass-public daily-life original per day/.test(dna) &&
-  /MASS CAP: at most one mass-public daily-life original per day/.test(libPerf));
+ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
+  /NO FIXED MIX/.test(dna) && /NO FIXED MIX/.test(libPerf));
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
@@ -105,9 +105,10 @@ ok("D31. Creator DNA is how he sees/thinks/expresses, not a template",
   /AP_PIPELINE drafts must not rewrite Creator DNA/.test(dna) &&
   /PURPOSE: Preserve how this person sees/.test(libDna) &&
   /Ask what he would notice first/.test(dna));
-ok("D32. Planner is strategy engine, planning before writing",
-  /plannerPhilosophyBlock/.test(quota) &&
-  /plannerPhilosophyBlock/.test(seedReason) &&
+ok("D32. Planner is strategy/select/allocation/recovery engine",
+  /inferSevenDayStrategy/.test(planner) &&
+  /selectSeedsForSevenDayPlan/.test(planner) &&
+  /recoverRejectedPlannerSlot/.test(planner) &&
   /PLANNER ROLE/.test(dna) &&
   /not a writing engine/.test(dna) &&
   /stronger months from now/.test(dna) &&
@@ -115,13 +116,14 @@ ok("D32. Planner is strategy engine, planning before writing",
 ok("D33. Architecture lock: no engine replaces the Creator",
   /No engine replaces the Creator/.test(arch) &&
   /No engine replaces the Creator/.test(libArch) &&
-  /plannerArchitectureLock/.test(quota) &&
-  /plannerArchitectureLock/.test(seedReason) &&
+  /plannerArchitectureLock/.test(planner) &&
+  !/plannerArchitectureLock/.test(seedReason) &&
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
-ok("D34. Pipeline order is locked in docs and in writeOneSlot",
-  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(arch) &&
-  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Interpretation\(boundaries\) → Writer closes thought then writes/.test(libArch) &&
+ok("D34. Seven-day role pipeline is locked in docs and runtime",
+  /Seed Pool\(explore\) → Planner seven-day strategy → Planner select\/allocate/.test(arch) &&
+  /Seed Pool\(explore\) → Planner seven-day strategy → Planner select\/allocate/.test(libArch) &&
+  /stepStrategy/.test(job) && /stepPlannerSelect/.test(job) && /stepRecover/.test(job) &&
   /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
   /selectDeliveryAfterThought/.test(pipe) &&
   /No engine replaces the Creator/.test(dna));
@@ -147,26 +149,24 @@ ok("D39. Mechanism NONE is normal",
   /none_is_normal/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")) &&
   /MECHANISM_NONE_IS_NORMAL/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")) &&
   !/default_observation_personality/.test(read("supabase/functions/weekly-plan/reader-self-projection.ts")));
-ok("D40. Quality last defense rejects high structural repeat",
+ok("D40. Judge does not hard-reject Planner structural strategy",
   /qualityPhilosophyBlock/.test(judge) &&
-  /hard\.push\("structural_repetition_high"\)/.test(judge));
-ok("D41. Writer gets everyday/style/humor/discourse philosophy",
-  /writingStagePhilosophyBlock/.test(wr) &&
-  /Easy must not mean shallow/.test(stage) &&
-  /NONE is normal/.test(stage));
-ok("D42. 3-day Planner loads Audience/Performance/Revenue/Memory/Current X",
+  !/hard\.push\("structural_repetition_high"\)/.test(judge));
+ok("D41. Writer decides creative form without a stage menu",
+  /Decide the necessary reasoning and expression yourself/.test(wr) &&
+  !/writingStagePhilosophyBlock\(\)/.test(wr));
+ok("D42. seven-day Planner loads Intelligence and actual X Analytics; Seed does not",
   /loadPlannerIntelligence/.test(job) &&
-  /loadPlannerIntelligence/.test(ix) &&
-  /intelligence/.test(quota) &&
-  /audience_dna_current/.test(seedReason) &&
-  /planner_memory/.test(seedReason) &&
-  /current_x_context/.test(seedReason));
+  /from\("post_metrics"\)/.test(planner) &&
+  /recent_x_analytics/.test(planner) &&
+  !/audience_dna_current/.test(seedReason) &&
+  !/planner_memory/.test(seedReason));
 ok("D43. Audience DNA primary is X Analytics, not follow-the-followers",
   /X Analytics primary/.test(arch) &&
   /Primary source: X Analytics/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")) &&
   /Must not overwrite Creator DNA/.test(read("supabase/functions/weekly-plan/engine-learning-philosophy.ts")));
 ok("D44. Learning loop closes only when Planner reads",
-  /next 3-day Planner reads/.test(arch) &&
+  /next seven-day Planner reads/.test(arch) &&
   /LEARNING_CYCLE/.test(libArch) &&
   /plannerMustRead/.test(read("app/api/learning/analyze/route.ts")));
 ok("D45. Performance DNA interpret order starts with followers gained",
@@ -180,15 +180,12 @@ ok("D47. Operator collaboration is chat-only, not Writer",
   /Not a being that thinks instead of the operator/.test(read("lib/intelligence/operator-collaboration.ts")) &&
   !/operator-collaboration/.test(wr) &&
   !/operatorCollaborationBlock/.test(wr));
-ok("D48. Writer+Judge get week structural signatures",
-  /writerWeekStructureConstraintLines/.test(wr) &&
-  /week_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
-  /weekStructureHardReasons/.test(judge) &&
-  /other_post_structural_signatures/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
-ok("D49. Rejected slot runs selective regen then re-judge",
-  /executeSelectiveRegeneration/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
-  /decideRegenerationRoute/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")) &&
-  /from "\.\/selective-regeneration\.ts"/.test(read("supabase/functions/weekly-plan/order-write-pipeline.ts")));
+ok("D48. Writer and Judge do not own virtual-week structure strategy",
+  !/writerWeekStructureConstraintLines\(ctx/.test(wr) &&
+  !/hard\.push\("structural_repetition_high"\)/.test(judge));
+ok("D49. Rejected slot returns to Planner recovery",
+  /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) &&
+  /recoverRejectedPlannerSlot/.test(job));
 ok("D50. Job uses weekly-count-ledger as completion gate",
   /from "\.\/weekly-count-ledger\.ts"/.test(job) &&
   /evaluateOrder8cCompletionGate/.test(job) &&
