@@ -184,69 +184,60 @@ export type InferredSurface = {
 
 function surfaceLine(ending: SurfaceEnding): string {
   if (ending === "HAEYO") {
-    return "THIS POST SURFACE (inferred, not a mode table): 해요/존칭 ending this time.";
+    return "THIS POST SURFACE (planner, this slot only): 해요/존칭 ending this time.";
   }
   if (ending === "EUMSEUM") {
-    return "THIS POST SURFACE (inferred, not a mode table): 음슴체 ending this time if it fits the observation.";
+    return "THIS POST SURFACE (planner, this slot only): 음슴체 ending this time if it fits the observation.";
   }
-  return "THIS POST SURFACE (inferred, not a mode table): a finished statement that is neither default 해요 nor default 음슴 — not the previous post's ending.";
+  return "THIS POST SURFACE (planner, this slot only): a finished statement that is neither default 해요 nor default 음슴 — not the previous post's ending.";
+}
+
+function slotSalt(seedKey?: string | null, slotIndex?: number): number {
+  const s = String(seedKey || "") + "#" + String(slotIndex || 0);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
 }
 
 /**
- * Infer 해요 / 음슴 / other from DNA two-speed + USER_DIRECT mix + this 3-day batch.
- * Editorial mode is not a 말투 table. Information posts may use 음슴. Casual may use 해요.
+ * Planner decides this slot's 해요/음슴/other.
+ * No frozen mix percentage. USER_DIRECT rates are evidence, not a quota.
+ * Editorial mode is not a 말투 table.
  */
-export function inferSlotSurface(args: {
+export function planSlotSurface(args: {
   voice?: VoiceRegister | null;
   recentEndingCounts?: Record<string, number> | null;
   lastEnding?: string | null;
   slotIndex?: number;
+  seedKey?: string | null;
 }): InferredSurface {
-  const v = args.voice || null;
+  const families: SurfaceEnding[] = ["HAEYO", "EUMSEUM", "OTHER"];
   const counts = args.recentEndingCounts || {};
-  const haeyoN = Number(counts.HAEYO || 0);
-  const eumN = Number(counts.EUMSEUM || 0);
-  const otherN = Number(counts.OTHER || 0);
-  const total = haeyoN + eumN + otherN;
-  const thin = !v || v.n < 5;
-  const pHaeyo = thin ? 0.4 : Math.max(0.15, Number(v.ending_haeyo_rate) || 0);
-  const pEum = thin ? 0.25 : Math.max(0.12, Number(v.ending_eumseum_rate) || 0);
-  const pOther = Math.max(0.15, 1 - Math.min(0.85, pHaeyo + pEum));
-  const share = (n: number) => (total <= 0 ? 0 : n / total);
-  const gap: Record<SurfaceEnding, number> = {
-    HAEYO: pHaeyo - share(haeyoN),
-    EUMSEUM: pEum - share(eumN),
-    OTHER: pOther - share(otherN),
-  };
+  const used = (k: SurfaceEnding) => Number(counts[k] || 0);
   const last = String(args.lastEnding || "").toUpperCase();
-  const idx = Number(args.slotIndex || 0);
-  let ending: SurfaceEnding = "OTHER";
-  let best = -999;
-  for (const k of ["HAEYO", "EUMSEUM", "OTHER"] as SurfaceEnding[]) {
-    let s = gap[k] + ((idx + (k === "HAEYO" ? 0 : k === "EUMSEUM" ? 1 : 2)) % 3) * 0.02;
-    if (last && k === last) s -= 0.4;
-    if (s > best) {
-      best = s;
-      ending = k;
-    }
+  let candidates = families.slice();
+  if (last && (families as string[]).includes(last) && candidates.length > 1) {
+    candidates = candidates.filter((k) => k !== last);
   }
-  if (total >= 3) {
-    if (haeyoN / total >= 0.75 && ending === "HAEYO") ending = eumN <= otherN ? "EUMSEUM" : "OTHER";
-    else if (eumN / total >= 0.75 && ending === "EUMSEUM") ending = haeyoN <= otherN ? "HAEYO" : "OTHER";
-    else if (otherN / total >= 0.75 && ending === "OTHER") ending = haeyoN <= eumN ? "HAEYO" : "EUMSEUM";
-  }
-  const reason = thin
-    ? "thin USER_DIRECT window — DNA two-speed mix + batch variety, not an editorial-mode table"
-    : "USER_DIRECT mix + DNA two-speed + batch anti-collapse";
+  const min = Math.min(...candidates.map(used));
+  const least = candidates.filter((k) => used(k) === min);
+  const ending = least[slotSalt(args.seedKey, args.slotIndex) % least.length];
+  const reason =
+    "planner chose this slot from DNA two-speed + engine (no single tone) + this 3-day set so far. No frozen 해요/음슴 mix ratio.";
   return {
     ending,
     reason,
     constraint_line: [
       surfaceLine(ending),
       "REASON: " + reason,
-      "Editorial mode is not 말투. Do not lock 해요 to information posts. Do not lock 음슴 to casual. Infer. Across the 3-day set, endings must not collapse to one register. Do not copy the previous post's ending.",
+      "Editorial mode is not 말투. Do not lock 해요 to information posts. Do not lock 음슴 to casual. USER_DIRECT rates are evidence, not a quota. Do not copy the previous post's ending. Do not collapse the 3-day set to one register.",
     ].join("\n"),
   };
+}
+
+/** @deprecated alias — planner decides; no mix quota */
+export function inferSlotSurface(args: Parameters<typeof planSlotSurface>[0]): InferredSurface {
+  return planSlotSurface(args);
 }
 
 export function voiceRegisterConstraintLine(
@@ -254,17 +245,17 @@ export function voiceRegisterConstraintLine(
   surface?: InferredSurface | null,
 ): string {
   const inferred = surface?.constraint_line ||
-    "THIS POST SURFACE: infer 해요/음슴/other from Creator DNA + engine + USER_DIRECT mix. Editorial mode is not a 말투 table.";
+    "THIS POST SURFACE: planner decides 해요/음슴/other for this slot from DNA + engine + this 3-day set. No frozen mix ratio. Editorial mode is not a 말투 table.";
   if (!reg || reg.n <= 0) {
     return [
-      "USER_DIRECT REGISTER: none in window — infer from Creator DNA two-speed mix + engine (no single global tone). No archive endings. No example posts.",
+      "USER_DIRECT REGISTER: none in window — planner still decides this slot from Creator DNA two-speed + engine (no single global tone). No archive endings. No example posts. No frozen mix percentage.",
       inferred,
       "Do not copy handmade wording. Never end this draft with ?, 까요, 나요, 을까. A question is not a mechanism and not a participation trick.",
       "median_chars is a handmade statistic, not this post's target. Length follows the reader-entry move until the observation is complete. Not a character quota. Not one sentence because the slot is informational.",
     ].join("\n");
   }
   return [
-    `USER_DIRECT REGISTER (stats only, no sample posts): n=${reg.n} window=${reg.window_days}d median_chars=${reg.median_chars}`,
+    `USER_DIRECT REGISTER (stats only, no sample posts, not a mix quota): n=${reg.n} window=${reg.window_days}d median_chars=${reg.median_chars}`,
     `haeyo=${reg.ending_haeyo_rate} eumseum=${reg.ending_eumseum_rate} question=${reg.ending_question_rate} kk=${reg.kk_rate}`,
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,

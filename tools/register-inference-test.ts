@@ -1,8 +1,7 @@
 /**
- * 말투 is inferred. Editorial mode is not a 해요 table.
- * 3-day batch must not collapse to one ending.
+ * Planner decides 말투 per slot. No frozen mix percentage.
  */
-import { inferSlotSurface, type VoiceRegister } from "../supabase/functions/weekly-plan/user-direct-voice-window.ts";
+import { planSlotSurface, type VoiceRegister } from "../supabase/functions/weekly-plan/user-direct-voice-window.ts";
 
 let pass = 0;
 let fail = 0;
@@ -31,35 +30,39 @@ const thin: VoiceRegister = {
   notes: [],
 };
 
-console.log("Register inference (no mode table)");
-const a = inferSlotSurface({ voice: thin, slotIndex: 1 });
-const b = inferSlotSurface({
+console.log("Register planner (no frozen mix)");
+const a = planSlotSurface({ voice: thin, slotIndex: 1, seedKey: "Terafab" });
+const b = planSlotSurface({
   voice: thin,
   recentEndingCounts: { HAEYO: 4, EUMSEUM: 0, OTHER: 0 },
   lastEnding: "HAEYO",
   slotIndex: 5,
+  seedKey: "a",
 });
-const c = inferSlotSurface({
+const c = planSlotSurface({
   voice: thin,
   recentEndingCounts: { HAEYO: 0, EUMSEUM: 4, OTHER: 0 },
   lastEnding: "EUMSEUM",
   slotIndex: 6,
+  seedKey: "b",
 });
-ok("R1. thin window still infers an ending", a.ending === "HAEYO" || a.ending === "EUMSEUM" || a.ending === "OTHER");
-ok("R2. 해요 collapse picks something else", b.ending !== "HAEYO");
-ok("R3. 음슴 collapse picks something else", c.ending !== "EUMSEUM");
-ok("R4. reason is not editorial-mode table", /not an editorial-mode table|anti-collapse/.test(a.reason + b.reason));
-ok("R5. constraint forbids mode lock", /Editorial mode is not 말투/.test(a.constraint_line));
+ok("R1. empty batch still gets a planner ending", a.ending === "HAEYO" || a.ending === "EUMSEUM" || a.ending === "OTHER");
+ok("R2. after many 해요, planner does not pick 해요", b.ending !== "HAEYO");
+ok("R3. after many 음슴, planner does not pick 음슴", c.ending !== "EUMSEUM");
+ok("R4. reason is planner, no frozen ratio", /planner chose this slot/.test(a.reason) && /No frozen/.test(a.reason));
+ok("R5. constraint forbids mode lock and mix quota", /Editorial mode is not 말투/.test(a.constraint_line) && /not a quota/.test(a.constraint_line));
 
-const mixed: VoiceRegister = { ...thin, n: 8, thin: false, ending_haeyo_rate: 0.5, ending_eumseum_rate: 0.2 };
-const d = inferSlotSurface({
+const mixed: VoiceRegister = { ...thin, n: 8, thin: false, ending_haeyo_rate: 0.9, ending_eumseum_rate: 0.05 };
+const d = planSlotSurface({
   voice: mixed,
   recentEndingCounts: { HAEYO: 1 },
   lastEnding: "HAEYO",
   slotIndex: 2,
+  seedKey: "c",
 });
-ok("R6. after a 해요 post, next is not 해요", d.ending !== "HAEYO");
+ok("R6. after a 해요 post, next is not 해요 even if handmade is 해요-heavy", d.ending !== "HAEYO");
+ok("R7. handmade 90% 해요 does not become a quota", d.ending !== "HAEYO");
 
 console.log("========================================");
-console.log(`REGISTER INFERENCE: ${pass} PASS / ${fail} FAIL`);
+console.log(`REGISTER PLANNER: ${pass} PASS / ${fail} FAIL`);
 if (fail) Deno.exit(1);

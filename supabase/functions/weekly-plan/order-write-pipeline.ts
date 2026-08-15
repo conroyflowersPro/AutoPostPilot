@@ -19,7 +19,7 @@ import type { EditorialMode } from "./editorial-mix.ts";
 import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
 import {
   inferSlotVoice,
-  inferSlotSurface,
+  planSlotSurface,
   voiceRegisterConstraintLine,
   endingKind,
   type VoiceActivityRow,
@@ -89,11 +89,12 @@ export async function writeOneSlot(args: {
     cluster: String(seed.cluster || seed.topic_cluster || ""),
     editorial_mode: mode,
   });
-  const surface = inferSlotSurface({
+  const surface = planSlotSurface({
     voice,
     recentEndingCounts: args.recentEndingCounts || null,
     lastEnding: args.lastEnding || null,
     slotIndex: slot,
+    seedKey: String(seed.concrete_subject || seed.seed_id || slotId),
   });
   const voicePayload = {
     n: voice.n,
