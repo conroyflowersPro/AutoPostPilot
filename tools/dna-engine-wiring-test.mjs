@@ -135,7 +135,8 @@ ok("D36. Planner Memory stores abstract patterns, not wording",
   /추상 패턴만 저장/.test(score) &&
   !/const snip = s\.contentSnippet/.test(score));
 ok("D37. Seed generation philosophy reaches Grok expand",
-  /planningStagePhilosophyBlock/.test(seedReason) &&
+  /seedCandidatePhilosophyBlock/.test(seedReason) &&
+  /EXPLORE MANY/.test(stage) &&
   /A seed starts thinking/.test(stage) &&
   /not yet a post topic/.test(stage));
 ok("D38. Core Thought is a judgment, can HOLD",
