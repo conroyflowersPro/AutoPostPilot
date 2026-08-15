@@ -44,6 +44,11 @@ import {
   localHumorKeywordSeeds,
 } from "./humor-fill.ts";
 import {
+  overlayClusterWeightsWithIntent14d,
+  clusterPriorityFromMix,
+} from "./creator-intent-14d.ts";
+import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
+import {
   ARCHIVE_EXPERIENCE_FALLBACK,
   buildRecentExperienceCandidates,
   experienceCandidateToSeedFields,
@@ -316,19 +321,26 @@ async function loadEvidence(supabase: any, extraSubjects: string[], intentText: 
     publishedEvidence,
     intentText,
   });
+  const { intent, cluster_weights } = overlayClusterWeightsWithIntent14d(
+    learned.cluster_weights,
+    (actRows || []) as any[],
+  );
+  learned.cluster_weights = cluster_weights;
   const experience = buildRecentExperienceCandidates(
     (actRows || []).map((r: any) => ({
       ...r,
       post_type: r.post_type || r.action_type,
     })),
   );
-  return { publishedEvidence, learned, experience };
+  return { publishedEvidence, learned, experience, intent14d: intent };
 }
 
 async function stepQuota(supabase: any, xaiKey: string, row: any) {
   const st = row.state;
   const intentText = String(st.topic || "").trim();
-  const { learned } = await loadEvidence(supabase, st.publishedTopics || [], intentText);
+  const { learned, intent14d } = await loadEvidence(supabase, st.publishedTopics || [], intentText);
+  st.cluster_weights = learned.cluster_weights;
+  st.intent14d_top = (intent14d?.publishing_interests || []).slice(0, 6);
   const quota = xaiKey
     ? await inferWeeklyQuota({
       xaiKey,
@@ -352,6 +364,9 @@ async function stepQuota(supabase: any, xaiKey: string, row: any) {
     `quota: ${quota.posts_per_day}/day × ${QUOTA_DAYS} = ${quota.required_slots}`,
     quota.rationale,
     learned.learning?.note_ko ? `학습: ${learned.learning.stage} · ${learned.learning.note_ko}` : "",
+    (st.intent14d_top || []).length
+      ? `14일 관심: ${(st.intent14d_top as string[]).join(", ")}`
+      : "14일 관심: cold",
   ].filter(Boolean).join("\n");
   row.step = "expand";
   row.label_ko = `시드 추론 0/${quota.required_slots}…`;
@@ -362,7 +377,9 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const required = Number(row.required_slots) || 0;
   const intentText = String(st.topic || "").trim();
   const published = (st.publishedTopics || []).map(String);
-  const { publishedEvidence, learned, experience } = await loadEvidence(supabase, published, intentText);
+  const { publishedEvidence, learned, experience, intent14d } = await loadEvidence(supabase, published, intentText);
+  st.cluster_weights = learned.cluster_weights;
+  st.intent14d_top = (intent14d?.publishing_interests || []).slice(0, 6);
   if (!xaiKey) {
     row.status = "error";
     row.error = "SEED_INFERENCE_REQUIRES_XAI";
@@ -623,6 +640,10 @@ async function stepSelect(supabase: any, row: any) {
   }));
   for (const plannedMode of queue) {
     const mode = plannedMode as EditorialMode;
+    const clusterMix: Record<string, number> = {};
+    for (const w of (st.cluster_weights || []) as Array<{ cluster: string; n: number }>) {
+      if (w?.cluster) clusterMix[w.cluster] = Number(w.n) || 0;
+    }
     const cands = pool
       .map((s, i) => ({ s, i, div: conceptualDiversityScore(s, selectedWeekly) }))
       .filter(({ s }) => {
@@ -632,7 +653,12 @@ async function stepSelect(supabase: any, row: any) {
         }
         return true;
       })
-      .sort((a, b) => b.div - a.div);
+      .sort((a, b) => {
+        const d = b.div - a.div;
+        if (d !== 0) return d;
+        return clusterPriorityFromMix(clusterMix, String(b.s.cluster || "")) -
+          clusterPriorityFromMix(clusterMix, String(a.s.cluster || ""));
+      });
     let picked: ConcreteSeed | null = null;
     for (const { s, i } of cands) {
       if (conceptualRepetitionLevel(s, selectedWeekly) === "HIGH" && selectedWeekly.length >= Math.ceil(required * 0.5)) continue;
@@ -817,6 +843,7 @@ async function stepWrite(supabase: any, openaiKey: string, userId: string, row: 
     slots: chunk,
     openaiKey: openaiKey || null,
     voiceRows: (voiceActs || []) as any,
+    audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
   });
   for (let k = 0; k < posts.length; k++) {
     const p = posts[k];

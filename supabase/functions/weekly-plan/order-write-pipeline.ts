@@ -16,6 +16,7 @@ import {
 import { judgeIndependentResult, isJudgeReject } from "./semantic-judge.ts";
 import type { ConcreteSeed } from "./seed-engine.ts";
 import type { EditorialMode } from "./editorial-mix.ts";
+import type { AudienceBarrierSignals } from "./everyday-language-reasoning.ts";
 import {
   inferSlotVoice,
   voiceRegisterConstraintLine,
@@ -57,6 +58,7 @@ export async function writeOneSlot(args: {
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
+  audienceSignals?: AudienceBarrierSignals | null;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -112,9 +114,29 @@ export async function writeOneSlot(args: {
       preserve_reader_entry: true,
       status: thinking_rail.status,
     },
+    mechanism: {
+      story_invitation_strength: String((reaction_mechanism as any)?.story_invitation_strength || ""),
+      status: String((reaction_mechanism as any)?.status || ""),
+    },
+    creator_comm_pref: {
+      prefers_broad_concrete_when_accurate: true,
+      avoids_unnecessary_jargon: true,
+      allows_attention_reentry: true,
+    },
+    audience_signals: args.audienceSignals || null,
   });
   const creator_style = decideCreatorStyle({
     context: {
+      creator_dna: {
+        prefers_compression: true,
+        prefers_conversational: true,
+        prefers_reflective: mode === "EXPERIENCE" || mode === "OPINION",
+        allows_technical_density: true,
+        community_native_ok: true,
+        longform_selective_ok: false,
+        politeness_default: mode === "INFORMATIVE" || mode === "COMPARE" ? "polite" : "mixed",
+        identity_stable: true,
+      },
       everyday_language_status: everyday_language.status,
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
       everyday_precision_conflict: everyday_language.precision_conflict,
@@ -123,6 +145,8 @@ export async function writeOneSlot(args: {
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
       mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
+      story_invitation_strength: String((reaction_mechanism as any)?.story_invitation_strength || ""),
+      self_projection_strength: String((reaction_mechanism as any)?.self_projection_strength || ""),
       rail_status: thinking_rail?.status || null,
       has_lived_reflection: !!seed.creator_evidence_available,
       has_experience_grounding: !!seed.creator_evidence_available || mode === "EXPERIENCE",
@@ -222,6 +246,7 @@ export async function writeSlotBatch(args: {
   openaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
+  audienceSignals?: AudienceBarrierSignals | null;
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
@@ -236,6 +261,7 @@ export async function writeSlotBatch(args: {
           dryRun: args.dryRun,
           voiceRows: args.voiceRows,
           recentMechanismUsage: recent.slice(-12),
+          audienceSignals: args.audienceSignals || null,
         })
       )
     );

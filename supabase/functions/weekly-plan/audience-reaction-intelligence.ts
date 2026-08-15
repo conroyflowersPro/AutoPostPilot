@@ -636,3 +636,32 @@ export function buildOrder4Diagnostics(records: AudienceReactionRecord[]): Order
     raw_text_for_generation: false,
   };
 }
+
+/** Generation-safe barrier hints from engagement meta. Never uses comment wording. */
+export function audienceBarrierSignalsFromActivityMeta(
+  rows: Array<{ meta?: Record<string, unknown> | null }>,
+): {
+  participation_barrier_tendency?: "LOW" | "MODERATE" | "HIGH" | "UNKNOWN" | null;
+  comprehension_barrier_tendency?: "LOW" | "MODERATE" | "HIGH" | "UNKNOWN" | null;
+  strong_self_projection_rate?: number | null;
+  story_invitation_strength?: string | null;
+} | null {
+  let replies = 0;
+  let n = 0;
+  for (const row of rows || []) {
+    const meta = (row?.meta || {}) as Record<string, unknown>;
+    const pm = ((meta.public_metrics || meta.publicMetrics || {}) as Record<string, unknown>);
+    const r = Number(pm.reply_count ?? pm.replies ?? meta.reply_count ?? 0);
+    if (!Number.isFinite(r)) continue;
+    replies += r;
+    n += 1;
+  }
+  if (n < 1) return null;
+  const avg = replies / n;
+  return {
+    participation_barrier_tendency: avg >= 2 ? "LOW" : avg >= 0.5 ? "MODERATE" : "UNKNOWN",
+    comprehension_barrier_tendency: "UNKNOWN",
+    strong_self_projection_rate: null,
+    story_invitation_strength: avg >= 2 ? "MODERATE" : "WEAK",
+  };
+}
