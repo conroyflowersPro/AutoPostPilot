@@ -111,7 +111,7 @@ ok("A28. seed prompt lives in California", /Creator lives in California/.test(cr
 ok("A29. job skips Korea-only on expand and select", /isKoreaOnlySituation/.test(job));
 ok("A30. expand batch 10 on job path", /const EXPAND_BATCH = 10/.test(job));
 const KOREA_ONLY_RE =
-  /이중\s*주차|관리사무소|관리비|주민센터|배달의민족|\b배민\b|쿠팡이츠|따릉이|마을버스|김밥천국|전세|청약|아파트\s*단지|경비실|공동현관|층간소음|무인\s*택배함|명절\s*귀성|\bktx\b|경부고속|한국\s*지하철|서울\s*지하철|홍대|인천공항(?!\s*환승)/i;
+  /이중\s*주차|관리사무소|관리비|주민센터|배달의민족|배민|쿠팡이츠|따릉이|마을버스|김밥천국|전세|청약|아파트\s*단지|경비실|공동현관|층간소음|무인\s*택배함|명절\s*귀성|\bktx\b|경부고속|한국\s*지하철|서울\s*지하철|홍대|인천공항(?!\s*환승)/i;
 ok("A31. 이중 주차 is Korea-only", KOREA_ONLY_RE.test("단지 이중 주차"));
 ok("A32. CA street parking is not Korea-only", !KOREA_ONLY_RE.test("빨간 연석 옆 길가 주차"));
 ok("A33. 배민 is Korea-only, drive-through is not", KOREA_ONLY_RE.test("배민 쿠폰") && !KOREA_ONLY_RE.test("드라이브스루 대기줄"));
