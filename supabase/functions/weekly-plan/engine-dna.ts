@@ -7,16 +7,20 @@
  * (Edge cannot import lib/).
  */
 export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.6-see-think-speak";
-export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.5-ca-mass";
+export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.6-x-window";
 
 type PerformanceWindow = {
   status?: string;
   validated_patterns?: number;
   window?: { from?: string; to?: string };
-  payout?: { period?: string; amount_usd?: number; note?: string };
+  payout?: { period?: string; amount_usd?: number; note?: string; next_payout?: string };
   patterns?: string[];
   forbidden?: string[];
   volume?: { originals?: number; replies?: number; note?: string };
+  analysis?: {
+    content_layer?: { original_follows?: number; reply_follows?: number };
+    overview_layer?: { new_follows?: number; impressions?: number };
+  };
 };
 
 function loadPerformanceWindow(): PerformanceWindow | null {
@@ -49,7 +53,7 @@ export function performanceDnaBlock(): string {
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
     "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
-    "CANDIDATE: practical investigation + real media → bookmarks/views; honest observation → replies",
+    "CANDIDATE: practical investigation → bookmarks/profile this window not follows; lived incident + clip → mixed conversion; ultra-short originals did not convert follows",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
     "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
   ];
@@ -63,8 +67,14 @@ export function performanceDnaBlock(): string {
       );
     }
     if (w.volume?.note) lines.push(`Volume: originals ${w.volume.originals ?? "?"} / replies ${w.volume.replies ?? "?"}. ${w.volume.note}`);
-    for (const p of (w.patterns || []).slice(0, 6)) lines.push(`CANDIDATE PATTERN: ${p}`);
-    for (const f of (w.forbidden || []).slice(0, 6)) lines.push(`WINDOW FORBIDDEN: ${f}`);
+    const contentFollows = (w.analysis?.content_layer?.original_follows ?? 0) + (w.analysis?.content_layer?.reply_follows ?? 0);
+    if (w.analysis?.overview_layer?.new_follows != null && contentFollows) {
+      lines.push(
+        `LAYER SPLIT: overview follows ${w.analysis.overview_layer.new_follows} vs content follows ${contentFollows}. missing ≠ 0. Do not average.`,
+      );
+    }
+    for (const p of (w.patterns || []).slice(0, 8)) lines.push(`CANDIDATE PATTERN: ${p}`);
+    for (const f of (w.forbidden || []).slice(0, 8)) lines.push(`WINDOW FORBIDDEN: ${f}`);
   }
   return lines.join("\n");
 }

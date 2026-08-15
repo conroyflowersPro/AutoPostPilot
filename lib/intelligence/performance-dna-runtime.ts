@@ -7,7 +7,7 @@
  */
 
 export const PERFORMANCE_DNA_RUNTIME_VERSION =
-  "performance-dna-runtime-v1.5-ca-mass";
+  "performance-dna-runtime-v1.6-x-window";
 
 export function buildPerformanceDnaPlannerBlock(): {
   block: string;
@@ -34,15 +34,16 @@ export function buildPerformanceDnaPlannerBlock(): {
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
     "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
-    "CANDIDATE associations (do NOT treat as proven rules):",
-    "1) Practical investigation + on-device video → higher bookmarks/views (CANDIDATE)",
-    "2) Pointing to ultra-practical community how-to → higher likes/RTs (CANDIDATE)",
-    "3) Long personal FSD experience essay → higher engagement when authentic (CANDIDATE)",
-    "4) Milestone personal story + gratitude → higher replies (CANDIDATE)",
-    "5) Honest incident report → higher replies (CANDIDATE)",
-    "6) Ultra-short reply-only posts → weak as reach drivers (may still build relationships)",
+    "CANDIDATE associations (do NOT treat as proven rules; VALIDATED = 0):",
+    "1) Lived Korea/US comparison from actual travel → this window strongest original follower conversion. One post = hypothesis. Never clone.",
+    "2) Lived in-car FSD incident + original clip → follows + profile + bookmarks + replies together. Cite the episode.",
+    "3) In-car product friction traced → high bookmarks and profile, almost no follows. Save ≠ follow this window.",
+    "4) Pointing to a community how-to → profile/bookmarks/replies, 0 follows. Not a seed clone.",
+    "5) Honest late-night own-fault scene → profile curiosity without bookmarks or follows.",
+    "6) Ultra-short originals: 32 posts, 0 follows this window. Replies keep relationships (321 posts, 0 bookmarks) and are not original seeds.",
     "OPERATOR WINDOW 2026-08-01..2026-08-15 (CANDIDATE): X Analytics content + overview + video export. Lived patterns only — never clone a post.",
-    "Revenue START 42.29 USD 2026-08-01..2026-08-15 (X Payouts). Next payout 2026-08-28. Account-level, not per-post. Video Estimated Revenue 0 is not this payout. Do not tweet the number. Do not raise daily quota from this one window.",
+    "LAYER SPLIT: overview follows 72 vs content follows 26; overview impressions 79900 vs content 287597. missing ≠ 0. Do not average.",
+    "Revenue START 42.29 USD 2026-08-01..2026-08-15 (X Payouts). Next payout 2026-08-28. Account-level, not per-post. Video Estimated Revenue 0 is not this payout. Clips not monetized. Library IDs did not join content posts. Do not tweet the number. Do not raise daily quota from this one window.",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · promote candidate→validated here · clone a winning post",
     "Planner use: soft preference only; never override Creator DNA authenticity or Creator Intent",
   ];

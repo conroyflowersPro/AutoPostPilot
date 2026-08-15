@@ -46,7 +46,7 @@ const contentHead = `Post id,Date,Post text,Post Link,Impressions,Likes,Engageme
 const overviewHead = `Date,Impressions,Likes,Engagements,Bookmarks,Shares,New follows,Unfollows,Replies,Reposts,Profile visits,Create Post,Video views,Media views`;
 const videoHead = `Video overview,,,,,\nDate,Views,Watch Time (ms),Completion Rate,Average Watch Time (ms),Estimated Revenue`;
 
-console.log("X Analytics + revenue start (v11.5.3)");
+console.log("X Analytics + revenue start (v11.5.4)");
 
 ok("R1. content kind", detectAnalyticsKind(contentHead) === "content");
 ok("R2. overview is not posts", detectAnalyticsKind(overviewHead) === "account_overview");
@@ -73,8 +73,22 @@ ok("R11. learning page takes multiple CSVs + payout",
   /multiple/.test(page) && /payoutUsd/.test(page) && /csvTexts/.test(page));
 ok("R12. import stores payout in raw_meta, does not split dollars onto posts",
   /account_payout_not_per_post/.test(imp) && !/42\.29 \/ rows/.test(imp));
-ok("R13. shipping 11.5.3",
-  /APP_VERSION = "11.5.3"/.test(ver) && /APP_VERSION = "11.5.3"/.test(ix));
+ok("R13. shipping 11.5.4",
+  /APP_VERSION = "11.5.4"/.test(ver) && /APP_VERSION = "11.5.4"/.test(ix));
+ok("R17. analysis is CANDIDATE not validated",
+  /"validated_patterns": 0/.test(json) && /"analyzed_at": "2026-08-15"/.test(json));
+ok("R18. no winning post body in window json",
+  !/보행자는 아직 길에/.test(json) &&
+    !/식겁할 뻔/.test(json) &&
+    !/미국에 살고 싶은/.test(json) &&
+    !/주간 한도가/.test(json));
+ok("R19. short originals 0 follows; replies not seeds",
+  /short_original_follows": 0/.test(json) && /Do not promote replies into original seeds/.test(json));
+ok("R20. layers not averaged",
+  /Do not average/.test(json) && /overview_layer/.test(json) && /content_layer/.test(json));
+ok("R21. Planner DNA version lockstep v1.6",
+  /performance-dna-runtime-v1.6-x-window/.test(read("lib/intelligence/performance-dna-runtime.ts")) &&
+    /performance-dna-runtime-v1.6-x-window/.test(read("supabase/functions/weekly-plan/engine-dna.ts")));
 
 const uploadDir = "/home/ubuntu/.cursor/projects/workspace/uploads";
 const contentFile = path.join(uploadDir, "account_analytics_content_2026-08-02_2026-08-15_714d.csv");
