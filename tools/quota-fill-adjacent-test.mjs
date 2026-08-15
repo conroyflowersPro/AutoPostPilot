@@ -80,7 +80,7 @@ days[0].posts = [{ source_type: "ADJACENT_EXPANSION" }, { source_type: "ADJACENT
 ok("A6. day with 3 adjacent is full", pickDay(days, 4, 3) !== 0);
 ok("A7. other days still accept adjacent", pickDay(days, 4, 3) > 0);
 
-ok("A8. job requests humorRing expand", /humorRing: humorFill \|\| massAtCap/.test(job));
+ok("A8. targeted refill requests humorRing without pre-capping discovery", /humorRing: humorFill \|\| compact/.test(job) && !/massAtCap/.test(job));
 ok("A9. job does not abort 22/28", !/할당량을 채운 뒤에만 저장합니다/.test(job));
 ok("A10. leftover adjacent respects per-day max", /pickDayForAdjacent/.test(job) && /enforceAdjacentPerDay/.test(job));
 ok("A11. shortfall keeps Grok humor expand, never a frozen keyword list", /humor_fill = true/.test(job) && /유머·관심 시드로 할당량 보충/.test(job) && !/localHumorKeywordSeeds/.test(job) && !/빈 칸은 작성하지 않음/.test(job));
@@ -91,7 +91,7 @@ ok("A15. mix EXPERIENCE capped to supply", /expSupply/.test(job));
 ok("A16. leftover pool fill after adjacent", /while \(totalPlanned < required && pool\.length > 0\)/.test(job));
 ok("A17. experience without evidence stays selectable as INFORMATIVE", /onlyMissingLived/.test(job));
 ok("A18. mass cap is 1/day", /MASS_PER_DAY_MAX = 1/.test(scopeSrc) && /enforceMassPerDay/.test(job));
-ok("A19. seed prompt forbids Elon/Tesla as default", /Tesla\/Elon\/Robotaxi-news are not the default/.test(cr));
+ok("A19. seed prompt rejects generic ticker/news, not Elon mention", /Elon\/Musk mention alone is not a rejection/.test(cr) && /generic Tesla ticker/.test(cr));
 ok("A20. writer mass slot forbids Tesla subject", /MASS PUBLIC SLOT/.test(wr) && /do not name Elon, Tesla, FSD/.test(wr));
 
 const personalDays = Array.from({ length: 7 }, () => ({ posts: [] }));
@@ -125,7 +125,7 @@ ok("A24. six Tesla seeds are all personal so a 12-slot 3-day is still short", ((
 ok("A34. empty Grok expand uses compactRetry next tick, never DNA keyword inject",
   /compactRetry: compact/.test(job) && /시드 짧게 재추론/.test(job) && !/DNA 관심 키워드/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A35. select bounces to Grok expand until quota, does not fill frozen keywords",
-  /if \(totalAfter < required\)/.test(job) && /Grok이 관심 시드를 더 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
+  /if \(totalAfter < required\)/.test(job) && /xAI가 부족 영역 후보를 묶어서 추론/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A36. humorRing remaps OBSERVATION cluster onto DNA interests",
   /inferPersonalCluster/.test(cr) && /humorRing cluster MUST/.test(cr));
 ok("A37. FSD keyword with OBSERVATION cluster is still personal",
@@ -147,8 +147,8 @@ ok("A44. typed empty slots: type only, concrete_subject empty",
   /export function buildOpenSlots/.test(scopeSrc) && /open_slots: openSlots/.test(cr) && /concrete_subject: ""/.test(scopeSrc) && /slotFillRule/.test(cr));
 ok("A45. type labels are dropped as seed bodies",
   /export function isSlotTypeLabel/.test(scopeSrc) && /isSlotTypeLabel/.test(cr) && /isSlotTypeLabel/.test(job));
-ok("A46. expand raises budget instead of writing short",
-  /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /canKeepExpanding\(st\)/.test(job) && /function quotaFilled/.test(job));
+ok("A46. expand is bounded instead of searching forever or writing short",
+  /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /return Number\(st\.dim_batch/.test(job) && /function quotaFilled/.test(job));
 ok("A47. write shortfall appends inferred slots, never frozen list, never underfill done",
   /write_fill_rounds/.test(job) && /WRITE_FILL_MAX = 8/.test(job) && /appendEligibleSeedsToWrite/.test(job) && /write_started/.test(job) && /bounceToFillQuota/.test(job) && !/할당 미달/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A48. Grok/writer prompts have no fill-in example sentences",
