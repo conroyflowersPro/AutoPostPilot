@@ -2,7 +2,7 @@
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
  * Seed supply: Creator DNA + engine rules + learned USER_DIRECT/performance → Grok infers quota AND fills it.
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
- * Target volume: prefer 4/day; 5 fills 14:00–22:00 PT; bounds 3–8.
+ * Target volume: prefer 4/day × 3 days; 5 fills 14:00–22:00 PT; bounds 3–8.
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
  */
@@ -43,7 +43,7 @@ import {
   topicDistributionReport,
   softDailyCap,
 } from "./daily-topic-distribute.ts";
-import { enforcePersonalPerDay, demoteExperienceOnMassSlots, PERSONAL_PER_DAY_MAX } from "./seed-scope.ts";
+import { enforceMassPerDay, demoteExperienceOnMassSlots, MASS_PER_DAY_MAX } from "./seed-scope.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
@@ -54,11 +54,13 @@ import {
   QUOTA_PER_DAY_MAX,
 } from "./quota-inference.ts";
 import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job.ts";
+import { overlayClusterWeightsWithIntent14d } from "./creator-intent-14d.ts";
+import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.3.4";
+const APP_VERSION = "11.4.1";
 const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -210,6 +212,11 @@ Deno.serve(async (req) => {
         publishedEvidence,
         intentText,
       });
+      const { cluster_weights } = overlayClusterWeightsWithIntent14d(
+        learned.cluster_weights,
+        (actRows || []) as any[],
+      );
+      learned.cluster_weights = cluster_weights;
       const quota = xaiKey
         ? await inferWeeklyQuota({
           xaiKey,
@@ -289,6 +296,11 @@ Deno.serve(async (req) => {
         publishedEvidence,
         intentText,
       });
+      const { cluster_weights } = overlayClusterWeightsWithIntent14d(
+        learned.cluster_weights,
+        (actRows || []) as any[],
+      );
+      learned.cluster_weights = cluster_weights;
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
       const targetSupply = Math.max(required_slots, Math.ceil(required_slots * 1.15));
@@ -651,7 +663,7 @@ Deno.serve(async (req) => {
         flatCount++;
       }
       const redistributed = redistributeDailyTopics(outDays, postsPerDay);
-      enforcePersonalPerDay(redistributed.days, PERSONAL_PER_DAY_MAX);
+      enforceMassPerDay(redistributed.days, MASS_PER_DAY_MAX);
       demoteExperienceOnMassSlots(redistributed.days);
       for (let di = 0; di < redistributed.days.length; di++) {
         redistributed.days[di].posts.forEach((p: any, si: number) => {
@@ -730,6 +742,7 @@ Deno.serve(async (req) => {
         openaiKey: openaiKey || null,
         dryRun,
         voiceRows: (voiceActs || []) as any,
+        audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
       });
       return json({
         success: true,

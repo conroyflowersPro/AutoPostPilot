@@ -247,5 +247,33 @@ export function clusterPriorityFromMix(
   mix: Record<string, number>,
   cluster: string
 ): number {
-  return Number(mix[String(cluster).toUpperCase()] || mix[cluster] || 0);
+  const key = String(cluster || "").trim();
+  if (!key) return 0;
+  return Number(mix[key.toUpperCase()] || mix[key] || 0);
+}
+
+/** Merge USER_DIRECT cluster counts with 14d publishing intent for Grok quota/expand. */
+export function overlayClusterWeightsWithIntent14d(
+  clusterWeights: Array<{ cluster: string; n: number }> | undefined,
+  actRows: CreatorActivityRow[],
+  now?: Date,
+): { intent: CreatorIntent14d; cluster_weights: Array<{ cluster: string; n: number }> } {
+  const intent = analyzeCreatorIntent14d(actRows || [], now);
+  const fromLearned: Record<string, number> = {};
+  for (const r of clusterWeights || []) {
+    const c = String(r.cluster || "").trim();
+    const n = Number(r.n) || 0;
+    if (!c || n <= 0) continue;
+    fromLearned[c] = (fromLearned[c] || 0) + n;
+  }
+  const defaults = Object.keys(fromLearned).length > 0 ? fromLearned : DEFAULT_INTEREST_MIX;
+  const blended = blendInterestMix(defaults, intent);
+  const overlay = Object.entries(blended)
+    .filter(([, w]) => Number(w) > 0)
+    .map(([cluster, w]) => ({ cluster, n: Math.max(1, Math.round(Number(w))) }))
+    .sort((a, b) => b.n - a.n);
+  return {
+    intent,
+    cluster_weights: overlay.length > 0 ? overlay : (clusterWeights || []),
+  };
 }

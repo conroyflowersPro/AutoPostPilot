@@ -178,8 +178,12 @@ export function buildCoreThought(
 ): CoreThought {
   const subject = s((interp as any)?.seed_subject || (seed as any)?.concrete_subject);
   const tension = s((interp as any)?.what_is_actually_happening);
-  const why = s((interp as any)?.why_it_matters_now);
-  const human = s((interp as any)?.human_element);
+  const why = s((interp as any)?.why_it_matters_now || (interp as any)?.why_it_might_matter_to_creator);
+  const human = s(
+    (interp as any)?.human_element ||
+      (interp as any)?.concrete_human_element ||
+      (interp as any)?.possible_reader_connection,
+  );
   if (!subject) {
     return {
       status: "CORE_THOUGHT_INSUFFICIENT_SEED",
@@ -337,18 +341,18 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       status: s(interp.status),
       seed_subject: s(interp.seed_subject || seed.concrete_subject),
       what_is_actually_happening: s(interp.what_is_actually_happening),
-      why_it_matters_now: s(interp.why_it_matters_now),
-      human_element: s(interp.human_element),
+      why_it_matters_now: s(interp.why_it_matters_now || interp.why_it_might_matter_to_creator),
+      human_element: s(interp.human_element || interp.concrete_human_element || interp.possible_reader_connection),
     },
-    why_it_matters: s(interp.why_it_matters_now),
-    human_element: s(interp.human_element),
+    why_it_matters: s(interp.why_it_matters_now || interp.why_it_might_matter_to_creator),
+    human_element: s(interp.human_element || interp.concrete_human_element || interp.possible_reader_connection),
     factual_boundaries: Array.isArray(interp.factual_boundaries)
       ? (interp.factual_boundaries as unknown[])
       : Array.isArray(seed.allowed_facts)
         ? (seed.allowed_facts as unknown[])
         : [],
     experience_boundaries: expBound,
-    cite_episode_hint: s((seed as any).cite_episode_hint || (seed as any).point_or_tension),
+    cite_episode_hint: s((seed as any).cite_episode_hint),
     source_type: s((seed as any).source_type || (seed as any).source_kind || seed.primary_source),
     source_kind: s((seed as any).source_kind),
     reader_self_projection: {
@@ -397,6 +401,10 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       reader_entry_strategy: s(everyday.reader_entry_strategy),
       human_relevance_bridge: s(everyday.human_relevance_bridge),
       precision_conflict: !!everyday.precision_conflict,
+      protected_meaning: Array.isArray(everyday.protected_meaning) ? everyday.protected_meaning : [],
+      forbidden_simplifications: Array.isArray(everyday.forbidden_simplifications)
+        ? everyday.forbidden_simplifications
+        : [],
     },
     creator_style: {
       status: s(style.status),
@@ -406,6 +414,14 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       short_post_compatible: !!style.short_post_compatible,
       conversational_level: s(style.conversational_level),
       paragraph_density: s(style.paragraph_density),
+      politeness_level: s(style.politeness_level),
+      directness: s(style.directness),
+      reflection_level: s(style.reflection_level),
+      technical_density: s(style.technical_density),
+      punchline_compatible: !!style.punchline_compatible,
+      prohibited_surface_behaviors: Array.isArray(style.prohibited_surface_behaviors)
+        ? style.prohibited_surface_behaviors
+        : [],
     },
     humor_decision: {
       humor_compatible: !!humor.humor_compatible,

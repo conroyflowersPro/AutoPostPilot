@@ -1,9 +1,9 @@
 /**
  * More inferred posts/seeds must not make a single Edge call fatter.
- * X anti-dump max is 8 originals/day × 7 = 56. Each expand/write request stays small;
+ * X anti-dump max is 8 originals/day × 3 = 24. Each expand/write request stays small;
  * the client only increases how many rounds it runs.
  */
-export const QUOTA_DAYS = 7;
+export const QUOTA_DAYS = 3;
 export const QUOTA_PER_DAY_MIN = 3;
 export const QUOTA_PER_DAY_MAX = 8;
 export const MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX * QUOTA_DAYS;
@@ -24,7 +24,7 @@ export function expandRoundBudget(requiredSlots: number): number {
 
 export function topupRoundBudget(requiredSlots: number): number {
   const slots = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
-  return Math.min(16, Math.max(6, Math.ceil(slots / 7)));
+  return Math.min(16, Math.max(6, Math.ceil(slots / 3)));
 }
 
 export function priorSubjectCap(requiredSlots: number): number {

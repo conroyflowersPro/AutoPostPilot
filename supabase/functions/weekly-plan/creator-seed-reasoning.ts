@@ -7,12 +7,14 @@
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 import { adjacentDomainGate, adjacentRingPromptLines } from "./adjacent-expansion.ts";
+import { humorRingPromptLines } from "./humor-fill.ts";
 import {
   isForbiddenDefaultSubject,
   isPersonalInterestSubject,
   massSectorFromText,
-  PERSONAL_PER_DAY_MAX,
+  MASS_PER_DAY_MAX,
 } from "./seed-scope.ts";
+import { QUOTA_DAYS } from "./quota-inference.ts";
 
 export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
 
@@ -44,8 +46,10 @@ export type CreatorSeedReasoningInput = {
   };
   model?: string;
   timeoutMs?: number;
-  /** Mass public sectors for quota-hole fill. Not Tesla/Elon. */
+  /** Mass public sectors (legacy hole fill). Prefer humorRing. */
   adjacentRing?: boolean;
+  /** Personal-interest observational humor to fill quota holes. */
+  humorRing?: boolean;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -211,7 +215,7 @@ export async function reasonCreatorSeeds(
       text: clean(v.text, 140),
       engagement_hint: clean(v.engagement_hint, 40),
     }))
-    .filter((v) => v.text.length >= 12 && (args.adjacentRing ? adjacentDomainGate(v.text) : interestDomainGate(v.text)))
+    .filter((v) => v.text.length >= 12 && (args.humorRing || !args.adjacentRing ? interestDomainGate(v.text) : adjacentDomainGate(v.text)))
     .slice(0, 12);
   const perf = (args.performancePatternHints?.length
     ? args.performancePatternHints
@@ -230,18 +234,18 @@ export async function reasonCreatorSeeds(
     "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
     "INFORMATIVE seeds stay in public scope for readers, not a Tesla club. Low entry barrier is wording AND wording range. Prefer words general readers and X catch, without distorting the claim. Avoid expert-only site names when a broader accurate phrase exists.",
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
-    "NEW READERS FIRST. Tesla/Elon/Robotaxi-news are not the default seed subject.",
+    "NEW READERS FIRST via one mass-public slot per day. Personal-interest originals fill the rest. Tesla/Elon/Robotaxi-news are not the default seed subject.",
     "Creator lives in California. Seeds are Korean words about US/CA daily life. FORBIDDEN invented subjects: 이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약, Korea subway/apartment-complex civic life.",
-    "At most about 1 personal-interest seed per day of quota (FSD/Cybertruck/LAFC/gaming/lived Tesla). Remaining seeds MUST be mass public sectors: DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
-    "If this batch asks for 6 seeds, return 5 mass + at most 1 personal. Do not return a Tesla-only list.",
+    "At most 1 mass-public daily-life seed per day of quota. Remaining seeds MUST be personal-interest (FSD/Cybertruck/LAFC/gaming/lived Tesla product). Do not invent lived episodes.",
+    "If this batch asks for 6 seeds, return at most 1 mass + 5 personal. Do not return a mass-only list.",
     "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",
-    "cluster_weights may inform the ONE personal slot, not the whole week. Do not let Tesla dominate the mix.",
+    "cluster_weights inform the personal mix. Mass public is the 1/day entry slot, not the week's center.",
     "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",
     "registry_interest_hints are HINTS of historically observed interests — never emit them as seed bodies.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Performance hints are PATTERN transfer only — never 'reuse last week's winning seed'.",
     "Lived evidence seeds may be CITE+RELATED follow-ups (e.g. night FSD pedestrian wait). Never clone the same content.",
-    ...(args.adjacentRing ? adjacentRingPromptLines() : []),
+    ...(args.humorRing ? humorRingPromptLines() : args.adjacentRing ? adjacentRingPromptLines() : []),
     "Do NOT name specific cities or venues in concrete_subject unless that label already appears in learned angle labels.",
     'Output strict JSON: {"seeds":[{"cluster":"...","dimension":"...","concrete_subject":"...","point_or_tension":"...","idea_angle_family":"...","entry_direction":"...","wording_note":"..."}]}',
   ].join("\n");
@@ -269,9 +273,11 @@ export async function reasonCreatorSeeds(
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
     performance_pattern_hints_not_seed_clones: perf,
-    weekly_goal_note: args.adjacentRing
-      ? "Fill quota holes with mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Not Tesla/Elon. Return requested_seed_count seeds."
-      : "Fill the inferred quota. New readers first. At most ~1 personal-interest seed per day. Rest mass public sectors. No frozen Tesla axes. Return requested_seed_count seeds.",
+    weekly_goal_note: args.humorRing
+      ? "Fill quota holes with personal-interest CASUAL/OPINION humor from Creator DNA. No invented lived experience. Return requested_seed_count seeds."
+      : args.adjacentRing
+      ? "Fill leftover mass-public slots only (max 1/day). Rest of the hole fill is personal. Return requested_seed_count seeds."
+      : "Fill the inferred 3-day quota. Personal-interest originals are the main mix. At most 1 mass-public daily-life seed per day. No invented experience. Return requested_seed_count seeds.",
     requirement:
       "Produce distinct inferred direction seeds. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
@@ -312,19 +318,20 @@ export async function reasonCreatorSeeds(
     const rawList = seedListFromParsed(parsed);
     const seeds: ConcreteSeed[] = [];
     const seen = new Set<string>();
-    const maxPersonal = args.adjacentRing
+    const maxMass = args.humorRing
       ? 0
-      : Math.max(1, Math.min(PERSONAL_PER_DAY_MAX * 7, Math.ceil(requested / 7)));
-    let personalN = 0;
+      : args.adjacentRing
+        ? Math.max(1, MASS_PER_DAY_MAX * QUOTA_DAYS)
+        : Math.max(1, Math.min(MASS_PER_DAY_MAX * QUOTA_DAYS, Math.ceil(requested / 4)));
+    let massN = 0;
     for (let i = 0; i < rawList.length; i++) {
       const n = normalizeSeed(rawList[i], seeds.length);
       if (!n) continue;
       if (isForbiddenDefaultSubject(n.concrete_subject)) continue;
       const personal = isPersonalInterestSubject(n.concrete_subject, n.cluster);
-      if (personal) {
-        if (personalN >= maxPersonal) continue;
-        personalN += 1;
-      } else {
+      if (!personal) {
+        if (massN >= maxMass) continue;
+        massN += 1;
         n.cluster = massSectorFromText(n.concrete_subject);
       }
       const sig = n.subject_signature || subjectSignature(n.concrete_subject);

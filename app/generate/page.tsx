@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isTransientEdgeError, koreanEdgeError } from "@/lib/transient-edge-error";
 import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
 
-const GENERATION_DAYS = 7;
+const GENERATION_DAYS = 3;
 const COLLISION_DAYS = 30;
 
 type LafcMatch = { match_date: string; opponent: string; home_or_away?: string; venue?: string };
@@ -284,7 +284,7 @@ function GeneratePageInner() {
 
   return (
     <main className="min-h-screen bg-black text-white p-4 md:p-8 max-w-3xl mx-auto">
-      <h1 className="mb-3 text-xl font-semibold">이번 주 계획 · 작성</h1>
+      <h1 className="mb-3 text-xl font-semibold">3일 계획 · 작성</h1>
       <details className="mb-4 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
         <summary className="cursor-pointer text-xs text-zinc-500">
           이번 버전 {APP_VERSION_LABEL}
@@ -298,7 +298,7 @@ function GeneratePageInner() {
         onChange={(e) => setStartDate(e.target.value)}
         className="w-full mb-4 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2"
       />
-      <label className="block text-sm mb-1 text-zinc-300">이번 주 메모 (선택)</label>
+      <label className="block text-sm mb-1 text-zinc-300">이번 3일 메모 (선택)</label>
       <textarea
         value={topic}
         onChange={(e) => setTopic(e.target.value)}
@@ -397,7 +397,7 @@ function GeneratePageInner() {
         onClick={runPlanAndGenerate}
         className="w-full rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 py-3 font-medium"
       >
-        {busy ? "생성 중…" : "이번 주 전략 만들기"}
+        {busy ? "생성 중…" : "3일 전략 만들기"}
       </button>
     </main>
   );

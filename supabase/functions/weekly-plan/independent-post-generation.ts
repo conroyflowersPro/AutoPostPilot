@@ -13,6 +13,7 @@ import type {
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
 import { isPersonalInterestSubject, lengthBandForMode } from "./seed-scope.ts";
+import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -147,7 +148,12 @@ const FORCED_CTA_PATTERNS = [
 const EXPERIENCE_FABRICATION_PATTERNS = [
   /제가\s*직접\s*써보니/,
   /어제\s*해봤는데/,
+  /어제\s*내가/,
+  /오늘\s*직접/,
+  /방금\s*테스트/,
   /운전하다가/,
+  /직접\s*운전/,
+  /내가\s*타봤/,
   /마님이\s*그러더라고/,
   /나리가\s*이렇게\s*했/,
   /직접\s*타보니/,
@@ -249,6 +255,80 @@ export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] 
   ];
 }
 
+export function writerEverydayConstraintLines(ctx: DeepGenerationContext): string[] {
+  const everyday = ((ctx as any).everyday_language || {}) as Record<string, unknown>;
+  const strategy = s(everyday.reader_entry_strategy);
+  if (!strategy || strategy === "NONE") return [];
+  const protectedMeaning = Array.isArray(everyday.protected_meaning)
+    ? (everyday.protected_meaning as unknown[]).map((x) => s(x)).filter(Boolean).slice(0, 4)
+    : [];
+  const forbidden = Array.isArray(everyday.forbidden_simplifications)
+    ? (everyday.forbidden_simplifications as unknown[]).map((x) => s(x)).filter(Boolean).slice(0, 4)
+    : [];
+  return [
+    "EVERYDAY LANGUAGE (keep thought depth; lower entry barrier; not a vocab list):",
+    "Entry strategy: " + strategy,
+    everyday.human_relevance_bridge ? "Bridge through a felt daily situation, not a lecture." : "",
+    s(everyday.compression_preference) ? "Compression: " + s(everyday.compression_preference) : "",
+    protectedMeaning.length ? "Do not dilute: " + protectedMeaning.join("; ") : "",
+    forbidden.length ? "Do not simplify into: " + forbidden.join("; ") : "",
+  ].filter(Boolean);
+}
+
+export function writerStyleConstraintLines(ctx: DeepGenerationContext): string[] {
+  const style = ((ctx as any).creator_style || {}) as Record<string, unknown>;
+  const family = s(style.style_family);
+  if (!family) return [];
+  const banned = Array.isArray(style.prohibited_surface_behaviors)
+    ? (style.prohibited_surface_behaviors as unknown[]).map((x) => s(x)).filter(Boolean).slice(0, 6)
+    : [];
+  return [
+    "CREATOR STYLE (surface tendency for this post, not a template): " + family,
+    s(style.conversational_level) ? "Conversational: " + s(style.conversational_level) : "",
+    s(style.compression_level) ? "Compression: " + s(style.compression_level) : "",
+    s(style.politeness_level) ? "Politeness: " + s(style.politeness_level) : "",
+    s(style.directness) ? "Directness: " + s(style.directness) : "",
+    s(style.reflection_level) ? "Reflection: " + s(style.reflection_level) : "",
+    s(style.technical_density) ? "Technical density: " + s(style.technical_density) : "",
+    banned.length ? "Forbidden surface: " + banned.join(", ") : "",
+  ].filter(Boolean);
+}
+
+export function writerBoundaryConstraintLines(ctx: DeepGenerationContext): string[] {
+  const facts = Array.isArray(ctx.factual_boundaries) ? ctx.factual_boundaries : [];
+  const prohibitedInvent = facts
+    .map((x: any) => (x && typeof x === "object" ? x : { item: x, status: "" }))
+    .filter((x: any) => String(x.status || "") === "prohibited_to_invent" || /without evidence/i.test(String(x.item || "")))
+    .map((x: any) => s(x.item))
+    .filter(Boolean)
+    .slice(0, 6);
+  const claims = Array.isArray(ctx.prohibited_claims)
+    ? ctx.prohibited_claims.map((x) => s(x)).filter(Boolean).slice(0, 6)
+    : [];
+  const lines = [
+    ctx.compression_target ? "COMPRESSION TARGET: " + s(ctx.compression_target) : "",
+  ];
+  if (prohibitedInvent.length) lines.push("FACTUAL DO-NOT-INVENT: " + prohibitedInvent.join("; "));
+  if (claims.length) lines.push("PROHIBITED CLAIMS: " + claims.join("; "));
+  return lines.filter(Boolean);
+}
+
+export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[] {
+  const h = ((ctx as any).humor_decision || {}) as Record<string, unknown>;
+  const strength = s(h.humor_strength, "NONE");
+  if (!h.humor_compatible || strength === "NONE") {
+    return ["HUMOR DECISION: NONE — do not force jokes, ㅋㅋ, or punchlines."];
+  }
+  return [
+    "HUMOR DECISION (do not name the engine):",
+    "Strength: " + strength,
+    h.humor_grounded ? "Keep humor grounded in the observed situation." : "Do not invent a comic scene.",
+    h.self_deprecation_allowed ? "Light self-deprecation ok if already in the situation." : "No self-deprecation.",
+    h.laughter_marker_allowed ? "ㅋㅋ only if it fits this post's register." : "No ㅋㅋ.",
+    h.stop_after_punchline_ok ? "Stop after the punch if the observation is complete." : "",
+  ].filter(Boolean);
+}
+
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
@@ -262,10 +342,17 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const editorialMode = s((ctx as any).seed_identity?.editorial_mode || (ctx as any).editorial_mode);
   const cluster = s((ctx as any).seed_identity?.cluster || (ctx as any).cluster);
   const personal = isPersonalInterestSubject(subject, cluster);
+  const humorFill = String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("HUMOR");
 
   return [
     "You write one Korean X post for creator @Seung4680.",
-    "Use ONLY the provided structured decisions. Do not invent lived experiences or private facts.",
+    "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences or private facts.",
+    "CREATOR DNA (identity / place / experience bounds — not sentences to copy):",
+    creatorDnaBlock(),
+    "ENGINE RULES (operator will):",
+    engineRulesAsWill(),
+    "PERFORMANCE DNA (strategy, not post prose):",
+    performanceDnaBlock(),
     "REASONING ORDER (internal only; do not output steps):",
     "1) Confirm Seed meaning. A short keyword seed is valid — infer a public-agreeable situation through Creator DNA vision. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies.",
     "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
@@ -275,7 +362,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
     "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
     "7) Apply Creator Style as surface register — not a fixed template. Register follows this post's character (editorial mode), not a single global ending.",
-    "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
+    "8) Humor: " + (humorFill ? "LIGHT observational humor from DNA interests. Do not invent a drive or private event." : mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines."),
     "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
     "10) One complete sentence is enough if the situation is delivered. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
     "LENGTH: " + lengthBandForMode(editorialMode),
@@ -288,6 +375,10 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     ...writerMechanismConstraintLines(ctx),
     ...writerRailConstraintLines(ctx),
+    ...writerEverydayConstraintLines(ctx),
+    ...writerStyleConstraintLines(ctx),
+    ...writerBoundaryConstraintLines(ctx),
+    ...writerHumorConstraintLines(ctx),
     "SEED SUBJECT: " + subject.slice(0, 200),
     "CORE AXIS (not literal sentence): " + s(core?.primary_claim).slice(0, 120),
     "TENSION HINT: " + s(core?.tension).slice(0, 100),
@@ -299,6 +390,9 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     personal
       ? ""
       : "MASS PUBLIC SLOT: do not name Elon, Tesla, FSD, Cybertruck, or Robotaxi as the subject. Write the everyday public situation.",
+    humorFill
+      ? "HUMOR FILL SLOT: light observational humor. FORBIDDEN: first-person lived drive/test/date. Keyword seed is valid. Do not fake a story."
+      : "",
     String((ctx as any).source_type || (ctx as any).source_kind || "").toUpperCase().includes("ADJACENT")
       ? "ADJACENT RING: mass public sectors (daily AI, phone/alerts, road/parking without a brand, living costs, queues, weather/out). Observation/opinion only. FORBIDDEN: first-person Tesla driving, Elon/Musk as subject, viral clone."
       : "",
