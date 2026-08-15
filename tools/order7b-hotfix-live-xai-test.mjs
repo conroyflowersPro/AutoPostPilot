@@ -34,7 +34,7 @@ ok("H20. generate-post not the write path in index", !/functions\/v1\/generate-p
 ok("H21. dry_run_generation explicit body flag only", /dry_run_generation/.test(index));
 ok("H22. callGrokWriter takes ctx + xai key", /callGrokWriter\(\s*ctx:\s*DeepGenerationContext,\s*xaiKey:\s*string/.test(mod));
 ok("H23. batch awaits per-item independently", /await generateIndependentPost\(ctx/.test(mod));
-ok("H24. constraint instructions forbid finished examples", /FORBIDDEN: finished examples/.test(mod));
+ok("H24. Writer instructions forbid prompt examples without adding samples", /Do not paste prompt material or examples/.test(mod));
 ok("H25. experience fabrication still validated", /EXPERIENCE_FABRICATION_PATTERNS|experience_fabrication/.test(mod));
 ok("H26. ORDER7B_PER_POST_ISOLATION", /ORDER7B_PER_POST_ISOLATION/.test(mod));
 ok("H27. ORDER7B_NO_FINISHED_EXAMPLES", /ORDER7B_NO_FINISHED_EXAMPLES/.test(mod));
