@@ -235,7 +235,7 @@ export function judgeSeedGrounding(input: GroundingInput): {
       claim_types,
       inference_type,
       grounding_status: "GROUNDED",
-      reasons,
+      reasons: [...new Set(reasons)],
     },
   };
 }
