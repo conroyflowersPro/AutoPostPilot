@@ -232,6 +232,7 @@ export async function reasonCreatorSeeds(
     "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
     "NEW READERS FIRST. Tesla/Elon/Robotaxi-news are not the default seed subject.",
     "At most about 1 personal-interest seed per day of quota (FSD/Cybertruck/LAFC/gaming/lived Tesla). Remaining seeds MUST be mass public sectors: DAILY_AI, PHONE_NOTIFY, ROAD_PARK, LIVING_COST, QUEUE_WAIT, WEATHER_OUT.",
+    "If this batch asks for 6 seeds, return 5 mass + at most 1 personal. Do not return a Tesla-only list.",
     "Do not emit Elon/Musk, Tesla ticker, or Robotaxi news as concrete_subject.",
     "cluster_weights may inform the ONE personal slot, not the whole week. Do not let Tesla dominate the mix.",
     "Will is Creator DNA + engine rules. Do not wait for a typed restatement. this_run_note is overlay only.",

@@ -41,6 +41,24 @@ export function countPersonalOnDay(
   ).length;
 }
 
+/** How many originals we can actually place: 1 personal/day + all mass seeds. */
+export function placeableSeedCount(
+  seeds: Array<{ cluster?: string; concrete_subject?: string; topic_cluster?: string }>,
+  days = 7,
+  maxPersonal = PERSONAL_PER_DAY_MAX,
+): number {
+  let personal = 0;
+  let mass = 0;
+  for (const s of seeds || []) {
+    if (isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || s.topic_cluster || ""))) {
+      personal += 1;
+    } else {
+      mass += 1;
+    }
+  }
+  return Math.min(personal, days * maxPersonal) + mass;
+}
+
 export function massSectorFromText(text: string): MassSector {
   const t = String(text || "");
   if (/번역|초안|요약|음성|챗gpt|chatgpt|\bgrok\b|그록|ai\b/i.test(t)) return "DAILY_AI";

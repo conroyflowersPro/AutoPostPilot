@@ -86,8 +86,9 @@ export async function inferWeeklyQuota(args: {
     `Infer posts_per_day as an integer between ${QUOTA_PER_DAY_MIN} and ${QUOTA_PER_DAY_MAX}. Prefer 4/day. 5 fills the 14:00–22:00 PT window. Not a frozen 5. Do not freeze 6 as a default.`,
     "Thin or missing learned evidence is expected (cold start). Still infer posts_per_day from DNA + cadence within bounds. Do not refuse. Do not wait for validated performance patterns.",
     "If handmade cadence is healthy and the 14:00–22:00 PT window has room, 5 is enough. Go to 6–8 only if dumping is unlikely. If dumping likely hurt reach, stay at 3–4.",
+    "Do not copy 6 just because an old example used 6. Prefer 4.",
     "Korean rationale, one or two sentences.",
-    'Output strict JSON: {"posts_per_day":6,"rationale":"..."}',
+    'Output strict JSON: {"posts_per_day":4,"rationale":"..."}',
   ].join("\n");
 
   const user = JSON.stringify({
