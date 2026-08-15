@@ -37,17 +37,17 @@ ok("S6. expand requires xAI, no template fallback", /SEED_INFERENCE_REQUIRES_XAI
 ok("S7. select asks for more seeds instead of aborting the week", /NEED_MORE_SEEDS/.test(ix) && !/SEED_SELECT_SHORTFALL/.test(ix));
 ok("S8. select does not lie seed_expansion true", !/xai_usage: \{ seed_expansion: true/.test(ix));
 ok("S9. Grok rejects registry-label bodies", /관찰·판단 축/.test(cr) && /Do NOT copy DIMENSION labels/.test(cr));
-ok("S10. mix follows cluster_weights", /cluster_weights_from_user_direct/.test(cr));
+ok("S10. Seed exploration does not follow a fixed cluster mix", !/cluster_weights_from_user_direct/.test(cr) && /no topic, domain, Editorial Mode, or personal\/public quota/.test(cr));
 ok("S11. generate starts a persisted job", /phase: "job_start"/.test(gen) && /job_id/.test(gen));
 ok("S12. generate follows ticks until quota filled", /phase: "job_tick"/.test(gen) && /followJob/.test(gen));
-ok("S13. direction: quota inferred then filled", /weekly quota itself is inferred/.test(dir) && /must fill it/.test(dir));
+ok("S13. direction: Planner final slots require equal Judge-PASS drafts", /N Planner slots require N Judge-PASS drafts/.test(dir));
 ok("S14. expand batched from learned data", /EXPAND_BATCH/.test(ix) && /collectLearnedSeedSignals/.test(ix));
 ok("S15. engine version quota fill", /v11_inferred_quota_fill/.test(ix));
 ok("S16. quota-inference module", /export async function inferWeeklyQuota/.test(qu) && /quotaFromCadence/.test(qu));
 ok("S17. cadence on learned signals", /cadence: CadenceSignal/.test(se) || /avg_originals_on_active_days/.test(se));
 ok("S18. quota phase on edge", /phase === "quota"/.test(ix) && /inferWeeklyQuota/.test(ix));
-ok("S19. explore inferred quota candidate pool from DNA", /requested_seed_count distinct candidates for the inferred 3-day quota/.test(cr) && /engine_rules_are_the_will/.test(cr));
-ok("S20. will is DNA+engine not a slogan", /Will lives in the engine and DNA/.test(dir) && !/operator_will/.test(qu) && /engineRulesAsWill/.test(qu));
+ok("S19. explore seven-day candidate Pool from Creator bounds", /requested_seed_count distinct candidates for the seven-day Seed Pool/.test(cr) && /creator_dna/.test(cr));
+ok("S20. capacity call is not strategy; Planner receives intelligence", /capacity recommendation/.test(qu) && !/plannerArchitectureLock/.test(qu) && /seven-day Planner/.test(dir));
 ok("S21. engine-dna module is will source", /Do not wait for a typed restatement of will/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-dna.ts"), "utf8")));
 
 console.log("========================================");
