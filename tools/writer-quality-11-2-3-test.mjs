@@ -113,6 +113,7 @@ ok("W41. writer tension can inform without preaching", /leave judgment to the re
 ok("W42. writer mix for bookmarks not archive-only", /do not write only keep-worthy archive posts/.test(wr));
 ok("W43. writer has no copy-link weight numbers", !/ShareViaCopyLink/.test(wr) && !/weight 20/.test(wr) && !/가중치 20/.test(wr));
 ok("W44. Korean summary names 2pm PT For You spacing", /태평양시 오후 2시/.test(ver));
+ok("W45. write phase does not credit Grok for ChatGPT originals", /chatgpt_writer_attempted/.test(ix) && /phase === "write"/.test(ix) && /creator_generation: false/.test(ix));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

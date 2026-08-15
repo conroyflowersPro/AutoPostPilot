@@ -700,7 +700,7 @@ Deno.serve(async (req) => {
           order8d_functional_restore: true,
           order8d_cors_methods: true,
           order0b_manual_leakage_separation: true,
-          order8d_note: "v11 write phase uses ORDER 7B independent writer; generate-post is fallback only",
+          order8d_note: "v11 write phase uses ORDER 7B ChatGPT writer; Grok is quota/seeds only; generate-post is not the write path",
           soft_daily_cap: softDailyCap(postsPerDay),
           max_daily_topic: redistributed.max_daily_topic,
           topic_distribution: topicDistributionReport(redistributed.days),
@@ -735,10 +735,11 @@ Deno.serve(async (req) => {
         engine: WEEKLY_ENGINE_VERSION,
         writer_model: V11_WRITER_MODEL,
         system_origin_class: "AP_PIPELINE",
+        chatgpt_writer_attempted: posts.some((p) => p.writer_call_attempted),
         xai_usage: {
           seed_expansion: false,
           external_supplement: false,
-          creator_generation: posts.some((p) => p.writer_call_attempted),
+          creator_generation: false,
         },
         timing: { total_ms: Date.now() - t0 },
       });

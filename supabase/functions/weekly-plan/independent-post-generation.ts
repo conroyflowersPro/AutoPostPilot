@@ -201,7 +201,7 @@ export function buildWriterPlanMarkers(ctx: DeepGenerationContext): IndependentP
 }
 
 /**
- * Constraint-only system instructions for live xAI writer.
+ * Constraint-only system instructions for the live ChatGPT writer.
  * No finished examples, no templates, no CTA, no fabrication.
  */
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
