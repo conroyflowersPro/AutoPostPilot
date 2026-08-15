@@ -174,16 +174,32 @@ export function inferSlotVoice(args: {
   };
 }
 
-export function voiceRegisterConstraintLine(reg: VoiceRegister | null | undefined): string {
+export function voiceRegisterConstraintLine(
+  reg: VoiceRegister | null | undefined,
+  editorialMode?: string | null,
+): string {
+  const mode = String(editorialMode || "").toUpperCase();
+  const character =
+    mode === "INFORMATIVE" || mode === "COMPARE"
+      ? "POST CHARACTER: information/compare — polite 해요/존칭. Do not use 음슴체. Endings follow this slot's character, not a casual handmade default."
+      : mode === "EXPERIENCE"
+        ? "POST CHARACTER: experience — USER_DIRECT endings for lived slots only. Still no fabricated first person."
+        : mode === "CASUAL_OBSERVATION" || mode === "OPINION"
+          ? "POST CHARACTER: casual/opinion — USER_DIRECT endings (including 음슴) may apply if comparable handmade used them."
+          : "POST CHARACTER: follow USER_DIRECT stats; endings still follow this slot's character when a mode is set.";
   if (!reg || reg.n <= 0) {
-    return "USER_DIRECT REGISTER: none in window — write conservatively as him, no archive endings, no example posts.";
+    return [
+      "USER_DIRECT REGISTER: none in window — write conservatively as him, no archive endings, no example posts.",
+      character,
+    ].join("\n");
   }
   return [
     `USER_DIRECT REGISTER (stats only, no sample posts): n=${reg.n} window=${reg.window_days}d median_chars=${reg.median_chars}`,
     `haeyo=${reg.ending_haeyo_rate} eumseum=${reg.ending_eumseum_rate} question=${reg.ending_question_rate} kk=${reg.kk_rate}`,
     `question_ending_allowed=${reg.question_ending_allowed} comparable_n=${reg.comparable_n} entry=${reg.comparable_entry_n}`,
     ...reg.notes,
+    character,
     "Do not copy handmade wording. Do not install a question because X rewards participation.",
-    "Length follows median_chars. One finished sentence is allowed. Do not inflate with a dummy second sentence.",
+    "Length follows median_chars of comparable handmade, then this slot's character. One finished sentence is allowed. Do not inflate with a dummy second sentence.",
   ].join("\n");
 }

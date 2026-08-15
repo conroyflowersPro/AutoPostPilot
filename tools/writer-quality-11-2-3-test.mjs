@@ -13,6 +13,7 @@ const ow = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-wr
 const dgc = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/deep-generation-context.ts"), "utf8");
 const sj = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/semantic-judge.ts"), "utf8");
 const cr = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/creator-seed-reasoning.ts"), "utf8");
+const se = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-engine.ts"), "utf8");
 const gi = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/generation-integration.ts"), "utf8");
 const voice = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/user-direct-voice-window.ts"), "utf8");
 const ver = readFileSync(path.join(ROOT, "lib/version.ts"), "utf8");
@@ -66,7 +67,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.2.4)");
+console.log("Writer quality + leftover seeds (v11.2.5)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -83,15 +84,21 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.2.4", /APP_VERSION = "11.2.4"/.test(ver) && /APP_VERSION = "11.2.4"/.test(ix));
-ok("W18. Korean summary allows one sentence", /한 문장이어도/.test(ver));
+ok("W17. version lockstep 11.2.5", /APP_VERSION = "11.2.5"/.test(ver) && /APP_VERSION = "11.2.5"/.test(ix));
+ok("W18. Korean summary names keyword infer", /키워드만 있어도/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
-ok("W20. tension must be visible", /Tension to make visible/.test(wr) && /felt snag/.test(cr));
+ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
 ok("W21. subject restate is rejected", isSubjectRestate("슈퍼차저 대기줄", "슈퍼차저 대기줄"));
 ok("W22. finished observation is not a restate", !isSubjectRestate("슈퍼차저 대기줄에서 앞차가 안 움직이면 충전 예상이 통째로 밀린다.", "슈퍼차저 대기줄"));
 ok("W23. generic thesis is rejected", GENERIC_THESIS_RE.test("전기차 보조금은 중요한 이슈다."));
 ok("W24. voice allows one sentence", /One finished sentence is allowed/.test(voice));
 ok("W25. 7C retry passes rewrite hint", /quality_rewrite|retry_hint: \(last\.block_reasons/.test(gi));
+ok("W26. short keyword subject is usable", /export function isUsableKeywordSubject/.test(se));
+ok("W27. writer infers keyword via vision, no example posts", /short keyword seed is valid/.test(wr) && /hardcoded example posts/.test(wr));
+ok("W28. info posts forbid 음슴체", /Do not use 음슴체 on information posts/.test(wr) && /Do not use 음슴체/.test(voice));
+ok("W29. public words must not distort the claim", /NEVER swap a word if it would change the claim/.test(wr));
+ok("W30. pipeline passes editorial mode into voice", /voiceRegisterConstraintLine\(voice, mode\)/.test(ow));
+ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
 
 console.log("========================================");
 console.log(`WRITER QUALITY: ${pass} PASS / ${fail} FAIL`);

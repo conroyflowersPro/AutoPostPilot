@@ -80,7 +80,7 @@ export async function writeOneSlot(args: {
     window_days: voice.window_days,
     median_chars: voice.median_chars,
     question_ending_allowed: voice.question_ending_allowed,
-    constraint_line: voiceRegisterConstraintLine(voice),
+    constraint_line: voiceRegisterConstraintLine(voice, mode),
   };
 
   const seed_interpretation = interpretConcreteSeed(seed, mode);

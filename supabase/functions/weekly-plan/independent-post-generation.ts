@@ -217,19 +217,21 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
 
   return [
     "You write one Korean X post for creator @Seung4680.",
-    "Use ONLY the provided structured decisions. Do not invent facts or lived experiences.",
+    "Use ONLY the provided structured decisions. Do not invent lived experiences or private facts.",
     "REASONING ORDER (internal only; do not output steps):",
-    "1) Confirm Seed meaning — do not expand Seed with external facts.",
+    "1) Confirm Seed meaning. A short keyword seed is valid — infer a public-agreeable situation through Creator DNA vision. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies.",
     "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
     "3) Keep reader self-projection space; never force questions or CTA.",
-    "4) Use Reaction Mechanism functionally — never name it or template it.",
+    "4) Reference the selected Reaction Mechanism as the reader-entry structure — never name it or template it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
-    "6) Prefer broad/simple everyday language without sacrificing accuracy.",
-    "7) Apply Creator Style as surface register — not a fixed template.",
+    "6) Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
+    "7) Apply Creator Style as surface register — not a fixed template. Register follows this post's character (editorial mode), not a single global ending.",
     "8) Humor: " + mode + " — if NONE, do not force jokes, ㅋㅋ, or punchlines.",
-    "9) QUALITY: write a finished observation. The reader should feel the snag, mismatch, or small human beat in the seed — not a topic label and not a memo fragment.",
-    "10) One complete sentence is enough if that observation is delivered. Do not add a dummy second sentence to look longer. Do not stop mid-token. No grand thesis tail.",
-    "FORBIDDEN: finished examples, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
+    "9) QUALITY: write a finished observation of a specific situation. A snag is optional — only if the seed already has one. Do not require conflict. Do not stop at the keyword name.",
+    "10) One complete sentence is enough if the situation is delivered. Do not add a dummy second sentence. Do not stop mid-token. No grand thesis tail.",
+    "INFORMATIVE/COMPARE register: polite 해요/존칭. Do not use 음슴체 on information posts.",
+    "INFORMATIVE scope: general public. Avoid expert-only site/factory names when a broader accurate phrase exists. Do not distort the fact to sound broader.",
+    "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
     "SEED SUBJECT: " + subject.slice(0, 200),
@@ -314,8 +316,10 @@ export async function callXaiWriter(
   const userMsg = [
     "Write the final Korean X post now.",
     "Situation: " + subject.slice(0, 160),
-    tension ? "Tension to make visible: " + tension.slice(0, 140) : "Tension: find the snag inside the situation. Do not just name the topic.",
-    "The reader should picture the moment or the mismatch. One finished sentence is OK. Do not pad.",
+    tension
+      ? "Optional angle (not required): " + tension.slice(0, 140)
+      : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
+    "One finished sentence is OK. Do not pad. Do not invent lived experience.",
     s(options.retry_hint)
       ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as a finished observation. One sentence is enough. Do not stutter. Do not restate the subject as the whole post."
       : "",

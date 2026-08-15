@@ -372,9 +372,18 @@ export function parseEditorialMode(raw: string): EditorialMode {
   return "INFORMATIVE";
 }
 
+export function isUsableKeywordSubject(raw: unknown): boolean {
+  const t = String(raw || "").trim();
+  if (t.length >= 8) return true;
+  if (t.length < 3) return false;
+  if (/^[A-Za-z][A-Za-z0-9._-]{2,}$/.test(t)) return true;
+  if (/^[가-힣]{2,7}$/.test(t)) return true;
+  return false;
+}
+
 export function evaluateEditorialSeedQuality(seed: Partial<ConcreteSeed>, mode: EditorialMode): { pass: boolean; reasons: string[] } {
   const reasons: string[] = [];
-  if (!seed.concrete_subject || String(seed.concrete_subject).length < 8) reasons.push("WEAK_SUBJECT");
+  if (!isUsableKeywordSubject(seed.concrete_subject)) reasons.push("WEAK_SUBJECT");
   if (mode === "EXPERIENCE" && !seed.creator_evidence_available) reasons.push("NO_CREATOR_EVIDENCE");
   if (isAiTopicSeed(seed) && scoreAiSpecificity(seed) === "GENERIC") reasons.push("AI_GENERIC");
   return { pass: reasons.length === 0, reasons };
