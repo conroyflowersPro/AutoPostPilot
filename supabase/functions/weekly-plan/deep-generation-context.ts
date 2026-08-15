@@ -3,6 +3,8 @@
  * Isolated per-post DeepGenerationContext. Consumes upstream decisions; does not re-decide.
  * Pipeline: … → Style → Humor → Core Thought → Deep Generation Context → downstream writer
  */
+import { getMechanismById, type MechanismId } from "./reaction-mechanisms.ts";
+
 export const ORDER7A_VERSION = "deep_generation_context_v1_order7a";
 export const ORDER7A_PER_POST_ISOLATION = true as const;
 export const ORDER7A_BATCH_TRANSPORT_NOT_REASONING = true as const;
@@ -354,12 +356,26 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       story_invitation_strength: s(mech.story_invitation_strength),
       question_required: false,
     },
-    reaction_mechanism: {
-      flexible: true,
-      status: s(mech.status),
-      selected_mechanism_id: s(mech.selected_mechanism_id || mech.mechanism_id),
-      mechanism_family: s(mech.mechanism_family || (mech.selected_mechanism as any)?.family),
-    },
+    reaction_mechanism: (() => {
+      const rawId = s(
+        mech.selected_mechanism_id ||
+          mech.mechanism_id ||
+          (typeof mech.selected_mechanism === "string" ? mech.selected_mechanism : ""),
+      );
+      const def = rawId && rawId !== "NONE" ? getMechanismById(rawId as MechanismId) : undefined;
+      return {
+        flexible: true,
+        status: s(mech.status),
+        selected_mechanism_id: rawId,
+        selected_mechanism: rawId,
+        mechanism_family: s(mech.mechanism_family || def?.mechanism_id || ""),
+        intended_reaction: s(mech.intended_reaction || def?.intended_reaction),
+        reader_entry_point: s(mech.reader_entry_point || def?.reader_entry_point),
+        reasoning_logic: s(mech.reasoning_logic || def?.reasoning_logic),
+        completion_style: s(mech.completion_style || def?.completion_style),
+        selection_reason: s(mech.selection_reason),
+      };
+    })(),
     core_thought: core,
     thinking_rail: {
       flexible: true,
@@ -367,6 +383,11 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       selected_rail_id: s(rail.selected_rail_id || rail.rail_id),
       compression_preference: s(rail.compression_preference),
       reasoning_shape: s(rail.reasoning_shape),
+      required_reasoning_beats: Array.isArray(rail.required_reasoning_beats)
+        ? rail.required_reasoning_beats
+        : Array.isArray(rail.structure_beats)
+          ? rail.structure_beats
+          : [],
     },
     everyday_language: {
       prefer_broad_simple: true,

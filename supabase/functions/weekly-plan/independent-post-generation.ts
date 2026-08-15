@@ -205,6 +205,50 @@ export function buildWriterPlanMarkers(ctx: DeepGenerationContext): IndependentP
  * Constraint-only system instructions for the live ChatGPT writer.
  * No finished examples, no templates, no CTA, no fabrication.
  */
+/** Operational mechanism lines for ChatGPT. Never a finished template. Never name M1–M9 in the post. */
+export function writerMechanismConstraintLines(ctx: DeepGenerationContext): string[] {
+  const mech = ((ctx as any).reaction_mechanism || {}) as Record<string, unknown>;
+  const id = s(mech.selected_mechanism_id || mech.selected_mechanism);
+  const status = s(mech.status);
+  if (!id || id === "NONE" || status === "NO_MECHANISM_NEEDED" || status === "MECHANISM_BLOCKED") {
+    return [
+      "READER ENTRY: no selected mechanism. Still leave a judgment gap so a reader can add their own case. Do not write a thesis closer.",
+    ];
+  }
+  const entry = s(mech.reader_entry_point);
+  const intended = s(mech.intended_reaction);
+  const logic = s(mech.reasoning_logic);
+  const complete = s(mech.completion_style);
+  return [
+    "READER ENTRY MOVE (use this structure; never name the mechanism; never write 메커니즘 or M1–M9):",
+    intended ? "Intended reader reaction: " + intended : "",
+    entry ? "How the reader enters: " + entry : "",
+    logic ? "How the observation is built: " + logic : "",
+    complete === "open"
+      ? "Stop with the situation still open. Do not close with a verdict."
+      : complete === "partial"
+        ? "Separate impression from fact. Leave the judgment unfinished."
+        : complete === "closed"
+          ? "One finished observation is enough. Do not explain the joke or add a thesis tail."
+          : "Leave a gap the reader can fill.",
+    "Personality is this entry move, not a slogan and not a generic news sentence.",
+  ].filter(Boolean);
+}
+
+export function writerRailConstraintLines(ctx: DeepGenerationContext): string[] {
+  const rail = ((ctx as any).thinking_rail || {}) as Record<string, unknown>;
+  const shape = s(rail.reasoning_shape);
+  const beats = Array.isArray(rail.required_reasoning_beats)
+    ? (rail.required_reasoning_beats as unknown[]).map((x) => s(x)).filter(Boolean).join(" → ")
+    : "";
+  if (!shape && !beats) return [];
+  return [
+    "THOUGHT ORDER (not paragraph count; do not name the rail): " +
+      (shape || "observation") +
+      (beats ? " · " + beats : ""),
+  ];
+}
+
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
   const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
@@ -226,7 +270,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "1) Confirm Seed meaning. A short keyword seed is valid — infer a public-agreeable situation through Creator DNA vision. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies.",
     "2) Interpret Core Thought as writing intent — do not paste Core Thought labels as prose.",
     "3) Keep reader self-projection space; never force questions or CTA. Do not hard-assert the creator's opinion — leave judgment to the reader so they can reply.",
-    "4) Reference the selected Reaction Mechanism as the reader-entry structure — never name it or template it.",
+    "4) The selected Reaction Mechanism is the personality of this post — the reader-entry structure. Use it. Never name it or template it.",
     "5) Thinking Rail guides thought order only — never force fixed paragraph count.",
     "6) Audience is readers, not followers and not a Tesla club. Low entry barrier is wording AND the range of wording. Prefer words general readers and the X algorithm catch, but NEVER swap a word if it would change the claim.",
     "PLACE: Creator lives in California. Write Korean. Use US/CA daily situations. Do not invent Korea-only civic life (이중주차, 관리사무소, 주민센터, 배민, 따릉이, 전세/청약).",
@@ -242,6 +286,8 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "FORBIDDEN: finished examples, hardcoded sample posts, token stutter (ent ent ent / 같은 음절 반복), restating the subject as the whole post, generic filler (중요하다/관심이 쏠린다), copy of manual posts, invented first-person experience, forced CTA/questions, AI/report conclusions.",
     s((ctx as any).voice_register?.constraint_line) ||
       "USER_DIRECT REGISTER: infer from recent handmade stats if provided; never from archive; never install a question for the algorithm.",
+    ...writerMechanismConstraintLines(ctx),
+    ...writerRailConstraintLines(ctx),
     "SEED SUBJECT: " + subject.slice(0, 200),
     "CORE AXIS (not literal sentence): " + s(core?.primary_claim).slice(0, 120),
     "TENSION HINT: " + s(core?.tension).slice(0, 100),
@@ -328,10 +374,11 @@ export async function callChatGptWriter(
   const userMsg = [
     "Write the final Korean X post now.",
     "Situation: " + subject.slice(0, 160),
+    ...writerMechanismConstraintLines(ctx).slice(0, 4),
     tension
       ? "Optional angle (not required): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "One finished sentence is OK. Do not pad. Do not invent lived experience.",
+    "One finished sentence is OK. Do not pad. Do not invent lived experience. Use the reader-entry move so the post has a recognizable angle, not a generic news line.",
     s(options.retry_hint)
       ? "QUALITY REWRITE: previous draft was rejected (" + s(options.retry_hint).slice(0, 180) + "). Rewrite as a finished observation. One sentence is enough. Do not stutter. Do not restate the subject as the whole post."
       : "",

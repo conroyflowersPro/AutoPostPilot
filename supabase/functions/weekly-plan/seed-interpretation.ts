@@ -108,7 +108,7 @@ function assessRepetitionRisk(seed: InterpretSeedInput): "LOW" | "MEDIUM" | "HIG
 }
 function detectHumanElement(seed: InterpretSeedInput): string {
   const text = `${clean(seed.concrete_subject)} ${clean(seed.point_or_tension)}`.toLowerCase();
-  if (!/시간|돈|습관|불편|선택|대기|줄|피곤|스트레스|체감|직접|해봤|타보|충전했|운전|직관|동선|대기시간|비용|가격체감|사람|관중|좌석|줄서|기다|짜증|편함|불편함/.test(text)) return "NONE";
+  if (!/시간|돈|습관|불편|선택|대기|줄|피곤|스트레스|체감|직접|해봤|타보|충전했|운전|직관|동선|대기시간|비용|가격체감|사람|관중|좌석|줄서|기다|짜증|편함|불편함|알림|화면|주차|구독|수수료|요금|날씨|외출|길찾기|와이퍼|업데이트|레이어|휴대폰|드라이브|연석/.test(text)) return "NONE";
   if (/충전|대기|슈퍼차저/.test(text)) return "charging wait or session friction in daily use";
   if (/직관|경기|bmo|동선/.test(text)) return "match-day movement and time cost";
   if (/합류|감시|핸들|개입/.test(text)) return "driver attention / intervention load while driving";

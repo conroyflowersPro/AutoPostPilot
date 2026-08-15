@@ -50,7 +50,22 @@ export type SelectMechanismInput = {
   audience_context?: string[];
 };
 
-function hasText(s: unknown): boolean { return String(s || "").trim().length >= 4; }
+function hasText(s: unknown): boolean {
+  const t = String(s || "").trim();
+  if (!t || /^(none|low|n\/a|null)$/i.test(t)) return false;
+  return t.length >= 4;
+}
+
+/** Daily public friction a reader can enter — not a topic→mechanism table. */
+function isEverydayPublicScene(interp: SeedInterpretation): boolean {
+  const t = lower(
+    `${interp.seed_subject} ${interp.what_is_actually_happening} ${interp.concrete_human_element} ${interp.possible_reader_connection}`,
+  );
+  return (
+    hasText(interp.concrete_human_element) ||
+    /알림|화면|주차|구독|수수료|요금|날씨|외출|길찾기|와이퍼|대기|줄|시간|돈|습관|불편|선택|사람|휴대폰|폰\b|번역|초안|요약|음성|드라이브|연석|업데이트|레이어/.test(t)
+  );
+}
 function lower(s: unknown): string { return String(s || "").toLowerCase(); }
 
 function assessReaderCapabilities(interp: SeedInterpretation) {
@@ -72,6 +87,12 @@ function assessReaderCapabilities(interp: SeedInterpretation) {
     reader_can_complete_unspoken_connection: readerConn && novelty !== "NONE",
     reader_can_learn_without_personal_projection: !human && !readerConn,
   };
+  if (isEverydayPublicScene(interp)) {
+    flags.reader_can_add_similar_case = true;
+    flags.reader_can_recognize_shared_pattern = true;
+    flags.reader_can_compare_own_behavior = true;
+    flags.reader_can_learn_without_personal_projection = false;
+  }
   const types: SelfProjectionType[] = [];
   if (flags.reader_can_recall_personal_experience) types.push("personal_experience");
   if (flags.reader_can_compare_own_behavior) types.push("behavior_compare");
@@ -192,8 +213,22 @@ export function selectReactionMechanism(input: SelectMechanismInput): MechanismS
   let status: MechanismStatus = "NO_MECHANISM_NEEDED";
   let selection_reason = "no_natural_self_projection";
   if (strength === "NONE" || (top && top.score < 1)) {
-    selected = "NONE"; status = "NO_MECHANISM_NEEDED";
-    selection_reason = strength === "NONE" ? "self_projection_none_informative_ok" : "no_candidate_scored_positive";
+    if (isEverydayPublicScene(interp) && top) {
+      const everydayIds: MechanismId[] = [
+        "M4_LIFE_PATTERN_EXPOSURE",
+        "M7_GROUP_BEHAVIOR_DISCOVERY",
+        "M9_EVERYDAY_BLANK_FILLING",
+        "M3_EVIDENCE_JUDGMENT",
+      ];
+      const everydayTop = candidates.find((c) => everydayIds.includes(c.mechanism_id) && c.score >= 0) ||
+        candidates.find((c) => everydayIds.includes(c.mechanism_id));
+      selected = (everydayTop?.mechanism_id || "M4_LIFE_PATTERN_EXPOSURE") as MechanismId;
+      status = "MECHANISM_WEAK";
+      selection_reason = "everyday_public_reader_entry";
+    } else {
+      selected = "NONE"; status = "NO_MECHANISM_NEEDED";
+      selection_reason = strength === "NONE" ? "self_projection_none_informative_ok" : "no_candidate_scored_positive";
+    }
   } else if (top.score >= 3) {
     selected = top.mechanism_id; status = "MECHANISM_OK"; selection_reason = top.fit_reasons.join(",") || "best_candidate";
   } else if (top.score >= 1) {

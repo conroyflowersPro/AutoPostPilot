@@ -56,6 +56,7 @@ export async function writeOneSlot(args: {
   openaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
+  recentMechanismUsage?: Array<{ mechanism_id?: string }>;
 }): Promise<{
   slotId: string;
   primaryTopic: string;
@@ -66,6 +67,7 @@ export async function writeOneSlot(args: {
   judge_status?: string;
   block_reasons: string[];
   writer_call_attempted: boolean;
+  mechanism_id?: string | null;
   system_origin_class: "AP_PIPELINE";
 }> {
   const seed = args.seed as ConcreteSeed & Record<string, unknown>;
@@ -90,7 +92,13 @@ export async function writeOneSlot(args: {
   const reaction_mechanism = selectReactionMechanism({
     interpretation: seed_interpretation,
     editorial_mode: mode,
+    recent_mechanism_usage: args.recentMechanismUsage || [],
   });
+  const selectedMechanismId = String(
+    (reaction_mechanism as any)?.selected_mechanism ||
+      (reaction_mechanism as any)?.selected_mechanism_id ||
+      "",
+  ) || null;
   const thinking_rail = selectThinkingRail({
     interpretation: seed_interpretation,
     mechanism: reaction_mechanism,
@@ -114,7 +122,7 @@ export async function writeOneSlot(args: {
       prefer_short: mode === "CASUAL_OBSERVATION",
       interpretation_status: seed_interpretation?.status || null,
       mechanism_status: (reaction_mechanism as any)?.status || null,
-      mechanism_id: (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
+      mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || (reaction_mechanism as any)?.mechanism_id || null,
       rail_status: thinking_rail?.status || null,
       has_lived_reflection: !!seed.creator_evidence_available,
       has_experience_grounding: !!seed.creator_evidence_available || mode === "EXPERIENCE",
@@ -127,7 +135,7 @@ export async function writeOneSlot(args: {
     context: {
       editorial_mode: mode,
       mechanism_status: (reaction_mechanism as any)?.status || null,
-      mechanism_id: (reaction_mechanism as any)?.selected_mechanism_id || null,
+      mechanism_id: (reaction_mechanism as any)?.selected_mechanism || (reaction_mechanism as any)?.selected_mechanism_id || null,
       rail_status: thinking_rail?.status || null,
       everyday_language_status: everyday_language.status,
       everyday_minimal_context_sufficient: everyday_language.minimal_context_sufficient,
@@ -186,6 +194,7 @@ export async function writeOneSlot(args: {
       judge_status: judged.overall_status,
       block_reasons: reasons,
       writer_call_attempted: !!integrated.writer_call_attempted,
+      mechanism_id: selectedMechanismId,
       system_origin_class: "AP_PIPELINE",
     };
   }
@@ -199,6 +208,7 @@ export async function writeOneSlot(args: {
     generation_status: status,
     block_reasons: reasons,
     writer_call_attempted: !!integrated.writer_call_attempted,
+    mechanism_id: selectedMechanismId,
     system_origin_class: "AP_PIPELINE",
   };
 }
@@ -211,6 +221,7 @@ export async function writeSlotBatch(args: {
 }): Promise<Awaited<ReturnType<typeof writeOneSlot>>[]> {
   const slots = Array.isArray(args.slots) ? args.slots : [];
   const out: Awaited<ReturnType<typeof writeOneSlot>>[] = [];
+  const recent: Array<{ mechanism_id?: string }> = [];
   for (let i = 0; i < slots.length; i += V11_WRITE_CONCURRENCY) {
     const chunk = slots.slice(i, i + V11_WRITE_CONCURRENCY);
     const part = await Promise.all(
@@ -220,9 +231,13 @@ export async function writeSlotBatch(args: {
           openaiKey: args.openaiKey,
           dryRun: args.dryRun,
           voiceRows: args.voiceRows,
+          recentMechanismUsage: recent.slice(-12),
         })
       )
     );
+    for (const p of part) {
+      if (p.mechanism_id) recent.push({ mechanism_id: p.mechanism_id });
+    }
     out.push(...part);
   }
   return out;
