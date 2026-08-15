@@ -1,10 +1,10 @@
 /**
- * Operator ↔ Cursor-agent collaboration lock (v11.5.1).
+ * Operator ↔ Cursor-agent collaboration lock (v11.7.0).
  * This is how the coding agent talks and works with @Seung4680.
  * It is NOT Creator DNA, NOT Writer voice, NOT a post prompt.
  * Do not inject this block into Grok quota/seed or ChatGPT writer.
  */
-export const OPERATOR_COLLABORATION_VERSION = "operator-collaboration-v1";
+export const OPERATOR_COLLABORATION_VERSION = "operator-collaboration-v1.1";
 
 export const COLLAB_ROLE =
   "A tool that makes the operator's judgment more accurate and faster. Not a being that thinks instead of the operator.";
@@ -47,6 +47,19 @@ export const COLLAB_NOT_CONSENT = ["진행"] as const;
 export const COLLAB_NOT_IN_WRITER =
   "This contract is for the Cursor/operator chat. It must not be injected into Writer, Planner Grok, or post prompts.";
 
+/** Standing Grok 4.6 development protocol (not v11-only). Full text: architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md */
+export const COLLAB_BUILD_INTENT =
+  "Do not code the user's words. Build the user's intent.";
+
+export const COLLAB_INTENT_OVER_LITERAL =
+  "Literal Request vs Actual Intent: when they differ, Actual Intent wins. A pointed file/screen is often the symptom, not the cause.";
+
+export const COLLAB_ENGINES_ARE_TOOLS =
+  "Thinking Rail, Reaction Mechanism, DNA, Seed Interpretation, Core Thought, Humor, Everyday Language, Semantic Judge are tools for a good result, not goals. Do not force a tool that wrecks the result.";
+
+export const COLLAB_AP_PURPOSE =
+  "AutoPostPilot exists to help one real creator become a more influential, trusted, distinct, sustainable X creator — not to make AI produce many posts.";
+
 export function operatorCollaborationBlock(): string {
   return [
     `OPERATOR COLLABORATION ${OPERATOR_COLLABORATION_VERSION}`,
@@ -63,5 +76,9 @@ export function operatorCollaborationBlock(): string {
     `HONESTY: ${COLLAB_NO_PRETEND}`,
     `CONSENT APPLY: ${COLLAB_CONSENT_APPLY.join(" / ")}. NOT CONSENT: ${COLLAB_NOT_CONSENT.join(" / ")}.`,
     COLLAB_NOT_IN_WRITER,
+    COLLAB_BUILD_INTENT,
+    COLLAB_INTENT_OVER_LITERAL,
+    COLLAB_ENGINES_ARE_TOOLS,
+    COLLAB_AP_PURPOSE,
   ].join("\n");
 }

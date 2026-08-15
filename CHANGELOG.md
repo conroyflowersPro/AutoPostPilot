@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.7.0 — 2026-08-15
+
+- Grok 4.6 개발은 문장을 그대로 코드로 옮기지 않습니다. 실제 의도와 원하는 결과를 구현합니다
+- 상위 원칙은 `architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md`에 둡니다. Writer·시드 프롬프트에는 넣지 않습니다
+
 ## 11.6.0 — 2026-08-15
 
 - 시드 칸은 유형만 넘깁니다. 문장·예시는 비워 두고, Grok이 Creator DNA와 엔진 규칙으로 이번 주 상황을 추론해 채웁니다

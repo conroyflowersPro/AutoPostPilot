@@ -11,6 +11,7 @@ const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 
 const collab = read("lib/intelligence/operator-collaboration.ts");
 const agents = read("AGENTS.md");
+const protocol = read("architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md");
 const dir = read("architecture/v11.0.0_PRODUCT_DIRECTION.md");
 const wr = read("supabase/functions/weekly-plan/independent-post-generation.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
@@ -31,9 +32,9 @@ function ok(name, cond) {
   }
 }
 
-console.log("Operator collaboration contract (v11.6.0)");
+console.log("Operator collaboration contract (v11.7.0)");
 
-ok("C1. version lock", /operator-collaboration-v1/.test(collab));
+ok("C1. version lock", /operator-collaboration-v1\.1/.test(collab));
 ok(
   "C2. tool not substitute thinker",
   /Not a being that thinks instead of the operator/.test(collab) &&
@@ -80,8 +81,9 @@ ok(
 ok(
   "C8. product direction names the contract",
   /Operator–agent collaboration/.test(dir) &&
-    /operator-collaboration-v1/.test(dir) &&
-    /AGENTS.md/.test(dir)
+    /operator-collaboration-v1\.1/.test(dir) &&
+    /AGENTS.md/.test(dir) &&
+    /GROK_DEVELOPMENT_INTENT_PROTOCOL/.test(dir)
 );
 ok(
   "C9. NOT injected into ChatGPT writer",
@@ -103,8 +105,8 @@ ok(
     !/operator-collaboration-v1/.test(dna)
 );
 ok(
-  "C12. shipping 11.6.0",
-  /APP_VERSION = "11.6.0"/.test(ver) && /APP_VERSION = "11.6.0"/.test(ix)
+  "C12. shipping 11.7.0",
+  /APP_VERSION = "11.7.0"/.test(ver) && /APP_VERSION = "11.7.0"/.test(ix)
 );
 ok(
   "C13. AGENTS.md forbids leaking into post prompts",
@@ -115,6 +117,21 @@ ok(
   /Talk with Seung in \*\*Korean\*\*/.test(agents)
 );
 ok("C15. deploy only on 배포해", /배포해/.test(agents));
+ok(
+  "C16. standing intent protocol is encoded, not v11-only",
+  /Do not code the user's words\. Build the user's intent/.test(protocol) &&
+    /v11 전용이 아니다/.test(protocol) &&
+    /Do not code the user's words\. Build the user's intent/.test(agents) &&
+    /Development Intent Protocol/.test(agents) &&
+    /COLLAB_BUILD_INTENT/.test(collab)
+);
+ok(
+  "C17. intent protocol is NOT injected into Writer / Grok quota / seed",
+  !/Build the user's intent/.test(wr) &&
+    !/GROK_DEVELOPMENT_INTENT_PROTOCOL/.test(wr) &&
+    !/Build the user's intent/.test(quota) &&
+    !/Build the user's intent/.test(seed)
+);
 
 console.log("========================================");
 console.log(`COLLAB: ${pass} PASS / ${fail} FAIL`);
