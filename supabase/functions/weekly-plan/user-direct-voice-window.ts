@@ -1,3 +1,4 @@
+/**
  * Rolling USER_DIRECT 말투 / 문체 window + slot surface.
  * Discourse-shape variety is judged on the whole unfold (hook, order, ending),
  * not by blacklisting conjunctions. Stats only — never finished-post examples.

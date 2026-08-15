@@ -1,3 +1,4 @@
+/**
  * ORDER 1 — Independent Seed Interpretation Layer
  * Seed is NOT a sentence and NOT yet a post topic.
  * This stage asks what can actually be thought from the material:

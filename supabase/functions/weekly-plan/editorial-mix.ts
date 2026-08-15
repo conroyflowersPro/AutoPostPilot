@@ -1,3 +1,4 @@
+/**
  * Weekly Editorial Mix — Planner-only allocation.
  * The week is one editorial object. DEFAULT_EDITORIAL_RATIO is a fallback prior,
  * not a frozen weekly quota. Do not invent forced balance.

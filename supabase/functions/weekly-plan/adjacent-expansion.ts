@@ -1,3 +1,4 @@
+/**
  * Quota-hole fill starts adjacent to existing interests, not random new topics.
  * Promotion path: Exploration → Emerging → Secondary → Core, by published outcomes.
  * Max 3 mass-fill posts per day. Mix is not a frozen ratio.
