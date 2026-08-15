@@ -15,6 +15,8 @@ const wr = read("supabase/functions/weekly-plan/independent-post-generation.ts")
 const dgc = read("supabase/functions/weekly-plan/deep-generation-context.ts");
 const pipe = read("supabase/functions/weekly-plan/order-write-pipeline.ts");
 const dna = read("supabase/functions/weekly-plan/engine-dna.ts");
+const arch = read("supabase/functions/weekly-plan/engine-architecture.ts");
+const libArch = read("lib/intelligence/engine-architecture.ts");
 const libDna = read("lib/intelligence/creator-dna-runtime.ts");
 const libPerf = read("lib/intelligence/performance-dna-runtime.ts");
 const intent = read("supabase/functions/weekly-plan/creator-intent-14d.ts");
@@ -22,6 +24,8 @@ const aud = read("supabase/functions/weekly-plan/audience-reaction-intelligence.
 const interp = read("supabase/functions/weekly-plan/seed-interpretation.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 const seedReason = read("supabase/functions/weekly-plan/creator-seed-reasoning.ts");
+const score = read("lib/learning/score.ts");
+const judge = read("supabase/functions/weekly-plan/semantic-judge.ts");
 const ver = read("lib/version.ts");
 
 let pass = 0;
@@ -36,11 +40,14 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.4.7)");
+console.log("DNA + engine live-path wiring (v11.4.8)");
 
 ok("D1. ChatGPT writer injects Creator DNA", /creatorDnaBlock\(\)/.test(wr) && /CREATOR DNA/.test(wr));
 ok("D2. ChatGPT writer injects engine rules", /engineRulesAsWill\(\)/.test(wr) && /ENGINE RULES/.test(wr));
-ok("D3. ChatGPT writer injects performance DNA", /performanceDnaBlock\(\)/.test(wr) && /PERFORMANCE DNA/.test(wr));
+ok("D3. Writer does not use Performance DNA as writing input",
+  /writerArchitectureLock/.test(wr) &&
+  /Performance DNA is Planner-only/.test(arch) &&
+  !/performanceDnaBlock\(\)/.test(wr));
 ok("D4. Grok quota gets DNA", /creatorDnaBlock\(\)/.test(quota) && /engineRulesAsWill\(\)/.test(quota));
 ok("D5. Grok seed expand gets DNA", /creatorDnaBlock\(\)/.test(seedReason) && /engineRulesAsWill\(\)/.test(seedReason));
 
@@ -83,7 +90,7 @@ ok("D26. Edge DNA MASS CAP matches lib intelligence",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.4.7", /APP_VERSION = "11.4.7"/.test(ver) && /APP_VERSION = "11.4.7"/.test(ix));
+ok("D28. version 11.4.8", /APP_VERSION = "11.4.8"/.test(ver) && /APP_VERSION = "11.4.8"/.test(ix));
 
 ok("D29. review engines stay off generate job",
   !/from "\.\/selective-regeneration\.ts"/.test(job) &&
@@ -106,6 +113,26 @@ ok("D32. Planner is strategy engine, planning before writing",
   /not a writing engine/.test(dna) &&
   /stronger months from now/.test(dna) &&
   /Do not learn from unpublished AI drafts/.test(dna));
+ok("D33. Architecture lock: no engine replaces the Creator",
+  /No engine replaces the Creator/.test(arch) &&
+  /No engine replaces the Creator/.test(libArch) &&
+  /plannerArchitectureLock/.test(quota) &&
+  /plannerArchitectureLock/.test(seedReason) &&
+  /writerArchitectureLock/.test(wr) &&
+  /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
+ok("D34. Pipeline order is locked",
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(arch) &&
+  /Data\/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought/.test(libArch) &&
+  /No engine replaces the Creator/.test(dna));
+ok("D35. Forbidden mixes named",
+  /Writer must not become Planner/.test(arch) &&
+  /Performance DNA must not overwrite Creator DNA/.test(arch) &&
+  /Revenue DNA must not dominate/.test(arch));
+ok("D36. Planner Memory stores abstract patterns, not wording",
+  /MANUAL_PREMIUM/.test(score) &&
+  /must not overwrite Creator DNA/.test(score) &&
+  /추상 패턴만 저장/.test(score) &&
+  !/const snip = s\.contentSnippet/.test(score));
 
 console.log("========================================");
 console.log(`DNA WIRING: ${pass} PASS / ${fail} FAIL`);

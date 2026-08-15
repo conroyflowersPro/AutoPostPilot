@@ -7,6 +7,14 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.4.8 — 2026-08-15
+
+- 엔진은 Creator를 대신하지 않습니다. Planner·Writer·Judge·DNA 역할이 섞이면 안 됩니다
+- 순서: 증거 → 4 DNA → Planner → Seed → Thinking → Core Thought → 반응/문체 → Writer → Judge → 선택 재생성 → 발행 → 분석 → 검증 학습 → Planner Memory
+- Performance DNA는 Creator DNA를 덮어쓰지 않습니다. Revenue DNA는 전략을 지배하지 않습니다
+- Planner Memory는 검증된 추상 패턴만 저장합니다. 직접 쓴 성공 글이 AI 초안보다 높은 학습 신호입니다
+- Writer는 성과 DNA로 주제를 고르지 않습니다
+
 ## 11.4.7 — 2026-08-15
 
 - Planner는 글을 만드는 엔진이 아닙니다. 계정을 몇 달 뒤 더 강하게 만들기 위해 무엇을·왜·언제·어느 방향으로 말할지를 정합니다

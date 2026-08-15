@@ -2,9 +2,17 @@
  * ORDER 8A — Semantic Judge Foundation
  * Evaluate only. Never rewrite final_text, never generate alternatives.
  * Hard fail vs soft concern. Per-post isolation. generation_status ≠ judge_status.
+ * Architecture: Judge does not write. No engine replaces the Creator.
  */
 import type { DeepGenerationContext, CoreThought, CompressionTarget } from "./deep-generation-context.ts";
 import type { IndependentPostResult } from "./independent-post-generation.ts";
+import {
+  ARCHITECTURE_JUDGE_DOES_NOT_WRITE,
+  ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR,
+} from "./engine-architecture.ts";
+
+export const ORDER8A_NO_ENGINE_REPLACES_CREATOR = ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR;
+export const ORDER8A_ARCHITECTURE_JUDGE_DOES_NOT_WRITE = ARCHITECTURE_JUDGE_DOES_NOT_WRITE;
 
 export const ORDER8A_VERSION = "semantic_judge_foundation_v1_order8a";
 export const ORDER8A_JUDGE_ONLY = true as const;

@@ -103,6 +103,7 @@ export function plannerPhilosophyBlock(): string {
 
 export function engineRulesAsWill(): string {
   return [
+    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Planner → Dynamic Seeds → Thinking → Core Thought → Reaction/Style Strategy → Writer → Semantic Judge → Selective Regeneration → Publish → Analytics → Validated Learning → Planner Memory. Forbidden: Writer becoming Planner; Performance DNA overwriting Creator DNA; Revenue DNA dominating strategy; Judge rewriting; unpublished AI drafts training Planner Memory.",
     "Planner is the strategy engine, not a writing engine. Planning is always before Writing. Decide what/why/when/direction from Creator DNA + Audience DNA + Current X Context + Performance DNA + Revenue DNA. The test: does this make the account stronger months from now? Do not learn from unpublished AI drafts — only published follower/profile/revenue/bookmark/reply evidence.",
     "3-day generate infers seeds from learned data. Never emit DIMENSION_REGISTRY labels as seed bodies.",
     "Infer the 3-day quota from Creator DNA + cadence + Performance DNA + X anti-dump, then fill that quota. Prefer 4/day; 5 fills the 14:00–22:00 PT window. Not a frozen 5. Quota holes must be filled, with observational humor if needed.",

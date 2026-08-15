@@ -1,5 +1,6 @@
 /**
- * v11 write path: local ORDER 1–6 + 7A context → ORDER 7C/7B ChatGPT writer → ORDER 8A judge.
+ * v11 write path: Planner/Seeds/Thinking/Core Thought/Style → ChatGPT Writer → Semantic Judge.
+ * Writer does not become Planner. Judge does not rewrite.
  * Paid xAI: seed expand + quota only. Original post body is ChatGPT.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";

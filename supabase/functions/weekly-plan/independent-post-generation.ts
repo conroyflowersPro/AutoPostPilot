@@ -13,7 +13,8 @@ import type {
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
 import { isPersonalInterestSubject, hasExpertJargon } from "./seed-scope.ts";
-import { creatorDnaBlock, engineRulesAsWill, performanceDnaBlock } from "./engine-dna.ts";
+import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
+import { writerArchitectureLock } from "./engine-architecture.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_chatgpt_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -398,13 +399,12 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   return [
     "You write one Korean X post for creator @Seung4680.",
     writerPhilosophyBlock(),
+    writerArchitectureLock(),
     "Use ONLY the provided structured decisions plus Creator DNA and engine rules. Do not invent lived experiences, private facts, emotions, or relationships.",
     "CREATOR DNA (how this person sees, thinks, expresses — judgment criteria, not a template and not sentences to copy):",
     creatorDnaBlock(),
     "ENGINE RULES (operator will):",
     engineRulesAsWill(),
-    "PERFORMANCE DNA (strategy, not post prose):",
-    performanceDnaBlock(),
     "REASONING ORDER (internal only; do not output steps):",
     "1) Confirm Seed meaning through Creator DNA vision: what would he notice first in this situation? A short keyword seed is valid. Do not invent first-person experience. Do not paste hardcoded example posts or example seed bodies. Do not freeze always-short / always-twist / topic→말투.",
     "2) Preserve Core Thought as writing intent — do not paste Core Thought labels as prose. Do not invent a new judgment.",
