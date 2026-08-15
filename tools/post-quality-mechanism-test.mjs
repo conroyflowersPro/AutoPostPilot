@@ -59,8 +59,8 @@ ok("Q15. DNA wording forbids 레이어2", /레이어2/.test(dna) && /Do not ask 
 ok("Q16. seed-scope exports hasExpertJargon", /export function hasExpertJargon/.test(scope));
 const everydayBlock = (rsp.match(/const everydayIds: MechanismId\[\] = \[([\s\S]*?)\];/) || [])[1] || "";
 ok("Q17. M9 is not the everyday fallback", /M4_LIFE_PATTERN_EXPOSURE/.test(everydayBlock) && !/M9_/.test(everydayBlock));
-ok("Q18. writer allows a genuine thinking question, forbids bait", /Engagement-bait questions/.test(wr) && /genuine thinking question/.test(wr));
-ok("Q19. length follows the closed thought, not a sentence quota", /Length follows the thought/.test(wr) && /Stop when the thought is complete/.test(wr));
+ok("Q18. final Judge rejects engagement bait, not every question mark", /hard\.push\("question_closer"\)/.test(sj) && !/if \(\/\[\?？\]\/\.test\(text\)\)/.test(sj));
+ok("Q19. Writer completes the thought without a sentence quota", /stop when the thought is complete/i.test(wr) && !/sentence quota/.test(wr));
 
 console.log("========================================");
 console.log(`POST QUALITY: ${pass} PASS / ${fail} FAIL`);
