@@ -7,6 +7,10 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.5.5 — 2026-08-15
+
+- `/learning` 분석이 이전 Audience DNA가 없을 때도 타입 검사를 통과합니다. Netlify 빌드가 여기서 막히지 않습니다
+
 ## 11.5.4 — 2026-08-15
 
 - 2026-08-02–15 X Analytics를 분석해 Performance DNA 후보로 넣었습니다. 검증된 패턴은 0입니다. 잘된 문장은 복사하지 않습니다
