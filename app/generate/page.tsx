@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isTransientEdgeError, koreanEdgeError } from "@/lib/transient-edge-error";
 import { APP_VERSION_LABEL, VERSION_SUMMARY_KO } from "@/lib/version";
 
 const GENERATION_DAYS = 7;
@@ -81,31 +82,40 @@ function GeneratePageInner() {
           : phaseName === "quota"
             ? 45000
             : 30000;
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), ms);
-    let res: Response;
-    try {
-      res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-        },
-        body: JSON.stringify(body),
-        signal: ac.signal,
-      });
-    } catch (e: any) {
-      if (e?.name === "AbortError") {
-        throw new Error(
-          `${phaseName || "요청"}이 ${Math.round(ms / 1000)}초 안에 끝나지 않았습니다. 시드는 이어서 채우고, 초안은 저장된 것만 남습니다.`
-        );
+    const attempts = phaseName === "job_status" ? 3 : 1;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), ms);
+      try {
+        const res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+          },
+          body: JSON.stringify(body),
+          signal: ac.signal,
+        });
+        return await readJson(res);
+      } catch (e: any) {
+        if (e?.name === "AbortError") {
+          throw new Error(
+            `${phaseName || "요청"}이 ${Math.round(ms / 1000)}초 안에 끝나지 않았습니다. 시드는 이어서 채우고, 초안은 저장된 것만 남습니다.`
+          );
+        }
+        lastErr = e;
+        if (isTransientEdgeError(e) && attempt < attempts - 1) {
+          await sleep(1500);
+          continue;
+        }
+        throw e;
+      } finally {
+        clearTimeout(timer);
       }
-      throw e;
-    } finally {
-      clearTimeout(timer);
     }
-    return readJson(res);
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr || "요청 실패"));
   }
 
   function applyJob(job: any) {
@@ -128,17 +138,22 @@ function GeneratePageInner() {
           throw new Error(job.error || job.label_ko || "주간 생성 실패");
         }
       } catch (e: any) {
-        const msg = String(e?.message || e);
-        const timedOut = /초 안에 끝나지 않았습니다/.test(msg);
-        if (!timedOut) throw e;
-        const st = await edgeCall(session, { phase: "job_status", job_id: jobId });
-        applyJob(st);
-        if (st.status === "done") {
-          setPhase(st.label_ko || `완료: ${st.saved_count || 0}개 draft 저장 · 리뷰하세요`);
-          return;
-        }
-        if (st.status === "error") {
-          throw new Error(st.error || st.label_ko || "주간 생성 실패");
+        if (!isTransientEdgeError(e)) throw e;
+        setPhase("사파리 연결이 잠깐 끊겼습니다. 서버 작업을 확인합니다…");
+        try {
+          const st = await edgeCall(session, { phase: "job_status", job_id: jobId });
+          applyJob(st);
+          if (st.status === "done") {
+            setPhase(st.label_ko || `완료: ${st.saved_count || 0}개 draft 저장 · 리뷰하세요`);
+            return;
+          }
+          if (st.status === "error") {
+            throw new Error(st.error || st.label_ko || "주간 생성 실패");
+          }
+        } catch (stErr: any) {
+          if (!isTransientEdgeError(stErr)) throw stErr;
+          await sleep(2000);
+          continue;
         }
       }
       if (Date.now() - started < 2000) await sleep(3000);
@@ -225,24 +240,42 @@ function GeneratePageInner() {
       } catch {}
 
       setPhase("주간 작업 시작…");
-      const started = await edgeCall(session, {
-        generationDays: GENERATION_DAYS,
-        startDate,
-        topic: topic.trim() || undefined,
-        creatorIntent: topic.trim() || undefined,
-        publishedTopics21d,
-        publishedTopics: publishedTopics21d,
-        scheduledTopics,
-        lafc_matches: lafcMatches,
-        phase: "job_start",
-      });
-      if (!started.success || !started.job_id) {
-        throw new Error(started.detail || started.error || "주간 작업을 시작하지 못했습니다.");
+      let started: any;
+      try {
+        started = await edgeCall(session, {
+          generationDays: GENERATION_DAYS,
+          startDate,
+          topic: topic.trim() || undefined,
+          creatorIntent: topic.trim() || undefined,
+          publishedTopics21d,
+          publishedTopics: publishedTopics21d,
+          scheduledTopics,
+          lafc_matches: lafcMatches,
+          phase: "job_start",
+        });
+      } catch (e: any) {
+        if (!isTransientEdgeError(e)) throw e;
+        setPhase("사파리 연결이 잠깐 끊겼습니다. 서버 작업을 확인합니다…");
+        try {
+          started = await edgeCall(session, { phase: "job_status" });
+        } catch {
+          throw new Error("주간 작업을 시작하지 못했습니다. 다시 눌러 주세요.");
+        }
+      }
+      if (!started?.job_id) {
+        throw new Error(started?.detail || started?.error || "주간 작업을 시작하지 못했습니다. 다시 눌러 주세요.");
       }
       applyJob(started);
+      if (started.status === "done") {
+        setPhase(started.label_ko || `완료: ${started.saved_count || 0}개 draft 저장 · 리뷰하세요`);
+        return;
+      }
+      if (started.status === "error") {
+        throw new Error(started.error || started.label_ko || "주간 생성 실패");
+      }
       await followJob(session, String(started.job_id));
     } catch (e: any) {
-      setError(e?.message || String(e));
+      setError(koreanEdgeError(e));
       setPhase("");
     } finally {
       setBusy(false);

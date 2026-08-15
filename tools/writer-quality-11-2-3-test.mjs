@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.3.3)");
+console.log("Writer quality + leftover seeds (v11.3.4)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.3.3", /APP_VERSION = "11.3.3"/.test(ver) && /APP_VERSION = "11.3.3"/.test(ix));
+ok("W17. version lockstep 11.3.4", /APP_VERSION = "11.3.4"/.test(ver) && /APP_VERSION = "11.3.4"/.test(ix));
 ok("W18. Korean summary names ChatGPT writer and new readers", /ChatGPT/.test(ver) && /새 독자/.test(ver) && /하루 관심사/.test(ver));
 ok("W19. quality rewrite hint on retry", /QUALITY REWRITE/.test(wr) && /retry_hint/.test(gi));
 ok("W20. snag is optional not required", /A snag is optional/.test(wr) && /optional angle, not a required snag/.test(cr));
@@ -124,6 +124,7 @@ ok("W52. writer PLACE forbids Korea-only civic", /PLACE: Creator lives in Califo
 ok("W53. empty draft is retried once", /_write_retry/.test(job) && /write_flat \|\| \[\]/.test(job));
 ok("W54. job expand batch is 10", /const EXPAND_BATCH = 10/.test(job));
 ok("W55. client follows 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
+ok("W61. Safari Load failed resumes the job", /isTransientEdgeError/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")) && /Load failed/.test(readFileSync(path.join(ROOT, "lib/transient-edge-error.ts"), "utf8")));
 ok("W56. writer gets mechanism constraint lines", /writerMechanismConstraintLines/.test(wr) && /READER ENTRY MOVE/.test(wr));
 ok("W57. writer gets rail thought order", /writerRailConstraintLines/.test(wr) && /THOUGHT ORDER/.test(wr));
 ok("W58. deep context maps selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/deep-generation-context.ts"), "utf8")));
