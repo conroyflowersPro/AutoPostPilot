@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.5 — 2026-08-16
+
+- 7일 생성이 끝나면 화면에 **생성 보고서**가 남습니다. 시드 개수·유형, Writer가 어떤 Seed로 썼는지, Judge 거절, Planner 재배차, Seed 재추출 여부를 한 번에 봅니다
+- 거절된 문장은 보고서에 REJECT로만 남고, Writer가 그 글을 다시 쓴 것으로 표시하지 않습니다
+
 ## 11.12.4 — 2026-08-16
 
 - 같은 Seed가 Judge에서 3번 거절되면 Planner가 그 Seed만 버립니다. 슬롯은 버리지 않습니다
