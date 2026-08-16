@@ -370,9 +370,12 @@ function fillUnassignedPlannerSlotsFromPool(args: {
   for (const slot of args.slots || []) {
     if (!slot?.slot_id || usedSlots.has(slot.slot_id)) continue;
     const mode = parseEditorialMode(String(slot.editorial_mode || ""));
-    const idx = unused.findIndex((seed) =>
+    let idx = unused.findIndex((seed) =>
       canServeEditorialMode(seed, mode) && !usedSeeds.has(String(seed.seed_id)),
     );
+    if (idx < 0 && mode !== "EXPERIENCE") {
+      idx = unused.findIndex((seed) => !usedSeeds.has(String(seed.seed_id)));
+    }
     if (idx < 0) continue;
     const seed = unused.splice(idx, 1)[0];
     usedSlots.add(slot.slot_id);
@@ -1364,7 +1367,9 @@ async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSe
     if (!seed?.concrete_subject) continue;
     const role = (seed.source_role as SourceRole) || "SEED_SOURCE";
     if (!isSeedEligibleRole(role)) continue;
-    const key = subjectKey(String(seed.concrete_subject));
+    const key = isLivedSelfSeed(seed as any)
+      ? `lived:${String(seed.seed_id || "")}`
+      : subjectKey(String(seed.concrete_subject));
     if (!key || seen.has(key)) continue;
     const leakage = guardCandidateAgainstManualLeakage({
       source_role: role,
@@ -1485,16 +1490,9 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       strategy.slots,
       (st.planner_assignments || []).map((item: PlannerSeedAssignment) => item.slot_id),
     );
-    if (remain.some((d) => !days.includes(d))) {
+    if (remain.length) {
       row.label_ko = `Planner Seed 선택 ${(st.planner_assignments || []).length}/${strategy.slots.length} · ${remain.map((d) => d + 1).join(",")}일차…`;
       return;
-    }
-    if (remain.length) {
-      st.planner_assignments = fillUnassignedPlannerSlotsFromPool({
-        slots: daySlots,
-        assignments: st.planner_assignments || [],
-        pool,
-      });
     }
   }
 
