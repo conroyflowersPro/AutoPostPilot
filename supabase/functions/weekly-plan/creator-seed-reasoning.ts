@@ -245,6 +245,7 @@ export async function reasonCreatorSeeds(
     "Do not copy already_held_seeds or recent_published_angles. Do not rotate last week's subjects. Infer a NEW situation each seed.",
     "Do not score Creator fit, Audience fit, performance potential, strategic relevance, or selection priority. Do not rank candidates.",
     "this_run_note and planner_exploration_direction are exploration bounds only. They do not authorize selection or allocation.",
+    "When planner_exploration_direction is set, explore THAT field only. Return requested_seed_count distinct candidates in that field (a batch, never a single seed). Do not refill unrelated types or restart the whole week pool.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Lived evidence seeds may be CITE+RELATED follow-ups from held episodes. Never clone the same content. Do not copy a prompt example as the new subject.",
     'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',

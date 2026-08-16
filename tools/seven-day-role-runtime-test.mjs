@@ -100,6 +100,17 @@ ok("R16c. Judge reject does not bounce recover before remaining planned writes",
   /SEED_REJECT_ABANDON = 3/.test(job) &&
   /recoverSeedPool/.test(job) &&
   !/reservedSeedIds\.add\(rejectedSeedId\)/.test(job));
+ok("R16f. 3-strike discards that Seed only; Planner still refills the slot",
+  /Planner가 Seed 3회 거절 후 버림/.test(job) &&
+  /슬롯은 재배차/.test(job) &&
+  /enqueueRecovery/.test(job) &&
+  !/write_flat\.push\(\{ \.\.\.chunk\[k\], _saved: false \}\)/.test(job) &&
+  !/JOB_RECOVERY_CAP_MULT/.test(job));
+ok("R16g. empty Seed pool asks Seed Generator for a 10-candidate field batch",
+  /TARGETED_EXPLORE_SEED_COUNT = 10/.test(job) &&
+  /requestTargetedSeedRefill/.test(job) &&
+  /Planner Seed 후보 없음 → Seed Generator/.test(job) &&
+  /a batch, never a single seed/.test(seed));
 ok("R17. recovery checks existing Pool first", /availableSeedPool: pool/.test(job) && /RESELECT_EXISTING/.test(planner));
 ok("R18. Planner can request targeted Seed exploration", /TARGETED_EXPLORE/.test(planner) && /planner_exploration_direction/.test(job + seed));
 ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent Seed rejection/.test(planner));

@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.4 — 2026-08-16
+
+- 같은 Seed가 Judge에서 3번 거절되면 Planner가 그 Seed만 버립니다. 슬롯은 버리지 않습니다
+- Writer는 거절된 글을 재시도하지 않습니다. 빈 초안·거절은 바로 Planner 재배차로 갑니다
+- 잡 전체 재배차 한도로 주간 채우기를 끊지 않습니다. 후보가 없으면 그 분야 Seed를 10개 더 요청합니다
+
 ## 11.12.3 — 2026-08-16
 
 - Writer에서 폐기된 xAI Live Search(`search_parameters`)를 제거했습니다. Writer는 Seed + Planner Intent만 이해하고 씁니다
