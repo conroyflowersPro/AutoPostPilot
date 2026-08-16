@@ -84,6 +84,7 @@ export type JobPublic = {
   summary: string;
   error: string | null;
   last_reject_ko?: string;
+  reject_log?: string[];
   learning?: unknown;
 };
 
@@ -103,11 +104,36 @@ const JUDGE_REASON_KO: Record<string, string> = {
 
 function judgeReasonsKo(reasons: unknown[]): string {
   const raw = (reasons || []).map((r) => String(r || "").trim()).filter(Boolean);
-  if (!raw.length) return "이유 없음";
+  if (!raw.length) return "이유 코드 없음";
   return raw
-    .map((r) => JUDGE_REASON_KO[r] || r)
-    .slice(0, 6)
+    .slice(0, 8)
+    .map((r) => {
+      const ko = JUDGE_REASON_KO[r];
+      return ko && ko !== r ? `${ko} (${r})` : r;
+    })
     .join(", ");
+}
+
+function appendRejectLog(st: any, line: string) {
+  st.reject_log = Array.isArray(st.reject_log) ? st.reject_log : [];
+  const text = String(line || "").trim();
+  if (!text) return;
+  if (st.reject_log[st.reject_log.length - 1] === text) return;
+  st.reject_log.push(text);
+  if (st.reject_log.length > 40) st.reject_log = st.reject_log.slice(-40);
+}
+
+function rejectLogFromState(st: any): string[] {
+  if (Array.isArray(st.reject_log) && st.reject_log.length) return st.reject_log.slice(-40);
+  const out: string[] = [];
+  for (const o of st.write_outcomes || []) {
+    const rejected = String(o?.judge_status || "") === "REJECT" || !String(o?.final_text || "").trim();
+    const reasons = o?.block_reasons || o?.judge_reasons || [];
+    if (!rejected && !(Array.isArray(reasons) && reasons.length)) continue;
+    const subject = String(o?.concrete_subject || o?.slotId || o?.slot_id || "slot").slice(0, 40);
+    out.push(`Judge 거절 · ${subject} · ${judgeReasonsKo(reasons)}`);
+  }
+  return out.slice(-40);
 }
 
 function expandRoundBudget(requiredSlots: number): number {
@@ -361,6 +387,7 @@ function publicView(row: any): JobPublic {
     summary: row.summary || "",
     error: row.error || null,
     last_reject_ko: state.last_reject_ko || "",
+    reject_log: rejectLogFromState(state),
     learning: state.learning || null,
   };
 }
@@ -1655,10 +1682,13 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       const retries = Number(st.writer_retry_counts[strategySlotId] || 0);
       const rejected = String(p.judge_status || "") === "REJECT";
       const seedId = seedIdOf(chunk[k]);
-      const reasons = p.block_reasons || [String(p.judge_status || "WRITER_FAILURE")];
+      const reasons = (p.block_reasons && p.block_reasons.length)
+        ? p.block_reasons
+        : [String(p.judge_status || p.generation_status || "WRITER_FAILURE")];
       const subject = String(chunk[k]?.concrete_subject || chunk[k]?.primaryTopic || p.slotId || "slot").slice(0, 40);
       const reasonKo = judgeReasonsKo(reasons);
       st.last_reject_ko = `Judge 거절 · ${subject} · ${reasonKo}`;
+      appendRejectLog(st, st.last_reject_ko);
       row.summary = [row.summary, st.last_reject_ko].filter(Boolean).join("\n");
       if (rejected || retries >= 1) {
         const rejects = rejected ? bumpSeedReject(st, seedId) : Number(st.seed_reject_counts?.[seedId] || 0);

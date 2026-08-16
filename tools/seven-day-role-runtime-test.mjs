@@ -89,6 +89,11 @@ ok("R16d. Judge reject reasons are shown to the operator",
   /JUDGE_REASON_KO/.test(job) &&
   /Judge 거절 ·/.test(job) &&
   /lastReject/.test(page));
+ok("R16e. Judge reject reasons stay as a list",
+  /reject_log/.test(job) &&
+  /appendRejectLog/.test(job) &&
+  /rejectLog/.test(page) &&
+  /Judge 거절 목록/.test(page));
 ok("R16c. Judge reject does not bounce recover before remaining planned writes",
   /enqueueRecovery/.test(job) &&
   /beginRecoverIfQueueReady/.test(job) &&

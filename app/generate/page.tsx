@@ -45,6 +45,7 @@ function GeneratePageInner() {
   const [doneCount, setDoneCount] = useState(0);
   const [planSummary, setPlanSummary] = useState("");
   const [lastReject, setLastReject] = useState("");
+  const [rejectLog, setRejectLog] = useState<string[]>([]);
   const [lafcMatches, setLafcMatches] = useState<LafcMatch[]>([]);
   const [lafcDate, setLafcDate] = useState("");
   const [lafcOpponent, setLafcOpponent] = useState("");
@@ -124,6 +125,9 @@ function GeneratePageInner() {
     if (job?.summary) setPlanSummary(String(job.summary));
     if (typeof job?.saved_count === "number") setDoneCount(job.saved_count);
     if (job?.last_reject_ko) setLastReject(String(job.last_reject_ko));
+    if (Array.isArray(job?.reject_log) && job.reject_log.length) {
+      setRejectLog(job.reject_log.map((line: unknown) => String(line || "")).filter(Boolean));
+    }
   }
 
   async function followJob(session: any, jobId: string) {
@@ -383,6 +387,16 @@ function GeneratePageInner() {
       )}
       {phase && <p className="mb-2 text-sm text-violet-300">{phase}</p>}
       {lastReject && <p className="mb-2 text-sm text-amber-300">{lastReject}</p>}
+      {rejectLog.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-900 bg-amber-950/40 p-3">
+          <p className="mb-2 text-xs text-amber-200">Judge 거절 목록 {rejectLog.length}건</p>
+          <ol className="max-h-56 list-decimal space-y-1 overflow-auto pl-5 text-sm text-amber-100">
+            {rejectLog.map((line, i) => (
+              <li key={`${i}-${line}`}>{line}</li>
+            ))}
+          </ol>
+        </div>
+      )}
       {doneCount > 0 && !busy && (
         <a
           href="/"
