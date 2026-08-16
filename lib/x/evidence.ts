@@ -105,16 +105,10 @@ export async function persistXPostEvidence(
   if (existing?.id) {
     activityId = existing.id;
     postStatus = "UPDATED";
-    const keptOrigin =
-      existing.system_origin_class &&
-      existing.system_origin_class !== "UNKNOWN"
-        ? existing.system_origin_class
-        : baseRow.system_origin_class;
     await supabase
       .from("account_activities")
       .update({
         ...baseRow,
-        system_origin_class: keptOrigin,
         first_collected_at: existing.first_collected_at || nowIso,
       })
       .eq("id", existing.id);

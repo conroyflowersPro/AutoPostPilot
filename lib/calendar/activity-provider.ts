@@ -16,6 +16,7 @@ import {
 } from "./types";
 import { getDemoActivities } from "./demo-data";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { inscribeMonthFromActivities } from "./planner-inscribe";
 
 function demoEnabled(): boolean {
   return (
@@ -319,4 +320,37 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData> {
     recentActual,
     todayPlan: [],
   };
+}
+
+/** Planner-inscribed month counts from last X sync. No Grok. No leftover drafts. */
+export async function getQueueMonthInscription(year: number, month1to12: number) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { days: [], accountId: null as string | null };
+    const { data: conn } = await supabase
+      .from("account_connections")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", "x")
+      .maybeSingle();
+    if (!conn?.id) return { days: [], accountId: null as string | null };
+    const fromDate = new Date(Date.UTC(year, month1to12 - 1, 0));
+    const toDate = new Date(Date.UTC(year, month1to12, 1));
+    const from = fromDate.toISOString().slice(0, 10);
+    const to = toDate.toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("account_activities")
+      .select("activity_date, published_at, action_type, post_type, system_origin_class, origin")
+      .eq("account_id", conn.id)
+      .eq("origin", "X_ACTUAL")
+      .gte("activity_date", from)
+      .lte("activity_date", to)
+      .limit(800);
+    return { days: inscribeMonthFromActivities(data || [], year, month1to12), accountId: conn.id };
+  } catch {
+    return { days: [], accountId: null as string | null };
+  }
 }

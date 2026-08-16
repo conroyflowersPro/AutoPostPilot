@@ -15,10 +15,35 @@ type Post = {
   media_urls: string[] | null;
   scheduled_at: string | null;
   created_at?: string;
+  strategy_json?: {
+    planned_at?: string | null;
+    planned_pt?: string | null;
+  } | null;
 };
 
 function postBody(p: Post) {
   return String(p.content || p.final_text || p.topic || "").trim();
+}
+
+function formatPT(iso: string) {
+  return new Date(iso).toLocaleString("ko-KR", {
+    timeZone: "America/Los_Angeles",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function queueWhen(post: Post): { kind: "예약" | "계획" | "없음"; text: string } {
+  if (post.scheduled_at) {
+    return { kind: "예약", text: `${formatPT(post.scheduled_at)} PT` };
+  }
+  const planned = String(post.strategy_json?.planned_at || "").trim();
+  if (planned) {
+    return { kind: "계획", text: `${formatPT(planned)} PT` };
+  }
+  return { kind: "없음", text: "시각 없음" };
 }
 
 const FILTERS = [
@@ -464,11 +489,14 @@ export default function PostList({ posts }: { posts: Post[] }) {
                       {post.media_urls?.length ? (
                         <span>📷 {post.media_urls.length}</span>
                       ) : null}
-                      {post.scheduled_at && (
-                        <span className="text-amber-300">
-                          예정 {formatLA(post.scheduled_at)} LA
-                        </span>
-                      )}
+                      {(() => {
+                        const when = queueWhen(post);
+                        return (
+                          <span className={when.kind === "없음" ? "text-zinc-600" : "text-amber-300"}>
+                            {when.kind === "없음" ? when.text : `${when.kind} ${when.text}`}
+                          </span>
+                        );
+                      })()}
                       <Link
                         href={`/posts/${post.id}`}
                         className="text-indigo-400 hover:text-indigo-300"

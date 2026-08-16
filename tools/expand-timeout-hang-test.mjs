@@ -40,7 +40,7 @@ ok("H10. write concurrency 2 / timeout 45s under Edge wall", /V11_WRITE_CONCURRE
 ok("H11. write retries once unless job skipSelectiveRegen", /allow_one_retry: args\.skipSelectiveRegen \? false : true/.test(ow));
 ok("H12. 7C honors allow_one_retry false", /options\.allow_one_retry !== false/.test(gi));
 ok("H13. seed-reasoning default timeout 32s", /timeoutMs \?\? 32000/.test(cr));
-ok("H14. shipping version lockstep (not frozen 11.1.2)", /const APP_VERSION = "11\.\d+\.\d+"/.test(ix));
+ok("H14. shipping version lockstep (not frozen 11.1.2)", /const APP_VERSION = "\d+\.\d+\.\d+"/.test(ix));
 
 console.log("========================================");
 console.log(`HANG FIX: ${pass} PASS / ${fail} FAIL`);

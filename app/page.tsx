@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import PostList from "./components/PostList";
+import QueueMonthCalendar from "./components/QueueMonthCalendar";
 import CollectMaxButton from "./components/CollectMaxButton";
 import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
 import EvidenceExportButton from "./components/EvidenceExportButton";
-import { getHomeDashboardData } from "@/lib/calendar/activity-provider";
+import { getAccountSyncState, getQueueMonthInscription } from "@/lib/calendar/activity-provider";
 
 function syncLabel(status: string) {
   switch (status) {
@@ -20,7 +21,23 @@ function syncLabel(status: string) {
   }
 }
 
-export default async function HomePage() {
+function parseCal(raw: string | undefined) {
+  const now = new Date();
+  const m = String(raw || "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (year < 2020 || year > 2100 || month < 1 || month > 12) {
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+  return { year, month };
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ cal?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -30,13 +47,18 @@ export default async function HomePage() {
     redirect("/login");
   }
 
+  const q = searchParams ? await searchParams : {};
+  const { year, month } = parseCal(q.cal);
+
   const { data: posts } = await supabase
     .from("SeungContent")
     .select("*")
     .order("created_at", { ascending: false });
 
-  const home = await getHomeDashboardData();
-  const { account, today, recentActual } = home;
+  const [account, inscribed] = await Promise.all([
+    getAccountSyncState(),
+    getQueueMonthInscription(year, month),
+  ]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -59,7 +81,7 @@ export default async function HomePage() {
                 <div className="mt-0.5 text-xs text-zinc-500">
                   {account.status === "not_connected"
                     ? "X를 연결하면 프로필·동기화를 쓸 수 있습니다."
-                    : "연결됨 — 필요 시 아래에서 데이터 업데이트를 실행하세요."}
+                    : "연결됨 — 「지금 동기화」를 누르면 달력이 갱신됩니다."}
                 </div>
               )}
             </div>
@@ -89,69 +111,12 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              오늘 요약
-            </div>
-            <Link href="/today" className="text-xs text-emerald-400 hover:underline">
-              오늘 화면 열기
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 text-sm">
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">실제 게시</div>
-              <div className="font-semibold">{today.actualPublished}</div>
-            </div>
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">예약</div>
-              <div className="font-semibold">{today.scheduled}</div>
-            </div>
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">자유 콘텐츠</div>
-              <div className="font-semibold capitalize">{today.wildFreeStatus}</div>
-            </div>
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">성장 콘텐츠</div>
-              <div className="font-semibold capitalize">{today.wildGrowthStatus}</div>
-            </div>
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">직접 작성</div>
-              <div className="font-semibold">{today.manualActions}</div>
-            </div>
-            <div className="rounded-lg bg-zinc-800/80 px-3 py-2">
-              <div className="text-[10px] text-zinc-500">유사 주의</div>
-              <div className="font-semibold">{today.duplicateWarnings}</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-              최근 X 활동
-            </div>
-            <Link href="/calendar" className="text-xs text-indigo-400 hover:underline">
-              캘린더
-            </Link>
-          </div>
-          {recentActual.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              아직 불러온 X 활동이 없습니다. X 연결 후 데이터 업데이트를 실행하세요.
-            </p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {recentActual.map((a) => (
-                <li key={a.activity_id} className="rounded-lg bg-zinc-950/50 px-3 py-2">
-                  <span className="text-xs text-sky-400">{a.action_type}</span>{" "}
-                  <span className="text-zinc-300">
-                    {a.final_text || a.topic || a.x_post_id}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <QueueMonthCalendar
+          year={year}
+          month={month}
+          days={inscribed.days}
+          lastSyncAt={account.lastSuccessfulSyncAt || null}
+        />
 
         <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
           <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-zinc-500">
@@ -162,7 +127,10 @@ export default async function HomePage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
             <Link href="/calendar" className="text-zinc-400 underline hover:text-zinc-200">
-              캘린더
+              상세 캘린더
+            </Link>
+            <Link href="/today" className="text-zinc-400 underline hover:text-zinc-200">
+              오늘
             </Link>
             <Link href="/learning" className="text-zinc-400 underline hover:text-zinc-200">
               인사이트
@@ -194,6 +162,7 @@ export default async function HomePage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-medium">콘텐츠 큐</h2>
+          <p className="text-[11px] text-zinc-500">작성된 글 전체 · 리뷰·삭제·Fedica 스케줄</p>
         </div>
 
         <PostList posts={posts || []} />

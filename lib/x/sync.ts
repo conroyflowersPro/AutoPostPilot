@@ -6,6 +6,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createXClient, XClientNotConfiguredError } from "@/lib/x/client";
 import { persistXPostEvidence } from "@/lib/x/evidence";
+import { classifyXPostOrigin, type ApOriginHint } from "@/lib/calendar/planner-inscribe";
 
 export type SyncResult = {
   ok: boolean;
@@ -84,9 +85,20 @@ export async function runXAccountSync(opts?: {
 
   const runId = runRow?.id as string | undefined;
 
+  async function loadApOriginHints(): Promise<ApOriginHint[]> {
+    const { data } = await supabase
+      .from("SeungContent")
+      .select("id, content, final_text, pipeline_id, fedica_post_id, strategy_json, schedule_provider")
+      .in("status", ["scheduled", "published", "reviewed", "scheduling"])
+      .order("created_at", { ascending: false })
+      .limit(200);
+    return (data || []) as ApOriginHint[];
+  }
+
   try {
     const client = await createXClient();
     const me = await client.getMe();
+    const apHints = await loadApOriginHints();
 
     let fetched = 0;
     let created = 0;
@@ -116,7 +128,7 @@ export async function runXAccountSync(opts?: {
           status: "PUBLISHED",
           collectionSource: source === "scheduled" ? "x_sync_scheduled" : "x_sync_manual",
           collectionRunId: runId || null,
-          systemOriginClass: "USER_DIRECT" as any,
+          systemOriginClass: classifyXPostOrigin(p.id, p.text || "", apHints),
         });
         if (persisted.postStatus === "NEW") created += 1;
         else updated += 1;
