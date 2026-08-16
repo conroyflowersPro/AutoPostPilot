@@ -1319,19 +1319,6 @@ async function stepRecover(xaiKey: string, row: any) {
     requestTargetedSeedRefill(row, pending, `Planner recovery JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
     return;
   }
-    pending.attempts = 0;
-    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
-    st.recovery_history.push({
-      strategy_slot_id: pending.strategy_slot_id,
-      action: "TARGETED_EXPLORE",
-      from_seed_id: seedIdOf(pending.slot || pending),
-      to_seed_id: "",
-      exploration_direction: slotExplorationDirection(pending.slot || pending),
-      judge_reasons: pending.judge_reasons || [],
-    });
-    requestTargetedSeedRefill(row, pending, `Planner recovery JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
-    return;
-  }
   const rejectedSeedId = seedIdOf(pending.slot || pending);
   const pool = recoverSeedPool(st);
   if (!pool.length) {
