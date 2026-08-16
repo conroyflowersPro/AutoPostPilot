@@ -12,7 +12,6 @@ export const ORDER8B_VERSION = "rejection_regeneration_routing_v1_order8b";
 export const ORDER8B_MAX_SEMANTIC_REGEN_ATTEMPTS = 2 as const;
 export const ORDER8B_JUDGE_RETRY_ON_UNAVAILABLE = 1 as const;
 export const ORDER8B_SOFT_ACCEPT_MAX_CONCERNS = 1 as const;
-export const ORDER8B_SOFT_REGEN_CREATOR_FIT_BELOW = 0.55 as const;
 export const ORDER8B_NO_PREVIOUS_DRAFT_FEWSHOT = true as const;
 export const ORDER8B_NO_AI_SELF_REINFORCEMENT = true as const;
 export const ORDER8B_NO_SILENT_DROP = true as const;
@@ -29,6 +28,7 @@ export type RejectionCode =
   | "CORE_THOUGHT_LOSS"
   | "MANUAL_LEAKAGE"
   | "EMPTY_OUTPUT"
+  | "CREATOR_CONTRADICTION"
   | "CREATOR_FIT_WEAK"
   | "MECHANISM_MISFIT"
   | "RAIL_MISFIT"
@@ -156,6 +156,7 @@ export const ORDER8B_GUARDS = {
 
 function mapHardReason(r: string): RejectionCode {
   const s = r.toLowerCase();
+  if (s.includes("contradiction") || s.includes("creator_identity")) return "CREATOR_CONTRADICTION";
   if (s.includes("experience") || s.includes("fabricated_experience")) return "FABRICATED_EXPERIENCE";
   if (s.includes("factual") || s.includes("fabricated_fact")) return "FABRICATED_FACT";
   if (s.includes("seed")) return "SEED_DRIFT";
@@ -191,6 +192,7 @@ function codesFromJudge(j: SemanticJudgeResult): { hard: RejectionCode[]; soft: 
   const soft = (j.soft_concerns || []).map(mapSoftReason);
   if (j.flags?.fabricated_experience && !hard.includes("FABRICATED_EXPERIENCE")) hard.push("FABRICATED_EXPERIENCE");
   if (j.flags?.fabricated_fact && !hard.includes("FABRICATED_FACT")) hard.push("FABRICATED_FACT");
+  if (j.flags?.creator_contradiction && !hard.includes("CREATOR_CONTRADICTION")) hard.push("CREATOR_CONTRADICTION");
   if (j.flags?.manual_text_leakage && !hard.includes("MANUAL_LEAKAGE")) hard.push("MANUAL_LEAKAGE");
   if (j.flags?.ai_report_voice && !soft.includes("AI_REPORT_VOICE")) soft.push("AI_REPORT_VOICE");
   if (j.flags?.over_explained && !soft.includes("OVER_EXPLAINED")) soft.push("OVER_EXPLAINED");
@@ -202,7 +204,6 @@ function codesFromJudge(j: SemanticJudgeResult): { hard: RejectionCode[]; soft: 
   if ((j.scores?.mechanism_fit ?? 1) < 0.4 && !soft.includes("MECHANISM_MISFIT")) soft.push("MECHANISM_MISFIT");
   if ((j.scores?.rail_fit ?? 1) < 0.4 && !soft.includes("RAIL_MISFIT")) soft.push("RAIL_MISFIT");
   if ((j.scores?.reader_self_projection ?? 1) < 0.45 && !soft.includes("SELF_PROJECTION_WEAK")) soft.push("SELF_PROJECTION_WEAK");
-  if ((j.scores?.creator_fit ?? 1) < ORDER8B_SOFT_REGEN_CREATOR_FIT_BELOW && !soft.includes("CREATOR_FIT_WEAK")) soft.push("CREATOR_FIT_WEAK");
   return { hard: [...new Set(hard)], soft: [...new Set(soft)] };
 }
 
@@ -227,7 +228,7 @@ function baseDecision(
     freeze_everyday: true,
     freeze_style: true,
     freeze_humor: true,
-    strengthen_experience_boundary: hard.includes("FABRICATED_EXPERIENCE"),
+    strengthen_experience_boundary: hard.includes("FABRICATED_EXPERIENCE") || hard.includes("CREATOR_CONTRADICTION"),
     strengthen_factual_boundary: hard.includes("FABRICATED_FACT"),
     strengthen_compression: soft.includes("OVER_EXPLAINED") || soft.includes("COMPRESSION_MISS"),
     strengthen_stop_condition: soft.includes("STOP_CONDITION_MISS") || soft.includes("AI_REPORT_VOICE"),
@@ -314,7 +315,7 @@ export function decideRegenerationRoute(
   if (hard.includes("MANUAL_LEAKAGE") || hard.includes("EMPTY_OUTPUT")) {
     return baseDecision("REWRITE_ONLY", "writer", hard, soft, "hard_writer_surface");
   }
-  if (hard.includes("FABRICATED_EXPERIENCE") || hard.includes("FABRICATED_FACT")) {
+  if (hard.includes("FABRICATED_EXPERIENCE") || hard.includes("FABRICATED_FACT") || hard.includes("CREATOR_CONTRADICTION")) {
     if (hard.includes("CORE_THOUGHT_LOSS") || hard.includes("SEED_DRIFT")) {
       return baseDecision("INTERPRETATION_REGENERATE", "interpretation", hard, soft, "hard_fact_with_core_seed");
     }
@@ -342,8 +343,7 @@ export function decideRegenerationRoute(
       soft.includes("CONCEPTUAL_REPETITION_HIGH") ||
       soft.includes("MECHANISM_MISFIT") ||
       soft.includes("RAIL_MISFIT") ||
-      soft.includes("SELF_PROJECTION_WEAK") ||
-      (judge.scores?.creator_fit ?? 1) < ORDER8B_SOFT_REGEN_CREATOR_FIT_BELOW;
+      soft.includes("SELF_PROJECTION_WEAK");
 
     if (!severe) {
       return baseDecision("ACCEPT_WITH_CONCERNS", "none", hard, soft, "mild_concerns_accept");

@@ -88,7 +88,7 @@ export function creatorDnaBlock(): string {
     "USE (planner + writer, every new situation): What would he notice first? How far to assert, and where to leave the reader's judgment? Would he use humor here? How would he interpret this experience in his own language?",
     "CLOCK: Change slowly. Update only from USER_DIRECT originals, his edits, repeated judgment patterns, and validated performance. AP_PIPELINE drafts must not rewrite Creator DNA.",
     "JOBS: identity preservation · thought direction · expression adjustment · anti-uniformity · long-term consistency.",
-    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Daily life is US/CA, not Korea civic housing. DNA describes identity and interests; it does not prescribe a fixed seven-day topic ratio.",
+    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Daily life is US/CA, not Korea civic housing. DNA describes identity and interests; it is not a topic whitelist and does not prescribe a fixed seven-day topic ratio. Judge may use DNA to detect a clear identity contradiction, never to block a new topic.",
     "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
     "PUBLISHING DNA: preserve the Creator's real range without freezing a surface mix. Planner sets strategic purpose; Writer decides expression after closing the thought.",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",

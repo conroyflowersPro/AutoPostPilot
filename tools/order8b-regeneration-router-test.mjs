@@ -57,10 +57,12 @@ function codesFrom(j) {
     else if (/empty/i.test(r)) hard.push("EMPTY_OUTPUT");
     else if (/core/i.test(r)) hard.push("CORE_THOUGHT_LOSS");
     else if (/fact/i.test(r)) hard.push("FABRICATED_FACT");
+    else if (/contradiction|creator_identity/i.test(r)) hard.push("CREATOR_CONTRADICTION");
   }
   for (const r of j.soft_concerns || []) {
     if (/ai_report/i.test(r)) soft.push("AI_REPORT_VOICE");
     if (/over_explained/i.test(r)) soft.push("OVER_EXPLAINED");
+    if (/forced_cta/i.test(r)) soft.push("FORCED_CTA");
     if (/creator_fit/i.test(r)) soft.push("CREATOR_FIT_WEAK");
     if (/mechanism/i.test(r)) soft.push("MECHANISM_MISFIT");
     if (/rail/i.test(r) && !/mechanism/i.test(r)) soft.push("RAIL_MISFIT");
@@ -70,6 +72,7 @@ function codesFrom(j) {
     if (/conceptual/i.test(r)) soft.push("CONCEPTUAL_REPETITION_HIGH");
   }
   if (j.flags?.fabricated_experience) hard.push("FABRICATED_EXPERIENCE");
+  if (j.flags?.creator_contradiction) hard.push("CREATOR_CONTRADICTION");
   if (j.flags?.conceptual_repetition === "HIGH") soft.push("CONCEPTUAL_REPETITION_HIGH");
   return { hard: [...new Set(hard)], soft: [...new Set(soft)] };
 }
@@ -81,7 +84,7 @@ function decide(j, attempts = 0, ju = 0) {
   if (j.overall_status === "PASS") return { route: "NO_ACTION", freeze_core: true };
   const { hard, soft } = codesFrom(j);
   if (hard.includes("MANUAL_LEAKAGE") || hard.includes("EMPTY_OUTPUT")) return { route: "REWRITE_ONLY", reset: "writer", freeze_seed: true };
-  if (hard.includes("FABRICATED_EXPERIENCE")) return { route: "REWRITE_ONLY", reset: "writer", strengthen_exp: true, freeze_core: true };
+  if (hard.includes("FABRICATED_EXPERIENCE") || hard.includes("CREATOR_CONTRADICTION")) return { route: "REWRITE_ONLY", reset: "writer", strengthen_exp: true, freeze_core: true };
   if (hard.includes("SEED_DRIFT")) return { route: "INTERPRETATION_REGENERATE", reset: "interpretation" };
   if (hard.includes("CORE_THOUGHT_LOSS") && (j.scores?.seed_fidelity ?? 1) < 0.4) return { route: "INTERPRETATION_REGENERATE" };
   if (hard.length) return { route: "REWRITE_ONLY", reset: "writer" };
@@ -90,7 +93,7 @@ function decide(j, attempts = 0, ju = 0) {
     if (soft.includes("MECHANISM_MISFIT")) return { route: "MECHANISM_REGENERATE", freeze_seed: true };
     if (soft.includes("RAIL_MISFIT")) return { route: "THINKING_RAIL_REGENERATE", freeze_mechanism: true };
     if (soft.includes("SELF_PROJECTION_WEAK")) return { route: "SELF_PROJECTION_REGENERATE" };
-    if (soft.length <= 1 && (j.scores?.creator_fit ?? 1) >= 0.55) return { route: "ACCEPT_WITH_CONCERNS" };
+    if (soft.length <= 1) return { route: "ACCEPT_WITH_CONCERNS" };
     if (soft.includes("HUMOR_FORCED")) return { route: "HUMOR_REGENERATE", force_none: true };
     if (soft.includes("AI_REPORT_VOICE") || soft.includes("CREATOR_FIT_WEAK") || soft.includes("STRUCTURAL_REPETITION")) {
       return { route: "STYLE_REGENERATE", freeze_core: true, freeze_seed: true };
@@ -105,9 +108,9 @@ let d = decide({ overall_status: "REJECT", hard_fail_reasons: ["fabricated_exper
 assert(d.route === "REWRITE_ONLY" && d.strengthen_exp && d.freeze_core, "T40 fabricated experience writer+boundary");
 
 d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["ai_report_voice"], flags: {}, scores: { creator_fit: 0.5 } });
-assert(d.route === "STYLE_REGENERATE" && d.freeze_core && d.freeze_seed, "T41 AI voice style freeze core/seed");
+assert(d.route === "ACCEPT_WITH_CONCERNS", "T41 low creator_fit score is not a regen gate");
 
-d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["over_explained", "over_explained_2"], flags: {}, scores: { creator_fit: 0.4 } });
+d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["over_explained", "forced_cta"], flags: {}, scores: { creator_fit: 0.4 } });
 assert(d.route === "REWRITE_ONLY" || d.strengthen_comp, "T42 over-explained writer constraints");
 
 d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["self_projection_weak"], flags: {}, scores: { creator_fit: 0.7, reader_self_projection: 0.3 } });
@@ -125,14 +128,20 @@ assert(d.route === "INTERPRETATION_REGENERATE", "T46 seed drift interpretation")
 d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["conceptual"], flags: { conceptual_repetition: "HIGH" }, scores: { creator_fit: 0.7 } });
 assert(d.route === "INTERPRETATION_REGENERATE", "T47 conceptual high deep rollback");
 
-d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["structural_repetition", "x"], flags: {}, scores: { creator_fit: 0.5 } });
-assert(d.route === "STYLE_REGENERATE" && d.freeze_core, "T48 structural style only");
+d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["structural_repetition"], flags: {}, scores: { creator_fit: 0.5 } });
+assert(d.route === "ACCEPT_WITH_CONCERNS", "T48 low creator_fit does not turn a mild structural concern into regen");
 
 d = decide({ overall_status: "PASS", hard_fail_reasons: [], soft_concerns: [], flags: {}, scores: {} });
 assert(d.route === "NO_ACTION", "T49 pass no humor regen");
 
 d = decide({ overall_status: "PASS_WITH_CONCERNS", hard_fail_reasons: [], soft_concerns: ["ai_report_voice"], flags: {}, scores: { creator_fit: 0.8 } });
 assert(d.route === "ACCEPT_WITH_CONCERNS", "mild single soft accept");
+
+d = decide({ overall_status: "REJECT", hard_fail_reasons: ["creator_identity_contradiction"], soft_concerns: [], flags: { creator_contradiction: true }, scores: { creator_fit: 0 } });
+assert(d.route === "REWRITE_ONLY" && d.strengthen_exp, "creator contradiction is a hard boundary, not a similarity score");
+
+assert(!src.includes("ORDER8B_SOFT_REGEN_CREATOR_FIT_BELOW"), "router does not score Creator Fit as a regen threshold");
+assert(src.includes("CREATOR_CONTRADICTION"), "router has contradiction hard code");
 
 d = decide({ overall_status: "JUDGE_UNAVAILABLE", hard_fail_reasons: [], soft_concerns: [], flags: {}, scores: {} }, 0, 0);
 assert(d.route === "JUDGE_RETRY", "T51 judge unavailable retry");

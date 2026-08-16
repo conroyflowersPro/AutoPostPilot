@@ -104,7 +104,8 @@ export function surfaceDiscoursePhilosophyBlock(): string {
 export function qualityPhilosophyBlock(): string {
   return [
     "QUALITY: Final publishability validation only. Judge does not select Seeds, redesign Planner strategy, or replace Writer creativity.",
-    "JOBS: reject only a completed post that is not actually publishable, including fabrication, direct leakage, unusable output, or complete departure from the assignment. Return Reject to Planner. Writing preferences and profile-level repetition are not Judge strategy decisions.",
+    "CREATOR CHECK: Contradiction Check, not Creator Fit. Do not score how similar the post is to past Creator data or Creator DNA topic frequency. Do not reject a new topic, adjacent expansion, experimental expansion, or low historical similarity. Those are normal Planner expansion outcomes. Reject Creator-related only when the completed post clearly contradicts known identity, facts, or lived-experience boundaries. Missing past evidence is not a fail.",
+    "JOBS: reject only a completed post that is not actually publishable, including fabrication, direct leakage, unusable output, complete departure from the assignment, or a clear Creator contradiction. Return Reject to Planner. Writing preferences, new topics, and profile-level repetition are not Judge strategy decisions.",
   ].join("\n");
 }
 

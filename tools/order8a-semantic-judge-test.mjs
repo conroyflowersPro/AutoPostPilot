@@ -43,7 +43,12 @@ assert(src.includes("manual_text_leakage"), "manual leakage");
 assert(src.includes("conceptual_repetition"), "conceptual_repetition");
 assert(src.includes("seed_fidelity"), "seed_fidelity score");
 assert(src.includes("core_thought_preservation"), "core_thought_preservation");
-assert(src.includes("creator_fit"), "creator_fit");
+assert(src.includes("creator_fit"), "creator_fit field kept");
+assert(src.includes("ORDER8A_CREATOR_CHECK_IS_CONTRADICTION"), "creator check is contradiction");
+assert(src.includes("hasCreatorIdentityContradiction"), "contradiction helper");
+assert(src.includes("creator_identity_contradiction"), "contradiction hard reason");
+assert(!src.includes("creator_fit_weak"), "no creator_fit_weak soft gate");
+assert(!src.includes("scores.creator_fit < 0.55"), "no creator_fit score gate");
 assert(src.includes("reader_self_projection"), "reader_self_projection");
 assert(src.includes("inference_space_fit"), "inference_space_fit");
 assert(src.includes("anti_ai_voice_fit"), "anti_ai_voice_fit");
@@ -63,15 +68,23 @@ const EXP = [/제가\s*직접\s*써보니/, /어제\s*해봤는데/, /운전하�
 const MANUAL = ["[MANUAL_RAW]", "MANUAL_POST_TEXT:", "<<<HISTORICAL>>>", "RAW_PROSE_LEAK"];
 const AI = [/결국\s*중요한\s*것/, /시사하는\s*바가\s*큽/, /결론적으로/, /요약하면/];
 
+const KOREA_ONLY = /이중\s*주차|관리사무소|전세|청약|아파트\s*단지/;
+const FIRST_PERSON_LIVED = /제가|나는|우리\s*(아파트|단지|집)|직접|살아보니|살아봤/;
+const FIRST_PERSON_KOREA_RESIDENCE = [/한국에\s*살/, /서울에\s*살/, /한국\s*거주/, /한국에서\s*(살고|지내)/, /한국\s*살면서/];
+
 function twin(input) {
   const text = (input.generated_text || "").trim();
   const hard = [], soft = [];
-  const flags = { fabricated_experience: false, manual_text_leakage: false, ai_report_voice: false, over_explained: false, conceptual_repetition: "LOW" };
+  const flags = { fabricated_experience: false, creator_contradiction: false, manual_text_leakage: false, ai_report_voice: false, over_explained: false, conceptual_repetition: "LOW" };
   if (!text) { hard.push("empty_final_text"); return { overall_status: "REJECT", hard_fail_reasons: hard, soft_concerns: soft, flags }; }
   for (const m of MANUAL) if (text.includes(m)) { flags.manual_text_leakage = true; hard.push("manual_text_leakage"); }
   const expB = input.experience_boundary || {};
   for (const re of EXP) if (re.test(text) && (expB.must_not_claim_first_person || !expB.creator_experienced)) {
     flags.fabricated_experience = true; hard.push("fabricated_experience"); break;
+  }
+  if (FIRST_PERSON_KOREA_RESIDENCE.some((re) => re.test(text)) || (KOREA_ONLY.test(text) && FIRST_PERSON_LIVED.test(text))) {
+    flags.creator_contradiction = true;
+    hard.push("creator_identity_contradiction");
   }
   const seed = (input.seed && input.seed.meaning) || "";
   const tokens = seed.split(/\s+/).filter(t => t.length >= 2);
@@ -115,6 +128,12 @@ assert(!("rewritten_text" in r), "no rewrite in result shape");
 const a = twin({ seed: { meaning: "Cybertruck" }, generated_text: "Cybertruck 충전 포트가 편하다." });
 const b = twin({ seed: { meaning: "LAFC" }, generated_text: "LAFC 홈 경기가 기대된다." });
 assert(a.overall_status === "PASS" && b.overall_status === "PASS", "isolation both pass independently");
+
+r = twin({ seed: { meaning: "캠핑 의자 접는 버릇" }, generated_text: "캠핑 의자 접는 버릇이 남는다. 자리를 뜨기 전에 한 번 더 확인한다." });
+assert(r.overall_status === "PASS" && !r.flags.creator_contradiction, "new topic is not a Creator reject");
+
+r = twin({ seed: { meaning: "전세 계약 갱신" }, generated_text: "우리 아파트 전세 계약 갱신하러 관리사무소에 다녀왔다." });
+assert(r.overall_status === "REJECT" && r.flags.creator_contradiction, "lived Korea civic identity contradiction REJECT");
 
 assert(src.includes("missing_judge_input") || src.includes("JUDGE_UNAVAILABLE"), "unavailable path");
 

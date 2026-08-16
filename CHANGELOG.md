@@ -7,6 +7,14 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.0 — 2026-08-16
+
+- Semantic Judge의 Creator 검사는 Creator Fit 점수가 아니라 Contradiction Check입니다
+- 새 주제, 인접·실험 확장, 낮은 historical similarity, Creator DNA Topic 빈도 부족만으로 Reject하지 않습니다
+- Judge는 Planner가 배치한 확장 전략을 “원래 관심사가 아니다”라는 이유로 되돌리지 않습니다
+- Creator 관련 Hard Gate는 알려진 정체성·사실·실제 행동 경계와의 명백한 충돌만 봅니다
+- `creator_fit` 점수 임계값과 `creator_fit_weak` soft gate를 제거했습니다. 필드가 남아 있어도 유사도 Hard Gate로 쓰지 않습니다
+
 ## 11.11.0 — 2026-08-15
 
 - 실제 흐름은 `Seed Pool → 7일 Planner 전략 → Planner Seed 선택·배차 → Writer → Semantic Judge`입니다

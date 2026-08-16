@@ -13,6 +13,7 @@ const writer = read("supabase/functions/weekly-plan/independent-post-generation.
 const pipe = read("supabase/functions/weekly-plan/order-write-pipeline.ts");
 const deep = read("supabase/functions/weekly-plan/deep-generation-context.ts");
 const judge = read("supabase/functions/weekly-plan/semantic-judge.ts");
+const stage = read("supabase/functions/weekly-plan/engine-stage-philosophy.ts");
 const quota = read("supabase/functions/weekly-plan/quota-inference.ts");
 const page = read("app/generate/page.tsx");
 const analyticsImport = read("app/api/learning/import/route.ts");
@@ -70,6 +71,13 @@ ok("R15. Judge hard failures are final-unacceptable only",
   /hard\.push\("expert_jargon"\)/.test(judge) &&
   /hard\.push\("generic_thesis"\)/.test(judge) &&
   !/hard\.push\("structural_repetition_high"\)/.test(judge));
+ok("R15b. Judge Creator check is contradiction, not topic similarity",
+  /ORDER8A_CREATOR_CHECK_IS_CONTRADICTION/.test(judge) &&
+  /hasCreatorIdentityContradiction/.test(judge) &&
+  /creator_identity_contradiction/.test(judge) &&
+  /Contradiction Check/.test(stage) &&
+  !/creator_fit_weak/.test(judge) &&
+  !/scores\.creator_fit < 0\.55/.test(judge));
 ok("R16. Judge reject returns slot to Planner", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job));
 ok("R16b. Planner requeues the recovered slot as the next Writer/Judge pass",
   /st\.write_flat\.splice\(insertAt, 0, replacement\)/.test(job) &&

@@ -5,6 +5,7 @@
  * Architecture: Judge does not write. No engine replaces the Creator.
  * Final publishability only. Strategy, selection, allocation, profile diversity,
  * and creative preferences remain Planner/Writer responsibilities.
+ * Creator-related judgment is Contradiction Check, not Creator Fit / topic similarity.
  */
 import type { DeepGenerationContext, CoreThought, CompressionTarget } from "./deep-generation-context.ts";
 import type { IndependentPostResult } from "./independent-post-generation.ts";
@@ -13,6 +14,7 @@ import {
   ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR,
 } from "./engine-architecture.ts";
 import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
+import { isKoreaOnlySituation } from "./seed-scope.ts";
 
 export {
   extractStructuralSignature,
@@ -42,6 +44,9 @@ export const ORDER8A_GENERATION_STATUS_SEPARATE = true as const;
 export const ORDER8A_NO_AUTO_REGENERATION = true as const;
 export const ORDER8A_JUDGE_FAILURE_EXPLICIT = true as const;
 export const ORDER8A_NO_FINISHED_EXAMPLES_IN_PROMPT = true as const;
+export const ORDER8A_CREATOR_CHECK_IS_CONTRADICTION = true as const;
+export const ORDER8A_NO_CREATOR_FIT_SCORE_GATE = true as const;
+export const ORDER8A_NO_TOPIC_FAMILIARITY_GATE = true as const;
 
 export type JudgeOverallStatus =
   | "PASS"
@@ -85,6 +90,7 @@ export type SemanticJudgeInput = {
 export type SemanticJudgeScores = {
   seed_fidelity: number;
   core_thought_preservation: number;
+  /** Legacy payload field. Not a similarity score and not a status gate. 1 = no contradiction, 0 = clear contradiction. */
   creator_fit: number;
   factual_grounding: number;
   experience_grounding: number;
@@ -104,6 +110,7 @@ export type SemanticJudgeScores = {
 export type SemanticJudgeFlags = {
   fabricated_fact: boolean;
   fabricated_experience: boolean;
+  creator_contradiction: boolean;
   manual_text_leakage: boolean;
   forced_cta: boolean;
   forced_question: boolean;
@@ -145,6 +152,9 @@ export const ORDER8A_GUARDS = {
   no_auto_regeneration: ORDER8A_NO_AUTO_REGENERATION,
   judge_failure_explicit: ORDER8A_JUDGE_FAILURE_EXPLICIT,
   no_finished_examples_in_prompt: ORDER8A_NO_FINISHED_EXAMPLES_IN_PROMPT,
+  creator_check_is_contradiction: ORDER8A_CREATOR_CHECK_IS_CONTRADICTION,
+  no_creator_fit_score_gate: ORDER8A_NO_CREATOR_FIT_SCORE_GATE,
+  no_topic_familiarity_gate: ORDER8A_NO_TOPIC_FAMILIARITY_GATE,
 } as const;
 
 const AI_REPORT_PATTERNS = [
@@ -205,6 +215,24 @@ const HOSTILE_RELATIONAL = [
   /공격적/,
 ];
 
+const FIRST_PERSON_LIVED = /제가|나는|우리\s*(아파트|단지|집)|직접|살아보니|살아봤/;
+const FIRST_PERSON_KOREA_RESIDENCE = [
+  /한국에\s*살/,
+  /서울에\s*살/,
+  /한국\s*거주/,
+  /한국에서\s*(살고|지내)/,
+  /한국\s*살면서/,
+];
+
+/**
+ * Creator check is Contradiction Check, not topic familiarity or "how Creator-like".
+ * New / adjacent / experimental topics are allowed. Low historical similarity is not a fail.
+ */
+function hasCreatorIdentityContradiction(text: string): boolean {
+  if (FIRST_PERSON_KOREA_RESIDENCE.some((re) => re.test(text))) return true;
+  return isKoreaOnlySituation(text) && FIRST_PERSON_LIVED.test(text);
+}
+
 function s(v: unknown, d = ""): string {
   if (v == null) return d;
   return String(v).trim() || d;
@@ -240,6 +268,7 @@ function emptyFlags(): SemanticJudgeFlags {
   return {
     fabricated_fact: false,
     fabricated_experience: false,
+    creator_contradiction: false,
     manual_text_leakage: false,
     forced_cta: false,
     forced_question: false,
@@ -495,11 +524,13 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   scores.everyday_language_fit = clamp01(academic ? 0.4 : 0.85);
   if (academic) soft.push("everyday_language_academic");
   scores.style_fit = clamp01(academic || flags.ai_report_voice ? 0.45 : 0.8);
-  scores.creator_fit = clamp01(
-    (scores.style_fit + scores.everyday_language_fit + scores.anti_ai_voice_fit + (flags.fabricated_experience ? 0.2 : 0.9)) /
-      4,
-  );
-  if (scores.creator_fit < 0.55) soft.push("creator_fit_weak");
+
+  if (hasCreatorIdentityContradiction(text)) {
+    flags.creator_contradiction = true;
+    hard.push("creator_identity_contradiction");
+  }
+  // creator_fit is a contradiction indicator only. Never a topic-similarity or "how Creator-like" score.
+  scores.creator_fit = flags.creator_contradiction || flags.fabricated_experience ? 0 : 1;
 
   scores.mechanism_fit = 0.75;
   scores.rail_fit = 0.75;
@@ -513,7 +544,6 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   const warmScene = /가족|마님|나리|강아지|반려|아이|아들|딸|아내|남편/.test(text + " " + seedMeaning);
   if (warmScene && HOSTILE_RELATIONAL.some((re) => re.test(text))) {
     soft.push("relational_connotation_hostile_in_warm_scene");
-    scores.creator_fit = clamp01(scores.creator_fit - 0.15);
   }
 
   // Profile-level repetition is Planner strategy, using actual X Analytics.
@@ -541,7 +571,7 @@ function finalize(
     overall = "JUDGE_UNAVAILABLE";
   } else if (hard.length > 0) {
     overall = "REJECT";
-  } else if (soft.length > 0 || scores.creator_fit < 0.55 || scores.seed_fidelity < 0.5) {
+  } else if (soft.length > 0 || scores.seed_fidelity < 0.5) {
     overall = "PASS_WITH_CONCERNS";
   } else {
     overall = "PASS";
