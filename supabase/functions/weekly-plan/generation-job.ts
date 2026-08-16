@@ -1129,7 +1129,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     analytics_request_needed: volume.analytics_request_needed === true,
     analytics_request_reason: volume.analytics_request_reason || "",
     version: "seven_day_planner_v1",
-  } satisfies SevenDayStrategy;
+  } as SevenDayStrategy;
   st.quota = null;
   row.required_slots = stamped.length;
   st.posts_per_day = Math.max(QUOTA_PER_DAY_MIN, Math.ceil(row.required_slots / QUOTA_DAYS));
