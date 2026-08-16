@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.1 — 2026-08-16
+
+- Judge 거절이 나면 나머지 예정 글을 멈추고 recover↔write만 반복하지 않습니다. 거절은 큐에 넣고 남은 7일 글을 먼저 씁니다
+- Recover pool에서 거절 Seed·아직 안 쓴 Seed를 hard-ban하지 않습니다. 저장된 PASS와 3회 거절 포기만 제외합니다
+- 같은 Seed가 3번 Judge 거절되면 그 Seed는 포기하고 다음 글로 갑니다
+
 ## 11.12.0 — 2026-08-16
 
 - Semantic Judge의 Creator 검사는 Creator Fit 점수가 아니라 Contradiction Check입니다

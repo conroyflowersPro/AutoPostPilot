@@ -97,6 +97,82 @@ function quotaFilled(row: any): boolean {
   return required > 0 && Number(row.saved_count || 0) >= required;
 }
 
+const SEED_REJECT_ABANDON = 3;
+const JOB_RECOVERY_CAP_MULT = 2;
+
+function seedIdOf(slot: any): string {
+  return String(slot?.seed_id || "").trim();
+}
+
+function bumpSeedReject(st: any, seedId: string): number {
+  const id = String(seedId || "").trim();
+  st.seed_reject_counts = st.seed_reject_counts && typeof st.seed_reject_counts === "object" ? st.seed_reject_counts : {};
+  if (!id) return 0;
+  const n = Number(st.seed_reject_counts[id] || 0) + 1;
+  st.seed_reject_counts[id] = n;
+  return n;
+}
+
+function abandonedSeedIds(st: any): Set<string> {
+  const out = new Set<string>();
+  const counts = st.seed_reject_counts && typeof st.seed_reject_counts === "object" ? st.seed_reject_counts : {};
+  for (const [id, n] of Object.entries(counts)) {
+    if (id && Number(n) >= SEED_REJECT_ABANDON) out.add(id);
+  }
+  return out;
+}
+
+function savedSeedIds(st: any): Set<string> {
+  return new Set(
+    (st.write_flat || []).filter((slot: any) => slot?._saved).map((slot: any) => seedIdOf(slot)).filter(Boolean),
+  );
+}
+
+function remainingUnwrittenSeedIds(st: any): string[] {
+  return (st.write_flat || [])
+    .slice(Number(st.write_index || 0))
+    .map((slot: any) => seedIdOf(slot))
+    .filter(Boolean);
+}
+
+/** Recover pool is gated Seeds minus saved PASS drafts and 3-strike abandoned Seeds. Not a hard-ban of rejected or unwritten Seeds. */
+function recoverSeedPool(st: any): any[] {
+  const saved = savedSeedIds(st);
+  const abandoned = abandonedSeedIds(st);
+  return (st.gated || []).filter((seed: any) => {
+    const id = String(seed.seed_id || "");
+    return id && !saved.has(id) && !abandoned.has(id);
+  });
+}
+
+function enqueueRecovery(st: any, item: Record<string, unknown>) {
+  st.recovery_queue = Array.isArray(st.recovery_queue) ? st.recovery_queue : [];
+  st.recovery_queue.push(item);
+}
+
+function takeQueuedRecovery(st: any): any | null {
+  st.recovery_queue = Array.isArray(st.recovery_queue) ? st.recovery_queue : [];
+  while (st.recovery_queue.length) {
+    const next = st.recovery_queue.shift();
+    const id = seedIdOf(next?.slot || next);
+    if (id && abandonedSeedIds(st).has(id)) continue;
+    return next;
+  }
+  return null;
+}
+
+function beginRecoverIfQueueReady(row: any, required: number): boolean {
+  const st = row.state;
+  if (Number(st.write_index || 0) < (st.write_flat || []).length) return false;
+  const next = takeQueuedRecovery(st);
+  if (!next) return false;
+  st.pending_recovery = next;
+  row.step = "recover";
+  const reason = Array.isArray(next.judge_reasons) && next.judge_reasons[0] ? String(next.judge_reasons[0]) : "REJECT";
+  row.label_ko = `거절 글 재배차 ${row.saved_count}/${required} · ${reason.slice(0, 40)}…`;
+  return true;
+}
+
 function canKeepExpanding(st: any): boolean {
   return Number(st.dim_batch || 0) < Number(st.max_expand || 0);
 }
@@ -331,6 +407,9 @@ export async function startWeeklyJob(args: {
     planner_selection_failures: 0,
     planner_exploration_direction: "",
     pending_recovery: null as any,
+    recovery_queue: [] as any[],
+    seed_reject_counts: {} as Record<string, number>,
+    job_recovery_count: 0,
     recovery_history: [] as any[],
   };
   const { data: running } = await args.supabase
@@ -966,27 +1045,37 @@ async function stepRecover(xaiKey: string, row: any) {
     row.label_ko = "Planner recovery 한도";
     return;
   }
-  const rejectedSeedId = String(pending.slot?.seed_id || "");
-  const reservedSeedIds = new Set(
-    (st.write_flat || [])
-      .slice(Number(st.write_index || 0))
-      .map((slot: any) => String(slot?.seed_id || ""))
-      .filter(Boolean),
-  );
-  if (rejectedSeedId) reservedSeedIds.add(rejectedSeedId);
-  const savedSeedIds = new Set(
-    (st.write_flat || []).filter((slot: any) => slot?._saved).map((slot: any) => String(slot.seed_id || "")),
-  );
-  const pool = (st.gated || []).filter((seed: any) => {
-    const id = String(seed.seed_id || "");
-    return id && !savedSeedIds.has(id) && !reservedSeedIds.has(id);
-  });
+  const rejectedSeedId = seedIdOf(pending.slot || pending);
+  if (rejectedSeedId && abandonedSeedIds(st).has(rejectedSeedId)) {
+    st.pending_recovery = null;
+    if (!beginRecoverIfQueueReady(row, Number(row.required_slots) || 0)) {
+      row.step = "write";
+      row.label_ko = `초안 생성 ${row.saved_count}/${row.required_slots}…`;
+    }
+    return;
+  }
+  st.job_recovery_count = Number(st.job_recovery_count || 0) + 1;
+  const recoveryCap = Math.max(2, (Number(row.required_slots) || 7) * JOB_RECOVERY_CAP_MULT);
+  if (st.job_recovery_count > recoveryCap) {
+    st.pending_recovery = null;
+    st.recovery_queue = [];
+    row.step = "write";
+    row.label_ko = `재배차 한도 · 남은 글 작성 ${row.saved_count}/${row.required_slots}…`;
+    return;
+  }
+  const pool = recoverSeedPool(st);
   const result = await recoverRejectedPlannerSlot({
     xaiKey,
     strategy,
     rejectedSlot: pending.slot || pending,
     judgeReasons: pending.judge_reasons || [],
     availableSeedPool: pool,
+    poolFacts: {
+      rejected_seed_id: rejectedSeedId,
+      already_saved_seed_ids: [...savedSeedIds(st)],
+      remaining_unwritten_seed_ids: remainingUnwrittenSeedIds(st),
+      abandoned_seed_ids: [...abandonedSeedIds(st)],
+    },
     timeoutMs: 32000,
   });
   if (!result.ok || !result.value) {
@@ -1478,9 +1567,13 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     return;
   }
   if (i >= flat.length) {
-    if (st.pending_recovery) {
-      row.step = "recover";
-      row.label_ko = `Semantic Judge → Planner 재판단 ${row.saved_count}/${required}…`;
+    if (st.pending_recovery || (Array.isArray(st.recovery_queue) && st.recovery_queue.length)) {
+      if (st.pending_recovery) {
+        row.step = "recover";
+        row.label_ko = `거절 글 재배차 ${row.saved_count}/${required}…`;
+      } else {
+        beginRecoverIfQueueReady(row, required);
+      }
     } else {
       row.status = "error";
       row.error = `7일 Count Integrity 실패: PASS 저장 ${row.saved_count}/${required}`;
@@ -1535,13 +1628,21 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       const strategySlotId = String(chunk[k]?.strategy_slot_id || chunk[k]?.slotId || p.slotId || "slot");
       st.writer_retry_counts = st.writer_retry_counts || {};
       const retries = Number(st.writer_retry_counts[strategySlotId] || 0);
-      if (String(p.judge_status || "") === "REJECT" || retries >= 1) {
-        st.pending_recovery = {
-          slot: chunk[k],
-          strategy_slot_id: strategySlotId,
-          judge_reasons: p.block_reasons || [String(p.judge_status || "WRITER_FAILURE")],
-          attempts: 0,
-        };
+      const rejected = String(p.judge_status || "") === "REJECT";
+      const seedId = seedIdOf(chunk[k]);
+      if (rejected || retries >= 1) {
+        const rejects = rejected ? bumpSeedReject(st, seedId) : Number(st.seed_reject_counts?.[seedId] || 0);
+        if (rejects < SEED_REJECT_ABANDON) {
+          enqueueRecovery(st, {
+            slot: chunk[k],
+            strategy_slot_id: strategySlotId,
+            seed_id: seedId,
+            judge_reasons: p.block_reasons || [String(p.judge_status || "WRITER_FAILURE")],
+            attempts: 0,
+          });
+        } else {
+          row.summary = [row.summary, `Seed 3회 거절 후 포기 ${seedId || strategySlotId}`].filter(Boolean).join("\n");
+        }
       } else {
         st.writer_retry_counts[strategySlotId] = retries + 1;
         st.write_flat.push({ ...chunk[k], _saved: false });
@@ -1590,11 +1691,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
     return;
   }
-  if (st.pending_recovery) {
-    row.step = "recover";
-    row.label_ko = `Semantic Judge → Planner 재판단 ${row.saved_count}/${required}…`;
-    return;
-  }
+  if (beginRecoverIfQueueReady(row, required)) return;
   if (st.write_index >= (st.write_flat || []).length) {
     row.status = "error";
     row.error = `7일 Count Integrity 실패: PASS 저장 ${row.saved_count}/${required}`;

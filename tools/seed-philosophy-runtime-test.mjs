@@ -29,7 +29,7 @@ function ok(name, condition) {
   }
 }
 
-console.log("Seed philosophy runtime (v11.12.0)");
+console.log("Seed philosophy runtime (v11.12.1)");
 ok("P1. candidate reserve is operational, not a domain ratio", /candidatePoolTarget/.test(job) && /Math\.sqrt\(required\)/.test(job) && !/CANDIDATE_POOL_MULTIPLIER/.test(job));
 ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));

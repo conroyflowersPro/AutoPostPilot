@@ -46,7 +46,7 @@ const contentHead = `Post id,Date,Post text,Post Link,Impressions,Likes,Engageme
 const overviewHead = `Date,Impressions,Likes,Engagements,Bookmarks,Shares,New follows,Unfollows,Replies,Reposts,Profile visits,Create Post,Video views,Media views`;
 const videoHead = `Video overview,,,,,\nDate,Views,Watch Time (ms),Completion Rate,Average Watch Time (ms),Estimated Revenue`;
 
-console.log("X Analytics + revenue start (v11.12.0)");
+console.log("X Analytics + revenue start (v11.12.1)");
 
 ok("R1. content kind", detectAnalyticsKind(contentHead) === "content");
 ok("R2. overview is not posts", detectAnalyticsKind(overviewHead) === "account_overview");
@@ -73,8 +73,8 @@ ok("R11. learning page takes multiple CSVs + payout",
   /multiple/.test(page) && /payoutUsd/.test(page) && /csvTexts/.test(page));
 ok("R12. import stores payout in raw_meta, does not split dollars onto posts",
   /account_payout_not_per_post/.test(imp) && !/42\.29 \/ rows/.test(imp));
-ok("R13. shipping 11.12.0",
-  /APP_VERSION = "11.12.0"/.test(ver) && /APP_VERSION = "11.12.0"/.test(ix));
+ok("R13. shipping 11.12.1",
+  /APP_VERSION = "11.12.1"/.test(ver) && /APP_VERSION = "11.12.1"/.test(ix));
 ok("R17. analysis is CANDIDATE not validated",
   /"validated_patterns": 0/.test(json) && /"analyzed_at": "2026-08-15"/.test(json));
 ok("R18. no winning post body in window json",
