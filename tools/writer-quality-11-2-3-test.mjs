@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.12.6)");
+console.log("Writer quality + leftover seeds (v11.12.7)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.12.6", /APP_VERSION = "11.12.6"/.test(ver) && /APP_VERSION = "11.12.6"/.test(ix));
+ok("W17. version lockstep 11.12.7", /APP_VERSION = "11.12.7"/.test(ver) && /APP_VERSION = "11.12.7"/.test(ix));
 ok("W18. Korean summary names seven-day role order", /7일 생성/.test(ver) && /Planner/.test(ver) && /Semantic Judge/.test(ver));
 ok("W19. retry is minimum-boundary retry, not creative rewrite direction", /BOUNDARY RETRY/.test(wr) && /retry_hint/.test(gi));
 ok("W20. Writer prompt does not prescribe a snag", !/A snag is optional/.test(wr) && /point_or_tension is an optional angle/.test(cr));
@@ -118,7 +118,7 @@ ok("W46. DNA new-reader signal is not a fixed topic quota", /NEW READERS/.test(d
 ok("W47. DNA has no fixed personal-public mix", /NO FIXED MIX/.test(dna) && !/at most one mass-public daily-life original per day/.test(dna));
 ok("W48. DNA does not prescribe Writer length", /Writer decides from the assigned thought/.test(dna) && !/informative ~50-110/.test(dna));
 ok("W49. Writer completes thought without a mode band", /stop when the thought is complete/i.test(wr) && !/lengthBandForMode/.test(wr));
-ok("W50. capacity recommendation is not final Planner count", /capacity recommendation/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")) && /POSTS_TARGET = 4/.test(ix));
+ok("W50. Planner locks count; quota file has no xAI", /SEED_POOL_BUFFER = 10/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")) && /POSTS_TARGET = 4/.test(ix));
 ok("W51. DNA PLACE is California Korean, Korea-only gated in code", /Creator lives in California/.test(dna) && /Language is Korean/.test(dna) && /Do not invent Korea-only/.test(dna) && /isKoreaOnlySituation/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seed-scope.ts"), "utf8")));
 ok("W52. Writer receives factual boundaries without situation examples", /writerBoundaryConstraintLines/.test(wr) && !/이중주차, 관리사무소/.test(wr));
 ok("W53. Judge reject returns to Planner; no fake padding", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job) && !/localHumorKeywordSeeds/.test(job));

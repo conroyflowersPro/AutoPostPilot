@@ -11,7 +11,7 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → 4 DNA → Seed Pool(explore) → Planner seven-day strategy → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → 4 DNA → Planner seven-day strategy (locks volume) → Seed Pool(explore to Planner count + buffer) → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory";
 
 export function architecturePrincipleBlock(): string {
   return [
@@ -36,7 +36,7 @@ export function dnaLayerBlock(): string {
 
 export function engineCatalogBlock(): string {
   return [
-    "SEED: Seed Generator explores a broad candidate pool. It does not strategize, rank, select, allocate, or judge final quality. PLANNING: after the pool exists, Planner reads intelligence, forms the seven-day strategy, then selects and allocates Seeds. Recent-flow context comes only from up to 30 days of actual X Analytics and never hard-bans a mode. Writer receives the assigned Seed + Planner Intent.",
+    "SEED: Seed Generator explores a candidate pool sized by Planner (locked slots + week buffer). It does not strategize, rank, select, allocate, or judge final quality. PLANNING: Planner locks seven-day volume and placement first, then Seed explores, then Planner selects and allocates. Recent-flow context comes only from up to 30 days of actual X Analytics and never hard-bans a mode. Writer receives the assigned Seed + Planner Intent.",
     "WRITING: Thought first, style follows. Grok 4.6 Writer closes ONE central judgment on this Seed (would this creator hold it? is it grounded?) then writes it in his language. Everyday language, 말투, humor, Mechanism, and Rail follow only to deliver that thought. They must not choose it. Do not invent identity. Do not invent lived experience.",
     "QUALITY: Semantic Judge sees only the completed post and decides final publishability. Creator-related judgment is a Contradiction Check, not a Creator Fit / topic-similarity score. It does not select Seeds, redesign strategy, undo Planner expansion, or rewrite. Reject returns the slot to Planner; Planner reselects from the existing pool first and requests targeted Seed exploration only when needed. Count Gate requires N Judge-PASS posts for N Planner slots.",
     "LEARNING: Closed loop — Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next seven-day Planner reads → new Planning. Analytics Import takes X Analytics first into a canonical model (Fedica is an adapter). Features are learned, not sentences. Manual published success is a stronger Creator Signal than an AI draft. One-off success stays hypothesis. Learning that the Planner does not read is not a closed loop.",

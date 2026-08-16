@@ -103,7 +103,7 @@ personalDays[0].posts = [
 personalDays[1].posts = [{ concrete_subject: "구독 수수료", cluster: "LIVING_COST" }];
 ok("A21. day 0 has two personal before cap", countPersonal(personalDays[0].posts) === 2);
 ok("A22. expand tracks broad candidate count, not personal-mass placeability", /candidateCount/.test(job) && /candidatePoolTarget/.test(job));
-ok("A23. quota example is 4 not 6", /posts_per_day":4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
+ok("A23. daily floor is 4 not 6", /QUOTA_PER_DAY_MIN = 4/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8")));
 ok("A25. Korea-only civic is forbidden default", /isKoreaOnlySituation/.test(scopeSrc) && /이중\\s\*주차/.test(scopeSrc));
 ok("A26. 이중주차 is Korea-only", /이중\\s\*주차/.test(scopeSrc) && /관리사무소/.test(scopeSrc) && /배민/.test(scopeSrc));
 ok("A27. adjacent infers mass situation, no street-parking menu", /Infer a NEW mass-public situation/.test(adjSrc) && !/street \/ structure \/ red curb/.test(adjSrc) && /이중\\s\*주차/.test(scopeSrc));

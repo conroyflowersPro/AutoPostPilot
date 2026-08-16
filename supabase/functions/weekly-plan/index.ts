@@ -1,8 +1,8 @@
 /**
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
- * Seed supply: Creator DNA + engine rules + learned USER_DIRECT/performance → Grok infers quota AND fills it.
+ * Seed supply: Planner locks seven-day slots, then Seed Generator fills requested_seed_count (slots + 10).
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
- * Target volume: prefer 4/day × 3 days; 5 fills 14:00–22:00 PT; bounds 3–8.
+ * Target volume: Planner owns count. Floor 4/day × 7 = 28; 5 fills 14:00–22:00 PT; bounds 4–8.
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
  */
@@ -47,13 +47,10 @@ import { enforceMassPerDay, demoteExperienceOnMassSlots, MASS_PER_DAY_MAX } from
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
-  inferWeeklyQuota,
-  quotaFromCadence,
   QUOTA_DAYS,
   QUOTA_PER_DAY_MIN,
   QUOTA_PER_DAY_MAX,
 } from "./quota-inference.ts";
-import { loadPlannerIntelligence } from "./planner-intelligence.ts";
 import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job.ts";
 import { overlayClusterWeightsWithIntent14d } from "./creator-intent-14d.ts";
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
@@ -61,8 +58,8 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "11.12.6";
-const WEEKLY_ENGINE_VERSION = "v11_inferred_quota_fill";
+const APP_VERSION = "11.12.7";
+const WEEKLY_ENGINE_VERSION = "v11_planner_owns_count";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
 const EXPAND_BATCH = 10;
@@ -177,81 +174,12 @@ Deno.serve(async (req) => {
     }
 
     if (phase === "quota") {
-      const intentText = String(body.creatorIntent || body.topic || "").trim();
-      const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
-      const { data: actRows } = await supabase
-        .from("account_activities")
-        .select("text_body, post_type, action_type, published_at, system_origin_class, x_post_id, meta")
-        .gte("published_at", since)
-        .limit(400);
-      const publishedEvidence: Array<{
-        text: string;
-        source_id?: string;
-        published_at?: string;
-        post_type?: string;
-        meta?: unknown;
-        system_origin_class?: string;
-      }> = [];
-      for (const row of actRows || []) {
-        const t = String((row as any).text_body || "").trim();
-        if (t.length < 12) continue;
-        const pt = String((row as any).post_type || (row as any).action_type || "").toUpperCase();
-        if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) continue;
-        const soc = String((row as any).system_origin_class || "").toUpperCase();
-        if (soc && /AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED/.test(soc)) continue;
-        publishedEvidence.push({
-          text: t,
-          source_id: (row as any).x_post_id || undefined,
-          published_at: (row as any).published_at || undefined,
-          post_type: pt,
-          meta: (row as any).meta,
-          system_origin_class: soc,
-        });
-      }
-      const learned = collectLearnedSeedSignals({
-        publishedEvidence,
-        intentText,
-      });
-      const { cluster_weights } = overlayClusterWeightsWithIntent14d(
-        learned.cluster_weights,
-        (actRows || []) as any[],
-      );
-      learned.cluster_weights = cluster_weights;
-      const intelligence = await loadPlannerIntelligence(supabase, learned.recent_angle_labels);
-      const quota = xaiKey
-        ? await inferWeeklyQuota({
-          xaiKey,
-          cadence: learned.cadence,
-          clusterWeights: learned.cluster_weights,
-          userDirectN: learned.user_direct_n,
-          performanceHints: learned.performance_pattern_hints,
-          learning: learned.learning,
-          intelligence,
-          explicitCreatorIntent: intentText || undefined,
-          model: V11_SEED_MODEL,
-          timeoutMs: 18000,
-        })
-        : quotaFromCadence(learned.cadence, intentText);
       return json({
-        success: true,
+        success: false,
+        error: "Quota 단계는 없습니다. 칸 수는 Planner가 잠그고 Seed Generator에 개수를 넘깁니다. job_start를 사용하세요.",
         phase: "quota",
-        quota,
-        postsPerDay: quota.posts_per_day,
-        generationDays: quota.days,
-        required_slots: quota.required_slots,
-        learning: learned.learning,
-        diagnostics: {
-          app_version: APP_VERSION,
-          weekly_engine_version: WEEKLY_ENGINE_VERSION,
-          learned_user_direct_n: learned.user_direct_n,
-          cadence: learned.cadence,
-          cluster_weights: learned.cluster_weights,
-          quota_source: quota.source,
-          quota_grok_error: quota.grok_error || null,
-          learning: learned.learning,
-        },
-        timing: { total_ms: Date.now() - t0 },
-      });
+        app_version: APP_VERSION,
+      }, 410);
     }
 
     if (phase === "expand") {
@@ -305,7 +233,7 @@ Deno.serve(async (req) => {
       learned.cluster_weights = cluster_weights;
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
-      const targetSupply = required_slots + 6 + Math.ceil(Math.sqrt(Math.max(1, required_slots)));
+      const targetSupply = required_slots + 10;
       const totalBatches = Math.max(1, Math.ceil(targetSupply / EXPAND_BATCH));
       const remaining = Math.max(0, targetSupply - priorSubjects.length);
 

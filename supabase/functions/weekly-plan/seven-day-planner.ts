@@ -7,13 +7,24 @@
  * Every exported call is one xAI request so generation-job can persist between
  * ticks and stay resumable on mobile.
  */
-import type { ConcreteSeed, EditorialMode } from "./seed-engine.ts";
+import type { CadenceSignal, ConcreteSeed, EditorialMode } from "./seed-engine.ts";
 import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
 import { plannerArchitectureLock } from "./engine-architecture.ts";
 import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
+import { MAX_WEEKLY_SLOTS, MIN_WEEKLY_SLOTS, QUOTA_PER_DAY_MAX, QUOTA_PER_DAY_MIN } from "./quota-inference.ts";
 
 export const SEVEN_DAY_PLANNER_VERSION = "seven_day_planner_v1";
 export const PLANNING_HORIZON_DAYS = 7;
+
+export function strategyCoversSevenDays(slots: Array<{ day_offset: number }>): boolean {
+  if (slots.length < MIN_WEEKLY_SLOTS || slots.length > MAX_WEEKLY_SLOTS) return false;
+  const byDay = Array.from({ length: PLANNING_HORIZON_DAYS }, () => 0);
+  for (const slot of slots) {
+    const day = Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(slot.day_offset) || 0)));
+    byDay[day] += 1;
+  }
+  return byDay.every((n) => n >= QUOTA_PER_DAY_MIN && n <= QUOTA_PER_DAY_MAX);
+}
 
 export type XAnalyticsPublishedPost = {
   post_id: string | null;
@@ -392,10 +403,13 @@ function strategySystem(): string {
     "Planning Horizon is seven days. Intelligence horizons remain whatever their evidence supports.",
     "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days, compacted to date, short text, and outcome metrics. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
     "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
+    "handmade_cadence is real published-account rhythm from USER_DIRECT originals. Empty recent_x_analytics does NOT mean the account posts once a day. Do not collapse the week to 7 slots because analytics rows are missing.",
+    "You own weekly volume and placement. There is no separate Quota call. Lock seven calendar days with no empty day. At least 4 originals per day, at most 8. Week floor 28, week ceiling 56. Mode overlap is allowed. 30-day posts inform placement, not a uniqueness ban.",
+    "Start the first original at 14:00 America/Los_Angeles and even-spread inside 14:00–22:00 PT. Anti-dump: stacked originals in one refresh become noise.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
-    "capacity_recommendation is operational context, not a command. Choose a final slot count that is credible for seven days and return exactly that many slot intents.",
-    "If available analytics are thin, use only what exists. Do not estimate missing dates. Set analytics_request_needed only when additional real X Analytics is materially needed.",
+    "volume_gates are hard. Return exactly final_slot_count slot intents, one per locked cell, covering all seven days.",
+    "If available analytics are thin, still lock a full seven-day volume from handmade_cadence and DNA. Do not estimate missing analytics dates. Set analytics_request_needed when additional real X Analytics would improve placement, not as an excuse to plan 1/day.",
     "Each slot contains strategic_role, editorial_mode, and planner_intent only. planner_intent says why this slot exists and what it should accomplish—not how to write it.",
     "Return strict JSON with top-level keys strategy_summary, profile_diversity_intent, final_slot_count, slots, analytics_request_needed, analytics_request_reason. Each slot has slot_id, day_offset, strategic_role, editorial_mode, planner_intent. No prose outside JSON.",
   ].join("\n");
@@ -403,19 +417,19 @@ function strategySystem(): string {
 
 export async function inferSevenDayStrategy(args: {
   xaiKey: string;
-  capacityRecommendation: number;
   analytics: XAnalyticsPublishedPost[];
   analyticsCoverageDays: number;
   accountDaily?: XAnalyticsDailyAccountPulse[];
   intelligence: PlannerIntelligenceBlocks;
+  cadence?: CadenceSignal | null;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<SevenDayStrategy>> {
   const analytics = compactPublishedFlow(args.analytics || []);
   return callPlanner({
     xaiKey: args.xaiKey,
-    maxTokens: 2800,
-    timeoutMs: args.timeoutMs ?? 22000,
+    maxTokens: 7000,
+    timeoutMs: args.timeoutMs ?? 28000,
     system: strategySystem(),
     user: {
       creator_dna: creatorDnaBlock(),
@@ -423,7 +437,15 @@ export async function inferSevenDayStrategy(args: {
       intelligence: args.intelligence,
       planning_horizon_days: PLANNING_HORIZON_DAYS,
       editorial_mode_labels: [...VALID_MODES],
-      capacity_recommendation: args.capacityRecommendation,
+      handmade_cadence: args.cadence || null,
+      volume_gates: {
+        min_originals_per_day: QUOTA_PER_DAY_MIN,
+        max_originals_per_day: QUOTA_PER_DAY_MAX,
+        min_week_slots: MIN_WEEKLY_SLOTS,
+        max_week_slots: MAX_WEEKLY_SLOTS,
+        empty_days_forbidden: true,
+        mode_overlap_allowed: true,
+      },
       recent_x_analytics: analytics,
       account_overview_daily: compactAccountDaily(args.accountDaily),
       analytics_rows_available: analytics.length,
@@ -432,7 +454,8 @@ export async function inferSevenDayStrategy(args: {
     },
     parse: (raw): SevenDayStrategy | null => {
       if (!raw || !Array.isArray(raw.slots)) return null;
-      const requested = Math.max(1, Math.min(56, Math.round(Number(raw.final_slot_count) || raw.slots.length)));
+      const requested = Math.round(Number(raw.final_slot_count) || raw.slots.length);
+      if (requested < MIN_WEEKLY_SLOTS || requested > MAX_WEEKLY_SLOTS) return null;
       const slots: PlannerSlotIntent[] = [];
       const seen = new Set<string>();
       for (let i = 0; i < raw.slots.length && slots.length < requested; i++) {
@@ -449,6 +472,7 @@ export async function inferSevenDayStrategy(args: {
         });
       }
       if (slots.length !== requested || slots.some((slot) => !slot.strategic_role || !slot.planner_intent)) return null;
+      if (!strategyCoversSevenDays(slots)) return null;
       return {
         strategy_summary: s(raw.strategy_summary, 600),
         profile_diversity_intent: s(raw.profile_diversity_intent, 400),

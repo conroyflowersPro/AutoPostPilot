@@ -40,13 +40,13 @@ ok("L2. collectLearnedSeedSignals includes learning", /learning: inferLearningSt
 ok("L3. COLD when almost no originals", inferLearningState({ user_direct_n: 2, cadence: { originals_last_14d: 1 } }) === "COLD");
 ok("L4. operator 40/14d is ACCUMULATING not empty", inferLearningState({ user_direct_n: 40, cadence: { originals_last_14d: 40 } }) === "ACCUMULATING");
 ok("L5. seed prompt forbids empty list on thin data", /Do not return an empty seeds array because evidence is incomplete/.test(cr));
-ok("L6. quota prompt allows cold start", /Thin or missing learned evidence is expected/.test(qu));
+ok("L6. planner prompt allows thin analytics without collapsing volume", /handmade_cadence/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")) && /Thin or missing learned evidence is expected/.test(cr));
 ok("L7. performance DNA names cold start", /COLD START/.test(dna));
-ok("L8. quota phase returns learning", /learning: learned\.learning/.test(ix));
+ok("L8. job stores learning on Planner strategy", /st\.learning = learned\.learning/.test(job));
 ok("L9. generate job shows 학습 line", /학습:/.test(job));
 ok("L10. direction: cold start + job runtime", /Cold start \(learning maturity\)/.test(dir) && /Generation runtime/.test(dir));
 ok("L11. video must not keep Edge loop", /Do not keep the current browser-orchestrated Edge loop for video/.test(dir));
-ok("L12. shipping 11.12.6", /const APP_VERSION = "11.12.6"/.test(ix));
+ok("L12. shipping 11.12.7", /const APP_VERSION = "11.12.7"/.test(ix));
 ok("L13. DNA success is participation not followers-first", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
 
 console.log("========================================");

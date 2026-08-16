@@ -42,7 +42,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v11.12.6)");
+console.log("DNA + engine live-path wiring (v11.12.7)");
 
 ok("D1. Grok Writer gets Creator Intelligence", /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
 ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
@@ -50,7 +50,7 @@ ok("D3. Writer does not use Performance DNA as writing input",
   /writerArchitectureLock/.test(wr) &&
   /Performance DNA is Planner-only/.test(arch) &&
   !/performanceDnaBlock\(\)/.test(wr));
-ok("D4. capacity recommendation is not Planner strategy", /operational seven-day candidate-capacity/.test(quota) && !/plannerArchitectureLock/.test(quota));
+ok("D4. horizon bounds are not a Quota xAI call", /SEED_POOL_BUFFER = 10/.test(quota) && !/inferWeeklyQuota/.test(quota) && !/plannerArchitectureLock/.test(quota));
 ok("D5. Grok Seed gets Creator bounds without strategic intelligence", /creatorDnaBlock\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason));
 
 ok("D6. interpretSeed emits why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(interp));
@@ -92,7 +92,7 @@ ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 11.12.6", /APP_VERSION = "11.12.6"/.test(ver) && /APP_VERSION = "11.12.6"/.test(ix));
+ok("D28. version 11.12.7", /APP_VERSION = "11.12.7"/.test(ver) && /APP_VERSION = "11.12.7"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
@@ -121,8 +121,8 @@ ok("D33. Architecture lock: no engine replaces the Creator",
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
 ok("D34. Seven-day role pipeline is locked in docs and runtime",
-  /Seed Pool\(explore\) → Planner seven-day strategy → Planner select\/allocate/.test(arch) &&
-  /Seed Pool\(explore\) → Planner seven-day strategy → Planner select\/allocate/.test(libArch) &&
+  /Planner seven-day strategy \(locks volume\) → Seed Pool\(explore to Planner count \+ buffer\)/.test(arch) &&
+  /Planner seven-day strategy \(locks volume\) → Seed Pool\(explore to Planner count \+ buffer\)/.test(libArch) &&
   /stepStrategy/.test(job) && /stepPlannerSelect/.test(job) && /stepRecover/.test(job) &&
   /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
   /selectDeliveryAfterThought/.test(pipe) &&

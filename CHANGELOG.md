@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.7 — 2026-08-16
+
+- 별도 Quota xAI 호출을 없앴습니다. 7일 칸 수는 Planner가 잠급니다
+- Planner가 잠근 칸 수 + 10을 Seed Generator에 넘깁니다. Seed는 개수를 스스로 추론하지 않습니다
+- 하루 1칸·7칸 달력 전략은 파서가 받지 않습니다. 하루 최소 4원본, 주 하한 28, 빈 날 없음
+- 오래된 `quota` job 스텝은 전략 스텝으로 이어집니다
+
 ## 11.12.6 — 2026-08-16
 
 - Writer는 폐기된 Live Search(`search_parameters`) 대신 xAI Agent Tools를 씁니다. `/v1/responses`에 `x_search`와 `web_search`만 켭니다

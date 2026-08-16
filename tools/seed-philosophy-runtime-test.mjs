@@ -29,8 +29,8 @@ function ok(name, condition) {
   }
 }
 
-console.log("Seed philosophy runtime (v11.12.6)");
-ok("P1. candidate reserve is operational, not a domain ratio", /candidatePoolTarget/.test(job) && /Math\.sqrt\(required\)/.test(job) && !/CANDIDATE_POOL_MULTIPLIER/.test(job));
+console.log("Seed philosophy runtime (v11.12.7)");
+ok("P1. candidate reserve is Planner slots plus week buffer", /candidatePoolTarget/.test(job) && /SEED_POOL_BUFFER/.test(job) && !/CANDIDATE_POOL_MULTIPLIER/.test(job));
 ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));
 ok("P4. short usable keywords survive normalize", /isUsableKeywordSubject\(subject\)/.test(seed) && !/subject\.length < 8/.test(seed));
@@ -45,9 +45,9 @@ ok("P12. Seed Grok receives candidate-only philosophy", /seedCandidatePhilosophy
 ok("P13. Planner recovery uses existing Pool before targeted exploration", /recoverRejectedPlannerSlot/.test(job) && /availableSeedPool/.test(job));
 ok("P14. seed rejection telemetry persists by reason", /seed_metrics/.test(job) && /rejected_by_reason/.test(job) && /raw_returned/.test(seed));
 ok("P15. expansion and Planner recovery are bounded", /return Number\(st\.dim_batch/.test(job) && /pending\.attempts > 4/.test(job));
-ok("P16. live quota, seed, and writer external endpoints are xAI only",
-  /api\.x\.ai/.test(quota) && /api\.x\.ai/.test(seed) && /api\.x\.ai/.test(writer) &&
-  !/api\.openai\.com/.test(quota + seed + writer));
+ok("P16. live seed, planner, and writer external endpoints are xAI only",
+  /api\.x\.ai/.test(read("supabase/functions/weekly-plan/seven-day-planner.ts")) && /api\.x\.ai/.test(seed) && /api\.x\.ai/.test(writer) &&
+  !/api\.openai\.com/.test(read("supabase/functions/weekly-plan/seven-day-planner.ts") + seed + writer));
 ok("P17. current facts and locations survive as verify boundaries",
   /CURRENT_FACT_VERIFY_REQUIRED/.test(grounding) && /LOCATION_VERIFY_REQUIRED/.test(grounding) &&
   !/UNSUPPORTED_CURRENT_FACT/.test(grounding) && /verification_requirements/.test(writePipe) &&

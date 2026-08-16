@@ -4,7 +4,7 @@
  * the client only increases how many rounds it runs.
  */
 export const QUOTA_DAYS = 7;
-export const QUOTA_PER_DAY_MIN = 3;
+export const QUOTA_PER_DAY_MIN = 4;
 export const QUOTA_PER_DAY_MAX = 8;
 export const MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX * QUOTA_DAYS;
 

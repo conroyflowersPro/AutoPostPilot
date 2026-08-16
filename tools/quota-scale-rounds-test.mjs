@@ -43,7 +43,7 @@ ok("Q4. 28-slot budget exceeds frozen 12", expandRoundBudget(28) > 12);
 ok("Q5. 56-slot fill at ~3 seeds/round", expandRoundBudget(56) >= Math.ceil((56 * 1.2) / 3));
 ok("Q6. Planner-targeted expansion is a 10-seed field batch", /TARGETED_EXPLORE_SEED_COUNT = 10/.test(job) && /const EXPAND_BATCH = 10/.test(job));
 ok("Q7. 56-slot prior subjects > 80", priorSubjectCap(56) > 80);
-ok("Q8. job uses expandRoundBudget(requiredSlots)", /expandRoundBudget\(quota\.required_slots\)/.test(job) || /expandRoundBudget\(required/.test(job));
+ok("Q8. job uses expandRoundBudget(requiredSlots)", /expandRoundBudget\(row\.required_slots\)/.test(job) || /expandRoundBudget\(required/.test(job));
 ok("Q9. Planner recovery is bounded", /pending\.attempts > 4/.test(job));
 ok("Q10. job uses priorSubjectCap", /priorSubjectCap\(required\)/.test(job) && !/slice\(-80\)/.test(job));
 ok("Q11. no frozen MAX_EXPAND_ROUNDS = 12", !/MAX_EXPAND_ROUNDS = 12/.test(job) && !/MAX_EXPAND_ROUNDS = 12/.test(gen));

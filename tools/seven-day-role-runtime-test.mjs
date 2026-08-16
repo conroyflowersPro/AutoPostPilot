@@ -51,7 +51,7 @@ ok("R9. Planner uses up to 30 days actual X Analytics",
   /from\("post_metrics"\)/.test(planner) && /Math\.min\(30, days\)/.test(planner) &&
   /limit\(1000\)/.test(planner) && /recent_x_analytics/.test(planner) &&
   /x-analytics-30d-window\.json/.test(planner) && /loadBundledXAnalyticsWindow/.test(planner));
-ok("R10. Planner does not replace missing analytics", /Do not estimate missing dates/.test(planner));
+ok("R10. Planner does not replace missing analytics", /Do not estimate missing analytics dates/.test(planner));
 ok("R11. Planner selects and allocates only after strategy",
   /selectSeedsForSevenDayPlan/.test(planner) && /seven_day_strategy/.test(planner) && /seed_pool/.test(planner));
 ok("R12. Writer receives Planner Intent", /planner_intent/.test(deep) && /planner_intent: \{/.test(pipe) && /ASSIGNED PLANNER INTENT/.test(writer));
@@ -126,8 +126,14 @@ ok("R23. account overview remains a separate daily Planner signal",
   /dailyAccountPulse/.test(analyticsImport) && /engagements: number/.test(analyticsParser) &&
   /account_overview_daily/.test(planner) && /never to attribute an account total to an individual post/.test(planner));
 ok("R24. Planner strategy sends compacted 30-day outcomes, not full post bodies",
-  /compactPublishedFlow/.test(planner) && /maxTokens: 2800/.test(planner) &&
+  /compactPublishedFlow/.test(planner) && /maxTokens: 7000/.test(planner) &&
   /compacted to date, short text, and outcome metrics/.test(planner));
+ok("R25. Planner owns weekly volume; 7-slot days are rejected",
+  /strategyCoversSevenDays/.test(planner) && /empty_days_forbidden/.test(planner) &&
+  /handmade_cadence/.test(planner) && /MIN_WEEKLY_SLOTS/.test(planner));
+ok("R26. job starts at Planner strategy, not Quota",
+  /step: "strategy"/.test(job) && /7일 Planner 전략/.test(job) &&
+  !/inferWeeklyQuota/.test(job) && /SEED_POOL_BUFFER/.test(job));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

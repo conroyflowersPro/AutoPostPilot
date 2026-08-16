@@ -9,6 +9,7 @@ const ROOT = process.cwd();
 const sch = readFileSync(path.join(ROOT, "lib/schedule.ts"), "utf8");
 const ui = readFileSync(path.join(ROOT, "app/components/BatchScheduleButton.tsx"), "utf8");
 const quota = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/quota-inference.ts"), "utf8");
+const planner = readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -50,7 +51,7 @@ ok("S7. 4 posts land on the window ends", four[0] === 0 && four[3] === windowMs)
 ok("S8. 8 posts still not a burst", eight.every((t, i) => i === 0 || t - eight[i - 1] >= HARD));
 ok("S9. UI starts 2pm Pacific", /태평양시 오후 2시/.test(ui));
 ok("S10. UI does not keep 17:00 / 3h", !/17:00 LA/.test(ui) && !/최소 3시간/.test(ui));
-ok("S11. quota strategy uses 14:00-22:00 PT", /14:00 America\/Los_Angeles/.test(quota) && /14:00–22:00 PT/.test(quota));
+ok("S11. planner volume uses 14:00-22:00 PT", /14:00 America\/Los_Angeles/.test(planner) && /14:00–22:00 PT/.test(planner));
 ok("S12. Grok refine is For You window constrained", /day window 14:00–22:00 Pacific/.test(sch) && /timesRespectForYou/.test(sch));
 
 console.log("========================================");

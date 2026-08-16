@@ -40,6 +40,14 @@ export async function expandSeedSupplyWithXai(args: {
   viralCandidates?: ViralCandidate[];
   compactRetry?: boolean;
   explorationDirection?: string;
+  plannerSlotIntents?: Array<{
+    slot_id?: string;
+    day_offset?: number;
+    editorial_mode?: string;
+    planner_intent?: string;
+    strategic_role?: string;
+  }>;
+  plannerRequestedCount?: number;
   model?: string;
   timeoutMs?: number;
 }): Promise<XaiSeedExpansionResult> {
@@ -52,6 +60,8 @@ export async function expandSeedSupplyWithXai(args: {
     viralCandidates: args.viralCandidates,
     compactRetry: args.compactRetry,
     explorationDirection: args.explorationDirection,
+    plannerSlotIntents: args.plannerSlotIntents,
+    plannerRequestedCount: args.plannerRequestedCount,
     model: args.model,
     timeoutMs: args.timeoutMs,
   });

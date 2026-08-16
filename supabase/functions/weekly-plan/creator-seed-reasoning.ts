@@ -39,6 +39,15 @@ export type CreatorSeedReasoningInput = {
   compactRetry?: boolean;
   /** Planner-requested field for a recovery expansion. Direction only; not selection. */
   explorationDirection?: string;
+  /** Locked week cells from Planner. Count + intents; Seed still explores, does not select. */
+  plannerSlotIntents?: Array<{
+    slot_id?: string;
+    day_offset?: number;
+    editorial_mode?: string;
+    planner_intent?: string;
+    strategic_role?: string;
+  }>;
+  plannerRequestedCount?: number;
   /** Typed empty cells. If omitted, built from needed + existing. */
   openSlots?: OpenSeedSlot[];
 };
@@ -245,15 +254,25 @@ export async function reasonCreatorSeeds(
     "Do not copy already_held_seeds or recent_published_angles. Do not rotate last week's subjects. Infer a NEW situation each seed.",
     "Do not score Creator fit, Audience fit, performance potential, strategic relevance, or selection priority. Do not rank candidates.",
     "this_run_note and planner_exploration_direction are exploration bounds only. They do not authorize selection or allocation.",
+    "When Planner has locked the week, requested_seed_count is the Planner count plus a small week buffer. Return that many candidates. planner_slot_intents describe locked cells so exploration can cover them. They are not a per-mode production quota.",
     "When planner_exploration_direction is set, explore THAT field only. Return requested_seed_count distinct candidates in that field (a batch, never a single seed). Do not refill unrelated types or restart the whole week pool.",
     "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
     "Lived evidence seeds may be CITE+RELATED follow-ups from held episodes. Never clone the same content. Do not copy a prompt example as the new subject.",
     'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',
   ].join("\n");
 
+  const plannerSlots = (args.plannerSlotIntents || []).slice(0, 56).map((slot) => ({
+    slot_id: clean(slot.slot_id, 40),
+    day_offset: Number(slot.day_offset) || 0,
+    editorial_mode: clean(slot.editorial_mode, 40),
+    planner_intent: clean(slot.planner_intent, 180),
+    strategic_role: clean(slot.strategic_role, 80),
+  }));
   const user = compact
     ? JSON.stringify({
       requested_seed_count: requested,
+      planner_requested_count: args.plannerRequestedCount || requested,
+      planner_slot_intents: plannerSlots.length ? plannerSlots : null,
       open_slots: openSlots,
       creator_dna: creatorDnaBlock(),
       already_held_seeds: existingAbstract,
@@ -264,6 +283,8 @@ export async function reasonCreatorSeeds(
     })
     : JSON.stringify({
     requested_seed_count: requested,
+    planner_requested_count: args.plannerRequestedCount || requested,
+    planner_slot_intents: plannerSlots.length ? plannerSlots : null,
     open_slots: openSlots,
     creator_dna: creatorDnaBlock(),
     this_run_note_overlay_only: intent || null,
@@ -272,7 +293,7 @@ export async function reasonCreatorSeeds(
     already_held_seeds: existingAbstract,
     interest_filtered_viral_sparks: viral.length ? viral : null,
     weekly_goal_note:
-      "Return requested_seed_count distinct candidates for the seven-day Seed Pool. Explore broadly; do not score, select, allocate, or decide writing form. No invented experience.",
+      "Return requested_seed_count distinct candidates for the seven-day Seed Pool. requested_seed_count comes from Planner after it locked the week. Explore broadly; do not score, select, allocate, or decide writing form. No invented experience.",
     requirement:
       "Fill typed empty cells by inference. No example sentences. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });

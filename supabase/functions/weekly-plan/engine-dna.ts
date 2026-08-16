@@ -115,7 +115,7 @@ export function plannerPhilosophyBlock(): string {
 
 export function engineRulesAsWill(): string {
   return [
-    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Seed Pool(explore) → Planner seven-day strategy → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory.",
+    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Planner seven-day strategy (locks volume) → Seed Pool(explore to Planner count + buffer) → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory.",
     "Planner is the strategy/select/allocation/recovery engine, not a writing engine. It uses up to 30 days of actual X Analytics for recent profile-level flow; missing days remain missing. It never uses drafts or virtual plans as recent published history.",
     "Seed Generator explores broadly and does not score, rank, select, allocate, or judge strategic fit. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
     "Planning Horizon is seven days. Intelligence horizons remain independent. Planner infers composition each cycle without fixed topic, mode, or surface ratios.",
