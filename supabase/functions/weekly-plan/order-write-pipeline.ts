@@ -43,7 +43,8 @@ export const V11_SEED_MODEL = "grok-4.6";
 /** Original post body is Grok 4.6 (xAI). No OpenAI. */
 export const V11_WRITER_MODEL = "grok-4.6";
 export const V11_WRITE_CONCURRENCY = 2;
-export const V11_WRITER_TIMEOUT_MS = 55000;
+/** Abort under the ~60s Edge wall so the tick can persist and retry. */
+export const V11_WRITER_TIMEOUT_MS = 45000;
 
 export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode): SeedInterpretation {
   return interpretSeed({

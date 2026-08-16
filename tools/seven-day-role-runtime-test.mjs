@@ -149,10 +149,16 @@ ok("R29. Planner stamps 14:00–22:00 PT after the week is locked",
   /FOR_YOU_END_HOUR = 22/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
   /planned_pt/.test(job));
 ok("R30. Writer timeout vs Judge reject labels",
-  /V11_WRITER_TIMEOUT_MS = 55000/.test(pipe) &&
+  /V11_WRITER_TIMEOUT_MS = 45000/.test(pipe) &&
   /formatPipelineReject/.test(job) &&
   /Writer 실패 ·/.test(job) &&
   /Judge 거절 ·/.test(job));
+ok("R31. xAI timeout keeps the job running",
+  /isTransientXaiError/.test(job) &&
+  /holdForXai/.test(job) &&
+  /같은 칸 다시 씀/.test(job) &&
+  /JOB_LOCK_MS = 55000/.test(job) &&
+  /row\.status = "error"/.test(job));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

@@ -73,7 +73,8 @@ import { stampPlannerSlotTimes } from "./for-you-spread.ts";
 const EXPAND_BATCH = 10;
 const WRITE_CHUNK = 1;
 const COLLISION_DAYS = 30;
-const JOB_LOCK_MS = 90000;
+/** Shorter than Edge ~60s wall so a killed invoke unlocks and the next tick retries. */
+const JOB_LOCK_MS = 55000;
 const EXPAND_HARD_CAP = 36;
 const CANDIDATE_RESERVE_MIN = SEED_POOL_BUFFER;
 
@@ -118,6 +119,22 @@ function isWriterFailure(reasons: unknown[], judgeStatus?: string): boolean {
   return (reasons || []).some((r) =>
     /^(writer_call_failed|xai_timeout|WRITER_FAILURE|xai_key_missing|xai_empty_content|xai_http|xai_fetch)/i.test(String(r || "")),
   );
+}
+
+/** Slow/unavailable xAI must not end the weekly job. Invalid JSON still uses the 3-try cap. */
+export function isTransientXaiError(err: unknown): boolean {
+  const name = err && typeof err === "object" && "name" in err ? String((err as { name?: unknown }).name) : "";
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  if (/xai_key_missing|XAI_API_KEY/i.test(msg)) return false;
+  if (name === "AbortError" || name === "TimeoutError") return true;
+  return /xai_timeout|writer_call_failed|xai_http_429|xai_http_5|xai_fetch|AbortError|timed out/i.test(msg);
+}
+
+function holdForXai(row: any, label: string, detail: string) {
+  row.status = "running";
+  row.label_ko = label;
+  const line = String(detail || "").trim();
+  if (line) row.summary = [row.summary, line].filter(Boolean).join("\n");
 }
 
 function formatPipelineReject(subject: string, reasons: unknown[], judgeStatus?: string): string {
@@ -685,9 +702,13 @@ export async function tickWeeklyJob(args: {
       row.label_ko = `할당량 이어서 추론 ${row.saved_count}/${row.required_slots}…`;
     }
   } catch (e: any) {
-    row.status = "error";
-    row.error = String(e?.message || e).slice(0, 240);
-    row.label_ko = "작업 실패";
+    if (isTransientXaiError(e)) {
+      holdForXai(row, "xAI 응답 대기 · 다음 틱에서 이어감…", `xAI 일시 지연: ${String(e?.message || e).slice(0, 160)}`);
+    } else {
+      row.status = "error";
+      row.error = String(e?.message || e).slice(0, 240);
+      row.label_ko = "작업 실패";
+    }
   }
   row.locked_at = null;
   await saveRow(args.supabase, row);
@@ -839,7 +860,9 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   for (const [reason, n] of Object.entries(xaiRes.reject_reasons || {})) {
     bumpReason(metrics.rejected_by_reason, reason, Number(n) || 0);
   }
-  st.dim_batch = Number(st.dim_batch || 0) + 1;
+  if (!isTransientXaiError(xaiRes.error)) {
+    st.dim_batch = Number(st.dim_batch || 0) + 1;
+  }
   const grokAdded: any[] = [];
   const roundPostRejected: Record<string, number> = {};
   const globallySeen = new Set(
@@ -904,6 +927,10 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         (reasonText ? ` · 탈락 ${reasonText}` : "") +
         (xaiRes.error ? ` · xAI ${xaiRes.error}` : ""),
     ].filter(Boolean).join("\n");
+    if (isTransientXaiError(st.last_expand_error || xaiRes.error)) {
+      holdForXai(row, "xAI 응답 대기 · Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
+      return;
+    }
     st.empty_streak = Number(st.empty_streak || 0) + 1;
     if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
       row.status = "error";
@@ -1016,9 +1043,13 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   };
 
   if (!st.planner_volume) {
-    st.planner_volume_attempts = Number(st.planner_volume_attempts || 0) + 1;
     const result = await inferSevenDayVolume({ ...shared, timeoutMs: 20000 });
     if (!result.ok || !result.value) {
+      if (isTransientXaiError(result.error)) {
+        holdForXai(row, "xAI 응답 대기 · 칸 수 이어감…", `Planner volume: ${result.error}`);
+        return;
+      }
+      st.planner_volume_attempts = Number(st.planner_volume_attempts || 0) + 1;
       if (st.planner_volume_attempts < 3) {
         row.label_ko = `7일 칸 수 재추론 ${st.planner_volume_attempts}/3…`;
         row.summary = [row.summary, analyticsLine, `Planner volume: ${result.error || "unusable"}`].filter(Boolean).join("\n");
@@ -1050,7 +1081,6 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   const partial: PlannerSlotIntent[] = Array.isArray(st.planner_slots_partial) ? st.planner_slots_partial : [];
   const days = nextStrategyDayOffsets(partial, volume.posts_per_day);
   if (days.length) {
-    st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
     const result = await inferSevenDaySlotsForDays({
       ...shared,
       days,
@@ -1059,6 +1089,11 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
       timeoutMs: 28000,
     });
     if (!result.ok || !result.value) {
+      if (isTransientXaiError(result.error)) {
+        holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 이어감…`, `Planner day slots: ${result.error}`);
+        return;
+      }
+      st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
       if (st.planner_day_batch_attempts < 3) {
         row.label_ko = `Planner ${days.map((d) => d + 1).join(",")}일차 슬롯 재추론 ${st.planner_day_batch_attempts}/3…`;
         row.summary = [row.summary, `Planner day slots: ${result.error || "unusable"}`].filter(Boolean).join("\n");
@@ -1170,7 +1205,6 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     return;
   }
   const pool = await plannerSelectablePool(supabase, st);
-  st.planner_selection_attempts = Number(st.planner_selection_attempts || 0) + 1;
   const result = await selectSeedsForSevenDayPlan({
     xaiKey,
     strategy,
@@ -1178,6 +1212,10 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     timeoutMs: 32000,
   });
   if (!result.ok || !result.value) {
+    if (isTransientXaiError(result.error)) {
+      holdForXai(row, "xAI 응답 대기 · Seed 선택 이어감…", `Planner select: ${result.error}`);
+      return;
+    }
     st.planner_selection_failures = Number(st.planner_selection_failures || 0) + 1;
     if (st.planner_selection_failures < 3) {
       row.label_ko = `Planner Seed 선택 재추론 ${st.planner_selection_failures}/3…`;
@@ -1281,6 +1319,19 @@ async function stepRecover(xaiKey: string, row: any) {
     requestTargetedSeedRefill(row, pending, `Planner recovery JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
     return;
   }
+    pending.attempts = 0;
+    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
+    st.recovery_history.push({
+      strategy_slot_id: pending.strategy_slot_id,
+      action: "TARGETED_EXPLORE",
+      from_seed_id: seedIdOf(pending.slot || pending),
+      to_seed_id: "",
+      exploration_direction: slotExplorationDirection(pending.slot || pending),
+      judge_reasons: pending.judge_reasons || [],
+    });
+    requestTargetedSeedRefill(row, pending, `Planner recovery JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
+    return;
+  }
   const rejectedSeedId = seedIdOf(pending.slot || pending);
   const pool = recoverSeedPool(st);
   if (!pool.length) {
@@ -1311,6 +1362,11 @@ async function stepRecover(xaiKey: string, row: any) {
     timeoutMs: 32000,
   });
   if (!result.ok || !result.value) {
+    if (isTransientXaiError(result.error)) {
+      pending.attempts = Math.max(0, Number(pending.attempts || 1) - 1);
+      holdForXai(row, "xAI 응답 대기 · Planner 재배차 이어감…", `Planner recovery: ${result.error}`);
+      return;
+    }
     row.label_ko = `Planner recovery 재추론 ${pending.attempts}/4…`;
     row.summary = [row.summary, `Planner recovery: ${result.error || "unusable"}`].filter(Boolean).join("\n");
     return;
@@ -1870,6 +1926,11 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       st.last_reject_ko = formatPipelineReject(subject, reasons, p.judge_status);
       appendRejectLog(st, st.last_reject_ko);
       row.summary = [row.summary, st.last_reject_ko].filter(Boolean).join("\n");
+      if (isWriterFailure(reasons, p.judge_status) && isTransientXaiError(reasons.join(" ") || p.generation_status)) {
+        holdForXai(row, `xAI 응답 대기 · 같은 칸 다시 씀 ${row.saved_count}/${required}…`, st.last_reject_ko);
+        st.write_index = i;
+        return;
+      }
       if (rejected) {
         const rejects = bumpSeedReject(st, seedId);
         if (rejects >= SEED_REJECT_ABANDON) {

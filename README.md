@@ -2,7 +2,7 @@
 
 Specialized Growth OS for **@Seung4680**.
 
-Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.12.8**). Shown in the app header as `v11.12.8`. See [CHANGELOG.md](CHANGELOG.md). Agent contract: [AGENTS.md](AGENTS.md). Development protocol: [architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md](architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md).
+Shipping version: `package.json` / `lib/version.ts` / weekly-plan `APP_VERSION` (currently **11.12.9**). Shown in the app header as `v11.12.9`. See [CHANGELOG.md](CHANGELOG.md). Agent contract: [AGENTS.md](AGENTS.md). Development protocol: [architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md](architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md).
 
 **Product direction (v11 lock):** [architecture/v11.0.0_PRODUCT_DIRECTION.md](architecture/v11.0.0_PRODUCT_DIRECTION.md)
 

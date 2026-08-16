@@ -36,7 +36,7 @@ ok("H6. AbortError shows Korean timeout, does not hang", /AbortError/.test(gen) 
 ok("H7. write chunk failure does not abort the week", /write_errors/.test(job) && /빈 초안/.test(job));
 ok("H8. empty drafts are not saved", /if \(!text\)/.test(job) && /빈 초안/.test(job));
 ok("H9. WRITE_CHUNK is 1 (one slot per job tick)", /const WRITE_CHUNK = 1/.test(job) && /export const WRITE_CHUNK = 1/.test(readFileSync(path.join(ROOT, "lib/weekly-generate-scale.ts"), "utf8")));
-ok("H10. write concurrency 2 / timeout 55s (Grok writer)", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 55000/.test(ow));
+ok("H10. write concurrency 2 / timeout 45s under Edge wall", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 45000/.test(ow));
 ok("H11. write retries once unless job skipSelectiveRegen", /allow_one_retry: args\.skipSelectiveRegen \? false : true/.test(ow));
 ok("H12. 7C honors allow_one_retry false", /options\.allow_one_retry !== false/.test(gi));
 ok("H13. seed-reasoning default timeout 32s", /timeoutMs \?\? 32000/.test(cr));
