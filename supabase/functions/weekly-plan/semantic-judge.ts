@@ -657,3 +657,22 @@ export function isJudgeReject(r: SemanticJudgeResult): boolean {
 export function isJudgePass(r: SemanticJudgeResult): boolean {
   return r.overall_status === "PASS" || r.overall_status === "PASS_WITH_CONCERNS";
 }
+
+/** Judge owns week count. Planner locks the plan and does not close the week. */
+export const JUDGE_OWNS_WEEK_COUNT = true as const;
+
+export function judgeWeekCount(args: { planned_slots: number; passed_saved: number }): {
+  complete: boolean;
+  remaining: number;
+  planned: number;
+  passed: number;
+} {
+  const planned = Math.max(0, Math.round(Number(args.planned_slots) || 0));
+  const passed = Math.max(0, Math.round(Number(args.passed_saved) || 0));
+  return {
+    complete: planned > 0 && passed >= planned,
+    remaining: Math.max(0, planned - passed),
+    planned,
+    passed,
+  };
+}

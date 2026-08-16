@@ -488,6 +488,26 @@ export function clampWeekVolume(postsPerDay: unknown): number[] {
   return out;
 }
 
+export function nextUnassignedDayOffsets(
+  slots: Array<{ slot_id: string; day_offset: number }>,
+  assignedIds: Iterable<string>,
+  batch = STRATEGY_DAYS_PER_TICK,
+): number[] {
+  const have = new Set([...assignedIds].map((id) => String(id || "")));
+  const need = new Set<number>();
+  for (const slot of slots || []) {
+    if (!have.has(String(slot.slot_id || ""))) {
+      const day = Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(slot.day_offset) || 0)));
+      need.add(day);
+    }
+  }
+  const days: number[] = [];
+  for (let d = 0; d < PLANNING_HORIZON_DAYS && days.length < batch; d++) {
+    if (need.has(d)) days.push(d);
+  }
+  return days;
+}
+
 export function nextStrategyDayOffsets(
   slots: Array<{ day_offset: number }>,
   postsPerDay: number[],
@@ -736,16 +756,80 @@ export async function inferSevenDayStrategy(args: {
   });
 }
 
-function selectionSystem(): string {
+function selectionSystem(dayScoped: boolean): string {
   return [
     "You are the seven-day Planner selecting and allocating Seeds after strategy already exists.",
-    "Preserve the supplied strategy. Select one Seed from seed_pool for each strategy slot. Do not write posts and do not decide prose, tone, thought order, humor, Mechanism, Rail, hook, ending, or sentence form.",
+    dayScoped
+      ? "This call covers only the listed day offsets. Leave other days untouched. Do not emit assignments for slots not in this batch."
+      : "Preserve the supplied strategy. Select one Seed from seed_pool for each strategy slot.",
+    "Do not write posts and do not decide prose, tone, thought order, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Seed Generator explored; you own strategic fit, selection, and allocation. Do not use a fixed ratio, numeric ranking system, or frozen mapping.",
     "planner_intent may clarify the strategic purpose for the selected Seed but must remain strategy, not writing instructions.",
-    "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots.",
+    "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
     "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field the Seed Generator should explore. Do not choose a final Seed in that direction.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
+}
+
+function compactSeedForSelect(seed: ConcreteSeed) {
+  return {
+    seed_id: seed.seed_id,
+    cluster: seed.cluster,
+    concrete_subject: seed.concrete_subject,
+    point_or_tension: seed.point_or_tension || null,
+    creator_evidence_available: !!seed.creator_evidence_available,
+  };
+}
+
+function compactSlotForSelect(slot: PlannerSlotIntent) {
+  return {
+    slot_id: slot.slot_id,
+    day_offset: slot.day_offset,
+    strategic_role: slot.strategic_role,
+    editorial_mode: slot.editorial_mode,
+    planner_intent: slot.planner_intent,
+  };
+}
+
+function parsePlannerSelection(
+  raw: any,
+  slots: PlannerSlotIntent[],
+  validSeedIds: Set<string>,
+  reservedSeedIds: Set<string>,
+): PlannerSelection | null {
+  if (!raw || !Array.isArray(raw.assignments) || !Array.isArray(raw.missing)) return null;
+  const validSlotIds = new Set(slots.map((slot) => slot.slot_id));
+  const assignments: PlannerSeedAssignment[] = [];
+  const missing: PlannerExplorationRequest[] = [];
+  const usedSlots = new Set<string>();
+  const usedSeeds = new Set<string>([...reservedSeedIds]);
+  for (const item of raw.assignments) {
+    const slotId = s(item?.slot_id, 40);
+    const seedId = s(item?.seed_id, 100);
+    if (!validSlotIds.has(slotId) || !validSeedIds.has(seedId) || usedSlots.has(slotId) || usedSeeds.has(seedId)) continue;
+    usedSlots.add(slotId);
+    usedSeeds.add(seedId);
+    const strategySlot = slots.find((slot) => slot.slot_id === slotId)!;
+    assignments.push({
+      slot_id: slotId,
+      seed_id: seedId,
+      planner_intent: s(item?.planner_intent, 240) || strategySlot.planner_intent,
+      editorial_mode: strategySlot.editorial_mode,
+    });
+  }
+  for (const item of raw.missing) {
+    const slotId = s(item?.slot_id, 40);
+    const direction = s(item?.exploration_direction, 240);
+    if (!validSlotIds.has(slotId) || usedSlots.has(slotId) || !direction) continue;
+    usedSlots.add(slotId);
+    missing.push({ slot_id: slotId, exploration_direction: direction });
+  }
+  for (const slot of slots) {
+    if (!usedSlots.has(slot.slot_id)) {
+      missing.push({ slot_id: slot.slot_id, exploration_direction: slot.planner_intent });
+    }
+  }
+  return { assignments, missing, version: SEVEN_DAY_PLANNER_VERSION };
 }
 
 export async function selectSeedsForSevenDayPlan(args: {
@@ -756,57 +840,48 @@ export async function selectSeedsForSevenDayPlan(args: {
 }): Promise<PlannerCallResult<PlannerSelection>> {
   const pool = (args.seedPool || []).slice(0, 96);
   const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
-  const validSlotIds = new Set(args.strategy.slots.map((slot) => slot.slot_id));
   return callPlanner({
     xaiKey: args.xaiKey,
     maxTokens: 6000,
     timeoutMs: args.timeoutMs,
-    system: selectionSystem(),
+    system: selectionSystem(false),
     user: {
       seven_day_strategy: args.strategy,
-      seed_pool: pool.map((seed) => ({
-        seed_id: seed.seed_id,
-        cluster: seed.cluster,
-        concrete_subject: seed.concrete_subject,
-        point_or_tension: seed.point_or_tension || null,
-        grounding_reasons: seed.grounding_reasons || [],
-        creator_evidence_available: !!seed.creator_evidence_available,
-      })),
+      seed_pool: pool.map(compactSeedForSelect),
     },
-    parse: (raw): PlannerSelection | null => {
-      if (!raw || !Array.isArray(raw.assignments) || !Array.isArray(raw.missing)) return null;
-      const assignments: PlannerSeedAssignment[] = [];
-      const missing: PlannerExplorationRequest[] = [];
-      const usedSlots = new Set<string>();
-      const usedSeeds = new Set<string>();
-      for (const item of raw.assignments) {
-        const slotId = s(item?.slot_id, 40);
-        const seedId = s(item?.seed_id, 100);
-        if (!validSlotIds.has(slotId) || !validSeedIds.has(seedId) || usedSlots.has(slotId) || usedSeeds.has(seedId)) continue;
-        usedSlots.add(slotId);
-        usedSeeds.add(seedId);
-        const strategySlot = args.strategy.slots.find((slot) => slot.slot_id === slotId)!;
-        assignments.push({
-          slot_id: slotId,
-          seed_id: seedId,
-          planner_intent: s(item?.planner_intent, 240) || strategySlot.planner_intent,
-          editorial_mode: strategySlot.editorial_mode,
-        });
-      }
-      for (const item of raw.missing) {
-        const slotId = s(item?.slot_id, 40);
-        const direction = s(item?.exploration_direction, 240);
-        if (!validSlotIds.has(slotId) || usedSlots.has(slotId) || !direction) continue;
-        usedSlots.add(slotId);
-        missing.push({ slot_id: slotId, exploration_direction: direction });
-      }
-      for (const slot of args.strategy.slots) {
-        if (!usedSlots.has(slot.slot_id)) {
-          missing.push({ slot_id: slot.slot_id, exploration_direction: slot.planner_intent });
-        }
-      }
-      return { assignments, missing, version: SEVEN_DAY_PLANNER_VERSION };
+    parse: (raw) => parsePlannerSelection(raw, args.strategy.slots, validSeedIds, new Set()),
+  });
+}
+
+/** Live job: two days per tick. Compact payload. Does not close the week. */
+export async function selectSeedsForDays(args: {
+  xaiKey: string;
+  strategy: SevenDayStrategy;
+  seedPool: ConcreteSeed[];
+  days: number[];
+  alreadyAssigned?: PlannerSeedAssignment[];
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSelection>> {
+  const daySet = new Set((args.days || []).map((d) => Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(d) || 0)))));
+  const assigned = args.alreadyAssigned || [];
+  const assignedSlotIds = new Set(assigned.map((item) => String(item.slot_id || "")));
+  const reservedSeedIds = new Set(assigned.map((item) => String(item.seed_id || "")).filter(Boolean));
+  const slots = args.strategy.slots.filter((slot) => daySet.has(slot.day_offset) && !assignedSlotIds.has(slot.slot_id));
+  const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || ""))).slice(0, 96);
+  const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 2000,
+    timeoutMs: args.timeoutMs ?? 28000,
+    system: selectionSystem(true),
+    user: {
+      day_offsets: [...daySet].sort((a, b) => a - b),
+      strategy_summary: args.strategy.strategy_summary,
+      slots: slots.map(compactSlotForSelect),
+      reserved_seed_ids: [...reservedSeedIds],
+      seed_pool: pool.map(compactSeedForSelect),
     },
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds),
   });
 }
 

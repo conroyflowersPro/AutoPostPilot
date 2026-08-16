@@ -119,7 +119,7 @@ ok("R16h. generate job returns a Korean pipeline report",
 ok("R17. recovery checks existing Pool first", /availableSeedPool: pool/.test(job) && /RESELECT_EXISTING/.test(planner));
 ok("R18. Planner can request targeted Seed exploration", /TARGETED_EXPLORE/.test(planner) && /planner_exploration_direction/.test(job + seed));
 ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent Seed rejection/.test(planner));
-ok("R20. count completes only from saved Judge-pass posts", /quotaFilled/.test(job) && /acceptedOutcomes/.test(job));
+ok("R20. count completes only from saved Judge-pass posts", /quotaFilled/.test(job) && /judgeWeekCount/.test(job) && /acceptedOutcomes/.test(job));
 ok("R21. each xAI stage is one-call-per-tick", /callPlanner/.test(planner) && /one xAI request/.test(planner));
 ok("R22. old local Seed judge/select are not live", /legacySeedJudgeUnused/.test(job) && /legacyLocalSelectUnused/.test(job));
 ok("R23. account overview remains a separate daily Planner signal",
@@ -159,6 +159,15 @@ ok("R31. xAI timeout keeps the job running",
   /같은 칸 다시 씀/.test(job) &&
   /JOB_LOCK_MS = 55000/.test(job) &&
   /row\.status = "error"/.test(job));
+ok("R32. Judge owns week count; Planner plans only",
+  /JUDGE_OWNS_WEEK_COUNT/.test(judge) &&
+  /judgeWeekCount/.test(job) &&
+  /selectSeedsForDays/.test(job) &&
+  /nextUnassignedDayOffsets/.test(job) &&
+  !/await selectSeedsForSevenDayPlan\(/.test(job) &&
+  /FIELD_REFILL_MAX = 30/.test(job) &&
+  /Judge 개수 미달/.test(job) &&
+  !/Count Integrity/.test(job));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

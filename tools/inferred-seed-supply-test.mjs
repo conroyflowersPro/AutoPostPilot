@@ -42,7 +42,7 @@ ok("S11. generate starts a persisted job", /phase: "job_start"/.test(gen) && /jo
 ok("S12. generate follows ticks until quota filled", /phase: "job_tick"/.test(gen) && /followJob/.test(gen));
 ok("S13. direction: Planner final slots require equal Judge-PASS drafts", /N Planner slots require N Judge-PASS drafts/.test(dir));
 ok("S14. expand batched from learned data", /EXPAND_BATCH/.test(ix) && /collectLearnedSeedSignals/.test(ix));
-ok("S15. engine version planner owns count", /v11_planner_owns_count/.test(ix));
+ok("S15. engine version judge owns week count", /v11_judge_owns_count/.test(ix));
 ok("S16. quota-inference is horizon bounds only", /SEED_POOL_BUFFER = 10/.test(qu) && /QUOTA_PER_DAY_MIN = 4/.test(qu) && !/inferWeeklyQuota/.test(qu));
 ok("S17. cadence on learned signals", /cadence: CadenceSignal/.test(se) || /avg_originals_on_active_days/.test(se));
 ok("S18. leftover quota phase is rejected", /phase === "quota"/.test(ix) && /Quota 단계는 없습니다/.test(ix) && !/inferWeeklyQuota/.test(ix));

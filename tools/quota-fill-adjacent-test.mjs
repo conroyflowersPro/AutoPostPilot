@@ -135,7 +135,7 @@ ok("A38. frozen 11.5.6 keyword list is a clone-guard not a seed injector",
   /export function isFrozenHumorClone/.test(humor) && /사이버트럭 사이드미러/.test(humor) && !/export function localHumorKeywordSeeds/.test(humor));
 ok("A39. Grok drops frozen clone subjects",
   /isFrozenHumorClone/.test(cr) && /isFrozenHumorClone/.test(job));
-ok("A40. job lock covers a write tick", /JOB_LOCK_MS = 90000/.test(job));
+ok("A40. job lock covers a write tick", /JOB_LOCK_MS = 55000/.test(job));
 ok("A41. write is one slot per tick so Safari can resume a seven-day run", /const WRITE_CHUNK = 1/.test(job) && /skipSelectiveRegen: true/.test(job));
 ok("A42. Grok seed prompt does not list the canned 11.5.6 subjects",
   !/사이버트럭 사이드미러/.test(cr) && !/차선 합류 망설임/.test(cr) && !/FORBIDDEN clone subjects/.test(humor) && !/Prefer 알림 겹침/.test(cr));

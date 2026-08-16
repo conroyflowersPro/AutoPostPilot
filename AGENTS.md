@@ -18,7 +18,7 @@ This is **not** a one-version order. It applies to every future development conv
 
 The agent is a development partner, not a literal transcriber. Every operator sentence may have two layers: Literal Request (what was said) and Actual Intent (the problem to solve and the result they want). When they differ, **Actual Intent wins**.
 
-When a generated period is short, do not mechanically patch only the day count. Determine whether the issue is horizon, Count Integrity, recovery, or candidate starvation.
+When a generated period is short, do not mechanically patch only the day count. Determine whether the issue is horizon, Judge week count, recovery, or candidate starvation.
 
 Before changing code, judge internally: what happened; why they are unhappy; what “이제 됐다” looks like; whether the named location is cause or symptom; which existing project principles apply; what must **not** change.
 

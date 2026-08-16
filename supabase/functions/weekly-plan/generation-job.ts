@@ -60,8 +60,9 @@ import {
   inferSevenDayVolume,
   loadRecentXAnalyticsPublished,
   nextStrategyDayOffsets,
+  nextUnassignedDayOffsets,
   recoverRejectedPlannerSlot,
-  selectSeedsForSevenDayPlan,
+  selectSeedsForDays,
   strategyCoversSevenDays,
   type PlannerSeedAssignment,
   type PlannerSlotIntent,
@@ -69,6 +70,7 @@ import {
   type SevenDayVolume,
 } from "./seven-day-planner.ts";
 import { stampPlannerSlotTimes } from "./for-you-spread.ts";
+import { judgeWeekCount } from "./semantic-judge.ts";
 
 const EXPAND_BATCH = 10;
 const WRITE_CHUNK = 1;
@@ -255,13 +257,17 @@ function expandRoundBudget(requiredSlots: number): number {
 }
 
 function quotaFilled(row: any): boolean {
-  const required = Number(row.required_slots) || 0;
-  return required > 0 && Number(row.saved_count || 0) >= required;
+  return judgeWeekCount({
+    planned_slots: row.required_slots,
+    passed_saved: row.saved_count,
+  }).complete;
 }
 
 const SEED_REJECT_ABANDON = 3;
 /** Planner-targeted Seed Generator refill is one batch of this size, not a single seed. */
 const TARGETED_EXPLORE_SEED_COUNT = 10;
+/** Same-field Seed refill cap. Batch is still 10. */
+const FIELD_REFILL_MAX = 30;
 
 function seedIdOf(slot: any): string {
   return String(slot?.seed_id || "").trim();
@@ -326,10 +332,41 @@ function slotExplorationDirection(slot: any): string {
   return String(slot?.planner_intent || slot?.cluster || slot?.concrete_subject || "creator adjacent field").slice(0, 240);
 }
 
+function fieldRefillKey(direction: string): string {
+  return String(direction || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 80);
+}
+
+function fieldRefillUsed(st: any, direction: string): number {
+  st.field_refill_counts = st.field_refill_counts && typeof st.field_refill_counts === "object"
+    ? st.field_refill_counts
+    : {};
+  return Number(st.field_refill_counts[fieldRefillKey(direction)] || 0);
+}
+
+function canRefillField(st: any, direction: string): boolean {
+  return fieldRefillUsed(st, direction) < FIELD_REFILL_MAX;
+}
+
+function recordFieldRefill(st: any, direction: string, n = TARGETED_EXPLORE_SEED_COUNT) {
+  st.field_refill_counts = st.field_refill_counts && typeof st.field_refill_counts === "object"
+    ? st.field_refill_counts
+    : {};
+  const key = fieldRefillKey(direction);
+  st.field_refill_counts[key] = Math.min(FIELD_REFILL_MAX, Number(st.field_refill_counts[key] || 0) + n);
+}
+
 function requestTargetedSeedRefill(row: any, pending: any, reason: string) {
   const st = row.state;
   const slot = pending?.slot || pending;
-  st.planner_exploration_direction = slotExplorationDirection(slot);
+  const direction = slotExplorationDirection(slot);
+  if (!canRefillField(st, direction)) {
+    st.pending_recovery = null;
+    row.step = "write";
+    row.summary = [row.summary, `${reason} · 같은 분야 Seed 재추출 한도 ${FIELD_REFILL_MAX}`].filter(Boolean).join("\n");
+    return;
+  }
+  recordFieldRefill(st, direction);
+  st.planner_exploration_direction = direction;
   st.planner_missing_count = TARGETED_EXPLORE_SEED_COUNT;
   st.max_expand = Number(st.max_expand || 0) + 4;
   st.pending_recovery = pending;
@@ -595,6 +632,7 @@ export async function startWeeklyJob(args: {
     pending_recovery: null as any,
     recovery_queue: [] as any[],
     seed_reject_counts: {} as Record<string, number>,
+    field_refill_counts: {} as Record<string, number>,
     job_recovery_count: 0,
     recovery_history: [] as any[],
   };
@@ -1204,62 +1242,82 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     row.label_ko = "7일 Planner 전략…";
     return;
   }
+  const assigned: PlannerSeedAssignment[] = Array.isArray(st.planner_assignments) ? st.planner_assignments : [];
+  const days = nextUnassignedDayOffsets(strategy.slots, assigned.map((item) => item.slot_id));
   const pool = await plannerSelectablePool(supabase, st);
-  const result = await selectSeedsForSevenDayPlan({
-    xaiKey,
-    strategy,
-    seedPool: pool,
-    timeoutMs: 32000,
-  });
-  if (!result.ok || !result.value) {
-    if (isTransientXaiError(result.error)) {
-      holdForXai(row, "xAI 응답 대기 · Seed 선택 이어감…", `Planner select: ${result.error}`);
-      return;
-    }
-    st.planner_selection_failures = Number(st.planner_selection_failures || 0) + 1;
-    if (st.planner_selection_failures < 3) {
-      row.label_ko = `Planner Seed 선택 재추론 ${st.planner_selection_failures}/3…`;
+  if (days.length) {
+    const result = await selectSeedsForDays({
+      xaiKey,
+      strategy,
+      seedPool: pool,
+      days,
+      alreadyAssigned: assigned,
+      timeoutMs: 28000,
+    });
+    if (!result.ok || !result.value) {
+      if (isTransientXaiError(result.error)) {
+        holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 Seed 선택 이어감…`, `Planner select: ${result.error}`);
+        return;
+      }
+      row.label_ko = `Planner ${days.map((d) => d + 1).join(",")}일차 Seed 선택 재추론…`;
       row.summary = [row.summary, `Planner select: ${result.error || "unusable"}`].filter(Boolean).join("\n");
       return;
     }
-    row.status = "error";
-    row.error = `Planner Seed 선택 실패: ${result.error || "unusable"}`;
-    row.label_ko = "Planner 선택 실패";
-    return;
-  }
-  st.planner_selection_failures = 0;
-  st.planner_assignments = result.value.assignments;
-  if (result.value.missing.length > 0) {
-    st.planner_missing_count = result.value.missing.length;
-    st.planner_exploration_direction = result.value.missing
-      .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
-      .join(" | ")
-      .slice(0, 1200);
-    st.max_expand = Number(st.max_expand || 0) + Math.min(6, result.value.missing.length + 1);
-    row.step = "expand";
-    row.label_ko = `Planner 지정 분야 Seed 탐색 ${result.value.missing.length}개 슬롯…`;
-    row.summary = [
-      row.summary,
-      `Planner가 기존 Pool에서 ${result.value.assignments.length}/${strategy.slots.length} 선택 · ${result.value.missing.length}개 분야 추가 탐색 요청`,
-    ].filter(Boolean).join("\n");
-    return;
+    const have = new Set(assigned.map((item) => item.slot_id));
+    for (const item of result.value.assignments) {
+      if (!have.has(item.slot_id)) {
+        assigned.push(item);
+        have.add(item.slot_id);
+      }
+    }
+    st.planner_assignments = assigned;
+    if (result.value.missing.length > 0) {
+      const direction = result.value.missing[0]?.exploration_direction || "";
+      st.planner_missing_count = result.value.missing.length;
+      st.planner_exploration_direction = result.value.missing
+        .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
+        .join(" | ")
+        .slice(0, 1200);
+      if (!canRefillField(st, direction)) {
+        row.summary = [
+          row.summary,
+          `같은 분야 Seed 재추출 한도 ${FIELD_REFILL_MAX} · ${assigned.length}/${strategy.slots.length} 지정`,
+        ].filter(Boolean).join("\n");
+        row.label_ko = `Planner Seed 선택 ${assigned.length}/${strategy.slots.length}…`;
+        return;
+      }
+      recordFieldRefill(st, direction);
+      st.max_expand = Number(st.max_expand || 0) + Math.min(6, result.value.missing.length + 1);
+      row.step = "expand";
+      row.label_ko = `Planner 지정 분야 Seed 탐색 ${result.value.missing.length}개 슬롯…`;
+      row.summary = [
+        row.summary,
+        `Planner가 기존 Pool에서 ${assigned.length}/${strategy.slots.length} 선택 · ${result.value.missing.length}개 분야 추가 탐색 요청`,
+      ].filter(Boolean).join("\n");
+      return;
+    }
+    const remain = nextUnassignedDayOffsets(strategy.slots, assigned.map((item) => item.slot_id));
+    if (remain.length) {
+      row.label_ko = `Planner Seed 선택 ${assigned.length}/${strategy.slots.length} · ${remain.map((d) => d + 1).join(",")}일차…`;
+      return;
+    }
   }
 
   const seedById = new Map(pool.map((seed) => [String(seed.seed_id), seed]));
   const strategyById = new Map(strategy.slots.map((slot) => [slot.slot_id, slot]));
-  const days: Array<{ dayOffset: number; posts: any[] }> = Array.from(
+  const weekDays: Array<{ dayOffset: number; posts: any[] }> = Array.from(
     { length: QUOTA_DAYS },
     (_, dayOffset) => ({ dayOffset, posts: [] }),
   );
-  for (const assignment of result.value.assignments) {
+  for (const assignment of assigned) {
     const seed = seedById.get(assignment.seed_id);
     const strategySlot = strategyById.get(assignment.slot_id);
     if (!seed || !strategySlot) continue;
     const day = Math.max(0, Math.min(QUOTA_DAYS - 1, strategySlot.day_offset));
-    days[day].posts.push(compactSlotLite(
+    weekDays[day].posts.push(compactSlotLite(
       seed,
       day,
-      days[day].posts.length + 1,
+      weekDays[day].posts.length + 1,
       assignment.editorial_mode,
       {
         strategic_role: strategySlot.strategic_role,
@@ -1270,14 +1328,14 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       },
     ));
   }
-  const flat = days.flatMap((day) => day.posts || []);
+  const flat = weekDays.flatMap((day) => day.posts || []);
   if (flat.length !== strategy.slots.length) {
     row.status = "error";
-    row.error = `Planner 배차 무결성 실패: ${flat.length}/${strategy.slots.length}`;
+    row.error = `Planner 배차 미완: ${flat.length}/${strategy.slots.length}`;
     row.label_ko = "Planner 배차 실패";
     return;
   }
-  st.days = days;
+  st.days = weekDays;
   st.write_flat = flat;
   st.write_index = 0;
   st.write_started = true;
@@ -1851,8 +1909,8 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       }
     } else {
       row.status = "error";
-      row.error = `7일 Count Integrity 실패: PASS 저장 ${row.saved_count}/${required}`;
-      row.label_ko = "Planner recovery 후보 소진";
+      row.error = `7일 Judge 개수 미달: PASS 저장 ${row.saved_count}/${required}`;
+      row.label_ko = "Judge 개수 미달";
     }
     return;
   }
@@ -1980,7 +2038,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
   if (beginRecoverIfQueueReady(row, required)) return;
   if (st.write_index >= (st.write_flat || []).length) {
     row.status = "error";
-    row.error = `7일 Count Integrity 실패: PASS 저장 ${row.saved_count}/${required}`;
-    row.label_ko = "Planner recovery 후보 소진";
+    row.error = `7일 Judge 개수 미달: PASS 저장 ${row.saved_count}/${required}`;
+    row.label_ko = "Judge 개수 미달";
   }
 }
