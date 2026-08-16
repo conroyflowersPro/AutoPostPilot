@@ -131,8 +131,8 @@ ok("R24. Planner strategy sends compacted 30-day outcomes, not full post bodies"
 ok("R25. Planner owns weekly volume; 7-slot days are rejected",
   /strategyCoversSevenDays/.test(planner) && /empty_days_forbidden/.test(planner) &&
   /handmade_cadence/.test(planner) && /MIN_WEEKLY_SLOTS/.test(planner));
-ok("R26. job starts at Planner strategy, not Quota",
-  /step: "strategy"/.test(job) && /7일 Planner 전략/.test(job) &&
+ok("R26. job starts at Seed expand, then Planner strategy",
+  /step: "expand"/.test(job) && /Seed Generator 공개 X 탐색/.test(job) &&
   !/inferWeeklyQuota/.test(job) && /SEED_POOL_BUFFER/.test(job));
 ok("R27. bundled X Analytics is a TS module first",
   /BUNDLED_X_ANALYTICS_WINDOW/.test(planner) &&

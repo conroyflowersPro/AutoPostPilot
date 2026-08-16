@@ -30,7 +30,7 @@ ok("J1. generation_jobs table", /create table if not exists public\.generation_j
 ok("J2. RLS own rows", /auth\.uid\(\) = user_id/.test(sql));
 ok("J3. Edge job_start / job_tick / job_status", /phase === "job_start"/.test(ix) && /phase === "job_tick"/.test(ix) && /phase === "job_status"/.test(ix));
 ok("J4. ticks are one step", /if \(row\.step === "quota"\)/.test(job) && /else if \(row\.step === "expand"\)/.test(job) && /else if \(row\.step === "write"\)/.test(job));
-ok("J5. expand timeout 32s on job tick", /timeoutMs: compact \? 20000 : 32000/.test(job));
+ok("J5. expand timeout 40s on job tick", /timeoutMs: compact \? 20000 : 40000/.test(job));
 ok("J6. write chunk 1", /const WRITE_CHUNK = 1/.test(job));
 ok("J7. drafts insert on write tick", /from\("SeungContent"\)\.insert/.test(job) && /job_id: row\.id/.test(job));
 ok("J8. empty drafts are not saved", /if \(!text\)/.test(job) && /빈 초안/.test(job));
@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 12.0.0", /const APP_VERSION = "12.0.0"/.test(ix));
+ok("J15. shipping 12.1.0", /const APP_VERSION = "12.1.0"/.test(ix));
 ok("J24. empty write returns to Planner and never reports a short success", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job));
 ok("J25. live Planner has no local HIGH repetition gate", !/conceptualRepetitionLevel/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
@@ -52,7 +52,7 @@ ok("J31. job_status retries after Safari drop", /phaseName === "job_status" \? 3
 ok("J16. video not implemented", /Video is out of scope/.test(job) && !/job_type.*video/.test(job));
 ok("J17. migration apply workflow", existsSync(wf));
 ok("J18. learning line on quota tick", /학습:/.test(job));
-ok("J19. job connects lived experience cite-seeds", /buildRecentExperienceCandidates/.test(job));
+ok("J19. job connects 30d Analytics lived seeds", /analyticsLivedSeeds/.test(job));
 ok("J20. Planner-targeted exploration replaces random humor fill", /Planner 지정 분야 Seed 추가 탐색/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("J21. Seed shortage returns to Planner field direction", /planner_exploration_direction/.test(job) && /planner_missing_count/.test(job));
 ok("J22. Planner recovery receives existing Seed Pool first", /availableSeedPool: pool/.test(job));

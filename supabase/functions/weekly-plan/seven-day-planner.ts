@@ -766,7 +766,8 @@ function selectionSystem(dayScoped: boolean): string {
     "Seed Generator explored; you own strategic fit, selection, and allocation. Do not use a fixed ratio, numeric ranking system, or frozen mapping.",
     "planner_intent may clarify the strategic purpose for the selected Seed but must remain strategy, not writing instructions.",
     "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
-    "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field the Seed Generator should explore. Do not choose a final Seed in that direction.",
+    "EXPERIENCE slots take ANALYTICS_LIVED owner SELF seeds only, newest occurred_at first. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take public seeds; viral is already on those seeds.",
+    "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request type EXPERIENCE only.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
 }
@@ -777,6 +778,9 @@ function compactSeedForSelect(seed: ConcreteSeed) {
     cluster: seed.cluster,
     concrete_subject: seed.concrete_subject,
     point_or_tension: seed.point_or_tension || null,
+    owner: (seed as any).owner || "OTHER",
+    viral: !!(seed as any).viral,
+    occurred_at: (seed as any).occurred_at || null,
     creator_evidence_available: !!seed.creator_evidence_available,
   };
 }

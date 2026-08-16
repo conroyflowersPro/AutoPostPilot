@@ -15,6 +15,7 @@ import {
 } from "./engine-architecture.ts";
 import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { isKoreaOnlySituation } from "./seed-scope.ts";
+import { hasForbiddenDayCountPhrase, inhabitsOtherLivedViral } from "./seed-ownership.ts";
 
 export {
   extractStructuralSignature,
@@ -65,6 +66,7 @@ export type SemanticJudgeInput = {
     topic?: string;
     editorial_mode?: string;
     concrete_subject?: string;
+    owner?: string;
   };
   interpretation?: Record<string, unknown> | null;
   planner_intent?: Record<string, unknown> | null;
@@ -304,6 +306,7 @@ export function buildSemanticJudgeInput(
       topic: s((ctx as any).seed_identity?.topic || (ctx as any).interpreted_meaning?.topic) || undefined,
       editorial_mode: s((ctx as any).editorial_mode) || undefined,
       concrete_subject: s((ctx as any).seed_identity?.concrete_subject) || undefined,
+      owner: s((ctx as any).experience_boundaries?.owner) || undefined,
     },
     interpretation: (ctx as any).interpreted_meaning || null,
     planner_intent: (ctx as any).planner_intent || null,
@@ -364,6 +367,15 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   const expBound = input.experience_boundary || {};
   const mustNot = !!(expBound as any).must_not_claim_first_person;
   const experienced = !!(expBound as any).creator_experienced;
+  const owner = String((expBound as any).owner || input.seed?.owner || "").toUpperCase();
+  if (hasForbiddenDayCountPhrase(text)) {
+    flags.fabricated_experience = true;
+    hard.push("lived_time_day_count");
+  }
+  if ((owner === "OTHER" || mustNot) && inhabitsOtherLivedViral(text)) {
+    flags.fabricated_experience = true;
+    hard.push("other_viral_inhabited");
+  }
   for (const re of EXPERIENCE_FABRICATION_PATTERNS) {
     if (re.test(text)) {
       if (mustNot || !experienced) {

@@ -28,7 +28,7 @@ function ok(name, cond) {
 
 console.log("Expand hang after inferred quota (v11.1.2)");
 ok("H1. EXPAND_BATCH is 10", /const EXPAND_BATCH = 10/.test(ix));
-ok("H2. expand Grok timeout 32s (one call, under 60s)", /timeoutMs:\s*32000/.test(ix));
+ok("H2. expand Grok timeout 40s (one call, under 60s)", /timeoutMs:\s*40000/.test(job) || /timeoutMs: compact \? 20000 : 40000/.test(job));
 ok("H3. no same-request expand retry", (ix.match(/await runExpand\(\)/g) || []).length === 1);
 ok("H4. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("H5. client aborts write ~50s kept for compat", /write/.test(gen) && /50000/.test(gen));
@@ -39,7 +39,7 @@ ok("H9. WRITE_CHUNK is 1 (one slot per job tick)", /const WRITE_CHUNK = 1/.test(
 ok("H10. write concurrency 2 / timeout 45s under Edge wall", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 45000/.test(ow));
 ok("H11. write retries once unless job skipSelectiveRegen", /allow_one_retry: args\.skipSelectiveRegen \? false : true/.test(ow));
 ok("H12. 7C honors allow_one_retry false", /options\.allow_one_retry !== false/.test(gi));
-ok("H13. seed-reasoning default timeout 32s", /timeoutMs \?\? 32000/.test(cr));
+ok("H13. seed-reasoning default timeout 40s", /timeoutMs \?\? 40000/.test(cr));
 ok("H14. shipping version lockstep (not frozen 11.1.2)", /const APP_VERSION = "\d+\.\d+\.\d+"/.test(ix));
 
 console.log("========================================");

@@ -50,6 +50,9 @@ export type CreatorSeedReasoningInput = {
   plannerRequestedCount?: number;
   /** Typed empty cells. If omitted, built from needed + existing. */
   openSlots?: OpenSeedSlot[];
+  searchWindow?: { from: string; to: string; key?: string };
+  officialPublicPosts?: Array<{ text: string; created_at?: string }>;
+  excludeHandle?: string;
 };
 
 export type CreatorSeedReasoningResult = {
@@ -97,6 +100,20 @@ function messageText(body: any): string {
   return String(msg.reasoning_content || "");
 }
 
+function responsesText(body: any): string {
+  const direct = typeof body?.output_text === "string" ? body.output_text : "";
+  if (direct.trim().length >= 4) return direct;
+  const chunks: string[] = [];
+  for (const item of Array.isArray(body?.output) ? body.output : []) {
+    if (typeof item?.text === "string") chunks.push(item.text);
+    for (const part of Array.isArray(item?.content) ? item.content : []) {
+      if (typeof part?.text === "string") chunks.push(part.text);
+    }
+  }
+  if (chunks.join("").trim()) return chunks.join("\n");
+  return messageText(body);
+}
+
 function seedListFromParsed(parsed: any): any[] {
   if (!parsed) return [];
   if (Array.isArray(parsed)) return parsed;
@@ -137,14 +154,21 @@ function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
     point_or_tension: tension,
     topic: clean(x?.topic, 60) || cluster,
     subtopic: clean(x?.subtopic, 80) || dimension,
-    primary_source: "CREATOR_SEED_REASONING",
-    supporting_sources: ["CREATOR_DNA", "RECENT_PUBLISHED", "XAI_REASONING"].concat(
+    primary_source: "PUBLIC_X",
+    supporting_sources: ["CREATOR_DNA", "PUBLIC_X_SEARCH", "XAI_REASONING"].concat(
       wording ? ["WORDING_INTENT"] : [],
     ),
     evidence_source_ids: [],
     creator_evidence_available: false,
     experience_required: false,
-    source_type: "CREATOR_SEED_REASONING",
+    source_type: "PUBLIC_X",
+    owner: "OTHER",
+    seed_source: "PUBLIC_X",
+    viral: true,
+    found_form: String(x?.found_form || "").toUpperCase() === "EXPERIENTIAL" || /내가|어제|직접 해/.test(subject)
+      ? "EXPERIENTIAL"
+      : "OTHER",
+    viral_hook: clean(x?.viral_hook, 120),
     claim_types: ["OBSERVATION"],
     inference_type: "CREATOR_REASONED_DIRECTION",
     grounding_status: "GROUNDED",
@@ -256,9 +280,13 @@ export async function reasonCreatorSeeds(
     "this_run_note and planner_exploration_direction are exploration bounds only. They do not authorize selection or allocation.",
     "When Planner has locked the week, requested_seed_count is the Planner count plus a small week buffer. Return that many candidates. planner_slot_intents describe locked cells so exploration can cover them. They are not a per-mode production quota.",
     "When planner_exploration_direction is set, explore THAT field only. Return requested_seed_count distinct candidates in that field (a batch, never a single seed). Do not refill unrelated types or restart the whole week pool.",
-    "Viral inputs are optional sparks only if they fit Creator interest domains; never restate viral claims as Seung's experience.",
-    "Lived evidence seeds may be CITE+RELATED follow-ups from held episodes. Never clone the same content. Do not copy a prompt example as the new subject.",
-    'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',
+    "Search public X. Infer search interests from Creator DNA this run. Do not freeze an interest list. Split coverage across those interests.",
+    "Every public seed must include a viral hook from circulating posts in the given date window. Experience-shaped found posts are owner OTHER — never the creator's lived episode.",
+    "If a found post is written as lived experience, set found_form EXPERIENTIAL and concrete_subject as a third-person circulating scene, not 내가/어제 내.",
+    "Do not search or emit the operator's own posts. Do not copy already_held or recent_published.",
+    "Lived evidence seeds are not your job in this call. Never clone the same content.",
+    "Lived evidence seeds are not your job in this call.",
+    'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, wording_note, viral_hook, found_form. owner is always OTHER. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',
   ].join("\n");
 
   const plannerSlots = (args.plannerSlotIntents || []).slice(0, 56).map((slot) => ({
@@ -289,19 +317,31 @@ export async function reasonCreatorSeeds(
     creator_dna: creatorDnaBlock(),
     this_run_note_overlay_only: intent || null,
     planner_exploration_direction: clean(args.explorationDirection, 240) || null,
-    recent_published_angles_avoid_repeat: recent,
     already_held_seeds: existingAbstract,
-    interest_filtered_viral_sparks: viral.length ? viral : null,
+    recent_published_angles_avoid_repeat: recent,
+    public_search_window: args.searchWindow || null,
+    official_public_posts: (args.officialPublicPosts || []).slice(0, 40).map((p) => ({
+      text: clean(p.text, 140),
+      created_at: p.created_at || null,
+    })),
     weekly_goal_note:
-      "Return requested_seed_count distinct candidates for the seven-day Seed Pool. requested_seed_count comes from Planner after it locked the week. Explore broadly; do not score, select, allocate, or decide writing form. No invented experience.",
+      "Return requested_seed_count distinct PUBLIC X candidates. Infer interests from Creator DNA this run. Attach viral_hook on every seed. owner OTHER. No invented creator experience.",
     requirement:
       "Fill typed empty cells by inference. No example sentences. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
   });
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 32000);
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
+    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 40000);
+    const window = args.searchWindow;
+    const exclude = clean(args.excludeHandle, 40) || "Seung4680";
+    const xSearchTool = {
+      type: "x_search",
+      excluded_x_handles: [exclude],
+      ...(window?.from ? { from_date: window.from } : {}),
+      ...(window?.to ? { to_date: window.to } : {}),
+    };
+    const res = await fetch("https://api.x.ai/v1/responses", {
       method: "POST",
       signal: controller.signal,
       headers: {
@@ -311,13 +351,11 @@ export async function reasonCreatorSeeds(
       body: JSON.stringify({
         model: args.model || "grok-4.6",
         temperature: 0.85,
-        max_tokens: compact ? 4096 : 8192,
+        max_output_tokens: compact ? 4096 : 8192,
         reasoning_effort: "low",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
+        instructions: system,
+        input: [{ role: "user", content: user }],
+        ...(compact ? {} : { tools: [xSearchTool] }),
       }),
     });
     clearTimeout(timer);
@@ -329,7 +367,7 @@ export async function reasonCreatorSeeds(
         error: clean(body?.error?.message || `xai_http_${res.status}`, 180),
       };
     }
-    const content = messageText(body);
+    const content = responsesText(body) || messageText(body);
     const parsed = extractJson(content);
     const rawList = seedListFromParsed(parsed);
     const seeds: ConcreteSeed[] = [];
@@ -343,6 +381,10 @@ export async function reasonCreatorSeeds(
       const n = normalized.seed;
       if (!n) {
         reject(normalized.reason || "NORMALIZE_REJECT");
+        continue;
+      }
+      if (/어제\s*내|내가\s*직접/.test(n.concrete_subject)) {
+        reject("SELF_INHABIT_ON_PUBLIC");
         continue;
       }
       if (isKoreaOnlySituation(n.concrete_subject)) {

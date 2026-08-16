@@ -15,6 +15,7 @@ import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-
 import { hasExpertJargon } from "./seed-scope.ts";
 import { creatorDnaBlock } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
+import { writerLivedTimeLines } from "./seed-ownership.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_grok_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -369,7 +370,7 @@ function writerPhilosophyBlock(): string {
     "You do not choose the seven-day strategy, select another Seed, or redesign slot allocation.",
     "HARD BOUNDARY: do not invent facts or lived experience, do not directly copy a Manual Creator Post, and do not abandon the assigned Seed and Planner Intent.",
     "Do not paste prompt material or examples. Decide the necessary reasoning and expression yourself.",
-    "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording or chase a viral hook.",
+    "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording. Do not inhabit someone else's viral lived post as your yesterday.",
     "Your goal is not to pass a writing-rule checklist. Complete the assigned Seed as an actual Creator post.",
   ].join("\n");
 }
@@ -400,8 +401,14 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "4) Write the complete post and stop when the thought is complete.",
     ...writerBoundaryConstraintLines(ctx),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "first-person is allowed only within supplied evidence" : "do not claim first-person lived experience"),
+    s((expBound as any).owner) === "OTHER"
+      ? "PUBLIC VIRAL: circulating scene. Write 요즘 도는 / 그 영상. Never 어제/저번주/예전에 as your life. Never inhabit the found post's I."
+      : "",
+    experienced && s((expBound as any).occurred_at)
+      ? writerLivedTimeLines(String((expBound as any).occurred_at)).join(" ")
+      : "",
     s((ctx as any).cite_episode_hint)
-      ? "RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Do not retell or copy the source post."
+      ? "CITE RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Do not retell or copy the source post. 동일 내용 금지."
       : "",
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta. No chain-of-thought.",
   ].join("\n");

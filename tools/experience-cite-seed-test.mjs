@@ -46,8 +46,8 @@ ok("E2. relatedExperienceSubject exported", /export function relatedExperienceSu
 ok("E3. never body.slice as subject", !/concrete_subject:\s*[^\n]*body\.slice/.test(exp));
 ok("E4. 동일 내용 금지 on extract", /동일 내용 금지/.test(exp));
 ok("E5. originals are SEED_SOURCE cite-seeds", /SEED_SOURCE/.test(exp) && /seed_eligible: userExplicit \|\| !isReply/.test(exp));
-ok("E6. job injects experience candidates", /buildRecentExperienceCandidates/.test(job) && /resolveExperienceSupply/.test(job));
-ok("E7. job summary shows 경험시드", /경험시드:/.test(job) && /동일 내용 금지/.test(job));
+ok("E6. job injects 30d Analytics lived seeds", /analyticsLivedSeeds/.test(job) && /ANALYTICS_LIVED/.test(job));
+ok("E7. job does not mix archive fallback into experience pool", /아카이브 폴백 없음/.test(job) && !/ARCHIVE_EXPERIENCE_FALLBACK/.test(job));
 ok("E8. writer may cite related, not clone", /CITE RELATED/.test(wr) && /동일 내용/.test(wr));
 ok("E9. Grok expand told not to clone lived", /CITE\+RELATED/.test(cr) || /Never clone the same content/.test(cr));
 ok("E10. night FSD pedestrian is experiential", isExp(night));

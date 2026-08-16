@@ -130,7 +130,10 @@ function seedToInterpretInput(seed: Record<string, unknown>, mode: string): Inte
       ? (seed.grounding_reasons as unknown[]).map(String)
       : [],
     creator_evidence_available: !!seed.creator_evidence_available,
-    experience_required: String(mode || "").toUpperCase() === "EXPERIENCE",
+    experience_required: String(seed.owner || "").toUpperCase() === "SELF",
+    owner: seed.owner != null ? String(seed.owner) : undefined,
+    occurred_at: seed.occurred_at != null ? String(seed.occurred_at) : undefined,
+    seed_source: seed.seed_source != null ? String(seed.seed_source) : undefined,
   };
 }
 
