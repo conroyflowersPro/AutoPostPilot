@@ -48,7 +48,8 @@ ok("R8. Planner strategy happens without Seed Pool input",
   /inferSevenDayStrategy/.test(planner) && !/seedPool: ConcreteSeed\[\][\s\S]*inferSevenDayStrategy/.test(planner));
 ok("R9. Planner uses up to 30 days actual X Analytics",
   /from\("post_metrics"\)/.test(planner) && /Math\.min\(30, days\)/.test(planner) &&
-  /limit\(1000\)/.test(planner) && /recent_x_analytics/.test(planner));
+  /limit\(1000\)/.test(planner) && /recent_x_analytics/.test(planner) &&
+  /x-analytics-30d-window\.json/.test(planner) && /loadBundledXAnalyticsWindow/.test(planner));
 ok("R10. Planner does not replace missing analytics", /Do not estimate missing dates/.test(planner));
 ok("R11. Planner selects and allocates only after strategy",
   /selectSeedsForSevenDayPlan/.test(planner) && /seven_day_strategy/.test(planner) && /seed_pool/.test(planner));

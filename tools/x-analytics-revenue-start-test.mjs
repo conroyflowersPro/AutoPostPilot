@@ -89,6 +89,11 @@ ok("R20. layers not averaged",
 ok("R21. Planner DNA version lockstep v1.6",
   /performance-dna-runtime-v1.6-x-window/.test(read("lib/intelligence/performance-dna-runtime.ts")) &&
     /performance-dna-runtime-v1.6-x-window/.test(read("supabase/functions/weekly-plan/engine-dna.ts")));
+ok("R22. bundled 30-day window is originals-only and not mixed with overview",
+  existsSync(path.join(ROOT, "supabase/functions/weekly-plan/x-analytics-30d-window.json")) &&
+    /"originals":\s*201/.test(read("supabase/functions/weekly-plan/x-analytics-30d-window.json")) &&
+    /"replies_excluded":\s*635/.test(read("supabase/functions/weekly-plan/x-analytics-30d-window.json")) &&
+    /do not average/.test(read("supabase/functions/weekly-plan/x-analytics-30d-window.json")));
 
 const uploadDir = "/home/ubuntu/.cursor/projects/workspace/uploads";
 const contentFile = path.join(uploadDir, "account_analytics_content_2026-08-02_2026-08-15_714d.csv");

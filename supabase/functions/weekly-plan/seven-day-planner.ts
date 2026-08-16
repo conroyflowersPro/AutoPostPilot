@@ -37,6 +37,62 @@ export type XAnalyticsDailyAccountPulse = {
   profile_visits: number;
 };
 
+function loadBundledXAnalyticsWindow(): {
+  rows: XAnalyticsPublishedPost[];
+  account_daily: XAnalyticsDailyAccountPulse[];
+} {
+  try {
+    const raw = Deno.readTextFileSync(new URL("./x-analytics-30d-window.json", import.meta.url));
+    const parsed = JSON.parse(raw);
+    const rows: XAnalyticsPublishedPost[] = [];
+    for (const item of Array.isArray(parsed?.posts) ? parsed.posts : []) {
+      const publishedAt = s(item?.published_at, 40);
+      const parsedAt = Date.parse(publishedAt);
+      if (!Number.isFinite(parsedAt)) continue;
+      if (item?.features?.isReply === true) continue;
+      rows.push({
+        post_id: item?.post_id ? s(item.post_id, 100) : null,
+        published_at: new Date(parsedAt).toISOString(),
+        content: s(item?.content, 240),
+        metrics: {
+          followers_gained: Number(item?.metrics?.followers_gained) || 0,
+          profile_visits: Number(item?.metrics?.profile_visits) || 0,
+          bookmarks: Number(item?.metrics?.bookmarks) || 0,
+          replies: Number(item?.metrics?.replies) || 0,
+          reposts: Number(item?.metrics?.reposts) || 0,
+          likes: Number(item?.metrics?.likes) || 0,
+          impressions: Number(item?.metrics?.impressions) || 0,
+          quotes: Number(item?.metrics?.quotes) || 0,
+          shares: Number(item?.metrics?.shares) || 0,
+          detail_expands: Number(item?.metrics?.detail_expands) || 0,
+        },
+        features: item?.features && typeof item.features === "object" ? item.features : { is_original: true },
+      });
+    }
+    const accountDaily: XAnalyticsDailyAccountPulse[] = [];
+    for (const pulse of Array.isArray(parsed?.account_daily) ? parsed.account_daily : []) {
+      const parsedAt = Date.parse(s(pulse?.date, 60));
+      if (!Number.isFinite(parsedAt)) continue;
+      accountDaily.push({
+        date: new Date(parsedAt).toISOString().slice(0, 10),
+        impressions: Number(pulse?.impressions) || 0,
+        likes: Number(pulse?.likes) || 0,
+        engagements: Number(pulse?.engagements) || 0,
+        bookmarks: Number(pulse?.bookmarks) || 0,
+        shares: Number(pulse?.shares) || 0,
+        new_follows: Number(pulse?.new_follows) || 0,
+        unfollows: Number(pulse?.unfollows) || 0,
+        replies: Number(pulse?.replies) || 0,
+        reposts: Number(pulse?.reposts) || 0,
+        profile_visits: Number(pulse?.profile_visits) || 0,
+      });
+    }
+    return { rows, account_daily: accountDaily };
+  } catch {
+    return { rows: [], account_daily: [] };
+  }
+}
+
 export async function loadRecentXAnalyticsPublished(
   supabase: { from: (table: string) => any },
   days = 30,
@@ -45,7 +101,27 @@ export async function loadRecentXAnalyticsPublished(
   coverage_days: number;
   account_daily: XAnalyticsDailyAccountPulse[];
 }> {
-  const since = new Date(Date.now() - Math.max(1, Math.min(30, days)) * 24 * 3600 * 1000).toISOString();
+  const sinceMs = Date.now() - Math.max(1, Math.min(30, days)) * 24 * 3600 * 1000;
+  const since = new Date(sinceMs).toISOString();
+  const bundled = loadBundledXAnalyticsWindow();
+  const rows: XAnalyticsPublishedPost[] = [];
+  const dates = new Set<string>();
+  const seenPosts = new Set<string>();
+
+  const pushRow = (row: XAnalyticsPublishedPost) => {
+    const parsed = Date.parse(row.published_at);
+    if (!Number.isFinite(parsed) || parsed < sinceMs) return;
+    const postKey = row.post_id
+      ? `id:${s(row.post_id, 100)}`
+      : `fallback:${new Date(parsed).toISOString()}|${s(row.content, 160)}`;
+    if (seenPosts.has(postKey)) return;
+    seenPosts.add(postKey);
+    dates.add(new Date(parsed).toISOString().slice(0, 10));
+    rows.push(row);
+  };
+
+  for (const row of bundled.rows) pushRow(row);
+
   try {
     let { data, error } = await supabase
       .from("post_metrics")
@@ -63,43 +139,34 @@ export async function loadRecentXAnalyticsPublished(
       data = fallback.data;
       error = fallback.error;
     }
-    if (error || !Array.isArray(data)) return { rows: [], coverage_days: 0, account_daily: [] };
-    const rows: XAnalyticsPublishedPost[] = [];
-    const dates = new Set<string>();
-    const seenPosts = new Set<string>();
-    for (const row of data) {
-      const actionType = s(row?.action_type, 40).toUpperCase();
-      if (/REPLY|REPOST|RETWEET/.test(actionType) || row?.features?.isReply === true) continue;
-      const publishedAt = s(row?.published_at, 40);
-      if (!publishedAt) continue;
-      const parsed = Date.parse(publishedAt);
-      if (!Number.isFinite(parsed)) continue;
-      const postKey = row?.post_id
-        ? `id:${s(row.post_id, 100)}`
-        : `fallback:${new Date(parsed).toISOString()}|${s(row?.content_snippet, 160)}`;
-      if (seenPosts.has(postKey)) continue;
-      seenPosts.add(postKey);
-      dates.add(new Date(parsed).toISOString().slice(0, 10));
-      rows.push({
-        post_id: row?.post_id ? s(row.post_id, 100) : null,
-        published_at: new Date(parsed).toISOString(),
-        content: s(row?.content_snippet, 240),
-        metrics: {
-          followers_gained: Number(row?.followers_gained) || 0,
-          profile_visits: Number(row?.profile_visits) || 0,
-          bookmarks: Number(row?.bookmarks) || 0,
-          replies: Number(row?.replies) || 0,
-          reposts: Number(row?.reposts) || 0,
-          likes: Number(row?.likes) || 0,
-          impressions: Number(row?.impressions) || 0,
-          quotes: Number(row?.quotes) || 0,
-          shares: Number(row?.shares) || 0,
-          detail_expands: Number(row?.detail_expands) || 0,
-        },
-        features: row?.features && typeof row.features === "object" ? row.features : null,
-      });
+    if (!error && Array.isArray(data)) {
+      for (const row of data) {
+        const actionType = s(row?.action_type, 40).toUpperCase();
+        if (/REPLY|REPOST|RETWEET/.test(actionType) || row?.features?.isReply === true) continue;
+        const publishedAt = s(row?.published_at, 40);
+        const parsed = Date.parse(publishedAt);
+        if (!publishedAt || !Number.isFinite(parsed)) continue;
+        pushRow({
+          post_id: row?.post_id ? s(row.post_id, 100) : null,
+          published_at: new Date(parsed).toISOString(),
+          content: s(row?.content_snippet, 240),
+          metrics: {
+            followers_gained: Number(row?.followers_gained) || 0,
+            profile_visits: Number(row?.profile_visits) || 0,
+            bookmarks: Number(row?.bookmarks) || 0,
+            replies: Number(row?.replies) || 0,
+            reposts: Number(row?.reposts) || 0,
+            likes: Number(row?.likes) || 0,
+            impressions: Number(row?.impressions) || 0,
+            quotes: Number(row?.quotes) || 0,
+            shares: Number(row?.shares) || 0,
+            detail_expands: Number(row?.detail_expands) || 0,
+          },
+          features: row?.features && typeof row.features === "object" ? row.features : null,
+        });
+      }
     }
-    const accountDaily: XAnalyticsDailyAccountPulse[] = [];
+
     const latestRun = await supabase
       .from("learning_runs")
       .select("raw_meta")
@@ -108,7 +175,8 @@ export async function loadRecentXAnalyticsPublished(
       .limit(1)
       .maybeSingle();
     const rawDaily = latestRun?.data?.raw_meta?.dailyAccountPulse;
-    if (Array.isArray(rawDaily)) {
+    const accountDaily: XAnalyticsDailyAccountPulse[] = [];
+    if (Array.isArray(rawDaily) && rawDaily.length) {
       for (const pulse of rawDaily.slice(0, 31)) {
         const parsed = Date.parse(s(pulse?.date, 60));
         if (!Number.isFinite(parsed) || parsed < Date.parse(since)) continue;
@@ -127,9 +195,19 @@ export async function loadRecentXAnalyticsPublished(
         });
       }
     }
-    return { rows, coverage_days: dates.size, account_daily: accountDaily };
+    rows.sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+    return {
+      rows,
+      coverage_days: dates.size,
+      account_daily: accountDaily.length ? accountDaily : bundled.account_daily.filter((d) => Date.parse(d.date) >= Date.parse(since)),
+    };
   } catch {
-    return { rows: [], coverage_days: 0, account_daily: [] };
+    rows.sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+    return {
+      rows,
+      coverage_days: dates.size,
+      account_daily: bundled.account_daily.filter((d) => Date.parse(d.date) >= Date.parse(since)),
+    };
   }
 }
 
