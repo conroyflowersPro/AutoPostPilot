@@ -45,7 +45,7 @@ function GeneratePageInner() {
   const [doneCount, setDoneCount] = useState(0);
   const [planSummary, setPlanSummary] = useState("");
   const [lastReject, setLastReject] = useState("");
-  const [jobReport, setJobReport] = useState("");
+  const [rejectLog, setRejectLog] = useState<string[]>([]);
   const [lafcMatches, setLafcMatches] = useState<LafcMatch[]>([]);
   const [lafcDate, setLafcDate] = useState("");
   const [lafcOpponent, setLafcOpponent] = useState("");
@@ -125,7 +125,6 @@ function GeneratePageInner() {
     if (job?.summary) setPlanSummary(String(job.summary));
     if (typeof job?.saved_count === "number") setDoneCount(job.saved_count);
     if (job?.last_reject_ko) setLastReject(String(job.last_reject_ko));
-    if (typeof job?.report_ko === "string" && job.report_ko.trim()) setJobReport(job.report_ko);
     if (Array.isArray(job?.reject_log) && job.reject_log.length) {
       setRejectLog(job.reject_log.map((line: unknown) => String(line || "")).filter(Boolean));
     }
@@ -200,7 +199,6 @@ function GeneratePageInner() {
     setError("");
     setDoneCount(0);
     setRejectLog([]);
-    setJobReport("");
     setLastReject("");
     setPlanSummary("");
     try {
@@ -383,11 +381,6 @@ function GeneratePageInner() {
             </button>
           </div>
         </div>
-      )}
-      {jobReport && (
-        <pre className="mb-4 text-xs whitespace-pre-wrap text-zinc-200 bg-zinc-950 p-3 rounded-xl border border-violet-900 max-h-96 overflow-auto">
-          {jobReport}
-        </pre>
       )}
       {planSummary && (
         <pre className="mb-4 text-xs whitespace-pre-wrap text-zinc-400 bg-zinc-950 p-3 rounded-xl border border-zinc-800 max-h-64 overflow-auto">

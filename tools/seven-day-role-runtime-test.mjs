@@ -115,8 +115,7 @@ ok("R16h. generate job returns a Korean pipeline report",
   /report_ko: buildJobReportKo\(row\)/.test(job) &&
   /생성 보고서/.test(job) &&
   /Writer가 거절된 글을 다시 썼는가/.test(job) &&
-  /jobReport/.test(page) &&
-  /report_ko/.test(page));
+  !/setJobReport/.test(page));
 ok("R17. recovery checks existing Pool first", /availableSeedPool: pool/.test(job) && /RESELECT_EXISTING/.test(planner));
 ok("R18. Planner can request targeted Seed exploration", /TARGETED_EXPLORE/.test(planner) && /planner_exploration_direction/.test(job + seed));
 ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent Seed rejection/.test(planner));
