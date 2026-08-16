@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isTransientEdgeError, koreanEdgeError } from "@/lib/transient-edge-error";
@@ -51,6 +51,8 @@ function GeneratePageInner() {
   const [lafcOpponent, setLafcOpponent] = useState("");
   const [lafcHome, setLafcHome] = useState<"HOME" | "AWAY" | "UNKNOWN">("UNKNOWN");
   const supabase = createClient();
+  const stopRef = useRef(false);
+  const jobIdRef = useRef("");
 
   useEffect(() => {
     if (startParam) setStartDate(startParam);
@@ -121,6 +123,7 @@ function GeneratePageInner() {
   }
 
   function applyJob(job: any) {
+    if (job?.job_id) jobIdRef.current = String(job.job_id);
     if (job?.label_ko) setPhase(String(job.label_ko));
     if (job?.summary) setPlanSummary(String(job.summary));
     if (typeof job?.saved_count === "number") setDoneCount(job.saved_count);
@@ -131,7 +134,9 @@ function GeneratePageInner() {
   }
 
   async function followJob(session: any, jobId: string) {
+    jobIdRef.current = jobId;
     for (let i = 0; i < 200; i++) {
+      if (stopRef.current) return;
       const started = Date.now();
       try {
         const job = await edgeCall(session, { phase: "job_tick", job_id: jobId });
@@ -177,7 +182,14 @@ function GeneratePageInner() {
       if (!session?.access_token || cancelled) return;
       try {
         const st = await edgeCall(session, { phase: "job_status" });
-        if (cancelled || !st?.success || !st.job_id || st.status !== "running") return;
+        if (cancelled || !st?.success || !st.job_id) return;
+        if (st.status === "error" && /배포로 이전|생성을 멈췄/.test(String(st.error || st.label_ko || ""))) {
+          setError(String(st.error || st.label_ko));
+          return;
+        }
+        if (st.status !== "running") return;
+        stopRef.current = false;
+        jobIdRef.current = String(st.job_id);
         setBusy(true);
         applyJob(st);
         await followJob(session, String(st.job_id));
@@ -194,7 +206,26 @@ function GeneratePageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function stopRunningJob() {
+    stopRef.current = true;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token || !jobIdRef.current) return;
+      const stopped = await edgeCall(session, { phase: "job_stop", job_id: jobIdRef.current });
+      applyJob(stopped);
+      setPhase(stopped.label_ko || "생성 멈춤");
+      setError(stopped.error || "생성을 멈췄습니다.");
+    } catch (e: any) {
+      setError(koreanEdgeError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runPlanAndGenerate() {
+    stopRef.current = false;
     setBusy(true);
     setError("");
     setDoneCount(0);
@@ -418,6 +449,15 @@ function GeneratePageInner() {
       >
         {busy ? "생성 중…" : "7일 전략 만들기"}
       </button>
+      {busy && (
+        <button
+          type="button"
+          onClick={stopRunningJob}
+          className="mt-3 w-full rounded-xl border border-zinc-600 py-3 text-sm text-zinc-200 hover:bg-zinc-900"
+        >
+          멈추기
+        </button>
+      )}
     </main>
   );
 }

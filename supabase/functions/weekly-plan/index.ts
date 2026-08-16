@@ -51,14 +51,14 @@ import {
   QUOTA_PER_DAY_MIN,
   QUOTA_PER_DAY_MAX,
 } from "./quota-inference.ts";
-import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob } from "./generation-job.ts";
+import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob, stopWeeklyJob } from "./generation-job.ts";
 import { overlayClusterWeightsWithIntent14d } from "./creator-intent-14d.ts";
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "12.1.1";
+const APP_VERSION = "12.1.2";
 const WEEKLY_ENGINE_VERSION = "v11_judge_owns_count";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -158,19 +158,26 @@ Deno.serve(async (req) => {
             ? body.publishedTopics21d.map(String)
             : [],
         scheduledTopics: Array.isArray(body.scheduledTopics) ? body.scheduledTopics.map(String) : [],
+        appVersion: APP_VERSION,
       });
       return json({ ...job, phase: "job_start", app_version: APP_VERSION, timing: { total_ms: Date.now() - t0 } });
     }
     if (phase === "job_status") {
-      const job = await statusWeeklyJob(supabase, user.id, body.job_id ? String(body.job_id) : undefined);
+      const job = await statusWeeklyJob(supabase, user.id, body.job_id ? String(body.job_id) : undefined, APP_VERSION);
       if (!job) return json({ success: false, error: "job not found", phase: "job_status" }, 404);
       return json({ ...job, phase: "job_status", app_version: APP_VERSION });
     }
     if (phase === "job_tick") {
       const jobId = String(body.job_id || "");
       if (!jobId) return json({ success: false, error: "job_id required", phase: "job_tick" }, 400);
-      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey });
+      const job = await tickWeeklyJob({ supabase, userId: user.id, jobId, xaiKey, appVersion: APP_VERSION });
       return json({ ...job, phase: "job_tick", app_version: APP_VERSION, timing: { total_ms: Date.now() - t0 } });
+    }
+    if (phase === "job_stop") {
+      const jobId = String(body.job_id || "");
+      if (!jobId) return json({ success: false, error: "job_id required", phase: "job_stop" }, 400);
+      const job = await stopWeeklyJob(supabase, user.id, jobId);
+      return json({ ...job, phase: "job_stop", app_version: APP_VERSION });
     }
 
     if (phase === "quota") {
@@ -694,7 +701,7 @@ Deno.serve(async (req) => {
     }
 
     return json(
-      { success: false, error: "phase required: job_start | job_tick | job_status | expand | judge | select | write", engine: WEEKLY_ENGINE_VERSION, days: [] },
+      { success: false, error: "phase required: job_start | job_tick | job_status | job_stop | expand | judge | select | write", engine: WEEKLY_ENGINE_VERSION, days: [] },
       400
     );
   } catch (err: any) {
