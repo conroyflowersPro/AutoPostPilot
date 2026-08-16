@@ -198,6 +198,8 @@ function GeneratePageInner() {
     setBusy(true);
     setError("");
     setDoneCount(0);
+    setRejectLog([]);
+    setLastReject("");
     setPlanSummary("");
     try {
       const {

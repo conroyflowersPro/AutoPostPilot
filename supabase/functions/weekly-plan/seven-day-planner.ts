@@ -542,7 +542,7 @@ function recoverySystem(): string {
     "You are the seven-day Planner recovering one slot after Semantic Judge rejected a completed post.",
     "Judge rejection is not permanent Seed rejection. Reconsider the slot in the context of the whole seven-day strategy.",
     "Use the existing Seed pool first. You may preserve or adjust the slot strategic role, Editorial Mode, and Planner Intent. Do not write the post and do not prescribe creative form.",
-    "If an existing Seed fits, choose RESELECT_EXISTING and a seed_id from available_seed_pool. Reusing the rejected Seed is allowed when the seven-day plan still needs that kind. already_saved_seed_ids and remaining_unwritten_seed_ids are facts, not bans. If none fits, choose TARGETED_EXPLORE and describe only the field/direction Seed Generator should explore.",
+    "If an existing Seed fits, choose RESELECT_EXISTING and a seed_id from available_seed_pool. Reusing the rejected Seed is allowed when the seven-day plan still needs that kind, unless it is in abandoned_seed_ids. abandoned_seed_ids are discarded Seeds: never pick them. already_saved_seed_ids and remaining_unwritten_seed_ids are facts, not bans. If none fits, choose TARGETED_EXPLORE and describe only the field/direction Seed Generator should explore. Seed Generator will then return a batch of candidates in that field, not one seed.",
     "Do not treat a different possible writing choice as a reason to redesign strategy. Use Judge reasons only to understand why the final post was not publishable.",
     "Return strict JSON with action, seed_id, strategic_role, editorial_mode, planner_intent, exploration_direction. No prose outside JSON.",
   ].join("\n");

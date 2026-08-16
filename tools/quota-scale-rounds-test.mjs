@@ -41,7 +41,7 @@ ok("Q2. Edge expand batch stays 10 at any quota", /const EXPAND_BATCH = 10/.test
 ok("Q3. write chunk stays 1", /export const WRITE_CHUNK = 1/.test(scale) && /const WRITE_CHUNK = 1/.test(job));
 ok("Q4. 28-slot budget exceeds frozen 12", expandRoundBudget(28) > 12);
 ok("Q5. 56-slot fill at ~3 seeds/round", expandRoundBudget(56) >= Math.ceil((56 * 1.2) / 3));
-ok("Q6. Planner-targeted expansion remains one bounded batch", /refillRequestCount/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
+ok("Q6. Planner-targeted expansion is a 10-seed field batch", /TARGETED_EXPLORE_SEED_COUNT = 10/.test(job) && /const EXPAND_BATCH = 10/.test(job));
 ok("Q7. 56-slot prior subjects > 80", priorSubjectCap(56) > 80);
 ok("Q8. job uses expandRoundBudget(requiredSlots)", /expandRoundBudget\(quota\.required_slots\)/.test(job) || /expandRoundBudget\(required/.test(job));
 ok("Q9. Planner recovery is bounded", /pending\.attempts > 4/.test(job));

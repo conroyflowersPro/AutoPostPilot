@@ -85,6 +85,7 @@ export type JobPublic = {
   error: string | null;
   last_reject_ko?: string;
   reject_log?: string[];
+  report_ko?: string;
   learning?: unknown;
 };
 
@@ -123,6 +124,71 @@ function appendRejectLog(st: any, line: string) {
   if (st.reject_log.length > 40) st.reject_log = st.reject_log.slice(-40);
 }
 
+function clip(text: unknown, n: number): string {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  return s.length > n ? `${s.slice(0, n)}…` : s;
+}
+
+function countBag(items: string[]): string {
+  const bag: Record<string, number> = {};
+  for (const item of items) {
+    const key = String(item || "UNKNOWN").trim() || "UNKNOWN";
+    bag[key] = Number(bag[key] || 0) + 1;
+  }
+  const parts = Object.entries(bag).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return parts.length ? parts.map(([k, n]) => `${k} ${n}`).join(", ") : "없음";
+}
+
+function buildJobReportKo(row: any): string {
+  const st = row?.state || {};
+  const gated: any[] = Array.isArray(st.gated) ? st.gated : [];
+  const targeted = gated.filter((s) => String(s?.source_type || "") === "PLANNER_TARGETED_EXPLORATION");
+  const outcomes: any[] = Array.isArray(st.write_outcomes) ? st.write_outcomes : [];
+  const history: any[] = Array.isArray(st.recovery_history) ? st.recovery_history : [];
+  const abandoned = [...abandonedSeedIds(st)];
+  const passN = outcomes.filter((o) => String(o?.final_text || "").trim() && String(o?.judge_status || "") !== "REJECT").length;
+  const rejectN = outcomes.filter((o) => String(o?.judge_status || "") === "REJECT" || !String(o?.final_text || "").trim()).length;
+  const lines: string[] = [
+    "생성 보고서",
+    `목표 슬롯 ${Number(row.required_slots) || 0} · PASS 저장 ${Number(row.saved_count) || 0} · 상태 ${row.status || ""}`,
+    "",
+    `1. Seed Generator 후보 ${gated.length}개`,
+    `   유형(cluster): ${countBag(gated.map((s) => String(s?.cluster || "UNKNOWN")))}`,
+    `   모드: ${countBag(gated.map((s) => String(s?.requested_editorial_mode || s?.editorial_mode || "INFORMATIVE")))}`,
+    `   Planner 지정 분야 재추출 ${targeted.length}개 (한 번에 최대 ${TARGETED_EXPLORE_SEED_COUNT}개)`,
+  ];
+  for (const seed of gated.slice(0, 40)) {
+    lines.push(`   - ${clip(seed?.seed_id, 24)} · ${clip(seed?.cluster, 24)} · ${clip(seed?.concrete_subject, 80)}`);
+  }
+  if (gated.length > 40) lines.push(`   …외 ${gated.length - 40}개`);
+  lines.push("", `2. Writer → Judge ${outcomes.length}회 (거절 문장은 지우고 새 배차로만 다시 씀)`);
+  for (const o of outcomes.slice(-60)) {
+    const pass = String(o?.final_text || "").trim() && String(o?.judge_status || "") !== "REJECT";
+    const reasons = judgeReasonsKo(o?.block_reasons || o?.judge_reasons || []);
+    lines.push(
+      `   - ${pass ? "PASS" : "REJECT"} · seed ${clip(o?.seed_id, 24) || "?"} · ${clip(o?.concrete_subject || o?.slotId, 60)}`,
+    );
+    if (pass) lines.push(`     글: ${clip(o?.final_text, 140) || "(저장됨)"}`);
+    else lines.push(`     이유: ${reasons}`);
+  }
+  lines.push("", `3. Judge 거절 ${rejectN} · Writer/Judge 시도 중 PASS ${passN}`);
+  lines.push("", "4. Planner 재배차");
+  if (!history.length) lines.push("   없음");
+  for (const h of history.slice(-40)) {
+    const action = String(h?.action || "");
+    if (action === "TARGETED_EXPLORE") {
+      lines.push(`   - 슬롯 ${clip(h?.strategy_slot_id, 24)} · 후보 없음 → Seed Generator 그 분야 10개 · ${clip(h?.exploration_direction, 80)}`);
+    } else {
+      lines.push(`   - 슬롯 ${clip(h?.strategy_slot_id, 24)} · 시드 ${clip(h?.from_seed_id, 24) || "?"} → ${clip(h?.to_seed_id, 24) || "?"} (${action || "RESELECT"})`);
+    }
+  }
+  lines.push("", `5. Planner가 버린 Seed(3회 거절) ${abandoned.length}개: ${abandoned.length ? abandoned.map((id) => clip(id, 24)).join(", ") : "없음"}`);
+  lines.push("6. Writer가 거절된 글을 다시 썼는가: 아니오. Judge 거절 문장은 비우고 Planner가 고른 Seed로 새로 씀.");
+  lines.push(`7. Seed 재추출: ${targeted.length || history.some((h) => h?.action === "TARGETED_EXPLORE") ? "있음 (해당 분야만, 전체 풀 재시작 아님)" : "없음"}`);
+  return lines.join("\n");
+}
+
 function rejectLogFromState(st: any): string[] {
   if (Array.isArray(st.reject_log) && st.reject_log.length) return st.reject_log.slice(-40);
   const out: string[] = [];
@@ -148,7 +214,8 @@ function quotaFilled(row: any): boolean {
 }
 
 const SEED_REJECT_ABANDON = 3;
-const JOB_RECOVERY_CAP_MULT = 2;
+/** Planner-targeted Seed Generator refill is one batch of this size, not a single seed. */
+const TARGETED_EXPLORE_SEED_COUNT = 10;
 
 function seedIdOf(slot: any): string {
   return String(slot?.seed_id || "").trim();
@@ -204,11 +271,25 @@ function takeQueuedRecovery(st: any): any | null {
   st.recovery_queue = Array.isArray(st.recovery_queue) ? st.recovery_queue : [];
   while (st.recovery_queue.length) {
     const next = st.recovery_queue.shift();
-    const id = seedIdOf(next?.slot || next);
-    if (id && abandonedSeedIds(st).has(id)) continue;
-    return next;
+    if (next) return next;
   }
   return null;
+}
+
+function slotExplorationDirection(slot: any): string {
+  return String(slot?.planner_intent || slot?.cluster || slot?.concrete_subject || "creator adjacent field").slice(0, 240);
+}
+
+function requestTargetedSeedRefill(row: any, pending: any, reason: string) {
+  const st = row.state;
+  const slot = pending?.slot || pending;
+  st.planner_exploration_direction = slotExplorationDirection(slot);
+  st.planner_missing_count = TARGETED_EXPLORE_SEED_COUNT;
+  st.max_expand = Number(st.max_expand || 0) + 4;
+  st.pending_recovery = pending;
+  row.step = "expand";
+  row.label_ko = "Planner 지정 분야 Seed 추가 탐색…";
+  row.summary = [row.summary, reason].filter(Boolean).join("\n");
 }
 
 function beginRecoverIfQueueReady(row: any, required: number): boolean {
@@ -235,7 +316,7 @@ function candidatePoolTarget(requiredSlots: number): number {
 
 function refillRequestCount(deficit: number): number {
   const missing = Math.max(1, Math.ceil(Number(deficit) || 1));
-  return Math.min(EXPAND_BATCH, Math.max(4, missing + 3));
+  return Math.min(EXPAND_BATCH, Math.max(TARGETED_EXPLORE_SEED_COUNT, missing));
 }
 
 function bumpReason(bag: Record<string, number>, reason: string, n = 1): void {
@@ -388,6 +469,7 @@ function publicView(row: any): JobPublic {
     error: row.error || null,
     last_reject_ko: state.last_reject_ko || "",
     reject_log: rejectLogFromState(state),
+    report_ko: buildJobReportKo(row),
     learning: state.learning || null,
   };
 }
@@ -689,7 +771,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const discoveryRemaining = Math.max(0, poolTarget - (st.gated || []).length);
   const targetedExploration = String(st.planner_exploration_direction || "").trim();
   const requestedNow = targetedExploration
-    ? refillRequestCount(Number(st.planner_missing_count || 1))
+    ? TARGETED_EXPLORE_SEED_COUNT
     : Math.max(1, Math.min(EXPAND_BATCH, discoveryRemaining));
   const existingHeld: ConcreteSeed[] = priorSubjects.map((s: string, i: number) => ({
     seed_id: `prior-${i + 1}`,
@@ -1092,30 +1174,34 @@ async function stepRecover(xaiKey: string, row: any) {
   }
   pending.attempts = Number(pending.attempts || 0) + 1;
   if (pending.attempts > 4) {
-    row.status = "error";
-    row.error = `Planner recovery 한도 초과: ${pending.strategy_slot_id || pending.slotId || "slot"}`;
-    row.label_ko = "Planner recovery 한도";
+    pending.attempts = 0;
+    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
+    st.recovery_history.push({
+      strategy_slot_id: pending.strategy_slot_id,
+      action: "TARGETED_EXPLORE",
+      from_seed_id: seedIdOf(pending.slot || pending),
+      to_seed_id: "",
+      exploration_direction: slotExplorationDirection(pending.slot || pending),
+      judge_reasons: pending.judge_reasons || [],
+    });
+    requestTargetedSeedRefill(row, pending, `Planner recovery JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
     return;
   }
   const rejectedSeedId = seedIdOf(pending.slot || pending);
-  if (rejectedSeedId && abandonedSeedIds(st).has(rejectedSeedId)) {
-    st.pending_recovery = null;
-    if (!beginRecoverIfQueueReady(row, Number(row.required_slots) || 0)) {
-      row.step = "write";
-      row.label_ko = `초안 생성 ${row.saved_count}/${row.required_slots}…`;
-    }
-    return;
-  }
-  st.job_recovery_count = Number(st.job_recovery_count || 0) + 1;
-  const recoveryCap = Math.max(2, (Number(row.required_slots) || 7) * JOB_RECOVERY_CAP_MULT);
-  if (st.job_recovery_count > recoveryCap) {
-    st.pending_recovery = null;
-    st.recovery_queue = [];
-    row.step = "write";
-    row.label_ko = `재배차 한도 · 남은 글 작성 ${row.saved_count}/${row.required_slots}…`;
-    return;
-  }
   const pool = recoverSeedPool(st);
+  if (!pool.length) {
+    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
+    st.recovery_history.push({
+      strategy_slot_id: pending.strategy_slot_id,
+      action: "TARGETED_EXPLORE",
+      from_seed_id: rejectedSeedId,
+      to_seed_id: "",
+      exploration_direction: slotExplorationDirection(pending.slot || pending),
+      judge_reasons: pending.judge_reasons || [],
+    });
+    requestTargetedSeedRefill(row, pending, `Planner Seed 후보 없음 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
+    return;
+  }
   const result = await recoverRejectedPlannerSlot({
     xaiKey,
     strategy,
@@ -1139,21 +1225,19 @@ async function stepRecover(xaiKey: string, row: any) {
   st.recovery_history.push({
     strategy_slot_id: pending.strategy_slot_id,
     action: result.value.action,
+    from_seed_id: seedIdOf(pending.slot || pending),
+    to_seed_id: result.value.action === "RESELECT_EXISTING" ? result.value.seed_id : "",
+    exploration_direction: result.value.exploration_direction || "",
     judge_reasons: pending.judge_reasons || [],
   });
   if (result.value.action === "TARGETED_EXPLORE") {
-    st.planner_exploration_direction = result.value.exploration_direction;
-    st.planner_missing_count = 1;
-    st.max_expand = Number(st.max_expand || 0) + 3;
-    row.step = "expand";
-    row.label_ko = "Planner 지정 분야 Seed 추가 탐색…";
+    requestTargetedSeedRefill(row, pending, `Planner TARGETED_EXPLORE → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
+    st.planner_exploration_direction = result.value.exploration_direction || st.planner_exploration_direction;
     return;
   }
   const seed = pool.find((candidate: any) => String(candidate.seed_id || "") === result.value!.seed_id);
   if (!seed) {
-    row.status = "error";
-    row.error = "Planner recovery selected unavailable Seed";
-    row.label_ko = "Planner recovery Seed 없음";
+    requestTargetedSeedRefill(row, pending, `Planner가 없는 Seed를 고름 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
     return;
   }
   const original = pending.slot || {};
@@ -1663,6 +1747,9 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       slot_id: p.slotId,
       strategy_slot_id: chunk[k]?.strategy_slot_id || null,
       seed_id: chunk[k]?.seed_id || null,
+      concrete_subject: chunk[k]?.concrete_subject || p.concrete_subject || "",
+      cluster: chunk[k]?.cluster || chunk[k]?.topic_cluster || "",
+      editorial_mode: chunk[k]?.editorial_mode || "",
       final_text: text,
       generation_status: p.generation_status,
       judge_status: p.judge_status || "",
@@ -1678,8 +1765,6 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     if (!text) {
       st.write_errors = [...(st.write_errors || []), `${p.slotId || "slot"} 빈 초안`];
       const strategySlotId = String(chunk[k]?.strategy_slot_id || chunk[k]?.slotId || p.slotId || "slot");
-      st.writer_retry_counts = st.writer_retry_counts || {};
-      const retries = Number(st.writer_retry_counts[strategySlotId] || 0);
       const rejected = String(p.judge_status || "") === "REJECT";
       const seedId = seedIdOf(chunk[k]);
       const reasons = (p.block_reasons && p.block_reasons.length)
@@ -1690,23 +1775,19 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       st.last_reject_ko = `Judge 거절 · ${subject} · ${reasonKo}`;
       appendRejectLog(st, st.last_reject_ko);
       row.summary = [row.summary, st.last_reject_ko].filter(Boolean).join("\n");
-      if (rejected || retries >= 1) {
-        const rejects = rejected ? bumpSeedReject(st, seedId) : Number(st.seed_reject_counts?.[seedId] || 0);
-        if (rejects < SEED_REJECT_ABANDON) {
-          enqueueRecovery(st, {
-            slot: chunk[k],
-            strategy_slot_id: strategySlotId,
-            seed_id: seedId,
-            judge_reasons: reasons,
-            attempts: 0,
-          });
-        } else {
-          row.summary = [row.summary, `Seed 3회 거절 후 포기 ${seedId || strategySlotId}`].filter(Boolean).join("\n");
+      if (rejected) {
+        const rejects = bumpSeedReject(st, seedId);
+        if (rejects >= SEED_REJECT_ABANDON) {
+          row.summary = [row.summary, `Planner가 Seed 3회 거절 후 버림 ${seedId || strategySlotId} · 슬롯은 재배차`].filter(Boolean).join("\n");
         }
-      } else {
-        st.writer_retry_counts[strategySlotId] = retries + 1;
-        st.write_flat.push({ ...chunk[k], _saved: false });
       }
+      enqueueRecovery(st, {
+        slot: chunk[k],
+        strategy_slot_id: strategySlotId,
+        seed_id: seedId,
+        judge_reasons: reasons,
+        attempts: 0,
+      });
       continue;
     }
     let ins = await supabase.from("SeungContent").insert({
