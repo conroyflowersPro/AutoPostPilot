@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 12.1.3", /const APP_VERSION = "12.1.3"/.test(ix));
+ok("J15. shipping 12.1.4", /const APP_VERSION = "12.1.4"/.test(ix));
 ok("J24. empty write returns to Planner and never reports a short success", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job));
 ok("J25. live Planner has no local HIGH repetition gate", !/conceptualRepetitionLevel/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
@@ -64,6 +64,7 @@ ok("J35. job_status exposes report_ko", /report_ko/.test(job) && /생성 보고�
 ok("J36. deploy retires unstamped or other-version running jobs", /retireStaleRunningJob/.test(job) && /배포로 이전 생성을 멈췄습니다/.test(job) && /app_version: args\.appVersion/.test(job));
 ok("J37. operator can stop a running job", /stopWeeklyJob/.test(job) && /멈추기/.test(gen) && /phase: "job_stop"/.test(gen));
 ok("J38. Planner select timeout uses pool instead of looping field explore", /fillUnassignedPlannerSlotsFromPool/.test(job) && /explored_missing/.test(job));
+ok("J39. lived pool is not collapsed by abstract subject", /lived:\$\{String\(seed\.seed_id/.test(job));
 
 console.log("========================================");
 console.log(`JOB TICKS: ${pass} PASS / ${fail} FAIL`);

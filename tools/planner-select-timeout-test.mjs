@@ -17,7 +17,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Planner select timeout (v12.1.3)");
+console.log("Planner select timeout (v12.1.4)");
 ok("S1. select timeout retries once then uses the existing pool",
   /st\.select_timeouts/.test(job) && /기존 Pool로/.test(job) && /fillUnassignedPlannerSlotsFromPool/.test(job));
 ok("S2. same missing fingerprint is not expanded forever",
@@ -28,6 +28,10 @@ ok("S4. expand timeout with a pool goes to Planner, not hold-forever",
   /공개 검색 시간 초과 · 기존 Seed Pool로 Planner 이어감/.test(job));
 ok("S5. targeted field explore skips live x_search",
   /const compact = !!st\.compact_next \|\| !!targetedExploration/.test(job));
+ok("S6. lived seeds stay distinct by seed_id; week continues while days remain",
+  /lived:\$\{String\(seed\.seed_id/.test(job) &&
+  /if \(remain\.length\)/.test(job) &&
+  !/remain\.some\(\(d\) => !days\.includes\(d\)\)/.test(job));
 
 console.log("========================================");
 console.log(`PLANNER SELECT TIMEOUT: ${pass} PASS / ${fail} FAIL`);
