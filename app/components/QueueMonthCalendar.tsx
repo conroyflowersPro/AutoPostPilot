@@ -1,5 +1,10 @@
 import Link from "next/link";
 import type { InscribedDay } from "@/lib/calendar/planner-inscribe";
+import {
+  dateInInclusiveWindow,
+  formatKoRange,
+  type AnalyticsCalendarCoverage,
+} from "@/lib/calendar/analytics-coverage";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -17,9 +22,13 @@ export default function QueueMonthCalendar(props: {
   month: number;
   days: InscribedDay[];
   lastSyncAt?: string | null;
+  analytics?: AnalyticsCalendarCoverage | null;
 }) {
-  const { year, month, days, lastSyncAt } = props;
+  const { year, month, days, lastSyncAt, analytics } = props;
   const byDate = new Map(days.map((d) => [d.date, d.kinds]));
+  const analyticsFrom = analytics?.from || "";
+  const analyticsTo = analytics?.to || "";
+  const hasAnalytics = Boolean(analyticsFrom && analyticsTo && analytics && analytics.originals > 0);
   const first = new Date(year, month - 1, 1);
   const startPad = first.getDay();
   const dim = new Date(year, month, 0).getDate();
@@ -53,8 +62,16 @@ export default function QueueMonthCalendar(props: {
         </div>
       </div>
       <p className="mb-3 text-[11px] text-zinc-500">
-        Planner가 「지금 동기화」 기록만 기입합니다. 수제·AP·인용·재게시는 그날 있는 종류만 숫자로 나옵니다. 큐에서 지운 초안은 여기 없습니다.
+        수제·AP·인용·재게시는 「지금 동기화」입니다. 노란 칸은 30일 X Analytics 창입니다. 창이 끊긴 날은 비어 보이는 것이 정상입니다.
       </p>
+      {hasAnalytics ? (
+        <p className="mb-3 text-[11px] text-amber-200/80">
+          X Analytics {formatKoRange(analyticsFrom, analyticsTo)} · 원글 {analytics.originals} · 가져옴{" "}
+          {analytics.imported_at || "—"}
+        </p>
+      ) : (
+        <p className="mb-3 text-[11px] text-zinc-600">X Analytics 30일 창이 아직 없습니다.</p>
+      )}
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-500">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
@@ -68,13 +85,24 @@ export default function QueueMonthCalendar(props: {
             return <div key={`pad-${i}`} className="min-h-[4.2rem] rounded-lg bg-zinc-950/20" />;
           }
           const kinds = byDate.get(cell.date) || [];
+          const inAnalytics = hasAnalytics && dateInInclusiveWindow(cell.date, analyticsFrom, analyticsTo);
+          const analyticsN = inAnalytics ? Number(analytics?.originalsByDate?.[cell.date] || 0) : 0;
           return (
             <div
               key={cell.date}
-              className="min-h-[4.2rem] rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-1"
+              className={
+                inAnalytics
+                  ? "min-h-[4.2rem] rounded-lg border border-amber-800/70 bg-amber-950/30 p-1"
+                  : "min-h-[4.2rem] rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-1"
+              }
             >
               <div className="text-[10px] text-zinc-500">{cell.dayNum}</div>
               <div className="mt-0.5 space-y-0.5">
+                {inAnalytics ? (
+                  <div className="text-[10px] leading-tight text-amber-200">
+                    Analytics {analyticsN}
+                  </div>
+                ) : null}
                 {kinds.map((k) => (
                   <div key={k.key} className="text-[10px] leading-tight text-zinc-300">
                     {k.label} {k.n}

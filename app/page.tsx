@@ -7,6 +7,7 @@ import CollectMaxButton from "./components/CollectMaxButton";
 import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
 import EvidenceExportButton from "./components/EvidenceExportButton";
 import { getAccountSyncState, getQueueMonthInscription } from "@/lib/calendar/activity-provider";
+import { loadBundledAnalyticsCoverage } from "@/lib/calendar/load-analytics-coverage";
 
 function syncLabel(status: string) {
   switch (status) {
@@ -59,6 +60,7 @@ export default async function HomePage({
     getAccountSyncState(),
     getQueueMonthInscription(year, month),
   ]);
+  const analytics = loadBundledAnalyticsCoverage();
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -116,6 +118,7 @@ export default async function HomePage({
           month={month}
           days={inscribed.days}
           lastSyncAt={account.lastSuccessfulSyncAt || null}
+          analytics={analytics}
         />
 
         <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
