@@ -83,8 +83,32 @@ export type JobPublic = {
   required_slots: number;
   summary: string;
   error: string | null;
+  last_reject_ko?: string;
   learning?: unknown;
 };
+
+const JUDGE_REASON_KO: Record<string, string> = {
+  empty_final_text: "빈 글",
+  fabricated_experience: "없는 경험 날조",
+  fabricated_factual_claim: "사실 날조",
+  seed_meaning_departure: "배정 Seed와 다른 글",
+  question_closer: "물음표로 끝내는 참여 유도",
+  expert_jargon: "전문가 jargon",
+  token_stutter: "토큰 반복",
+  generic_thesis: "일반론 결론",
+  creator_identity_contradiction: "Creator 정체성 충돌",
+  manual_text_leakage: "원문 누수",
+  WRITER_FAILURE: "Writer 실패",
+};
+
+function judgeReasonsKo(reasons: unknown[]): string {
+  const raw = (reasons || []).map((r) => String(r || "").trim()).filter(Boolean);
+  if (!raw.length) return "이유 없음";
+  return raw
+    .map((r) => JUDGE_REASON_KO[r] || r)
+    .slice(0, 6)
+    .join(", ");
+}
 
 function expandRoundBudget(requiredSlots: number): number {
   const slots = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
@@ -336,6 +360,7 @@ function publicView(row: any): JobPublic {
     required_slots: Number(row.required_slots) || 0,
     summary: row.summary || "",
     error: row.error || null,
+    last_reject_ko: state.last_reject_ko || "",
     learning: state.learning || null,
   };
 }
@@ -1630,6 +1655,11 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       const retries = Number(st.writer_retry_counts[strategySlotId] || 0);
       const rejected = String(p.judge_status || "") === "REJECT";
       const seedId = seedIdOf(chunk[k]);
+      const reasons = p.block_reasons || [String(p.judge_status || "WRITER_FAILURE")];
+      const subject = String(chunk[k]?.concrete_subject || chunk[k]?.primaryTopic || p.slotId || "slot").slice(0, 40);
+      const reasonKo = judgeReasonsKo(reasons);
+      st.last_reject_ko = `Judge 거절 · ${subject} · ${reasonKo}`;
+      row.summary = [row.summary, st.last_reject_ko].filter(Boolean).join("\n");
       if (rejected || retries >= 1) {
         const rejects = rejected ? bumpSeedReject(st, seedId) : Number(st.seed_reject_counts?.[seedId] || 0);
         if (rejects < SEED_REJECT_ABANDON) {
@@ -1637,7 +1667,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
             slot: chunk[k],
             strategy_slot_id: strategySlotId,
             seed_id: seedId,
-            judge_reasons: p.block_reasons || [String(p.judge_status || "WRITER_FAILURE")],
+            judge_reasons: reasons,
             attempts: 0,
           });
         } else {

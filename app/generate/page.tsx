@@ -44,6 +44,7 @@ function GeneratePageInner() {
   const [error, setError] = useState("");
   const [doneCount, setDoneCount] = useState(0);
   const [planSummary, setPlanSummary] = useState("");
+  const [lastReject, setLastReject] = useState("");
   const [lafcMatches, setLafcMatches] = useState<LafcMatch[]>([]);
   const [lafcDate, setLafcDate] = useState("");
   const [lafcOpponent, setLafcOpponent] = useState("");
@@ -122,6 +123,7 @@ function GeneratePageInner() {
     if (job?.label_ko) setPhase(String(job.label_ko));
     if (job?.summary) setPlanSummary(String(job.summary));
     if (typeof job?.saved_count === "number") setDoneCount(job.saved_count);
+    if (job?.last_reject_ko) setLastReject(String(job.last_reject_ko));
   }
 
   async function followJob(session: any, jobId: string) {
@@ -380,6 +382,7 @@ function GeneratePageInner() {
         </pre>
       )}
       {phase && <p className="mb-2 text-sm text-violet-300">{phase}</p>}
+      {lastReject && <p className="mb-2 text-sm text-amber-300">{lastReject}</p>}
       {doneCount > 0 && !busy && (
         <a
           href="/"

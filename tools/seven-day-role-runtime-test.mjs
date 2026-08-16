@@ -84,6 +84,11 @@ ok("R16b. Planner requeues the recovered slot as the next Writer/Judge pass",
   /st\.write_index = insertAt/.test(job) &&
   /Planner 재배차 → Writer 재작성/.test(job) &&
   /skipSelectiveRegen: true/.test(job));
+ok("R16d. Judge reject reasons are shown to the operator",
+  /last_reject_ko/.test(job) &&
+  /JUDGE_REASON_KO/.test(job) &&
+  /Judge 거절 ·/.test(job) &&
+  /lastReject/.test(page));
 ok("R16c. Judge reject does not bounce recover before remaining planned writes",
   /enqueueRecovery/.test(job) &&
   /beginRecoverIfQueueReady/.test(job) &&
