@@ -11,7 +11,7 @@ const index = existsSync(INDEX) ? readFileSync(INDEX, "utf8") : "";
 console.log("ORDER 7B HOTFIX live xAI writer tests");
 ok("H1. callGrokWriter exists", /export async function callGrokWriter/.test(mod));
 ok("H2. generateIndependentPost is async", /export async function generateIndependentPost/.test(mod));
-ok("H3. api.x.ai chat completions URL", /api\.x\.ai\/v1\/chat\/completions/.test(mod) && !/api\.openai\.com/.test(mod));
+ok("H3. api.x.ai Agent Tools responses URL", /api\.x\.ai\/v1\/responses/.test(mod) && /x_search/.test(mod) && !/search_parameters/.test(mod) && !/api\.openai\.com/.test(mod));
 ok("H4. uses buildConstraintOnlyWriterInstructions in live path", /buildConstraintOnlyWriterInstructions\(ctx\)/.test(mod));
 ok("H5. explicit dry_run only", /explicitDryRun|options\.dry_run === true/.test(mod));
 ok("H6. no_key returns RETRY not fake GENERATED", /xai_key_missing/.test(mod) && /writer_mode: "no_key"/.test(mod));
@@ -28,7 +28,7 @@ ok("H14. v11 write phase wired", /phase === "write"/.test(index) && /writeSlotBa
 ok("H15. pipeline passes xai_key", /xai_key: args\.xaiKey/.test(pipe));
 ok("H16. pipeline uses integrateSlotGeneration", /integrateSlotGeneration/.test(pipe));
 ok("H17. writer and seed models are grok-4.6", /V11_WRITER_MODEL = "grok-4.6"/.test(pipe) && /V11_SEED_MODEL = "grok-4.6"/.test(pipe));
-ok("H18. index APP 11.12.5", /APP_VERSION = "11.12.5"/.test(index));
+ok("H18. index APP 11.12.6", /APP_VERSION = "11.12.6"/.test(index));
 ok("H19. index engine inferred quota fill", /v11_inferred_quota_fill/.test(index));
 ok("H20. generate-post not the write path in index", !/functions\/v1\/generate-post/.test(index));
 ok("H21. dry_run_generation explicit body flag only", /dry_run_generation/.test(index));

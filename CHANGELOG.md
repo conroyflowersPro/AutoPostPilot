@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.6 — 2026-08-16
+
+- Writer는 폐기된 Live Search(`search_parameters`) 대신 xAI Agent Tools를 씁니다. `/v1/responses`에 `x_search`와 `web_search`만 켭니다
+- 검색은 공개 사실 확인용입니다. 남의 글을 초안으로 베끼지 않습니다. 새 API 키는 필요 없고 기존 xAI 키를 씁니다
+
 ## 11.12.5 — 2026-08-16
 
 - 주간 잡이 `report_ko`를 남깁니다. 시드 개수·유형, Writer/Judge 결과, Planner 재배차, Seed 재추출을 에이전트가 잡을 읽고 여기에 보고합니다. 운영자 생성 화면에는 보고서를 띄우지 않습니다

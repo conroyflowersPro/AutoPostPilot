@@ -1,5 +1,5 @@
 /**
- * Operator ↔ Cursor-agent collaboration lock (v11.12.5).
+ * Operator ↔ Cursor-agent collaboration lock (v11.12.6).
  * This is how the coding agent talks and works with @Seung4680.
  * It is NOT Creator DNA, NOT Writer voice, NOT a post prompt.
  * Do not inject this block into Grok quota/seed or Grok writer.

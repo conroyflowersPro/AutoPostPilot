@@ -458,9 +458,25 @@ export type WriterCallResult = {
   attempted: boolean;
 };
 
+function extractXaiResponsesText(parsed: any): string {
+  const direct = s(parsed?.output_text);
+  if (direct.length >= 4) return direct;
+  const chunks: string[] = [];
+  for (const item of Array.isArray(parsed?.output) ? parsed.output : []) {
+    if (typeof item?.text === "string") chunks.push(item.text);
+    for (const part of Array.isArray(item?.content) ? item.content : []) {
+      if (typeof part?.text === "string") chunks.push(part.text);
+      if (typeof part?.output_text === "string") chunks.push(part.output_text);
+    }
+  }
+  const joined = chunks.map((c) => s(c)).filter((c) => c.length > 0).join("\n").trim();
+  if (joined.length >= 4) return joined;
+  return s(parsed?.choices?.[0]?.message?.content);
+}
+
 /**
- * Grok 4.6 /v1/chat/completions writer — one slot, thought-first, no shared history.
- * Quota/expand also Grok. No OpenAI.
+ * Grok 4.6 Agent Tools writer — /v1/responses with x_search + web_search.
+ * Not the retired Live Search chat field (HTTP 410).
  */
 export async function callGrokWriter(
   ctx: DeepGenerationContext,
@@ -477,7 +493,7 @@ export async function callGrokWriter(
     tension
       ? "Seed material (not the closed thought): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "Do not invent lived experience. Not a generic news line. Do not copy a previously successful sentence. Understand the assigned Seed + Planner Intent; do not search X for wording.",
+    "Use x_search and web_search only to check public current facts. Do not copy other posts as the draft. Do not invent lived experience. Not a generic news line.",
     s(options.retry_hint)
       ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Understand the same assignment again and create a valid post without changing Planner strategy."
       : "",
@@ -485,11 +501,11 @@ export async function callGrokWriter(
   ].filter(Boolean).join("\n");
 
   const controller = new AbortController();
-  const timeoutMs = options.timeout_ms ?? 32000;
+  const timeoutMs = options.timeout_ms ?? 45000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
+    const response = await fetch("https://api.x.ai/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -497,12 +513,11 @@ export async function callGrokWriter(
       },
       body: JSON.stringify({
         model: options.model || "grok-4.6",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userMsg },
-        ],
+        instructions: system,
+        input: [{ role: "user", content: userMsg }],
+        tools: [{ type: "x_search" }, { type: "web_search" }],
         temperature: options.temperature ?? 0.7,
-        max_tokens: 1400,
+        max_output_tokens: 1400,
         reasoning_effort: "low",
       }),
       signal: controller.signal,
@@ -522,7 +537,7 @@ export async function callGrokWriter(
     } catch {
       return { ok: false, text: "", error: "xai_json_parse_failed", attempted: true };
     }
-    const content = s(parsed?.choices?.[0]?.message?.content);
+    const content = extractXaiResponsesText(parsed);
     if (!content || content.length < 4) {
       return { ok: false, text: "", error: "xai_empty_content", attempted: true };
     }

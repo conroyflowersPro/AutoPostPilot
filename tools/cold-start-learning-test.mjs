@@ -46,7 +46,7 @@ ok("L8. quota phase returns learning", /learning: learned\.learning/.test(ix));
 ok("L9. generate job shows 학습 line", /학습:/.test(job));
 ok("L10. direction: cold start + job runtime", /Cold start \(learning maturity\)/.test(dir) && /Generation runtime/.test(dir));
 ok("L11. video must not keep Edge loop", /Do not keep the current browser-orchestrated Edge loop for video/.test(dir));
-ok("L12. shipping 11.12.5", /const APP_VERSION = "11.12.5"/.test(ix));
+ok("L12. shipping 11.12.6", /const APP_VERSION = "11.12.6"/.test(ix));
 ok("L13. DNA success is participation not followers-first", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
 
 console.log("========================================");

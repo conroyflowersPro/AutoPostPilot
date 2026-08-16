@@ -33,7 +33,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Operator collaboration contract (v11.12.5)");
+console.log("Operator collaboration contract (v11.12.6)");
 
 ok("C1. version lock", /operator-collaboration-v1\.1/.test(collab));
 ok(
@@ -106,8 +106,8 @@ ok(
     !/operator-collaboration-v1/.test(dna)
 );
 ok(
-  "C12. shipping 11.12.5",
-  /APP_VERSION = "11.12.5"/.test(ver) && /APP_VERSION = "11.12.5"/.test(ix)
+  "C12. shipping 11.12.6",
+  /APP_VERSION = "11.12.6"/.test(ver) && /APP_VERSION = "11.12.6"/.test(ix)
 );
 ok(
   "C13. AGENTS.md forbids leaking into post prompts",
