@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.3 — 2026-08-16
+
+- Writer에서 폐기된 xAI Live Search(`search_parameters`)를 제거했습니다. Writer는 Seed + Planner Intent만 이해하고 씁니다
+- 글 복제 여부는 Live Search로 판단하지 않습니다. 그 호출이 410을 내서 작성이 전부 실패하고 있었습니다
+
 ## 11.12.2 — 2026-08-16
 
 - Judge 거절 이유를 한 줄로 스쳐 지나가지 않고 생성 화면에 목록으로 남깁니다

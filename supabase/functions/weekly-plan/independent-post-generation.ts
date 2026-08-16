@@ -477,7 +477,7 @@ export async function callGrokWriter(
     tension
       ? "Seed material (not the closed thought): " + tension.slice(0, 140)
       : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "Do not invent lived experience. Not a generic news line. Do not copy a previously successful sentence. Do not copy tweet wording from live search.",
+    "Do not invent lived experience. Not a generic news line. Do not copy a previously successful sentence. Understand the assigned Seed + Planner Intent; do not search X for wording.",
     s(options.retry_hint)
       ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Understand the same assignment again and create a valid post without changing Planner strategy."
       : "",
@@ -504,11 +504,6 @@ export async function callGrokWriter(
         temperature: options.temperature ?? 0.7,
         max_tokens: 1400,
         reasoning_effort: "low",
-        search_parameters: {
-          mode: "auto",
-          return_citations: false,
-          sources: [{ type: "x" }, { type: "web" }],
-        },
       }),
       signal: controller.signal,
     });

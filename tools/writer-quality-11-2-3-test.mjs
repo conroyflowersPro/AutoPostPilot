@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v11.12.2)");
+console.log("Writer quality + leftover seeds (v11.12.3)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 11.12.2", /APP_VERSION = "11.12.2"/.test(ver) && /APP_VERSION = "11.12.2"/.test(ix));
+ok("W17. version lockstep 11.12.3", /APP_VERSION = "11.12.3"/.test(ver) && /APP_VERSION = "11.12.3"/.test(ix));
 ok("W18. Korean summary names seven-day role order", /7일 생성/.test(ver) && /Planner/.test(ver) && /Semantic Judge/.test(ver));
 ok("W19. retry is minimum-boundary retry, not creative rewrite direction", /BOUNDARY RETRY/.test(wr) && /retry_hint/.test(gi));
 ok("W20. Writer prompt does not prescribe a snag", !/A snag is optional/.test(wr) && /point_or_tension is an optional angle/.test(cr));
@@ -101,7 +101,7 @@ ok("W29. Planner Intent is strategy, never a writing template", /strategic purpo
 ok("W30. pipeline does not lock 해요/음슴 before the thought", !/planSlotSurface/.test(ow) && /voiceRegisterConstraintLine\(voice\)/.test(ow) && /THOUGHT_FIRST_RUNTIME/.test(ow));
 ok("W31. no Texas\/1TW sample in writer or seed prompts", !/1TW/.test(wr) && !/텍사스에서 짓고/.test(wr + cr));
 ok("W32. original body uses Grok 4.6 on xAI", /api\.x\.ai\/v1\/chat\/completions/.test(wr) && /grok-4\.6/.test(wr) && !/OPENAI_API_KEY/.test(ix) && !/api\.openai\.com/.test(wr));
-ok("W33. writer calls xAI with live search and low reasoning", /api\.x\.ai/.test(wr) && /reasoning_effort:\s*"low"/.test(wr) && /search_parameters/.test(wr));
+ok("W33. writer calls xAI with low reasoning and no live search", /api\.x\.ai/.test(wr) && /reasoning_effort:\s*"low"/.test(wr) && !/search_parameters/.test(wr));
 ok("W34. DNA participation order replies bookmarks quotes reposts", /replies > bookmarks > quotes > reposts/.test(dna) && !/followers > profile visits/.test(dna));
 ok("W35. DNA says weights are probabilities not counts", /predicted action probabilities/.test(dna));
 ok("W36. DNA spacing 48h For You window 14-22 PT", /48 hours/.test(dna) && /14:00 America\/Los_Angeles/.test(dna) && /14:00–22:00 PT/.test(dna) && /Do not stack originals/.test(dna));

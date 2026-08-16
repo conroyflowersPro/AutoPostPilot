@@ -142,7 +142,7 @@ export function judgeSeedGrounding(input: GroundingInput): {
       !!input.creator_evidence_available || (input.evidence_source_ids?.length ?? 0) > 0;
     if (!hasEvidence) {
       // A Seed is thinking material, not a published factual claim. Preserve
-      // it with a boundary; xAI live search + final post Judge must verify it.
+      // it with a boundary; Writer uses Seed + Planner Intent, and the final Judge verifies the completed post.
       reasons.push("CURRENT_FACT_VERIFY_REQUIRED", "XAI_LIVE_FACT_CHECK_REQUIRED");
     }
   }
