@@ -357,7 +357,10 @@ export function scoreCasualEditorialFit(seed: Partial<ConcreteSeed>): {
 
 export function canServeEditorialMode(seed: Partial<ConcreteSeed>, mode: EditorialMode): boolean {
   const m = String(mode || "").toUpperCase();
-  if (m === "EXPERIENCE") return !!seed.experience_required || !!seed.creator_evidence_available;
+  if (m === "EXPERIENCE") {
+    return String((seed as any).owner || "").toUpperCase() === "SELF"
+      || String((seed as any).seed_source || seed.primary_source || "").toUpperCase() === "ANALYTICS_LIVED";
+  }
   if (m === "OPINION") return true;
   if (m === "COMPARE") return true;
   if (m === "CASUAL_OBSERVATION") return scoreCasualEditorialFit(seed).fit !== "POOR";

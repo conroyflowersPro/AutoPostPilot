@@ -66,7 +66,10 @@ export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode):
       ? (seed as any).grounding_reasons
       : [],
     creator_evidence_available: !!seed.creator_evidence_available,
-    experience_required: String(mode || "").toUpperCase() === "EXPERIENCE",
+    experience_required: String((seed as any).owner || "").toUpperCase() === "SELF",
+    owner: (seed as any).owner,
+    occurred_at: (seed as any).occurred_at,
+    seed_source: (seed as any).seed_source || seed.primary_source,
   });
 }
 

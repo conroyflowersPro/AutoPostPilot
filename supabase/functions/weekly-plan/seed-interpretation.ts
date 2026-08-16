@@ -63,6 +63,9 @@ export type InterpretSeedInput = {
   point_or_tension?: string;
   creator_evidence_available?: boolean;
   experience_required?: boolean;
+  owner?: string;
+  occurred_at?: string;
+  seed_source?: string;
   creator_interest_signals?: string[];
   recent_repetition_signals?: string[];
   audience_relevance_signals?: string[];
@@ -116,8 +119,17 @@ function buildClaimBoundaries(seed: InterpretSeedInput, factual: FactualBoundary
   return { fact, observation, personal_experience, hypothesis, opinion };
 }
 function buildExperienceBoundaries(seed: InterpretSeedInput): ExperienceBoundary {
-  const hasExp = !!(seed.creator_evidence_available || (seed.experience_facts && seed.experience_facts.length > 0));
-  return { creator_experienced: hasExp, evidence_supported: hasExp, general_observation_only: !hasExp, must_not_claim_first_person: !hasExp };
+  const owner = String(seed.owner || seed.seed_source || "").toUpperCase();
+  const self = owner === "SELF" || owner === "ANALYTICS_LIVED";
+  const hasExp = self && !!(seed.creator_evidence_available || seed.experience_required || seed.occurred_at);
+  return {
+    creator_experienced: hasExp,
+    evidence_supported: hasExp,
+    general_observation_only: !hasExp,
+    must_not_claim_first_person: !hasExp,
+    occurred_at: seed.occurred_at || "",
+    owner: self ? "SELF" : "OTHER",
+  } as ExperienceBoundary;
 }
 function assessRepetitionRisk(seed: InterpretSeedInput): "LOW" | "MEDIUM" | "HIGH" {
   const signals = (seed.recent_repetition_signals || []).map(clean).filter(Boolean);

@@ -69,7 +69,7 @@ export function classifyExperienceTime(text: string, published_at?: string): Exp
   return "TIMELESS";
 }
 
-function clusterFromText(text: string): string {
+export function clusterFromText(text: string): string {
   const t = text.toLowerCase();
   if (/fsd|자율|합류|공사|보행/.test(t)) return "FSD";
   if (/cyber|사이버|충전|적재|슈퍼차저/.test(t)) return "CYBERTRUCK";

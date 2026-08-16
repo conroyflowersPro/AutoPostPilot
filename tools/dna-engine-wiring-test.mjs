@@ -42,7 +42,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v12.0.0)");
+console.log("DNA + engine live-path wiring (v12.1.0)");
 
 ok("D1. Grok Writer gets Creator Intelligence", /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
 ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
@@ -84,15 +84,15 @@ ok("D22. job loadEvidence overlays 14d intent", /overlayClusterWeightsWithIntent
 ok("D23. index quota/expand overlay 14d intent",
   (ix.match(/overlayClusterWeightsWithIntent14d/g) || []).length >= 2);
 ok("D24. Planner xAI owns Seed selection without local rank", /selectSeedsForDays/.test(job) && /selectSeedsForSevenDayPlan/.test(planner) && !/clusterPriorityFromMix/.test(job));
-ok("D25. job keeps experience cite seeds",
-  /buildRecentExperienceCandidates/.test(job) && /from "\.\/experience-evidence\.ts"/.test(job));
+ok("D25. job keeps 30d Analytics lived seeds",
+  /analyticsLivedSeeds/.test(job) && /from "\.\/analytics-lived-seeds\.ts"/.test(job));
 
 ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
   /NO FIXED MIX/.test(dna) && /NO FIXED MIX/.test(libPerf));
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 12.0.0", /APP_VERSION = "12.0.0"/.test(ver) && /APP_VERSION = "12.0.0"/.test(ix));
+ok("D28. version 12.1.0", /APP_VERSION = "12.1.0"/.test(ver) && /APP_VERSION = "12.1.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
