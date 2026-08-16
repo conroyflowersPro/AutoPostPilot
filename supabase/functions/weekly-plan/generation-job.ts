@@ -594,8 +594,22 @@ function publicView(row: any): JobPublic {
   };
 }
 
+const STALE_JOB_KO = "배포로 이전 생성을 멈췄습니다. 다시 눌러 주세요.";
+const STOPPED_JOB_KO = "생성을 멈췄습니다.";
+
+function retireStaleRunningJob(row: any, appVersion: string): boolean {
+  if (!row || row.status !== "running") return false;
+  const stamped = String(row.state?.app_version || "");
+  if (stamped && stamped === appVersion) return false;
+  row.status = "error";
+  row.error = STALE_JOB_KO;
+  row.label_ko = "이전 생성 중단";
+  row.locked_at = null;
+  return true;
+}
+
 async function saveRow(supabase: any, row: any) {
-  const { error } = await supabase.from("generation_jobs").update({
+  let q = supabase.from("generation_jobs").update({
     status: row.status,
     step: row.step,
     saved_count: row.saved_count,
@@ -607,6 +621,8 @@ async function saveRow(supabase: any, row: any) {
     locked_at: row.locked_at,
     updated_at: new Date().toISOString(),
   }).eq("id", row.id);
+  if (row.status === "running") q = q.eq("status", "running");
+  const { error } = await q;
   if (error) throw new Error(error.message);
 }
 
@@ -618,6 +634,7 @@ export async function startWeeklyJob(args: {
   lafc_matches: unknown[];
   publishedTopics: string[];
   scheduledTopics: string[];
+  appVersion: string;
 }): Promise<JobPublic> {
   const state = {
     startDate: args.startDate,
@@ -670,6 +687,7 @@ export async function startWeeklyJob(args: {
     field_refill_counts: {} as Record<string, number>,
     job_recovery_count: 0,
     recovery_history: [] as any[],
+    app_version: args.appVersion,
   };
   const { data: running } = await args.supabase
     .from("generation_jobs")
@@ -679,7 +697,10 @@ export async function startWeeklyJob(args: {
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (running) return publicView(running);
+  if (running) {
+    if (!retireStaleRunningJob(running, args.appVersion)) return publicView(running);
+    await saveRow(args.supabase, running);
+  }
 
   const insert = {
     user_id: args.userId,
@@ -707,13 +728,38 @@ export async function startWeeklyJob(args: {
   return publicView(data);
 }
 
-export async function statusWeeklyJob(supabase: any, userId: string, jobId?: string): Promise<JobPublic | null> {
+export async function statusWeeklyJob(
+  supabase: any,
+  userId: string,
+  jobId?: string,
+  appVersion?: string,
+): Promise<JobPublic | null> {
   let q = supabase.from("generation_jobs").select("id, status, step, saved_count, required_slots, label_ko, summary, error, state").eq("user_id", userId);
   if (jobId) q = q.eq("id", jobId);
   else q = q.eq("status", "running").order("updated_at", { ascending: false }).limit(1);
   const { data, error } = jobId ? await q.maybeSingle() : await q.maybeSingle();
   if (error) throw new Error(error.message);
+  if (data && appVersion && retireStaleRunningJob(data, appVersion)) {
+    await saveRow(supabase, data);
+  }
   return data ? publicView(data) : null;
+}
+
+export async function stopWeeklyJob(supabase: any, userId: string, jobId: string): Promise<JobPublic> {
+  const { data: row, error } = await supabase
+    .from("generation_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .single();
+  if (error || !row) throw new Error(error?.message || "job not found");
+  if (row.status !== "running") return publicView(row);
+  row.status = "error";
+  row.error = STOPPED_JOB_KO;
+  row.label_ko = "생성 멈춤";
+  row.locked_at = null;
+  await saveRow(supabase, row);
+  return publicView(row);
 }
 
 export async function tickWeeklyJob(args: {
@@ -721,6 +767,7 @@ export async function tickWeeklyJob(args: {
   userId: string;
   jobId: string;
   xaiKey: string;
+  appVersion: string;
 }): Promise<JobPublic> {
   const { data: row, error } = await args.supabase
     .from("generation_jobs")
@@ -730,6 +777,10 @@ export async function tickWeeklyJob(args: {
     .single();
   if (error || !row) throw new Error(error?.message || "job not found");
   if (row.status !== "running") return publicView(row);
+  if (retireStaleRunningJob(row, args.appVersion)) {
+    await saveRow(args.supabase, row);
+    return publicView(row);
+  }
 
   const lockedAt = row.locked_at ? Date.parse(String(row.locked_at)) : 0;
   if (lockedAt && Date.now() - lockedAt < JOB_LOCK_MS) return publicView(row);

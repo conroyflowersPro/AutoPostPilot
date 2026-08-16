@@ -28,7 +28,7 @@ function ok(name, cond) {
 console.log("Weekly job ticks (v11.2.0 text only)");
 ok("J1. generation_jobs table", /create table if not exists public\.generation_jobs/.test(sql));
 ok("J2. RLS own rows", /auth\.uid\(\) = user_id/.test(sql));
-ok("J3. Edge job_start / job_tick / job_status", /phase === "job_start"/.test(ix) && /phase === "job_tick"/.test(ix) && /phase === "job_status"/.test(ix));
+ok("J3. Edge job_start / job_tick / job_status / job_stop", /phase === "job_start"/.test(ix) && /phase === "job_tick"/.test(ix) && /phase === "job_status"/.test(ix) && /phase === "job_stop"/.test(ix));
 ok("J4. ticks are one step", /if \(row\.step === "quota"\)/.test(job) && /else if \(row\.step === "expand"\)/.test(job) && /else if \(row\.step === "write"\)/.test(job));
 ok("J5. expand timeout 40s on job tick", /timeoutMs: compact \? 20000 : 40000/.test(job));
 ok("J6. write chunk 1", /const WRITE_CHUNK = 1/.test(job));
@@ -40,7 +40,7 @@ ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test
 ok("J12. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 12.1.1", /const APP_VERSION = "12.1.1"/.test(ix));
+ok("J15. shipping 12.1.2", /const APP_VERSION = "12.1.2"/.test(ix));
 ok("J24. empty write returns to Planner and never reports a short success", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job));
 ok("J25. live Planner has no local HIGH repetition gate", !/conceptualRepetitionLevel/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));
@@ -61,6 +61,8 @@ ok("J32. write shortfall uses Planner recovery", /pending_recovery/.test(job) &&
 ok("J33. Planner never completes an underfilled selection", /Planner 배차 미완/.test(job) && /flat\.length !== strategy\.slots\.length/.test(job));
 ok("J34. expand/recovery are bounded; only saved quota can complete", /EXPAND_HARD_CAP = 36/.test(job) && /pending\.attempts > 4/.test(job) && /function quotaFilled/.test(job));
 ok("J35. job_status exposes report_ko", /report_ko/.test(job) && /생성 보고서/.test(job));
+ok("J36. deploy retires unstamped or other-version running jobs", /retireStaleRunningJob/.test(job) && /배포로 이전 생성을 멈췄습니다/.test(job) && /app_version: args\.appVersion/.test(job));
+ok("J37. operator can stop a running job", /stopWeeklyJob/.test(job) && /멈추기/.test(gen) && /phase: "job_stop"/.test(gen));
 
 console.log("========================================");
 console.log(`JOB TICKS: ${pass} PASS / ${fail} FAIL`);
