@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 11.12.8 — 2026-08-16
+
+- X Analytics 30일 창을 TS 모듈로 실어 Edge가 JSON 파일을 버려도 Planner가 실제 게시 흐름을 봅니다
+- 7일 전략은 한 번에 28칸 JSON을 받지 않습니다. 칸 수 잠금 다음, 틱마다 2일치 슬롯만 채웁니다
+- 슬롯 시각은 첫 원글 14:00 PT, 그날 원글은 14:00–22:00 PT에 고르게 찍습니다. 캘린더 예약이 아닙니다
+- Writer 타임아웃을 55초로 올리고 클라이언트 job_tick은 90초입니다. `xai_timeout` / `writer_call_failed`는 Writer 실패로 남기고 Judge 거절과 섞지 않습니다
+
 ## 11.12.7 — 2026-08-16
 
 - 별도 Quota xAI 호출을 없앴습니다. 7일 칸 수는 Planner가 잠급니다

@@ -78,7 +78,7 @@ function GeneratePageInner() {
     const phaseName = String(body.phase || "");
     const ms =
       phaseName === "job_tick" || phaseName === "expand"
-        ? 55000
+        ? 90000
         : phaseName === "write"
           ? 50000
           : phaseName === "quota"

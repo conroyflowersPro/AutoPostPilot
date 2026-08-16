@@ -134,6 +134,25 @@ ok("R25. Planner owns weekly volume; 7-slot days are rejected",
 ok("R26. job starts at Planner strategy, not Quota",
   /step: "strategy"/.test(job) && /7일 Planner 전략/.test(job) &&
   !/inferWeeklyQuota/.test(job) && /SEED_POOL_BUFFER/.test(job));
+ok("R27. bundled X Analytics is a TS module first",
+  /BUNDLED_X_ANALYTICS_WINDOW/.test(planner) &&
+  /x-analytics-30d-bundled/.test(planner) &&
+  /source: "module"/.test(planner));
+ok("R28. strategy fills volume then 2 days per tick",
+  /STRATEGY_DAYS_PER_TICK = 2/.test(planner) &&
+  /inferSevenDayVolume/.test(job) &&
+  /inferSevenDaySlotsForDays/.test(job) &&
+  !/await inferSevenDayStrategy\(/.test(job));
+ok("R29. Planner stamps 14:00–22:00 PT after the week is locked",
+  /stampPlannerSlotTimes/.test(job) &&
+  /FOR_YOU_START_HOUR = 14/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
+  /FOR_YOU_END_HOUR = 22/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
+  /planned_pt/.test(job));
+ok("R30. Writer timeout vs Judge reject labels",
+  /V11_WRITER_TIMEOUT_MS = 55000/.test(pipe) &&
+  /formatPipelineReject/.test(job) &&
+  /Writer 실패 ·/.test(job) &&
+  /Judge 거절 ·/.test(job));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

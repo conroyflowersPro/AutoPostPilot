@@ -12,6 +12,9 @@ import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
 import { plannerArchitectureLock } from "./engine-architecture.ts";
 import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { MAX_WEEKLY_SLOTS, MIN_WEEKLY_SLOTS, QUOTA_PER_DAY_MAX, QUOTA_PER_DAY_MIN } from "./quota-inference.ts";
+import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
+
+export const STRATEGY_DAYS_PER_TICK = 2;
 
 export const SEVEN_DAY_PLANNER_VERSION = "seven_day_planner_v1";
 export const PLANNING_HORIZON_DAYS = 7;
@@ -48,60 +51,86 @@ export type XAnalyticsDailyAccountPulse = {
   profile_visits: number;
 };
 
-function loadBundledXAnalyticsWindow(): {
+function parseBundledWindow(parsed: any): {
   rows: XAnalyticsPublishedPost[];
   account_daily: XAnalyticsDailyAccountPulse[];
 } {
+  const rows: XAnalyticsPublishedPost[] = [];
+  for (const item of Array.isArray(parsed?.posts) ? parsed.posts : []) {
+    const publishedAt = s(item?.published_at, 40);
+    const parsedAt = Date.parse(publishedAt);
+    if (!Number.isFinite(parsedAt)) continue;
+    if (item?.features?.isReply === true) continue;
+    rows.push({
+      post_id: item?.post_id ? s(item.post_id, 100) : null,
+      published_at: new Date(parsedAt).toISOString(),
+      content: s(item?.content, 240),
+      metrics: {
+        followers_gained: Number(item?.metrics?.followers_gained) || 0,
+        profile_visits: Number(item?.metrics?.profile_visits) || 0,
+        bookmarks: Number(item?.metrics?.bookmarks) || 0,
+        replies: Number(item?.metrics?.replies) || 0,
+        reposts: Number(item?.metrics?.reposts) || 0,
+        likes: Number(item?.metrics?.likes) || 0,
+        impressions: Number(item?.metrics?.impressions) || 0,
+        quotes: Number(item?.metrics?.quotes) || 0,
+        shares: Number(item?.metrics?.shares) || 0,
+        detail_expands: Number(item?.metrics?.detail_expands) || 0,
+      },
+      features: item?.features && typeof item.features === "object" ? item.features : { is_original: true },
+    });
+  }
+  const accountDaily: XAnalyticsDailyAccountPulse[] = [];
+  for (const pulse of Array.isArray(parsed?.account_daily) ? parsed.account_daily : []) {
+    const parsedAt = Date.parse(s(pulse?.date, 60));
+    if (!Number.isFinite(parsedAt)) continue;
+    accountDaily.push({
+      date: new Date(parsedAt).toISOString().slice(0, 10),
+      impressions: Number(pulse?.impressions) || 0,
+      likes: Number(pulse?.likes) || 0,
+      engagements: Number(pulse?.engagements) || 0,
+      bookmarks: Number(pulse?.bookmarks) || 0,
+      shares: Number(pulse?.shares) || 0,
+      new_follows: Number(pulse?.new_follows) || 0,
+      unfollows: Number(pulse?.unfollows) || 0,
+      replies: Number(pulse?.replies) || 0,
+      reposts: Number(pulse?.reposts) || 0,
+      profile_visits: Number(pulse?.profile_visits) || 0,
+    });
+  }
+  return { rows, account_daily: accountDaily };
+}
+
+function loadBundledXAnalyticsWindow(): {
+  rows: XAnalyticsPublishedPost[];
+  account_daily: XAnalyticsDailyAccountPulse[];
+  source: "module" | "file" | "empty";
+  error: string;
+} {
+  try {
+    const fromModule = parseBundledWindow(BUNDLED_X_ANALYTICS_WINDOW);
+    if (fromModule.rows.length || fromModule.account_daily.length) {
+      return { ...fromModule, source: "module", error: "" };
+    }
+  } catch (e: any) {
+    const moduleError = s(e?.message || "bundled_module_failed", 120);
+    try {
+      const raw = Deno.readTextFileSync(new URL("./x-analytics-30d-window.json", import.meta.url));
+      return { ...parseBundledWindow(JSON.parse(raw)), source: "file", error: moduleError };
+    } catch (e2: any) {
+      return { rows: [], account_daily: [], source: "empty", error: `${moduleError}; ${s(e2?.message || "read_failed", 120)}` };
+    }
+  }
   try {
     const raw = Deno.readTextFileSync(new URL("./x-analytics-30d-window.json", import.meta.url));
-    const parsed = JSON.parse(raw);
-    const rows: XAnalyticsPublishedPost[] = [];
-    for (const item of Array.isArray(parsed?.posts) ? parsed.posts : []) {
-      const publishedAt = s(item?.published_at, 40);
-      const parsedAt = Date.parse(publishedAt);
-      if (!Number.isFinite(parsedAt)) continue;
-      if (item?.features?.isReply === true) continue;
-      rows.push({
-        post_id: item?.post_id ? s(item.post_id, 100) : null,
-        published_at: new Date(parsedAt).toISOString(),
-        content: s(item?.content, 240),
-        metrics: {
-          followers_gained: Number(item?.metrics?.followers_gained) || 0,
-          profile_visits: Number(item?.metrics?.profile_visits) || 0,
-          bookmarks: Number(item?.metrics?.bookmarks) || 0,
-          replies: Number(item?.metrics?.replies) || 0,
-          reposts: Number(item?.metrics?.reposts) || 0,
-          likes: Number(item?.metrics?.likes) || 0,
-          impressions: Number(item?.metrics?.impressions) || 0,
-          quotes: Number(item?.metrics?.quotes) || 0,
-          shares: Number(item?.metrics?.shares) || 0,
-          detail_expands: Number(item?.metrics?.detail_expands) || 0,
-        },
-        features: item?.features && typeof item.features === "object" ? item.features : { is_original: true },
-      });
+    const fromFile = parseBundledWindow(JSON.parse(raw));
+    if (fromFile.rows.length || fromFile.account_daily.length) {
+      return { ...fromFile, source: "file", error: "module_empty" };
     }
-    const accountDaily: XAnalyticsDailyAccountPulse[] = [];
-    for (const pulse of Array.isArray(parsed?.account_daily) ? parsed.account_daily : []) {
-      const parsedAt = Date.parse(s(pulse?.date, 60));
-      if (!Number.isFinite(parsedAt)) continue;
-      accountDaily.push({
-        date: new Date(parsedAt).toISOString().slice(0, 10),
-        impressions: Number(pulse?.impressions) || 0,
-        likes: Number(pulse?.likes) || 0,
-        engagements: Number(pulse?.engagements) || 0,
-        bookmarks: Number(pulse?.bookmarks) || 0,
-        shares: Number(pulse?.shares) || 0,
-        new_follows: Number(pulse?.new_follows) || 0,
-        unfollows: Number(pulse?.unfollows) || 0,
-        replies: Number(pulse?.replies) || 0,
-        reposts: Number(pulse?.reposts) || 0,
-        profile_visits: Number(pulse?.profile_visits) || 0,
-      });
-    }
-    return { rows, account_daily: accountDaily };
-  } catch {
-    return { rows: [], account_daily: [] };
+  } catch (e: any) {
+    return { rows: [], account_daily: [], source: "empty", error: s(e?.message || "bundled_read_failed", 180) };
   }
+  return { rows: [], account_daily: [], source: "empty", error: "bundled_window_empty" };
 }
 
 export async function loadRecentXAnalyticsPublished(
@@ -111,6 +140,8 @@ export async function loadRecentXAnalyticsPublished(
   rows: XAnalyticsPublishedPost[];
   coverage_days: number;
   account_daily: XAnalyticsDailyAccountPulse[];
+  bundled_source?: "module" | "file" | "empty";
+  bundled_error?: string;
 }> {
   const sinceMs = Date.now() - Math.max(1, Math.min(30, days)) * 24 * 3600 * 1000;
   const since = new Date(sinceMs).toISOString();
@@ -211,6 +242,8 @@ export async function loadRecentXAnalyticsPublished(
       rows,
       coverage_days: dates.size,
       account_daily: accountDaily.length ? accountDaily : bundled.account_daily.filter((d) => Date.parse(d.date) >= Date.parse(since)),
+      bundled_source: bundled.source,
+      bundled_error: bundled.error,
     };
   } catch {
     rows.sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
@@ -218,6 +251,8 @@ export async function loadRecentXAnalyticsPublished(
       rows,
       coverage_days: dates.size,
       account_daily: bundled.account_daily.filter((d) => Date.parse(d.date) >= Date.parse(since)),
+      bundled_source: bundled.source,
+      bundled_error: bundled.error,
     };
   }
 }
@@ -228,6 +263,8 @@ export type PlannerSlotIntent = {
   strategic_role: string;
   editorial_mode: EditorialMode;
   planner_intent: string;
+  planned_at?: string;
+  planned_pt?: string;
 };
 
 export type SevenDayStrategy = {
@@ -413,6 +450,218 @@ function strategySystem(): string {
     "Each slot contains strategic_role, editorial_mode, and planner_intent only. planner_intent says why this slot exists and what it should accomplish—not how to write it.",
     "Return strict JSON with top-level keys strategy_summary, profile_diversity_intent, final_slot_count, slots, analytics_request_needed, analytics_request_reason. Each slot has slot_id, day_offset, strategic_role, editorial_mode, planner_intent. No prose outside JSON.",
   ].join("\n");
+}
+
+export type SevenDayVolume = {
+  posts_per_day: number[];
+  summary: string;
+  profile_diversity_intent: string;
+  analytics_request_needed: boolean;
+  analytics_request_reason: string;
+};
+
+export function clampWeekVolume(postsPerDay: unknown): number[] {
+  const raw = Array.isArray(postsPerDay) ? postsPerDay : [];
+  const out = Array.from({ length: PLANNING_HORIZON_DAYS }, (_, i) => {
+    const n = Math.round(Number(raw[i]) || QUOTA_PER_DAY_MIN);
+    return Math.max(QUOTA_PER_DAY_MIN, Math.min(QUOTA_PER_DAY_MAX, n));
+  });
+  let sum = out.reduce((a, b) => a + b, 0);
+  let i = 0;
+  while (sum < MIN_WEEKLY_SLOTS && i < 80) {
+    const d = i % PLANNING_HORIZON_DAYS;
+    if (out[d] < QUOTA_PER_DAY_MAX) {
+      out[d] += 1;
+      sum += 1;
+    }
+    i += 1;
+  }
+  i = 0;
+  while (sum > MAX_WEEKLY_SLOTS && i < 80) {
+    const d = i % PLANNING_HORIZON_DAYS;
+    if (out[d] > QUOTA_PER_DAY_MIN) {
+      out[d] -= 1;
+      sum -= 1;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+export function nextStrategyDayOffsets(
+  slots: Array<{ day_offset: number }>,
+  postsPerDay: number[],
+  batch = STRATEGY_DAYS_PER_TICK,
+): number[] {
+  const counts = Array.from({ length: PLANNING_HORIZON_DAYS }, () => 0);
+  for (const slot of slots || []) {
+    const day = Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(slot.day_offset) || 0)));
+    counts[day] += 1;
+  }
+  const days: number[] = [];
+  for (let d = 0; d < PLANNING_HORIZON_DAYS && days.length < batch; d++) {
+    const want = postsPerDay[d] || QUOTA_PER_DAY_MIN;
+    if (counts[d] < want) days.push(d);
+  }
+  return days;
+}
+
+function volumeSystem(): string {
+  return [
+    "You are the seven-day Planner for @Seung4680.",
+    plannerArchitectureLock(),
+    "This call locks weekly volume only. Do not emit slots. Do not inspect Seeds. Do not write posts. Times are stamped later at 14:00–22:00 America/Los_Angeles.",
+    "Planning Horizon is seven days. Use only recent_x_analytics as the recent published-flow record. handmade_cadence is real published-account rhythm. Empty recent_x_analytics does NOT mean the account posts once a day.",
+    "volume_gates are hard: each day 4-8 originals, week floor 28, week ceiling 56, no empty day.",
+    "Return strict JSON with posts_per_day (7 integers), strategy_summary, profile_diversity_intent, analytics_request_needed, analytics_request_reason. No prose outside JSON.",
+  ].join("\n");
+}
+
+function daySlotsSystem(days: number[]): string {
+  return [
+    "You are the seven-day Planner for @Seung4680.",
+    plannerArchitectureLock(),
+    `This call fills slot intents for day_offset values ${days.join(", ")} only. Do not emit other days. Do not emit planned times.`,
+    "Each slot contains slot_id, day_offset, strategic_role, editorial_mode, and planner_intent only. planner_intent says why this slot exists—not how to write it.",
+    "Fill exactly posts_per_day[d] slots for each requested day. Mode overlap is allowed. No fixed mode ratio.",
+    "Return strict JSON with slots array. No prose outside JSON.",
+  ].join("\n");
+}
+
+function plannerUserPayload(args: {
+  intelligence: PlannerIntelligenceBlocks;
+  cadence?: CadenceSignal | null;
+  analytics: XAnalyticsPublishedPost[];
+  analyticsCoverageDays: number;
+  accountDaily?: XAnalyticsDailyAccountPulse[];
+  operatorNote?: string;
+  extra?: Record<string, unknown>;
+}): Record<string, unknown> {
+  const analytics = compactPublishedFlow(args.analytics || []);
+  return {
+    creator_dna: creatorDnaBlock(),
+    engine_rules: engineRulesAsWill(),
+    intelligence: args.intelligence,
+    planning_horizon_days: PLANNING_HORIZON_DAYS,
+    editorial_mode_labels: [...VALID_MODES],
+    handmade_cadence: args.cadence || null,
+    volume_gates: {
+      min_originals_per_day: QUOTA_PER_DAY_MIN,
+      max_originals_per_day: QUOTA_PER_DAY_MAX,
+      min_week_slots: MIN_WEEKLY_SLOTS,
+      max_week_slots: MAX_WEEKLY_SLOTS,
+      empty_days_forbidden: true,
+      mode_overlap_allowed: true,
+    },
+    recent_x_analytics: analytics,
+    account_overview_daily: compactAccountDaily(args.accountDaily),
+    analytics_rows_available: analytics.length,
+    analytics_coverage_days: args.analyticsCoverageDays,
+    operator_note_overlay_only: s(args.operatorNote, 180) || null,
+    ...(args.extra || {}),
+  };
+}
+
+export async function inferSevenDayVolume(args: {
+  xaiKey: string;
+  analytics: XAnalyticsPublishedPost[];
+  analyticsCoverageDays: number;
+  accountDaily?: XAnalyticsDailyAccountPulse[];
+  intelligence: PlannerIntelligenceBlocks;
+  cadence?: CadenceSignal | null;
+  operatorNote?: string;
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<SevenDayVolume>> {
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 800,
+    timeoutMs: args.timeoutMs ?? 20000,
+    system: volumeSystem(),
+    user: plannerUserPayload(args),
+    parse: (raw): SevenDayVolume | null => {
+      if (!raw) return null;
+      const posts_per_day = clampWeekVolume(raw.posts_per_day);
+      const summary = s(raw.strategy_summary || raw.summary, 600);
+      if (!summary) return null;
+      return {
+        posts_per_day,
+        summary,
+        profile_diversity_intent: s(raw.profile_diversity_intent, 400),
+        analytics_request_needed: raw.analytics_request_needed === true,
+        analytics_request_reason: s(raw.analytics_request_reason, 300),
+      };
+    },
+  });
+}
+
+export async function inferSevenDaySlotsForDays(args: {
+  xaiKey: string;
+  days: number[];
+  postsPerDay: number[];
+  already: PlannerSlotIntent[];
+  analytics: XAnalyticsPublishedPost[];
+  analyticsCoverageDays: number;
+  accountDaily?: XAnalyticsDailyAccountPulse[];
+  intelligence: PlannerIntelligenceBlocks;
+  cadence?: CadenceSignal | null;
+  operatorNote?: string;
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSlotIntent[]>> {
+  const days = (args.days || []).filter((d) => d >= 0 && d < PLANNING_HORIZON_DAYS);
+  const allowed = new Set(days);
+  const want = days.reduce((sum, d) => sum + (args.postsPerDay[d] || QUOTA_PER_DAY_MIN), 0);
+  const perDayCap = new Map(days.map((d) => [d, args.postsPerDay[d] || QUOTA_PER_DAY_MIN]));
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 2800,
+    timeoutMs: args.timeoutMs ?? 28000,
+    system: daySlotsSystem(days),
+    user: plannerUserPayload({
+      ...args,
+      extra: {
+        requested_day_offsets: days,
+        posts_per_day: args.postsPerDay,
+        slots_already_planned: (args.already || []).map((slot) => ({
+          slot_id: slot.slot_id,
+          day_offset: slot.day_offset,
+          strategic_role: slot.strategic_role,
+          editorial_mode: slot.editorial_mode,
+          planner_intent: slot.planner_intent,
+        })),
+        required_slot_count_this_call: want,
+      },
+    }),
+    parse: (raw): PlannerSlotIntent[] | null => {
+      if (!raw || !Array.isArray(raw.slots) || want < 1) return null;
+      const slots: PlannerSlotIntent[] = [];
+      const seen = new Set((args.already || []).map((slot) => slot.slot_id));
+      const dayCounts = new Map<number, number>();
+      for (let i = 0; i < raw.slots.length && slots.length < want; i++) {
+        const item = raw.slots[i] || {};
+        let slotId = s(item.slot_id, 40) || `D${Number(item.day_offset) || 0}S${i + 1}`;
+        if (seen.has(slotId)) slotId = `${slotId}_${slots.length + 1}`;
+        const day = Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(item.day_offset) || 0)));
+        if (!allowed.has(day)) continue;
+        const cap = perDayCap.get(day) || QUOTA_PER_DAY_MIN;
+        const n = dayCounts.get(day) || 0;
+        if (n >= cap) continue;
+        const role = s(item.strategic_role, 120);
+        const intent = s(item.planner_intent, 240);
+        if (!role || !intent) continue;
+        seen.add(slotId);
+        dayCounts.set(day, n + 1);
+        slots.push({
+          slot_id: slotId,
+          day_offset: day,
+          strategic_role: role,
+          editorial_mode: mode(item.editorial_mode),
+          planner_intent: intent,
+        });
+      }
+      if (slots.length !== want) return null;
+      return slots;
+    },
+  });
 }
 
 export async function inferSevenDayStrategy(args: {

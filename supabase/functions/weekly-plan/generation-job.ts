@@ -56,13 +56,19 @@ import {
   resolveExperienceSupply,
 } from "./experience-evidence.ts";
 import {
-  inferSevenDayStrategy,
+  inferSevenDaySlotsForDays,
+  inferSevenDayVolume,
   loadRecentXAnalyticsPublished,
+  nextStrategyDayOffsets,
   recoverRejectedPlannerSlot,
   selectSeedsForSevenDayPlan,
+  strategyCoversSevenDays,
   type PlannerSeedAssignment,
+  type PlannerSlotIntent,
   type SevenDayStrategy,
+  type SevenDayVolume,
 } from "./seven-day-planner.ts";
+import { stampPlannerSlotTimes } from "./for-you-spread.ts";
 
 const EXPAND_BATCH = 10;
 const WRITE_CHUNK = 1;
@@ -101,7 +107,23 @@ const JUDGE_REASON_KO: Record<string, string> = {
   creator_identity_contradiction: "Creator 정체성 충돌",
   manual_text_leakage: "원문 누수",
   WRITER_FAILURE: "Writer 실패",
+  writer_call_failed: "Writer 호출 실패",
+  xai_timeout: "Writer 시간 초과",
+  xai_key_missing: "Writer 키 없음",
+  xai_empty_content: "Writer 빈 응답",
 };
+
+function isWriterFailure(reasons: unknown[], judgeStatus?: string): boolean {
+  if (String(judgeStatus || "") === "REJECT") return false;
+  return (reasons || []).some((r) =>
+    /^(writer_call_failed|xai_timeout|WRITER_FAILURE|xai_key_missing|xai_empty_content|xai_http|xai_fetch)/i.test(String(r || "")),
+  );
+}
+
+function formatPipelineReject(subject: string, reasons: unknown[], judgeStatus?: string): string {
+  const prefix = isWriterFailure(reasons, judgeStatus) ? "Writer 실패 ·" : "Judge 거절 ·";
+  return `${prefix} ${subject} · ${judgeReasonsKo(reasons)}`;
+}
 
 function judgeReasonsKo(reasons: unknown[]): string {
   const raw = (reasons || []).map((r) => String(r || "").trim()).filter(Boolean);
@@ -173,6 +195,13 @@ function buildJobReportKo(row: any): string {
     else lines.push(`     이유: ${reasons}`);
   }
   lines.push("", `3. Judge 거절 ${rejectN} · Writer/Judge 시도 중 PASS ${passN}`);
+  const planned = (st.planner_strategy?.slots || []).filter((s: any) => s?.planned_pt);
+  if (planned.length) {
+    lines.push("", "3b. Planner 예정 시각 (America/Los_Angeles, For You 간격)");
+    for (const slot of planned.slice(0, 56)) {
+      lines.push(`   - ${clip(slot.slot_id, 16)} · D${Number(slot.day_offset) + 1} · ${clip(slot.planned_pt, 32)}`);
+    }
+  }
   lines.push("", "4. Planner 재배차");
   if (!history.length) lines.push("   없음");
   for (const h of history.slice(-40)) {
@@ -197,7 +226,7 @@ function rejectLogFromState(st: any): string[] {
     const reasons = o?.block_reasons || o?.judge_reasons || [];
     if (!rejected && !(Array.isArray(reasons) && reasons.length)) continue;
     const subject = String(o?.concrete_subject || o?.slotId || o?.slot_id || "slot").slice(0, 40);
-    out.push(`Judge 거절 · ${subject} · ${judgeReasonsKo(reasons)}`);
+    out.push(formatPipelineReject(subject, reasons, o?.judge_status));
   }
   return out.slice(-40);
 }
@@ -416,7 +445,7 @@ function compactSlotLite(
   dayOffset: number,
   slot: number,
   mode: EditorialMode,
-  planner?: { strategic_role?: string; planner_intent?: string; strategy_slot_id?: string },
+  planner?: { strategic_role?: string; planner_intent?: string; strategy_slot_id?: string; planned_at?: string; planned_pt?: string },
 ) {
   return {
     slotId: `D${dayOffset + 1}P${slot}`,
@@ -429,6 +458,8 @@ function compactSlotLite(
     strategic_role: planner?.strategic_role || "",
     planner_intent: planner?.planner_intent || "",
     strategy_slot_id: planner?.strategy_slot_id || "",
+    planned_at: planner?.planned_at || "",
+    planned_pt: planner?.planned_pt || "",
     length_mode: lengthForEditorial(mode),
     angle: seed.point_or_tension || "",
     actionType: "ORIGINAL",
@@ -535,8 +566,12 @@ export async function startWeeklyJob(args: {
     quota: null as any,
     learning: null as any,
     planner_strategy: null as SevenDayStrategy | null,
+    planner_volume: null as SevenDayVolume | null,
+    planner_slots_partial: [] as PlannerSlotIntent[],
     planner_assignments: [] as PlannerSeedAssignment[],
     planner_strategy_attempts: 0,
+    planner_volume_attempts: 0,
+    planner_day_batch_attempts: 0,
     planner_selection_attempts: 0,
     planner_selection_failures: 0,
     planner_exploration_direction: "",
@@ -964,8 +999,13 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   }
   const analytics = await loadRecentXAnalyticsPublished(supabase, 30);
   const plannerIntel = intelligence || await loadPlannerIntelligence(supabase, []);
-  st.planner_strategy_attempts = Number(st.planner_strategy_attempts || 0) + 1;
-  const result = await inferSevenDayStrategy({
+  const analyticsLine = [
+    `X Analytics 실제 게시 ${analytics.rows.length}행 · 실제 날짜 ${analytics.coverage_days}일`,
+    `X Analytics 계정 개요 ${analytics.account_daily.length}일`,
+    `bundled ${analytics.bundled_source || "none"}${analytics.bundled_error ? ` · ${analytics.bundled_error}` : ""}`,
+  ].join(" · ");
+
+  const shared = {
     xaiKey,
     analytics: analytics.rows,
     analyticsCoverageDays: analytics.coverage_days,
@@ -973,34 +1013,99 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     intelligence: plannerIntel,
     cadence: learned.cadence,
     operatorNote: intentText || undefined,
-    timeoutMs: 28000,
-  });
-  if (!result.ok || !result.value) {
-    if (st.planner_strategy_attempts < 3) {
-      row.label_ko = `7일 Planner 전략 재추론 ${st.planner_strategy_attempts}/3…`;
-      row.summary = [row.summary, `Planner strategy: ${result.error || "unusable"}`].filter(Boolean).join("\n");
+  };
+
+  if (!st.planner_volume) {
+    st.planner_volume_attempts = Number(st.planner_volume_attempts || 0) + 1;
+    const result = await inferSevenDayVolume({ ...shared, timeoutMs: 20000 });
+    if (!result.ok || !result.value) {
+      if (st.planner_volume_attempts < 3) {
+        row.label_ko = `7일 칸 수 재추론 ${st.planner_volume_attempts}/3…`;
+        row.summary = [row.summary, analyticsLine, `Planner volume: ${result.error || "unusable"}`].filter(Boolean).join("\n");
+        return;
+      }
+      row.status = "error";
+      row.error = `7일 Planner 칸 수 실패: ${result.error || "unusable"}`;
+      row.label_ko = "Planner 칸 수 실패";
       return;
     }
-    row.status = "error";
-    row.error = `7일 Planner 전략 실패: ${result.error || "unusable"}`;
-    row.label_ko = "Planner 전략 실패";
+    st.planner_volume = result.value;
+    st.planner_slots_partial = [];
+    st.planner_day_batch_attempts = 0;
+    const locked = result.value.posts_per_day.reduce((a, b) => a + b, 0);
+    row.label_ko = `7일 칸 수 잠금 ${locked}칸 · 날짜별 슬롯…`;
+    row.summary = [
+      row.summary,
+      analyticsLine,
+      `Planner 칸 수 ${locked} · 하루 ${result.value.posts_per_day.join("/")}`,
+      `Planner 요약: ${result.value.summary}`,
+      result.value.analytics_request_needed
+        ? `X Analytics 추가 요청 필요: ${result.value.analytics_request_reason || "Planner 판단"}`
+        : "",
+    ].filter(Boolean).join("\n");
     return;
   }
-  st.planner_strategy = result.value;
+
+  const volume = st.planner_volume as SevenDayVolume;
+  const partial: PlannerSlotIntent[] = Array.isArray(st.planner_slots_partial) ? st.planner_slots_partial : [];
+  const days = nextStrategyDayOffsets(partial, volume.posts_per_day);
+  if (days.length) {
+    st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
+    const result = await inferSevenDaySlotsForDays({
+      ...shared,
+      days,
+      postsPerDay: volume.posts_per_day,
+      already: partial,
+      timeoutMs: 28000,
+    });
+    if (!result.ok || !result.value) {
+      if (st.planner_day_batch_attempts < 3) {
+        row.label_ko = `Planner ${days.map((d) => d + 1).join(",")}일차 슬롯 재추론 ${st.planner_day_batch_attempts}/3…`;
+        row.summary = [row.summary, `Planner day slots: ${result.error || "unusable"}`].filter(Boolean).join("\n");
+        return;
+      }
+      row.status = "error";
+      row.error = `7일 Planner 슬롯 실패 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "unusable"}`;
+      row.label_ko = "Planner 슬롯 실패";
+      return;
+    }
+    st.planner_slots_partial = [...partial, ...result.value];
+    st.planner_day_batch_attempts = 0;
+    const remain = nextStrategyDayOffsets(st.planner_slots_partial, volume.posts_per_day);
+    if (remain.length) {
+      row.label_ko = `Planner 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;
+      return;
+    }
+  }
+
+  const stamped = stampPlannerSlotTimes(String(st.startDate || ""), st.planner_slots_partial as PlannerSlotIntent[]);
+  if (!strategyCoversSevenDays(stamped)) {
+    row.status = "error";
+    row.error = `7일 Planner 달력 무결성 실패: ${stamped.length}칸`;
+    row.label_ko = "Planner 달력 실패";
+    return;
+  }
+  st.planner_strategy = {
+    strategy_summary: volume.summary,
+    profile_diversity_intent: volume.profile_diversity_intent || "",
+    slots: stamped,
+    analytics_rows_used: analytics.rows.length,
+    analytics_coverage_days: analytics.coverage_days,
+    analytics_request_needed: volume.analytics_request_needed === true,
+    analytics_request_reason: volume.analytics_request_reason || "",
+    version: "seven_day_planner_v1",
+  } satisfies SevenDayStrategy;
   st.quota = null;
-  row.required_slots = result.value.slots.length;
+  row.required_slots = stamped.length;
   st.posts_per_day = Math.max(QUOTA_PER_DAY_MIN, Math.ceil(row.required_slots / QUOTA_DAYS));
   st.max_expand = Math.max(Number(st.max_expand || 0), expandRoundBudget(row.required_slots));
   const seedTarget = candidatePoolTarget(row.required_slots);
   row.summary = [
     row.summary,
     `Planner 잠금 ${row.required_slots}칸 · 하루 ${st.posts_per_day} · Seed Generator에 ${seedTarget}개 요청 (칸 + ${SEED_POOL_BUFFER})`,
-    `Planner 7일 전략: ${result.value.strategy_summary}`,
-    `X Analytics 실제 게시 ${result.value.analytics_rows_used}행 · 실제 날짜 ${result.value.analytics_coverage_days}일`,
-    `X Analytics 계정 개요 ${analytics.account_daily.length}일`,
-    result.value.analytics_request_needed
-      ? `X Analytics 추가 요청 필요: ${result.value.analytics_request_reason || "Planner 판단"}`
-      : "",
+    `Planner 7일 전략: ${volume.summary}`,
+    analyticsLine,
+    `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "14:00 PT"}`,
   ].filter(Boolean).join("\n");
   if ((st.gated || []).length < seedTarget && canKeepExpanding(st)) {
     row.step = "expand";
@@ -1122,6 +1227,8 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         strategic_role: strategySlot.strategic_role,
         planner_intent: assignment.planner_intent || strategySlot.planner_intent,
         strategy_slot_id: strategySlot.slot_id,
+        planned_at: strategySlot.planned_at,
+        planned_pt: strategySlot.planned_pt,
       },
     ));
   }
@@ -1240,11 +1347,13 @@ async function stepRecover(xaiKey: string, row: any) {
     day,
     Number(String(original.slotId || "").replace(/^D\d+P/, "")) || 1,
     result.value.editorial_mode,
-    {
-      strategic_role: result.value.strategic_role || original.strategic_role,
-      planner_intent: result.value.planner_intent || original.planner_intent,
-      strategy_slot_id: original.strategy_slot_id,
-    },
+      {
+        strategic_role: result.value.strategic_role || original.strategic_role,
+        planner_intent: result.value.planner_intent || original.planner_intent,
+        strategy_slot_id: original.strategy_slot_id,
+        planned_at: original.planned_at || strategySlot?.planned_at,
+        planned_pt: original.planned_pt || strategySlot?.planned_pt,
+      },
   );
   const insertAt = Math.max(0, Math.min(Number(st.write_index || 0), (st.write_flat || []).length));
   st.write_flat.splice(insertAt, 0, replacement);
@@ -1758,8 +1867,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
         ? p.block_reasons
         : [String(p.judge_status || p.generation_status || "WRITER_FAILURE")];
       const subject = String(chunk[k]?.concrete_subject || chunk[k]?.primaryTopic || p.slotId || "slot").slice(0, 40);
-      const reasonKo = judgeReasonsKo(reasons);
-      st.last_reject_ko = `Judge 거절 · ${subject} · ${reasonKo}`;
+      st.last_reject_ko = formatPipelineReject(subject, reasons, p.judge_status);
       appendRejectLog(st, st.last_reject_ko);
       row.summary = [row.summary, st.last_reject_ko].filter(Boolean).join("\n");
       if (rejected) {
@@ -1791,6 +1899,8 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
         seed_id: chunk[k]?.seed_id || null,
         strategic_role: chunk[k]?.strategic_role || null,
         planner_intent: chunk[k]?.planner_intent || null,
+        planned_at: chunk[k]?.planned_at || null,
+        planned_pt: chunk[k]?.planned_pt || null,
         writer_model: "grok-4.6",
         engine: "v11_seven_day_planner_runtime",
         job_id: row.id,

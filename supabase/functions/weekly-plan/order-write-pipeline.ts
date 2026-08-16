@@ -43,7 +43,7 @@ export const V11_SEED_MODEL = "grok-4.6";
 /** Original post body is Grok 4.6 (xAI). No OpenAI. */
 export const V11_WRITER_MODEL = "grok-4.6";
 export const V11_WRITE_CONCURRENCY = 2;
-export const V11_WRITER_TIMEOUT_MS = 32000;
+export const V11_WRITER_TIMEOUT_MS = 55000;
 
 export function interpretConcreteSeed(seed: ConcreteSeed, mode?: EditorialMode): SeedInterpretation {
   return interpretSeed({

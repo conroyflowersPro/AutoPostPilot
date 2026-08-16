@@ -37,10 +37,10 @@ ok("J8. empty drafts are not saved", /if \(!text\)/.test(job) && /빈 초안/.te
 ok("J9. no template fill on empty expand", /템플릿으로 채우지 않습니다/.test(job));
 ok("J10. client starts a job then follows ticks", /phase: "job_start"/.test(gen) && /phase: "job_tick"/.test(gen));
 ok("J11. client does not orchestrate quota/expand/write", !/phase: "quota"/.test(gen) && !/phase: "expand"/.test(gen) && !/phase: "write"/.test(gen));
-ok("J12. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
+ok("J12. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("J13. refresh resumes running job", /phase: "job_status"/.test(gen) && /status !== "running"/.test(gen));
 ok("J14. tick timeout polls status instead of wiping the week", /job_status/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
-ok("J15. shipping 11.12.7", /const APP_VERSION = "11.12.7"/.test(ix));
+ok("J15. shipping 11.12.8", /const APP_VERSION = "11.12.8"/.test(ix));
 ok("J24. empty write returns to Planner and never reports a short success", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /quotaFilled/.test(job));
 ok("J25. live Planner has no local HIGH repetition gate", !/conceptualRepetitionLevel/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/seven-day-planner.ts"), "utf8")));
 ok("J26. client followJob 200 ticks", /for \(let i = 0; i < 200; i\+\+\)/.test(gen));

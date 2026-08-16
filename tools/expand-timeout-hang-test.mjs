@@ -27,16 +27,16 @@ function ok(name, cond) {
 }
 
 console.log("Expand hang after inferred quota (v11.1.2)");
-ok("H1. EXPAND_BATCH is 6", /const EXPAND_BATCH = 6/.test(ix));
+ok("H1. EXPAND_BATCH is 10", /const EXPAND_BATCH = 10/.test(ix));
 ok("H2. expand Grok timeout 32s (one call, under 60s)", /timeoutMs:\s*32000/.test(ix));
 ok("H3. no same-request expand retry", (ix.match(/await runExpand\(\)/g) || []).length === 1);
-ok("H4. client aborts job_tick ~55s", /job_tick/.test(gen) && /55000/.test(gen));
+ok("H4. client aborts job_tick ~90s", /job_tick/.test(gen) && /90000/.test(gen));
 ok("H5. client aborts write ~50s kept for compat", /write/.test(gen) && /50000/.test(gen));
 ok("H6. AbortError shows Korean timeout, does not hang", /AbortError/.test(gen) && /초 안에 끝나지 않았습니다/.test(gen));
 ok("H7. write chunk failure does not abort the week", /write_errors/.test(job) && /빈 초안/.test(job));
 ok("H8. empty drafts are not saved", /if \(!text\)/.test(job) && /빈 초안/.test(job));
 ok("H9. WRITE_CHUNK is 1 (one slot per job tick)", /const WRITE_CHUNK = 1/.test(job) && /export const WRITE_CHUNK = 1/.test(readFileSync(path.join(ROOT, "lib/weekly-generate-scale.ts"), "utf8")));
-ok("H10. write concurrency 2 / timeout 32s (Grok writer)", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 32000/.test(ow));
+ok("H10. write concurrency 2 / timeout 55s (Grok writer)", /V11_WRITE_CONCURRENCY = 2/.test(ow) && /V11_WRITER_TIMEOUT_MS = 55000/.test(ow));
 ok("H11. write retries once unless job skipSelectiveRegen", /allow_one_retry: args\.skipSelectiveRegen \? false : true/.test(ow));
 ok("H12. 7C honors allow_one_retry false", /options\.allow_one_retry !== false/.test(gi));
 ok("H13. seed-reasoning default timeout 32s", /timeoutMs \?\? 32000/.test(cr));
