@@ -354,6 +354,39 @@ function recordFieldRefill(st: any, direction: string, n = TARGETED_EXPLORE_SEED
   st.field_refill_counts[key] = Math.min(FIELD_REFILL_MAX, Number(st.field_refill_counts[key] || 0) + n);
 }
 
+function missingSlotFingerprint(missing: Array<{ slot_id?: string }>): string {
+  return (missing || []).map((item) => String(item.slot_id || "")).filter(Boolean).sort().join(",");
+}
+
+function fillUnassignedPlannerSlotsFromPool(args: {
+  slots: PlannerSlotIntent[];
+  assignments: PlannerSeedAssignment[];
+  pool: ConcreteSeed[];
+}): PlannerSeedAssignment[] {
+  const usedSlots = new Set(args.assignments.map((item) => String(item.slot_id || "")));
+  const usedSeeds = new Set(args.assignments.map((item) => String(item.seed_id || "")).filter(Boolean));
+  const unused = (args.pool || []).filter((seed) => seed?.seed_id && !usedSeeds.has(String(seed.seed_id)));
+  const out = [...args.assignments];
+  for (const slot of args.slots || []) {
+    if (!slot?.slot_id || usedSlots.has(slot.slot_id)) continue;
+    const mode = parseEditorialMode(String(slot.editorial_mode || ""));
+    const idx = unused.findIndex((seed) =>
+      canServeEditorialMode(seed, mode) && !usedSeeds.has(String(seed.seed_id)),
+    );
+    if (idx < 0) continue;
+    const seed = unused.splice(idx, 1)[0];
+    usedSlots.add(slot.slot_id);
+    usedSeeds.add(String(seed.seed_id));
+    out.push({
+      slot_id: slot.slot_id,
+      seed_id: String(seed.seed_id),
+      planner_intent: slot.planner_intent,
+      editorial_mode: mode,
+    });
+  }
+  return out;
+}
+
 function requestTargetedSeedRefill(row: any, pending: any, reason: string) {
   const st = row.state;
   const slot = pending?.slot || pending;
@@ -961,7 +994,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     : [];
   const gated = applyLocalGates(local, [], createSeedIdFactory("s"));
   const candidates: any[] = [...(st.gated || []), ...(gated.passed || [])];
-  const compact = !!st.compact_next;
+  const compact = !!st.compact_next || !!targetedExploration;
   const windows = publicSearchWindows();
   const half = String(st.public_search_half || "") === "far7" ? "far" : "near";
   st.public_search_half = half === "near" ? "far7" : "near7";
@@ -1064,6 +1097,14 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         (xaiRes.error ? ` · xAI ${xaiRes.error}` : ""),
     ].filter(Boolean).join("\n");
     if (isTransientXaiError(st.last_expand_error || xaiRes.error)) {
+      const poolReady = (st.gated || []).length > 0;
+      if (targetedExploration || (required > 0 && poolReady) || (required <= 0 && poolReady)) {
+        st.compact_next = false;
+        row.step = nextPlannerStep;
+        row.label_ko = labelForPlannerStep(nextPlannerStep);
+        row.summary = [row.summary, "공개 검색 시간 초과 · 기존 Seed Pool로 Planner 이어감"].filter(Boolean).join("\n");
+        return;
+      }
       holdForXai(row, "xAI 응답 대기 · Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
       return;
     }
@@ -1358,6 +1399,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   const days = nextUnassignedDayOffsets(strategy.slots, assigned.map((item) => item.slot_id));
   const pool = await plannerSelectablePool(supabase, st);
   if (days.length) {
+    const daySlots = strategy.slots.filter((slot) => days.includes(slot.day_offset));
     const result = await selectSeedsForDays({
       xaiKey,
       strategy,
@@ -1367,74 +1409,103 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       timeoutMs: 28000,
     });
     if (!result.ok || !result.value) {
-      if (isTransientXaiError(result.error)) {
+      st.select_timeouts = Number(st.select_timeouts || 0) + 1;
+      if (isTransientXaiError(result.error) && st.select_timeouts <= 1) {
         holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 Seed 선택 이어감…`, `Planner select: ${result.error}`);
         return;
       }
-      row.label_ko = `Planner ${days.map((d) => d + 1).join(",")}일차 Seed 선택 재추론…`;
-      row.summary = [row.summary, `Planner select: ${result.error || "unusable"}`].filter(Boolean).join("\n");
-      return;
-    }
-    const have = new Set(assigned.map((item) => item.slot_id));
-    for (const item of result.value.assignments) {
-      if (!have.has(item.slot_id)) {
-        assigned.push(item);
-        have.add(item.slot_id);
-      }
-    }
-    const enforced = applyNewestLivedExperienceAssignments({
-      slots: strategy.slots.filter((slot) => days.includes(slot.day_offset)),
-      assignments: assigned.filter((item) => {
-        const slot = strategy.slots.find((s) => s.slot_id === item.slot_id);
-        return slot && days.includes(slot.day_offset);
-      }),
-      missing: result.value.missing,
-      pool: pool as any[],
-    });
-    const kept = assigned.filter((item) => {
-      const slot = strategy.slots.find((s) => s.slot_id === item.slot_id);
-      return !(slot && days.includes(slot.day_offset));
-    });
-    st.planner_assignments = [...kept, ...enforced.assignments];
-    if (enforced.missing.length > 0) {
-      const direction = enforced.missing[0]?.exploration_direction || "";
-      st.planner_missing_count = enforced.missing.length;
-      st.planner_exploration_direction = enforced.missing
-        .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
-        .join(" | ")
-        .slice(0, 1200);
-      if (!canRefillField(st, direction)) {
-        row.summary = [
-          row.summary,
-          `같은 분야 Seed 재추출 한도 ${FIELD_REFILL_MAX} · ${st.planner_assignments.length}/${strategy.slots.length} 지정`,
-        ].filter(Boolean).join("\n");
-        row.label_ko = `Planner Seed 선택 ${st.planner_assignments.length}/${strategy.slots.length}…`;
-        return;
-      }
-      recordFieldRefill(st, direction);
-      st.max_expand = Number(st.max_expand || 0) + Math.min(6, enforced.missing.length + 1);
-      row.step = "expand";
-      row.label_ko = `Planner 지정 분야 Seed 탐색 ${result.value.missing.length}개 슬롯…`;
+      st.select_timeouts = 0;
+      st.planner_assignments = fillUnassignedPlannerSlotsFromPool({
+        slots: daySlots,
+        assignments: assigned,
+        pool,
+      });
       row.summary = [
         row.summary,
-        `Planner가 기존 Pool에서 ${assigned.length}/${strategy.slots.length} 선택 · ${result.value.missing.length}개 분야 추가 탐색 요청`,
+        `Planner select ${result.error || "unusable"} · 기존 Pool로 ${days.map((d) => d + 1).join(",")}일차 배차`,
       ].filter(Boolean).join("\n");
+    } else {
+      st.select_timeouts = 0;
+      const have = new Set(assigned.map((item) => item.slot_id));
+      for (const item of result.value.assignments) {
+        if (!have.has(item.slot_id)) {
+          assigned.push(item);
+          have.add(item.slot_id);
+        }
+      }
+      const enforced = applyNewestLivedExperienceAssignments({
+        slots: daySlots,
+        assignments: assigned.filter((item) => {
+          const slot = strategy.slots.find((s) => s.slot_id === item.slot_id);
+          return slot && days.includes(slot.day_offset);
+        }),
+        missing: result.value.missing,
+        pool: pool as any[],
+      });
+      const kept = assigned.filter((item) => {
+        const slot = strategy.slots.find((s) => s.slot_id === item.slot_id);
+        return !(slot && days.includes(slot.day_offset));
+      });
+      st.planner_assignments = [...kept, ...enforced.assignments];
+      if (enforced.missing.length > 0) {
+        const direction = enforced.missing[0]?.exploration_direction || "";
+        const fingerprint = missingSlotFingerprint(enforced.missing);
+        st.explored_missing = st.explored_missing && typeof st.explored_missing === "object" ? st.explored_missing : {};
+        const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction);
+        if (!alreadyExplored) {
+          st.explored_missing[fingerprint] = true;
+          st.planner_missing_count = enforced.missing.length;
+          st.planner_exploration_direction = enforced.missing
+            .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
+            .join(" | ")
+            .slice(0, 1200);
+          recordFieldRefill(st, direction);
+          st.max_expand = Number(st.max_expand || 0) + Math.min(6, enforced.missing.length + 1);
+          row.step = "expand";
+          row.label_ko = `Planner 지정 분야 Seed 탐색 ${enforced.missing.length}개 슬롯…`;
+          row.summary = [
+            row.summary,
+            `Planner가 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${enforced.missing.length}개 분야 추가 탐색 요청`,
+          ].filter(Boolean).join("\n");
+          return;
+        }
+        st.planner_assignments = fillUnassignedPlannerSlotsFromPool({
+          slots: daySlots,
+          assignments: st.planner_assignments,
+          pool,
+        });
+        st.planner_exploration_direction = "";
+        row.summary = [
+          row.summary,
+          `추가 탐색 한도 · 기존 Pool로 빈 칸 배차 ${st.planner_assignments.length}/${strategy.slots.length}`,
+        ].filter(Boolean).join("\n");
+      }
+    }
+    const remain = nextUnassignedDayOffsets(
+      strategy.slots,
+      (st.planner_assignments || []).map((item: PlannerSeedAssignment) => item.slot_id),
+    );
+    if (remain.some((d) => !days.includes(d))) {
+      row.label_ko = `Planner Seed 선택 ${(st.planner_assignments || []).length}/${strategy.slots.length} · ${remain.map((d) => d + 1).join(",")}일차…`;
       return;
     }
-    const remain = nextUnassignedDayOffsets(strategy.slots, assigned.map((item) => item.slot_id));
     if (remain.length) {
-      row.label_ko = `Planner Seed 선택 ${assigned.length}/${strategy.slots.length} · ${remain.map((d) => d + 1).join(",")}일차…`;
-      return;
+      st.planner_assignments = fillUnassignedPlannerSlotsFromPool({
+        slots: daySlots,
+        assignments: st.planner_assignments || [],
+        pool,
+      });
     }
   }
 
+  const finalAssigned: PlannerSeedAssignment[] = Array.isArray(st.planner_assignments) ? st.planner_assignments : assigned;
   const seedById = new Map(pool.map((seed) => [String(seed.seed_id), seed]));
   const strategyById = new Map(strategy.slots.map((slot) => [slot.slot_id, slot]));
   const weekDays: Array<{ dayOffset: number; posts: any[] }> = Array.from(
     { length: QUOTA_DAYS },
     (_, dayOffset) => ({ dayOffset, posts: [] }),
   );
-  for (const assignment of assigned) {
+  for (const assignment of finalAssigned) {
     const seed = seedById.get(assignment.seed_id);
     const strategySlot = strategyById.get(assignment.slot_id);
     if (!seed || !strategySlot) continue;
