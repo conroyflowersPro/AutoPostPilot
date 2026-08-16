@@ -110,7 +110,8 @@ ok("E9. REJECT returns the slot to Planner",
 ok("E10. Planner recovery receives Judge reasons, not failed post prose",
   /semantic_judge_reasons/.test(planner) && !/previous_final_text/.test(planner));
 ok("E11. Planner recovery returns through Writer then Judge",
-  /recoverRejectedPlannerSlot/.test(job) && /st\.write_flat\.push\(replacement\)/.test(job));
+  /recoverRejectedPlannerSlot/.test(job) && /st\.write_flat\.splice\(insertAt, 0, replacement\)/.test(job) &&
+  /st\.write_index = insertAt/.test(job) && /row\.step = "write"/.test(job));
 ok("E12. Job calls weekly-count-ledger",
   /evaluateOrder8cCompletionGate/.test(job) &&
     /attachCountLedger/.test(job) &&

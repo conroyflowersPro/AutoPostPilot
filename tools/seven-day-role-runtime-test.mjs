@@ -71,6 +71,11 @@ ok("R15. Judge hard failures are final-unacceptable only",
   /hard\.push\("generic_thesis"\)/.test(judge) &&
   !/hard\.push\("structural_repetition_high"\)/.test(judge));
 ok("R16. Judge reject returns slot to Planner", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job));
+ok("R16b. Planner requeues the recovered slot as the next Writer/Judge pass",
+  /st\.write_flat\.splice\(insertAt, 0, replacement\)/.test(job) &&
+  /st\.write_index = insertAt/.test(job) &&
+  /Planner 재배차 → Writer 재작성/.test(job) &&
+  /skipSelectiveRegen: true/.test(job));
 ok("R17. recovery checks existing Pool first", /availableSeedPool: pool/.test(job) && /RESELECT_EXISTING/.test(planner));
 ok("R18. Planner can request targeted Seed exploration", /TARGETED_EXPLORE/.test(planner) && /planner_exploration_direction/.test(job + seed));
 ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent Seed rejection/.test(planner));

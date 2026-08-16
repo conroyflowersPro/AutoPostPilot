@@ -966,10 +966,21 @@ async function stepRecover(xaiKey: string, row: any) {
     row.label_ko = "Planner recovery 한도";
     return;
   }
+  const rejectedSeedId = String(pending.slot?.seed_id || "");
+  const reservedSeedIds = new Set(
+    (st.write_flat || [])
+      .slice(Number(st.write_index || 0))
+      .map((slot: any) => String(slot?.seed_id || ""))
+      .filter(Boolean),
+  );
+  if (rejectedSeedId) reservedSeedIds.add(rejectedSeedId);
   const savedSeedIds = new Set(
     (st.write_flat || []).filter((slot: any) => slot?._saved).map((slot: any) => String(slot.seed_id || "")),
   );
-  const pool = (st.gated || []).filter((seed: any) => !savedSeedIds.has(String(seed.seed_id || "")));
+  const pool = (st.gated || []).filter((seed: any) => {
+    const id = String(seed.seed_id || "");
+    return id && !savedSeedIds.has(id) && !reservedSeedIds.has(id);
+  });
   const result = await recoverRejectedPlannerSlot({
     xaiKey,
     strategy,
@@ -1023,11 +1034,13 @@ async function stepRecover(xaiKey: string, row: any) {
       strategy_slot_id: original.strategy_slot_id,
     },
   );
-  st.write_flat.push(replacement);
+  const insertAt = Math.max(0, Math.min(Number(st.write_index || 0), (st.write_flat || []).length));
+  st.write_flat.splice(insertAt, 0, replacement);
+  st.write_index = insertAt;
   st.pending_recovery = null;
   st.planner_exploration_direction = "";
   row.step = "write";
-  row.label_ko = `Planner 재배차 완료 · 초안 ${row.saved_count}/${row.required_slots}…`;
+  row.label_ko = `Planner 재배차 → Writer 재작성 ${row.saved_count}/${row.required_slots}…`;
 }
 
 /** @deprecated Not called by the live job. Seed Generator no longer has a semantic Judge. */
