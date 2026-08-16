@@ -80,6 +80,9 @@ ok("R22. old local Seed judge/select are not live", /legacySeedJudgeUnused/.test
 ok("R23. account overview remains a separate daily Planner signal",
   /dailyAccountPulse/.test(analyticsImport) && /engagements: number/.test(analyticsParser) &&
   /account_overview_daily/.test(planner) && /never to attribute an account total to an individual post/.test(planner));
+ok("R24. Planner strategy sends compacted 30-day outcomes, not full post bodies",
+  /compactPublishedFlow/.test(planner) && /maxTokens: 2800/.test(planner) &&
+  /compacted to date, short text, and outcome metrics/.test(planner));
 
 console.log("========================================");
 console.log(`SEVEN-DAY ROLES: ${pass} PASS / ${fail} FAIL`);

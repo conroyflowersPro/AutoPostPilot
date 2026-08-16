@@ -361,13 +361,36 @@ function mode(v: unknown): EditorialMode {
   return VALID_MODES.has(value) ? value : "INFORMATIVE";
 }
 
+function compactPublishedFlow(rows: XAnalyticsPublishedPost[]) {
+  return rows.slice(0, 180).map((row) => ({
+    d: s(row.published_at, 10),
+    t: s(row.content, 72),
+    fol: Number(row.metrics?.followers_gained) || 0,
+    pv: Number(row.metrics?.profile_visits) || 0,
+    bm: Number(row.metrics?.bookmarks) || 0,
+    rp: Number(row.metrics?.replies) || 0,
+    imp: Number(row.metrics?.impressions) || 0,
+  }));
+}
+
+function compactAccountDaily(rows: XAnalyticsDailyAccountPulse[] | undefined) {
+  return (rows || []).slice(0, 31).map((row) => ({
+    d: s(row.date, 10),
+    fol: Number(row.new_follows) || 0,
+    unf: Number(row.unfollows) || 0,
+    pv: Number(row.profile_visits) || 0,
+    bm: Number(row.bookmarks) || 0,
+    imp: Number(row.impressions) || 0,
+  }));
+}
+
 function strategySystem(): string {
   return [
     "You are the seven-day Planner for @Seung4680.",
     plannerArchitectureLock(),
     "Your only job in this call is to infer the seven-day account strategy and slot intents. Do not inspect or select Seeds. Do not write posts. Do not choose prose, thought order, tone, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Planning Horizon is seven days. Intelligence horizons remain whatever their evidence supports.",
-    "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
+    "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days, compacted to date, short text, and outcome metrics. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
     "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
@@ -388,11 +411,11 @@ export async function inferSevenDayStrategy(args: {
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<SevenDayStrategy>> {
-  const analytics = (args.analytics || []).slice(0, 300);
+  const analytics = compactPublishedFlow(args.analytics || []);
   return callPlanner({
     xaiKey: args.xaiKey,
-    maxTokens: 6000,
-    timeoutMs: args.timeoutMs,
+    maxTokens: 2800,
+    timeoutMs: args.timeoutMs ?? 22000,
     system: strategySystem(),
     user: {
       creator_dna: creatorDnaBlock(),
@@ -402,7 +425,7 @@ export async function inferSevenDayStrategy(args: {
       editorial_mode_labels: [...VALID_MODES],
       capacity_recommendation: args.capacityRecommendation,
       recent_x_analytics: analytics,
-      account_overview_daily: (args.accountDaily || []).slice(0, 31),
+      account_overview_daily: compactAccountDaily(args.accountDaily),
       analytics_rows_available: analytics.length,
       analytics_coverage_days: args.analyticsCoverageDays,
       operator_note_overlay_only: s(args.operatorNote, 180) || null,

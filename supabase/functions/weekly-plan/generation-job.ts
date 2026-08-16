@@ -775,7 +775,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     accountDaily: analytics.account_daily,
     intelligence,
     operatorNote: String(st.topic || "") || undefined,
-    timeoutMs: 32000,
+    timeoutMs: 22000,
   });
   if (!result.ok || !result.value) {
     if (st.planner_strategy_attempts < 3) {
