@@ -13,7 +13,7 @@ import type {
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
 import { hasExpertJargon, isEngagementBaitCloser } from "./seed-scope.ts";
-import { creatorDnaBlock } from "./engine-dna.ts";
+import { creatorDnaWriterSlice } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writerLivedTimeLines } from "./seed-ownership.ts";
 
@@ -393,7 +393,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     subject.slice(0, 200),
     "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 160),
     "CREATOR INTELLIGENCE (supporting judgment, never sentences to copy):",
-    creatorDnaBlock(),
+    creatorDnaWriterSlice(s(planner.strategic_role)),
     "REASONING ORDER (internal only; do not output steps):",
     "1) Understand the Seed and Planner Intent together.",
     "2) Close one central thought this Creator would hold. Code labels are material, not the thought.",

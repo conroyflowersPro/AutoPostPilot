@@ -11,7 +11,7 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → Audience DNA (X status) → Creator DNA (RETURN/BRIDGE + type) → Planner place/time/Seeds → Seed Pool(explore to locked count + buffer) → Planner allocate Seeds → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Creator DNA reject relabel → Planner Seeds → Writer batch → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → Audience DNA (X status) → Creator DNA (RETURN/BRIDGE/REACH + type) → Planner place/time/Seeds → Seed Pool(explore to locked count + buffer) → Planner allocate Seeds → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Creator DNA reject relabel → Planner Seeds → Writer batch → Publish → Analytics → Validated Learning → Planner Memory";
 
 export function architecturePrincipleBlock(): string {
   return [
@@ -36,7 +36,7 @@ export function dnaLayerBlock(): string {
 
 export function engineCatalogBlock(): string {
   return [
-    "SEED: Seed Generator explores a candidate pool sized by locked slots + week buffer. It does not strategize, rank, select, allocate, or judge final quality. PLANNING: Creator DNA judges RETURN/BRIDGE and types. Planner places 14:00–22:00 PT and allocates Seeds. Recent-flow lived material is Analytics originals plus sync-gap originals. Writer receives the assigned Seed + Planner Intent.",
+    "SEED: Seed Generator explores a candidate pool sized by locked slots + week buffer. It does not strategize, rank, select, allocate, or judge final quality. PLANNING: Creator DNA judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Planner places 14:00–22:00 PT and allocates Seeds. Recent-flow lived material is Analytics originals plus sync-gap originals. Writer receives the assigned Seed + Planner Intent.",
     "WRITING: Thought first, style follows. Grok 4.6 Writer closes ONE central judgment on this Seed (would this creator hold it? is it grounded?) then writes it in his language. Everyday language, 말투, humor, Mechanism, and Rail follow only to deliver that thought. They must not choose it. Do not invent identity. Do not invent lived experience.",
     "QUALITY: Semantic Judge sees only the completed post and decides final publishability. Creator-related judgment is a Contradiction Check, not a Creator Fit / topic-similarity score. It does not select Seeds, redesign strategy, undo Planner expansion, or rewrite. Reject returns the slot to Planner; Planner reselects from the existing pool first and requests targeted Seed exploration only when needed. Week count is Judge: N Judge-PASS saved posts for N planned slots. Planner locks the plan and does not close the week.",
     "LEARNING: Closed loop — Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next seven-day Planner reads → new Planning. Analytics Import takes X Analytics first into a canonical model (Fedica is an adapter). Features are learned, not sentences. Manual published success is a stronger Creator Signal than an AI draft. One-off success stays hypothesis. Learning that the Planner does not read is not a closed loop.",

@@ -68,7 +68,7 @@ function isSubjectRestate(text, subject) {
   return false;
 }
 
-console.log("Writer quality + leftover seeds (v12.2.2)");
+console.log("Writer quality + leftover seeds (v12.3.0)");
 ok("W1. stutter detector exists", /export function isTokenStutter/.test(wr) && /token_stutter/.test(wr));
 ok("W2. fragment detector exists", /export function isFragmentOriginal/.test(wr) && /too_short_original/.test(wr));
 ok("W3. ent ent ent is stutter", isTokenStutter("슈퍼차저 줄에서 ent ent ent ent ent ent"));
@@ -85,7 +85,7 @@ ok("W13. leftover selectable fill", /while \(totalPlanned < required && pool\.le
 ok("W14. experience without evidence remints", /onlyMissingLived/.test(job) && /NO_CREATOR_EVIDENCE/.test(job));
 ok("W15. non-casual compression never VERY_COMPRESSED", /mode !== "CASUAL_OBSERVATION"/.test(dgc) && /return "NATURAL"/.test(dgc));
 ok("W16. judge hard-fails stutter", /hard\.push\("token_stutter"\)/.test(sj));
-ok("W17. version lockstep 12.2.2", /APP_VERSION = "12.2.2"/.test(ver) && /APP_VERSION = "12.2.2"/.test(ix));
+ok("W17. version lockstep 12.3.0", /APP_VERSION = "12.3.0"/.test(ver) && /APP_VERSION = "12.3.0"/.test(ix));
 ok("W18. Korean summary names seven-day role order", /7일 생성/.test(ver) && /Planner/.test(ver) && /Semantic Judge/.test(ver));
 ok("W19. retry is minimum-boundary retry, not creative rewrite direction", /BOUNDARY RETRY/.test(wr) && /retry_hint/.test(gi));
 ok("W20. Writer prompt does not prescribe a snag", !/A snag is optional/.test(wr) && /point_or_tension is an optional angle/.test(cr));
@@ -130,7 +130,7 @@ ok("W57. live writer does not inject pre-chosen rail beats", /writerRailConstrai
 ok("W58. deep context maps selected_mechanism string", /typeof mech\.selected_mechanism === "string"/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/deep-generation-context.ts"), "utf8")));
 ok("W59. everyday public still gets a mechanism", /everyday_public_reader_entry/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 ok("W60. write batch passes recent mechanisms", /recentMechanismUsage/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/order-write-pipeline.ts"), "utf8")));
-ok("W62. Grok writer consumes Planner Intent + Creator Intelligence", /planner_intent/.test(wr) && /creatorDnaBlock\(\)/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
+ok("W62. Grok writer consumes Planner Intent + Creator Intelligence slice", /planner_intent/.test(wr) && /creatorDnaWriterSlice\(/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
 ok("W63. seven-day generate on client", /GENERATION_DAYS = 7/.test(readFileSync(path.join(ROOT, "app/generate/page.tsx"), "utf8")));
 ok("W64. live Writer prompt has no preselected everyday strategy", !/writingStagePhilosophyBlock\(\)/.test(wr) && !/\.\.\.writerEverydayConstraintLines/.test(wr));
 ok("W65. live Writer prompt has no preselected style family", !/writingStagePhilosophyBlock\(\)/.test(wr) && !/\.\.\.writerStyleConstraintLines/.test(wr));

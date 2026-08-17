@@ -10,7 +10,7 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → Audience DNA (X status) → Creator DNA (RETURN/BRIDGE + type) → Planner place/time/Seeds → Seed Pool(explore to locked count + buffer) → Planner allocate Seeds → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Creator DNA reject relabel → Planner Seeds → Writer batch → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → Audience DNA (X status) → Creator DNA (RETURN/BRIDGE/REACH + type) → Planner place/time/Seeds → Seed Pool(explore to locked count + buffer) → Planner allocate Seeds → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Creator DNA reject relabel → Planner Seeds → Writer batch → Publish → Analytics → Validated Learning → Planner Memory";
 
 export const ARCHITECTURE_FORBIDDEN_MIXES =
   "Writer must not become Planner. Performance DNA must not overwrite Creator DNA. Revenue DNA must not dominate strategy. Judge must not rewrite. Unpublished AI drafts must not train Planner Memory.";

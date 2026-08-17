@@ -28,28 +28,28 @@ function ok(name, cond) {
   }
 }
 
-console.log("Creator slot judgment (v12.2.2)");
+console.log("Creator slot judgment (v12.3.0)");
 
 ok("C1. Audience DNA reports status only",
   /Do not decide slots/.test(audience) && /lived_scene_count/.test(audience) && /sync_gap_originals/.test(audience));
-ok("C2. Creator DNA judges RETURN/BRIDGE and types",
+ok("C2. Creator DNA judges RETURN/BRIDGE/REACH and types",
   /growthRole/.test(creator) && /inferCreatorWeekVolume/.test(creator) && /inferCreatorSlotsForDays/.test(creator) &&
-  /Do not emit PRESENCE/.test(creator));
+  /PRESENCE is not a role/.test(creator));
 ok("C3. Job uses Creator volume/slots, not Planner type inference",
   /inferCreatorWeekVolume/.test(job) && /inferCreatorSlotsForDays/.test(job) &&
   !/inferSevenDayVolume\(/.test(job) && !/inferSevenDaySlotsForDays\(/.test(job));
 ok("C4. Planner attach does not change types",
-  /Creator DNA already judged RETURN\/BRIDGE/.test(planner) && /attachSeedsForSlots/.test(planner));
+  /Creator DNA already judged RETURN\/BRIDGE\/REACH/.test(planner) && /attachSeedsForSlots/.test(planner));
 ok("C5. Reject batch goes to Creator DNA then Planner Seeds",
   /creatorRelabelRejectBatch/.test(job) && /attachSeedsForSlots/.test(job) && /RECOVER_WRITE_CHUNK = 4/.test(job));
 ok("C6. Sync-gap lived seeds join Analytics lived seeds",
   /syncGapLivedSeeds/.test(lived) && /syncGapLivedSeeds/.test(job) && /동기화 공백/.test(job));
-ok("C7. Writer still receives Creator DNA",
-  /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
+ok("C7. Writer receives Creator DNA writer slice",
+  /creatorDnaWriterSlice\(/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
 ok("C8. Pipeline text: Audience → Creator → Planner place",
   /Audience DNA reports X status/.test(dna) && /Reject batches return to Creator DNA/.test(dna));
-ok("C9. version lockstep 12.2.2",
-  /"version": "12.2.2"/.test(pkg) && /APP_VERSION = "12.2.2"/.test(ver) && /APP_VERSION = "12.2.2"/.test(ix));
+ok("C9. version lockstep 12.3.0",
+  /"version": "12.3.0"/.test(pkg) && /APP_VERSION = "12.3.0"/.test(ver) && /APP_VERSION = "12.3.0"/.test(ix));
 
 console.log("========================================");
 console.log(`CREATOR SLOT JUDGMENT: ${pass} PASS / ${fail} FAIL`);

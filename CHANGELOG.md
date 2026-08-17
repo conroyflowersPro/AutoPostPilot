@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.3.0 — 2026-08-17
+
+- Creator DNA가 RETURN / BRIDGE / REACH를 판단합니다. REACH는 하루 1개, 같은 날 최대 2개입니다. PRESENCE 칸은 없습니다
+- Writer는 역할 태도·상시 금지 슬라이스만 받습니다. Tesla/FSD는 시드 탐색용이지 글에 쌓을 재료가 아닙니다
+- 경험 칸은 Analytics·동기화 원글이 있을 때만입니다. 재료가 없으면 비중을 억지로 채우지 않습니다
+- 의견은 빼지 않고, 역할마다 전달 방식만 바꿉니다. REACH 여운은 관찰을 닫지 않은 채 끝내고 질문으로 열지 않습니다
+
 ## 12.2.2 — 2026-08-17
 
 - Judge는 시드 제목 단어가 초안에 없어도 하드 거절하지 않습니다

@@ -758,7 +758,7 @@ export async function inferSevenDayStrategy(args: {
 
 function selectionSystem(dayScoped: boolean): string {
   return [
-    "You are the seven-day Planner attaching Seeds. Creator DNA already judged RETURN/BRIDGE and editorial types. Do not change those.",
+    "You are the seven-day Planner attaching Seeds. Creator DNA already judged RETURN/BRIDGE/REACH and editorial types. Do not change those.",
     dayScoped
       ? "This call covers only the listed day offsets. Leave other days untouched. Do not emit assignments for slots not in this batch."
       : "Preserve the supplied strategy types. Select one Seed from seed_pool for each strategy slot.",
@@ -889,7 +889,7 @@ export async function selectSeedsForDays(args: {
   });
 }
 
-/** Attach Seeds to already-judged slots. Does not change RETURN/BRIDGE or types. */
+/** Attach Seeds to already-judged slots. Does not change RETURN/BRIDGE/REACH or types. */
 export async function attachSeedsForSlots(args: {
   xaiKey: string;
   strategy: SevenDayStrategy;
