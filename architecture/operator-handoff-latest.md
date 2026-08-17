@@ -61,15 +61,15 @@ If 8:29 dumps still exist:
 - Do not merge to `main` without **배포해**.
 - Do not put this handoff into post engines.
 
-## Stated, not shipped — 승Grok absorbs Planner (2026-08-17)
+## Stated, not shipped — Agent승 absorbs Planner (2026-08-17)
 
 Do **not** treat the full absorb as live until Seung says **반영해** / **넣어** / **이대로**. Name + operating structure are planted in the DNA block; RAG search is coded but not yet on the write path.
 
-**Name:** Creator DNA → **승Grok**. Not a chat agent.
+**Name:** Creator DNA → **Agent승**. Not a chat agent.
 
 **Seed Generator:** candidates only.
 
-**승Grok operating structure (always in the model, not RAG):**
+**Agent승 operating structure (always in the model, not RAG):**
 choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH · writing theory · Writer 말투/structure instructions · seven-day schedule + batches.
 
 **Writing theories:** xAI **Collections API** (`POST /v1/documents/search`, hybrid). Server-side search only — do **not** give Grok `collections_search` as a tool (multi-search cost). `limit` 3 chunks. Reinterpret; mix at most 2 cards. Env `XAI_THEORY_COLLECTION_ID`. Skip if unset.
@@ -78,7 +78,7 @@ choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH · writing theory
 
 **Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking. Diversity, seed-fit, anti-repeat.
 
-**Writer:** body only from 승Grok instructions.
+**Writer:** body only from Agent승 instructions.
 
 **Planner:** absorbed (not fully wired yet).
 

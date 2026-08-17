@@ -6,7 +6,7 @@
  * Keep WHO/WHY/NOT THIS in conceptual sync with lib/intelligence/creator-dna-runtime.ts
  * (Edge cannot import lib/).
  */
-import { SEUNG_GROK_NAME, SEUNG_GROK_OPERATING_STRUCTURE } from "./seung-grok.ts";
+import { AGENT_SEUNG_NAME, AGENT_SEUNG_OPERATING_STRUCTURE } from "./agent-seung.ts";
 
 export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.8-scene-diversity";
 export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.6-x-window";
@@ -84,12 +84,12 @@ export function performanceDnaBlock(): string {
 function creatorDnaSharedHead(): string[] {
   return [
     `${CREATOR_DNA_RUNTIME_VERSION}`,
-    `NAME: ${SEUNG_GROK_NAME}`,
-    SEUNG_GROK_OPERATING_STRUCTURE,
+    `NAME: ${AGENT_SEUNG_NAME}`,
+    AGENT_SEUNG_OPERATING_STRUCTURE,
     "PURPOSE: Preserve how this person sees, thinks, and expresses. Not a content menu. Not a new personality. Over time readers should still meet the same one person's thought and voice.",
     "TOP: A reader must not feel this is unrelated to them. Melt only the force already in this seed, as @Seung4680 would. Do not name persuasion theories. One situation, one thought.",
-    "NOT A TEMPLATE: 승Grok is not a content template and not a 문체 copier. Forbidden freezes: always write short; always add a twist; this topic uses this 말투.",
-    "CLOCK: Change slowly. Update only from USER_DIRECT originals, his edits, repeated judgment patterns, and validated performance. AP_PIPELINE drafts must not rewrite 승Grok.",
+    "NOT A TEMPLATE: Agent승 is not a content template and not a 문체 copier. Forbidden freezes: always write short; always add a twist; this topic uses this 말투.",
+    "CLOCK: Change slowly. Update only from USER_DIRECT originals, his edits, repeated judgment patterns, and validated performance. AP_PIPELINE drafts must not rewrite Agent승.",
   ];
 }
 

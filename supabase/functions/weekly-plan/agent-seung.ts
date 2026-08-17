@@ -1,11 +1,11 @@
 /**
- * Edge lockstep of lib/intelligence/seung-grok.ts (Edge cannot import lib/).
+ * Edge lockstep of lib/intelligence/agent-seung.ts (Edge cannot import lib/).
  */
-export const SEUNG_GROK_NAME = "승Grok";
-export const SEUNG_GROK_NAME_EN = "SeungGrok";
+export const AGENT_SEUNG_NAME = "Agent승";
+export const AGENT_SEUNG_NAME_EN = "AgentSeung";
 
-export const SEUNG_GROK_OPERATING_STRUCTURE = [
-  `${SEUNG_GROK_NAME} runs the week. Seed Generator only collects candidates.`,
+export const AGENT_SEUNG_OPERATING_STRUCTURE = [
+  `${AGENT_SEUNG_NAME} runs the week. Seed Generator only collects candidates.`,
   "Jobs: choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH · theory for writing · 말투/structure Writer instructions · seven-day schedule and its batches.",
   "Seed evidence: 30-day X Analytics; 14-day X sync fills holes in that window. Analytics is primary.",
   "Data is not a scoreboard for which theory converts. Use it to keep card diversity, fit the seed, and block frequent repeating patterns (complexity / emergence).",
@@ -13,7 +13,7 @@ export const SEUNG_GROK_OPERATING_STRUCTURE = [
   "Writer writes body only from that instruction. Planner is absorbed — do not wait for a separate Planner strategy job.",
 ].join("\n");
 
-export const SEUNG_GROK_RAG = {
+export const AGENT_SEUNG_RAG = {
   provider: "xai_collections" as const,
   searchUrl: "https://api.x.ai/v1/documents/search",
   retrievalMode: "hybrid" as const,
@@ -23,8 +23,8 @@ export const SEUNG_GROK_RAG = {
   skipOnJudge: true,
 };
 
-export function seungGrokIdentityLine(): string {
-  return `You are ${SEUNG_GROK_NAME}. ${SEUNG_GROK_OPERATING_STRUCTURE.split("\n")[0]}`;
+export function agentSeungIdentityLine(): string {
+  return `You are ${AGENT_SEUNG_NAME}. ${AGENT_SEUNG_OPERATING_STRUCTURE.split("\n")[0]}`;
 }
 
 export type TheoryChunk = {
@@ -46,8 +46,8 @@ export async function searchWritingTheories(
       "",
   ).trim();
   if (!key || !collectionId || !String(query || "").trim()) return [];
-  const limit = Math.min(SEUNG_GROK_RAG.maxChunks, Math.max(1, opts?.limit || SEUNG_GROK_RAG.maxChunks));
-  const res = await fetch(SEUNG_GROK_RAG.searchUrl, {
+  const limit = Math.min(AGENT_SEUNG_RAG.maxChunks, Math.max(1, opts?.limit || AGENT_SEUNG_RAG.maxChunks));
+  const res = await fetch(AGENT_SEUNG_RAG.searchUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -56,7 +56,7 @@ export async function searchWritingTheories(
     body: JSON.stringify({
       query: String(query).slice(0, 500),
       source: { collection_ids: [collectionId] },
-      retrieval_mode: { type: SEUNG_GROK_RAG.retrievalMode },
+      retrieval_mode: { type: AGENT_SEUNG_RAG.retrievalMode },
       limit,
     }),
   });

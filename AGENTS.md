@@ -2,7 +2,7 @@
 
 This file is the Cursor/cloud-agent contract for **@Seung4680** (Seung). AutoPostPilot post engines do **not** read it. Do not paste it into Writer, Planner Grok, or any post prompt.
 
-**New chat: read `architecture/operator-handoff-latest.md` first** (last thread 2026-08-17, shipped **v12.5.5**. Creator DNA renamed **승Grok** — absorb-Planner not fully wired).
+**New chat: read `architecture/operator-handoff-latest.md` first** (last thread 2026-08-17, shipped **v12.5.5**. Creator DNA renamed **Agent승** — absorb-Planner not fully wired).
 
 Lockstep: `lib/intelligence/operator-collaboration.ts` (`operator-collaboration-v1.1`). Product direction: `architecture/v11.0.0_PRODUCT_DIRECTION.md`. Standing development protocol: `architecture/GROK_DEVELOPMENT_INTENT_PROTOCOL.md`.
 
