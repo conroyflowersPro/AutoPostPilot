@@ -1,22 +1,25 @@
 /**
- * Korean track scheduling (America/Los_Angeles) — For You optimized.
- * - Day starts 14:00 PT (2pm Pacific)
- * - Planner even-spreads originals across the afternoon–evening For You window
- * - Same-author originals in one refresh are decayed; do not stack
- * - For You candidates drop after ~48 hours (spacing only; not a writer recipe)
+ * Korean-track scheduling (America/Los_Angeles).
+ *
+ * Gap = X Home/For You ranking: same-author originals in one refresh are
+ * decayed; out-of-network candidates drop after ~48 hours. Step ~2 hours.
+ * Do not compress gaps to fill an afternoon window.
+ *
+ * 14:00–22:00 PT = this account's Pacific posting hours (audience awake),
+ * not an AP "For You" product window.
  */
 
 const TZ = "America/Los_Angeles";
 const MODEL = "grok-4.6";
 
-/** First original of a Pacific calendar day. */
+/** First original of a Pacific calendar day (audience hours). */
 export const FOR_YOU_START_HOUR = 14;
-/** Last original of a Pacific calendar day (US afternoon/evening For You). */
+/** Last original of a Pacific calendar day (audience hours). */
 export const FOR_YOU_END_HOUR = 22;
-/** Preferred gap so two originals are less likely to land in the same refresh. */
+/** X For You author-diversity gap between originals. */
 export const FOR_YOU_PREFERRED_GAP_MS = 2 * 60 * 60 * 1000;
-/** Anti-burst floor when quota is dense inside the 14:00–22:00 window. */
-export const FOR_YOU_HARD_MIN_GAP_MS = 45 * 60 * 1000;
+/** Same as preferred — do not tighten to pack 14:00–22:00. */
+export const FOR_YOU_HARD_MIN_GAP_MS = FOR_YOU_PREFERRED_GAP_MS;
 
 const ANCHOR_HOUR = FOR_YOU_START_HOUR;
 
@@ -101,21 +104,21 @@ function dayStartMs(year: number, month: number, day: number, hour: number, minu
   return new Date(laWallTimeToISO(year, month, day, hour, minute)).getTime();
 }
 
-function clampHourToForYouWindow(hour: number): number {
+function clampHourToPostingHours(hour: number): number {
   if (hour < FOR_YOU_START_HOUR) return FOR_YOU_START_HOUR;
   if (hour > FOR_YOU_END_HOUR) return FOR_YOU_END_HOUR;
   return hour;
 }
 
-/** How many originals fit in [startMs, endMs] with the anti-burst floor. */
+/** How many originals fit in [startMs, endMs] at the X author-diversity gap. */
 export function forYouFitCount(startMs: number, endMs: number): number {
   if (!(endMs >= startMs)) return 0;
   return Math.floor((endMs - startMs) / FOR_YOU_HARD_MIN_GAP_MS) + 1;
 }
 
 /**
- * Even-spread n originals from firstMs through endMs (inclusive).
- * Prefers ~2h gaps; if quota is denser, still spreads instead of stacking at 14:00.
+ * Even-spread helper (tests / callers). Scheduling itself steps +2h
+ * instead of densifying to fill 14:00–22:00.
  */
 export function evenSpreadInWindow(firstMs: number, endMs: number, count: number): string[] {
   const n = Math.max(0, Math.floor(count));
@@ -130,7 +133,8 @@ export function evenSpreadInWindow(firstMs: number, endMs: number, count: number
   return slots;
 }
 
-function evenSpreadForYouDay(
+/** +2h from first posting hour until 22:00 PT. Remainder rolls to the next day. */
+function stepXAuthorDiversityDay(
   year: number,
   month: number,
   day: number,
@@ -138,12 +142,18 @@ function evenSpreadForYouDay(
   firstHour: number,
   firstMinute = 0
 ): string[] {
-  const startH = clampHourToForYouWindow(firstHour);
-  const firstMs = dayStartMs(year, month, day, startH, firstMinute);
+  const startH = clampHourToPostingHours(firstHour);
+  let ms = dayStartMs(year, month, day, startH, firstMinute);
   const endMs = dayStartMs(year, month, day, FOR_YOU_END_HOUR, 0);
-  const fit = forYouFitCount(firstMs, endMs);
-  const n = Math.min(count, fit);
-  return evenSpreadInWindow(firstMs, endMs, n);
+  const slots: string[] = [];
+  const n = Math.max(0, Math.floor(count));
+  while (slots.length < n && ms <= endMs + 1000) {
+    const p = getLAParts(new Date(ms));
+    if (p.hour > FOR_YOU_END_HOUR) break;
+    slots.push(new Date(ms).toISOString());
+    ms += FOR_YOU_PREFERRED_GAP_MS;
+  }
+  return slots;
 }
 
 /** Start ISO for a given LA calendar date YYYY-MM-DD */
@@ -183,7 +193,7 @@ export function computeKRBatchStartISO(now = new Date()): string {
   return laWallTimeToISO(p.year, p.month, p.day, hour, 0);
 }
 
-/** Snap a timestamp into the For You window (same day 14:00 or next day 14:00). */
+/** Snap into Pacific posting hours (same day 14:00 or next day 14:00). */
 export function snapToForYouWindow(isoOrMs: string | number): string {
   const ms = typeof isoOrMs === "number" ? isoOrMs : Date.parse(isoOrMs);
   if (!Number.isFinite(ms)) return computeKRBatchStartISO();
@@ -202,7 +212,7 @@ export function snapToForYouWindow(isoOrMs: string | number): string {
  * Continue after times already on AP/Fedica so a retry does not reuse 14:00
  * and make the pipeline dump everything at "now".
  * Always resume after the latest occupied slot when that slot is at/after
- * the requested start (do not fill holes before existing For You posts).
+ * the requested start (do not fill holes before existing originals).
  */
 export function nextForYouSlotAfterOccupied(
   startISO: string,
@@ -231,8 +241,8 @@ export function nextForYouSlotAfterOccupied(
 
 /**
  * Spread posts across Pacific days from startISO.
- * Planner even-spreads inside 14:00–22:00 PT. Extra posts that cannot
- * keep the anti-burst floor roll to the next day at 14:00.
+ * Step ~2h for X For You author diversity. Hours 14:00–22:00 PT are
+ * audience posting hours. Extra posts roll to the next day at 14:00.
  */
 export function buildDaySpreadSlots(
   startISO: string,
@@ -246,13 +256,13 @@ export function buildDaySpreadSlots(
   let firstHour = parts.hour;
   let firstMinute = parts.minute;
   let remaining = count;
-  const cap = Math.min(8, Math.max(1, maxPerDay));
+  const cap = Math.min(5, Math.max(1, maxPerDay));
 
   let guard = 0;
   while (remaining > 0 && guard < 60) {
     guard += 1;
     const want = Math.min(remaining, cap);
-    const daySlots = evenSpreadForYouDay(
+    const daySlots = stepXAuthorDiversityDay(
       parts.year,
       parts.month,
       parts.day,
@@ -310,12 +320,13 @@ export async function assignSlotsWithGrok(
 
   const base = buildDaySpreadSlots(startISO, posts.length, maxPerDay);
 
-  const system = `Assign X post times for For You, timezone America/Los_Angeles.
-Rules: first at/after ${startISO}; day window 14:00–22:00 Pacific; even-spread so same-author originals are not stacked in one refresh; prefer ~2h gaps; never closer than 45 minutes; max ${maxPerDay} posts per calendar day; next day starts 14:00.
+  const system = `Assign X post times, timezone America/Los_Angeles.
+X Home/For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Gap originals by about 2 hours. Do not compress gaps to fill the afternoon.
+Pacific posting hours 14:00–22:00 are audience hours, not the algorithm. First at/after ${startISO}; max ${maxPerDay} per calendar day; next day starts 14:00.
 Do not write captions. Times only.
 Return same order ISO UTC. JSON only: { "times": ["..."] }`;
 
-  const user = `Refine ${posts.length} For You times (keep even day spread).
+  const user = `Refine ${posts.length} times (keep ~2h X For You gaps).
 Base suggestion:
 ${base.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
 

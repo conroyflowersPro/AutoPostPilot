@@ -47,5 +47,14 @@ assert.equal(h.hour, 20, "do not fill 14:00 when 18:00 is already booked");
 const slots = buildDaySpreadSlots(resume, 3, 5);
 assert.equal(slots.length, 3);
 assert.equal(ptHour(slots[0]).hour, 20);
+assert.equal(ptHour(slots[1]).hour, 22, "X For You keeps ~2h; do not pack 20/21/22");
+assert.equal(ptHour(slots[2]).hour, 14);
+
+const packed = buildDaySpreadSlots(start, 5, 5).map((iso) => ptHour(iso).hour);
+assert.deepEqual(packed, [14, 16, 18, 20, 22]);
+
+const sixth = buildDaySpreadSlots(start, 6, 5);
+assert.equal(ptHour(sixth[5]).hour, 14);
+assert.notEqual(ptHour(sixth[5]).day, ptHour(sixth[0]).day);
 
 console.log("schedule-resume-occupied ok", { resume, resumeNextDay, holes, slots });

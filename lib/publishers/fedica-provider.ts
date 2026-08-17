@@ -34,7 +34,7 @@ async function resolveTwitterAccounts(
 
 /**
  * Fedica Publishing Provider.
- * Operator pipeline + Specific DateTime. Slot times come from For You spacing in AP.
+ * Operator pipeline + Specific DateTime. Slot times use X For You ~2h author-diversity gaps.
  */
 export class FedicaProvider implements PublisherProvider {
   readonly name = "fedica";

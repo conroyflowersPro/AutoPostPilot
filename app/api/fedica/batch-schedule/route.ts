@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       : [];
     const startDate =
       typeof body.startDate === "string" ? body.startDate.trim() : "";
-    const maxPerDay = Math.min(8, Math.max(3, Number(body.maxPerDay) || 5));
+    const maxPerDay = Math.min(5, Math.max(3, Number(body.maxPerDay) || 5));
     const slotOffset = Math.max(0, Number(body.slotOffset) || 0);
     const totalPlanned = Math.max(
       postIds.length,

@@ -226,7 +226,7 @@ function buildJobReportKo(row: any): string {
   lines.push("", `3. Judge 거절 ${rejectN} · Writer/Judge 시도 중 PASS ${passN}`);
   const planned = (st.planner_strategy?.slots || []).filter((s: any) => s?.planned_pt);
   if (planned.length) {
-    lines.push("", "3b. Planner 예정 시각 (America/Los_Angeles, For You 간격)");
+    lines.push("", "3b. Planner 예정 시각 (America/Los_Angeles, X For You 원글 간격 약 2시간)");
     for (const slot of planned.slice(0, 56)) {
       lines.push(`   - ${clip(slot.slot_id, 16)} · D${Number(slot.day_offset) + 1} · ${clip(slot.planned_pt, 32)}`);
     }

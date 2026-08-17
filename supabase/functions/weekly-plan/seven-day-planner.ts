@@ -443,7 +443,7 @@ function strategySystem(): string {
     "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
     "handmade_cadence is real published-account rhythm from USER_DIRECT originals. Empty recent_x_analytics does NOT mean the account posts once a day. Do not collapse the week to 7 slots because analytics rows are missing.",
     "You own weekly volume and placement. There is no separate Quota call. Lock seven calendar days with no empty day. At least 4 originals per day, at most 8. Week floor 28, week ceiling 56. Mode overlap is allowed. 30-day posts inform placement, not a uniqueness ban.",
-    "Start the first original at 14:00 America/Los_Angeles and even-spread inside 14:00–22:00 PT. Anti-dump: stacked originals in one refresh become noise.",
+    "Start the first original at 14:00 America/Los_Angeles. Gap about 2 hours for X For You author diversity. 14:00–22:00 PT are audience posting hours — do not even-spread tighter to fill them. Anti-dump: stacked originals in one refresh become noise.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
     "volume_gates are hard. Return exactly final_slot_count slot intents, one per locked cell, covering all seven days.",

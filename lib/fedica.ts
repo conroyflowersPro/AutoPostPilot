@@ -8,7 +8,7 @@ const PT = "America/Los_Angeles";
 
 /**
  * Operator pipeline + Specific Date: ISO-8601 with timezone offset (Pacific wall clock).
- * Slot spacing is assigned in AP from the For You 14:00–22:00 PT window.
+ * Slot spacing is X For You author diversity (~2h). 14:00–22:00 PT are audience posting hours.
  */
 export function formatFedicaDateTime(iso: string, timeZone = PT): string {
   const d = new Date(iso);

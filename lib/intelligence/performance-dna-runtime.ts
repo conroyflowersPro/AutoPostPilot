@@ -33,7 +33,7 @@ export function buildPerformanceDnaPlannerBlock(): {
     "LENGTH: Writer decides from the assigned thought. No mode quota, Planner length prescription, or fixed seven-day length mix.",
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
-    "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
+    "SPACING (strategy only): X For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Gap originals by about 2 hours. Pacific 14:00–22:00 America/Los_Angeles are audience posting hours, not an AP For You window — do not compress gaps to fill that window. Do not write the last sentence for the algorithm.",
     "CANDIDATE associations (do NOT treat as proven rules; VALIDATED = 0):",
     "1) Lived Korea/US comparison from actual travel → this window strongest original follower conversion. One post = hypothesis. Never clone.",
     "2) Lived in-car FSD incident + original clip → follows + profile + bookmarks + replies together. Cite the episode.",

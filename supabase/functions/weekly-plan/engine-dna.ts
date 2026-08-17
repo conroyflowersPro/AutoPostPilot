@@ -52,7 +52,7 @@ export function performanceDnaBlock(): string {
     "LENGTH: Writer decides from the assigned thought. No mode quota, Planner length prescription, or fixed seven-day length mix.",
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
-    "SPACING (strategy only): first original 14:00 America/Los_Angeles. Planner even-spreads inside the For You window 14:00–22:00 PT. Same-author originals in one refresh are decayed; candidates drop after 48 hours. Do not stack originals. Do not write the last sentence for the algorithm.",
+    "SPACING (strategy only): X For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Gap originals by about 2 hours. Pacific 14:00–22:00 America/Los_Angeles are audience posting hours, not an AP For You window — do not compress gaps to fill that window. Do not write the last sentence for the algorithm.",
     "CANDIDATE: practical investigation → bookmarks/profile this window not follows; lived incident + clip → mixed conversion; ultra-short originals did not convert follows",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
     "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
@@ -189,7 +189,7 @@ export function engineRulesAsWill(): string {
     "USER_DIRECT informs Creator Intelligence. AP_PIPELINE trains performance only and must not rewrite Creator DNA. Planner does not prescribe writing form; Writer does not redesign strategy.",
     "Do not invent lived experience or opinions. Authenticity first. Place and experience bounds live in Creator DNA + these engine rules — the writer must consume them.",
     "Semantic Judge validates only final publishability. Judge does not select Seeds, redesign strategy, or replace Writer choices. Reject batches return to Creator DNA, then Planner places Seeds.",
-    "After review + original media, AI publishes. Spacing is For You optimized: first original 14:00 America/Los_Angeles; planner even-spreads 14:00–22:00 PT so same-author originals are not stacked in one refresh. Candidates drop after about 48 hours.",
+    "After review + original media, AI publishes. Spacing follows X For You: ~2 hours between same-author originals so they are not stacked in one refresh. OON candidates drop after about 48 hours. 14:00–22:00 PT are audience posting hours, not a window to pack.",
     "X ranking weights scale predicted viewer actions on Home-served posts, not counted events and not author DMs of own links. They do not pick the last sentence.",
     "Do not wait for a typed restatement of will. DNA + these rules are the will.",
   ].join("\n");

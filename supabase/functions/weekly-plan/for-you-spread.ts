@@ -1,5 +1,6 @@
 /**
- * For You spacing for Edge (America/Los_Angeles).
+ * X For You author-diversity spacing for Edge (America/Los_Angeles).
+ * ~2h between originals. 14:00–22:00 PT are audience posting hours, not an AP For You window.
  * Mirrors lib/schedule.ts without importing Next lib/.
  */
 const TZ = "America/Los_Angeles";
@@ -56,12 +57,26 @@ function parseStartDate(startDate: string): { year: number; month: number; day: 
   return { year: p.year, month: p.month, day: p.day };
 }
 
-function evenSpreadIso(firstMs: number, endMs: number, count: number): string[] {
+function stepTwoHoursIso(firstMs: number, count: number): string[] {
   const n = Math.max(0, Math.floor(count));
   if (n <= 0) return [];
-  if (n === 1) return [new Date(firstMs).toISOString()];
-  const span = Math.max(0, endMs - firstMs);
-  return Array.from({ length: n }, (_, i) => new Date(Math.round(firstMs + (span * i) / (n - 1))).toISOString());
+  const gap = 2 * 60 * 60 * 1000;
+  const out: string[] = [];
+  let t = firstMs;
+  while (out.length < n) {
+    let p = laParts(new Date(t));
+    if (p.hour < FOR_YOU_START_HOUR) {
+      t = Date.parse(laWallTimeToISO(p.year, p.month, p.day, FOR_YOU_START_HOUR, 0));
+      p = laParts(new Date(t));
+    }
+    if (p.hour > FOR_YOU_END_HOUR) {
+      const next = addDays(p.year, p.month, p.day, 1);
+      t = Date.parse(laWallTimeToISO(next.year, next.month, next.day, FOR_YOU_START_HOUR, 0));
+    }
+    out.push(new Date(t).toISOString());
+    t += gap;
+  }
+  return out;
 }
 
 function formatPt(iso: string): string {
@@ -86,8 +101,7 @@ export function stampPlannerSlotTimes<T extends { day_offset: number; planned_at
   for (const [day, list] of byDay) {
     const cal = addDays(origin.year, origin.month, origin.day, day);
     const firstMs = Date.parse(laWallTimeToISO(cal.year, cal.month, cal.day, FOR_YOU_START_HOUR, 0));
-    const endMs = Date.parse(laWallTimeToISO(cal.year, cal.month, cal.day, FOR_YOU_END_HOUR, 0));
-    const times = evenSpreadIso(firstMs, endMs, list.length);
+    const times = stepTwoHoursIso(firstMs, list.length);
     list.forEach((slot, i) => {
       slot.planned_at = times[i] || "";
       slot.planned_pt = times[i] ? formatPt(times[i]) : "";
