@@ -1,5 +1,5 @@
 /** Single source of truth for AutoPostPilot product version (UI badges + package + weekly-plan). */
-export const APP_VERSION = "12.1.4";
+export const APP_VERSION = "12.2.0";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 export const BUILD_STAMP = APP_VERSION;
 

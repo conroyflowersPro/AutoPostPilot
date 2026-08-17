@@ -42,7 +42,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v12.1.4)");
+console.log("DNA + engine live-path wiring (v12.2.0)");
 
 ok("D1. Grok Writer gets Creator Intelligence", /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
 ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
@@ -92,7 +92,7 @@ ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 12.1.4", /APP_VERSION = "12.1.4"/.test(ver) && /APP_VERSION = "12.1.4"/.test(ix));
+ok("D28. version 12.2.0", /APP_VERSION = "12.2.0"/.test(ver) && /APP_VERSION = "12.2.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
@@ -105,12 +105,13 @@ ok("D31. Creator DNA is how he sees/thinks/expresses, not a template",
   /AP_PIPELINE drafts must not rewrite Creator DNA/.test(dna) &&
   /PURPOSE: Preserve how this person sees/.test(libDna) &&
   /Ask what he would notice first/.test(dna));
-ok("D32. Planner is strategy/select/allocation/recovery engine",
+ok("D32. Planner places clock and Seeds after Creator DNA judges types",
   /inferSevenDayStrategy/.test(planner) &&
   /selectSeedsForSevenDayPlan/.test(planner) &&
-  /recoverRejectedPlannerSlot/.test(planner) &&
+  /attachSeedsForSlots/.test(planner) &&
   /PLANNER ROLE/.test(dna) &&
   /not a writing engine/.test(dna) &&
+  /do not decide RETURN\/BRIDGE/.test(dna) &&
   /stronger months from now/.test(dna) &&
   /Do not learn from unpublished AI drafts/.test(dna));
 ok("D33. Architecture lock: no engine replaces the Creator",
@@ -121,8 +122,8 @@ ok("D33. Architecture lock: no engine replaces the Creator",
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
 ok("D34. Seven-day role pipeline is locked in docs and runtime",
-  /Planner seven-day strategy \(locks volume\) → Seed Pool\(explore to Planner count \+ buffer\)/.test(arch) &&
-  /Planner seven-day strategy \(locks volume\) → Seed Pool\(explore to Planner count \+ buffer\)/.test(libArch) &&
+  /Creator DNA \(RETURN\/BRIDGE \+ type\)/.test(arch) &&
+  /Creator DNA \(RETURN\/BRIDGE \+ type\)/.test(libArch) &&
   /stepStrategy/.test(job) && /stepPlannerSelect/.test(job) && /stepRecover/.test(job) &&
   /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
   /selectDeliveryAfterThought/.test(pipe) &&
@@ -155,10 +156,11 @@ ok("D40. Judge does not hard-reject Planner structural strategy",
 ok("D41. Writer decides creative form without a stage menu",
   /Decide the necessary reasoning and expression yourself/.test(wr) &&
   !/writingStagePhilosophyBlock\(\)/.test(wr));
-ok("D42. seven-day Planner loads Intelligence and actual X Analytics; Seed does not",
-  /loadPlannerIntelligence/.test(job) &&
+ok("D42. Creator DNA judges slots from Audience X status; Planner does not compose types from Intelligence",
+  /inferCreatorWeekVolume/.test(job) &&
+  /inferCreatorSlotsForDays/.test(job) &&
+  /buildAudienceXStatus/.test(job) &&
   /from\("post_metrics"\)/.test(planner) &&
-  /recent_x_analytics/.test(planner) &&
   !/audience_dna_current/.test(seedReason) &&
   !/planner_memory/.test(seedReason));
 ok("D43. Audience DNA primary is X Analytics, not follow-the-followers",
@@ -183,9 +185,9 @@ ok("D47. Operator collaboration is chat-only, not Writer",
 ok("D48. Writer and Judge do not own virtual-week structure strategy",
   !/writerWeekStructureConstraintLines\(ctx/.test(wr) &&
   !/hard\.push\("structural_repetition_high"\)/.test(judge));
-ok("D49. Rejected slot returns to Planner recovery",
-  /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) &&
-  /recoverRejectedPlannerSlot/.test(job));
+ok("D49. Rejected slots return to Creator DNA then Planner Seeds",
+  /recover_batch/.test(job) && /row\.step = "recover"/.test(job) &&
+  /creatorRelabelRejectBatch/.test(job) && /attachSeedsForSlots/.test(job));
 ok("D50. Job uses weekly-count-ledger as completion gate",
   /from "\.\/weekly-count-ledger\.ts"/.test(job) &&
   /evaluateOrder8cCompletionGate/.test(job) &&

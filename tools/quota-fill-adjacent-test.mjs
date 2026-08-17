@@ -149,8 +149,8 @@ ok("A45. type labels are dropped as seed bodies",
   /export function isSlotTypeLabel/.test(scopeSrc) && /isSlotTypeLabel/.test(cr) && /isSlotTypeLabel/.test(job));
 ok("A46. expand is bounded instead of searching forever or writing short",
   /const EXPAND_HARD_CAP = 36/.test(job) && /function canKeepExpanding/.test(job) && /return Number\(st\.dim_batch/.test(job) && /function quotaFilled/.test(job));
-ok("A47. write shortfall returns to Planner recovery, never frozen fill",
-  /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /recoverRejectedPlannerSlot/.test(job) && !/localHumorKeywordSeeds/.test(job));
+ok("A47. write shortfall returns to Creator DNA reject batch, never frozen fill",
+  /pending_recovery/.test(job) && /row\.step = "recover"/.test(job) && /creatorRelabelRejectBatch/.test(job) && !/localHumorKeywordSeeds/.test(job));
 ok("A48. Grok/writer prompts have no fill-in example sentences",
   !/Use 알림\/화면\/겹침\/가림/.test(wr) && !/이중주차, 관리사무소/.test(cr) && !/이중주차, 관리사무소/.test(wr));
 

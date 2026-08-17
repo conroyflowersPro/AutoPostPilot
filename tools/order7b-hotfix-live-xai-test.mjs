@@ -28,7 +28,7 @@ ok("H14. v11 write phase wired", /phase === "write"/.test(index) && /writeSlotBa
 ok("H15. pipeline passes xai_key", /xai_key: args\.xaiKey/.test(pipe));
 ok("H16. pipeline uses integrateSlotGeneration", /integrateSlotGeneration/.test(pipe));
 ok("H17. writer and seed models are grok-4.6", /V11_WRITER_MODEL = "grok-4.6"/.test(pipe) && /V11_SEED_MODEL = "grok-4.6"/.test(pipe));
-ok("H18. index APP 12.1.4", /APP_VERSION = "12.1.4"/.test(index));
+ok("H18. index APP 12.2.0", /APP_VERSION = "12.2.0"/.test(index));
 ok("H19. index engine planner locks plan", /v11_judge_owns_count/.test(index));
 ok("H20. generate-post not the write path in index", !/functions\/v1\/generate-post/.test(index));
 ok("H21. dry_run_generation explicit body flag only", /dry_run_generation/.test(index));

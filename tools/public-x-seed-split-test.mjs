@@ -27,12 +27,12 @@ const planner = read("supabase/functions/weekly-plan/seven-day-planner.ts");
 const lived = read("supabase/functions/weekly-plan/analytics-lived-seeds.ts");
 const pub = read("supabase/functions/weekly-plan/public-x-seed-search.ts");
 
-console.log("Public X / lived Analytics seed split (v12.1.4)");
+console.log("Public X / lived Analytics seed split (v12.2.0)");
 ok("P1. no frozen interest list in public search", !/FSD OR Tesla OR Grok/.test(pub + cr) && /Infer search interests from Creator DNA/.test(cr));
 ok("P2. 14d split near/far", /near7/.test(own) && /far7/.test(own) && /publicSearchWindows/.test(job));
 ok("P3. official recent search excludes operator handle", /search\/recent/.test(pub) && /excluded_x_handles/.test(cr) && /Seung4680/.test(pub));
 ok("P4. public seeds owner OTHER + viral", /owner: "OTHER"/.test(cr) && /viral: true/.test(cr) && /owner: "OTHER"/.test(job));
-ok("P5. lived seeds from 30d analytics only", /analyticsLivedSeeds/.test(lived) && /BUNDLED_X_ANALYTICS_WINDOW/.test(lived) && !/ARCHIVE_EXPERIENCE_FALLBACK/.test(job));
+ok("P5. lived seeds from Analytics plus sync-gap originals", /analyticsLivedSeeds/.test(lived) && /syncGapLivedSeeds/.test(lived) && /BUNDLED_X_ANALYTICS_WINDOW/.test(lived) && !/ARCHIVE_EXPERIENCE_FALLBACK/.test(job));
 ok("P6. Planner does not extract analytics seeds", /applyNewestLivedExperienceAssignments/.test(job) && /EXPERIENCE slots take ANALYTICS_LIVED/.test(planner));
 ok("P7. Writer OTHER inhabit ban + lived time buckets", /PUBLIC VIRAL/.test(wr) && /writerLivedTimeLines/.test(wr) && /3일 전/.test(own));
 ok("P8. Judge N일 전 and other viral inhabit", /lived_time_day_count/.test(judge) && /other_viral_inhabited/.test(judge));

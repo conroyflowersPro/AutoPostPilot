@@ -35,10 +35,10 @@ console.log("Seven-day role runtime");
 ok("R1. planning horizon is seven days", /QUOTA_DAYS = 7/.test(quota) && /GENERATION_DAYS = 7/.test(page));
 ok("R2. persisted job has strategy, select, write, recover steps",
   /"strategy"/.test(job) && /"select"/.test(job) && /"write"/.test(job) && /"recover"/.test(job));
-ok("R3. live router uses Planner strategy/select/recover",
+ok("R3. live router uses Creator strategy then Planner select/recover",
   /stepStrategy\(args\.supabase, args\.xaiKey, row\)/.test(job) &&
   /stepPlannerSelect\(args\.supabase, args\.xaiKey, row\)/.test(job) &&
-  /stepRecover\(args\.xaiKey \|\| "", row\)/.test(job));
+  /stepRecover\(args\.supabase, args\.xaiKey \|\| "", row\)/.test(job));
 ok("R4. Seed Generator is explore-only", /Do not score Creator fit/.test(seed) && /No scores, rankings, strategy, selection, allocation/.test(seed));
 ok("R5. Seed output has no strategic judgment fields",
   !/why_now/.test(seed) && !/creator_relevance/.test(seed) && !/audience_relevance/.test(seed) &&
@@ -79,10 +79,10 @@ ok("R15b. Judge Creator check is contradiction, not topic similarity",
   !/creator_fit_weak/.test(judge) &&
   !/scores\.creator_fit < 0\.55/.test(judge));
 ok("R16. Judge reject returns slot to Planner", /pending_recovery/.test(job) && /row\.step = "recover"/.test(job));
-ok("R16b. Planner requeues the recovered slot as the next Writer/Judge pass",
-  /st\.write_flat\.splice\(insertAt, 0, replacement\)/.test(job) &&
+ok("R16b. recovered slots requeue as the next Writer/Judge pass",
+  /st\.write_flat\.splice\(insertAt, 0, \.\.\.replacements\)/.test(job) &&
   /st\.write_index = insertAt/.test(job) &&
-  /Planner 재배차 → Writer 재작성/.test(job) &&
+  /Writer 묶음 재작성/.test(job) &&
   /skipSelectiveRegen: true/.test(job));
 ok("R16d. Judge reject reasons are shown to the operator",
   /last_reject_ko/.test(job) &&
@@ -109,16 +109,16 @@ ok("R16f. 3-strike discards that Seed only; Planner still refills the slot",
 ok("R16g. empty Seed pool asks Seed Generator for a 10-candidate field batch",
   /TARGETED_EXPLORE_SEED_COUNT = 10/.test(job) &&
   /requestTargetedSeedRefill/.test(job) &&
-  /Planner Seed 후보 없음 → Seed Generator/.test(job) &&
+  /거절 묶음 Seed 후보 없음 → Seed Generator/.test(job) &&
   /a batch, never a single seed/.test(seed));
 ok("R16h. generate job returns a Korean pipeline report",
   /report_ko: buildJobReportKo\(row\)/.test(job) &&
   /생성 보고서/.test(job) &&
   /Writer가 거절된 글을 다시 썼는가/.test(job) &&
   !/setJobReport/.test(page));
-ok("R17. recovery checks existing Pool first", /availableSeedPool: pool/.test(job) && /RESELECT_EXISTING/.test(planner));
+ok("R17. recovery checks existing Pool first", /recoverSeedPool\(st\)/.test(job) && /attachSeedsForSlots/.test(job));
 ok("R18. Planner can request targeted Seed exploration", /TARGETED_EXPLORE/.test(planner) && /planner_exploration_direction/.test(job + seed));
-ok("R19. Judge reject does not delete Seed", /Judge rejection is not permanent Seed rejection/.test(planner));
+ok("R19. Judge reject does not delete Seed", /abandoned_seed_ids are discarded Seeds/.test(planner) && /recoverSeedPool/.test(job));
 ok("R20. count completes only from saved Judge-pass posts", /quotaFilled/.test(job) && /judgeWeekCount/.test(job) && /acceptedOutcomes/.test(job));
 ok("R21. each xAI stage is one-call-per-tick", /callPlanner/.test(planner) && /one xAI request/.test(planner));
 ok("R22. old local Seed judge/select are not live", /legacySeedJudgeUnused/.test(job) && /legacyLocalSelectUnused/.test(job));
@@ -138,10 +138,10 @@ ok("R27. bundled X Analytics is a TS module first",
   /BUNDLED_X_ANALYTICS_WINDOW/.test(planner) &&
   /x-analytics-30d-bundled/.test(planner) &&
   /source: "module"/.test(planner));
-ok("R28. strategy fills volume then 2 days per tick",
+ok("R28. Creator DNA fills volume then 2 days per tick",
   /STRATEGY_DAYS_PER_TICK = 2/.test(planner) &&
-  /inferSevenDayVolume/.test(job) &&
-  /inferSevenDaySlotsForDays/.test(job) &&
+  /inferCreatorWeekVolume/.test(job) &&
+  /inferCreatorSlotsForDays/.test(job) &&
   !/await inferSevenDayStrategy\(/.test(job));
 ok("R29. Planner stamps 14:00–22:00 PT after the week is locked",
   /stampPlannerSlotTimes/.test(job) &&
