@@ -2,7 +2,7 @@
  * Creator DNA judges seven-day AP slots: RETURN|BRIDGE + editorial type.
  * Audience DNA supplies X status only. Planner does not judge types.
  */
-import { creatorDnaBlock, engineRulesAsWill } from "./engine-dna.ts";
+import { creatorDnaBlock } from "./engine-dna.ts";
 import {
   callPlanner,
   clampWeekVolume,
@@ -15,8 +15,6 @@ import {
   audienceStatusBlock,
   type AudienceXStatus,
 } from "./audience-x-status.ts";
-
-const GROWTH_ROLES = new Set(["RETURN", "BRIDGE"]);
 
 function s(v: unknown, max = 240): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -34,32 +32,115 @@ function growthRole(v: unknown): "RETURN" | "BRIDGE" {
   return "RETURN";
 }
 
-function creatorJudgeSystem(): string {
-  return [
-    "You are Creator DNA judging this account's next seven-day AP slots.",
-    creatorDnaBlock(),
-    engineRulesAsWill(),
-    "Audience DNA below is X status only. You judge. Do not let Audience overwrite identity.",
-    "AP roles are RETURN or BRIDGE only. Do not emit PRESENCE. Handmade presence is not an AP slot.",
-    "Each slot needs growth_role, editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
-    "RETURN+EXPERIENCE count must be <= lived_scene_count (Analytics originals + sync-gap originals).",
-    "BRIDGE+EXPERIENCE should be rare (almost never). Circulating compare seeds stay COMPARE or INFORMATIVE, never EXPERIENCE.",
-    "Do not leave an empty day. Each day 4-8 originals. Week 28-56.",
-    "Do not move AP days to make room for handmade. Do not reduce handmade.",
-    "Revenue DNA does not pick this mix. Current X Context does not vote.",
-    "Return strict JSON: posts_per_day (7 ints), strategy_summary, slots. Each slot: slot_id, day_offset, growth_role, editorial_mode, planner_intent. No prose outside JSON.",
-  ].join("\n");
-}
-
-function creatorDaySlotsSystem(days: number[]): string {
+function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
+  const spec = days.map((d) => `day_offset ${d} = ${perDay[d] || QUOTA_PER_DAY_MIN} slots`).join("; ");
   return [
     "You are Creator DNA filling AP slot intents for the listed day_offset values only.",
     creatorDnaBlock(),
-    `Fill day_offset values ${days.join(", ")} only. growth_role is RETURN or BRIDGE. editorial_mode is one of the five types.`,
-    "Do not emit PRESENCE. RETURN+EXPERIENCE must stay within lived_scene_count remaining.",
-    "Do not change types later via Planner. Planner only places time and Seeds.",
-    "Return strict JSON with slots array. No prose outside JSON.",
+    `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
+    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
+    "Do not emit PRESENCE. RETURN+EXPERIENCE must stay within lived_scene_count remaining. BRIDGE+EXPERIENCE almost never.",
+    "planner_intent says why the slot exists, not how to write it.",
+    "Return strict JSON: { \"slots\": [ ... ] }. Fill every required slot. No prose outside JSON.",
   ].join("\n");
+}
+
+function compactAudienceCounts(audience: AudienceXStatus) {
+  return {
+    analytics_originals: audience.analytics_originals,
+    sync_gap_originals: audience.sync_gap_originals,
+    lived_scene_count: audience.lived_scene_count,
+  };
+}
+
+function slotItems(raw: any): any[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.slots)) return raw.slots;
+  if (Array.isArray(raw.day_slots)) return raw.day_slots;
+  return [];
+}
+
+function rawDayNumber(item: any): number {
+  const n = Number(item?.day_offset ?? item?.dayOffset);
+  if (Number.isFinite(n)) return Math.round(n);
+  const fromId = /^D(\d+)/i.exec(s(item?.slot_id, 12));
+  if (fromId) return Number(fromId[1]);
+  return NaN;
+}
+
+/** Grok often emits 1-based 일차 (1,2) while the job sends 0-based day_offset (0,1). */
+export function creatorDaysAreOneBased(rawOffsets: number[], allowed: number[]): boolean {
+  const nums = rawOffsets.filter((n) => Number.isFinite(n));
+  if (!nums.length || !allowed.length) return false;
+  const zeroOk = nums.filter((n) => allowed.includes(n)).length;
+  const oneOk = nums.filter((n) => allowed.includes(n - 1)).length;
+  return oneOk > zeroOk;
+}
+
+const PAD_MODES: EditorialMode[] = ["INFORMATIVE", "COMPARE", "OPINION", "CASUAL_OBSERVATION"];
+
+export function parseCreatorDaySlots(args: {
+  raw: any;
+  days: number[];
+  postsPerDay: number[];
+}): PlannerSlotIntent[] | null {
+  const days = (args.days || []).filter((d) => d >= 0 && d < QUOTA_DAYS);
+  const want = days.reduce((n, d) => n + (args.postsPerDay[d] || QUOTA_PER_DAY_MIN), 0);
+  if (want < 1) return null;
+  const items = slotItems(args.raw);
+  const offsets = items.map(rawDayNumber).filter((n) => Number.isFinite(n));
+  const oneBased = creatorDaysAreOneBased(offsets, days);
+  const slots: PlannerSlotIntent[] = [];
+  const dayCounts = new Map<number, number>();
+  const seen = new Set<string>();
+  for (const item of items) {
+    let day = rawDayNumber(item);
+    if (oneBased) day -= 1;
+    if (!days.includes(day)) continue;
+    const cap = args.postsPerDay[day] || QUOTA_PER_DAY_MIN;
+    const n = dayCounts.get(day) || 0;
+    if (n >= cap) continue;
+    const role = growthRole(item?.growth_role || item?.strategic_role);
+    let slotId = s(item?.slot_id, 40) || `D${day + 1}P${n + 1}`;
+    if (seen.has(slotId)) slotId = `D${day + 1}P${n + 1}`;
+    const intent = s(item?.planner_intent || item?.intent || item?.purpose, 240)
+      || `${role} ${mode(item?.editorial_mode)} AP original`;
+    seen.add(slotId);
+    dayCounts.set(day, n + 1);
+    slots.push({
+      slot_id: slotId,
+      day_offset: day,
+      strategic_role: role,
+      editorial_mode: mode(item?.editorial_mode),
+      planner_intent: intent,
+    });
+  }
+  if (!slots.length) return null;
+  for (const day of days) {
+    const cap = args.postsPerDay[day] || QUOTA_PER_DAY_MIN;
+    while ((dayCounts.get(day) || 0) < cap) {
+      const n = dayCounts.get(day) || 0;
+      let seq = n + 1;
+      let slotId = `D${day + 1}P${seq}`;
+      while (seen.has(slotId)) {
+        seq += 1;
+        slotId = `D${day + 1}P${seq}`;
+      }
+      const editorial_mode = PAD_MODES[n % PAD_MODES.length];
+      const role = n % 3 === 0 ? "BRIDGE" : "RETURN";
+      seen.add(slotId);
+      dayCounts.set(day, n + 1);
+      slots.push({
+        slot_id: slotId,
+        day_offset: day,
+        strategic_role: role,
+        editorial_mode,
+        planner_intent: `${role} ${editorial_mode} AP original`,
+      });
+    }
+  }
+  return slots.length === want ? slots : null;
 }
 
 export async function inferCreatorWeekVolume(args: {
@@ -103,37 +184,22 @@ export async function inferCreatorSlotsForDays(args: {
   const wanted = args.days.reduce((n, d) => n + (args.postsPerDay[d] || QUOTA_PER_DAY_MIN), 0);
   return callPlanner({
     xaiKey: args.xaiKey,
-    maxTokens: 5000,
+    maxTokens: 3500,
     timeoutMs: args.timeoutMs,
-    system: creatorDaySlotsSystem(args.days) + "\n" + audienceStatusBlock(args.audience),
+    system: creatorDaySlotsSystem(args.days, args.postsPerDay),
     user: {
-      audience_x_status: args.audience,
-      audience_block: audienceStatusBlock(args.audience),
+      audience_counts: compactAudienceCounts(args.audience),
       posts_per_day: args.postsPerDay,
       day_offsets: args.days,
+      required_slot_count_this_call: wanted,
       already_slot_count: args.already.length,
       operator_note: args.operatorNote || "",
     },
-    parse: (raw) => {
-      const items = Array.isArray(raw?.slots) ? raw.slots : [];
-      const slots: PlannerSlotIntent[] = [];
-      for (const item of items) {
-        const day = Math.max(0, Math.min(QUOTA_DAYS - 1, Math.round(Number(item.day_offset) || 0)));
-        if (!args.days.includes(day)) continue;
-        const role = growthRole(item.growth_role || item.strategic_role);
-        if (!GROWTH_ROLES.has(role)) continue;
-        slots.push({
-          slot_id: s(item.slot_id, 40) || `D${day + 1}P${slots.filter((x) => x.day_offset === day).length + 1}`,
-          day_offset: day,
-          strategic_role: role,
-          editorial_mode: mode(item.editorial_mode),
-          planner_intent: s(item.planner_intent, 240),
-        });
-      }
-      if (slots.length !== wanted) return null;
-      if (slots.some((slot) => !slot.planner_intent)) return null;
-      return slots;
-    },
+    parse: (raw) => parseCreatorDaySlots({
+      raw,
+      days: args.days,
+      postsPerDay: args.postsPerDay,
+    }),
   });
 }
 

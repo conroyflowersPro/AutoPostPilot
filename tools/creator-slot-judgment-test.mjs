@@ -28,7 +28,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Creator slot judgment (v12.2.0)");
+console.log("Creator slot judgment (v12.2.1)");
 
 ok("C1. Audience DNA reports status only",
   /Do not decide slots/.test(audience) && /lived_scene_count/.test(audience) && /sync_gap_originals/.test(audience));
@@ -48,8 +48,8 @@ ok("C7. Writer still receives Creator DNA",
   /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
 ok("C8. Pipeline text: Audience → Creator → Planner place",
   /Audience DNA reports X status/.test(dna) && /Reject batches return to Creator DNA/.test(dna));
-ok("C9. version lockstep 12.2.0",
-  /"version": "12.2.0"/.test(pkg) && /APP_VERSION = "12.2.0"/.test(ver) && /APP_VERSION = "12.2.0"/.test(ix));
+ok("C9. version lockstep 12.2.1",
+  /"version": "12.2.1"/.test(pkg) && /APP_VERSION = "12.2.1"/.test(ver) && /APP_VERSION = "12.2.1"/.test(ix));
 
 console.log("========================================");
 console.log(`CREATOR SLOT JUDGMENT: ${pass} PASS / ${fail} FAIL`);

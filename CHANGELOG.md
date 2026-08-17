@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.2.1 — 2026-08-17
+
+- Creator DNA 1·2일차 슬롯이 `planner_json_unusable`로 멈추던 문제를 고칩니다. Grok이 1일차를 `day_offset: 1`로 보내도 받고, JSON이 조금 모자라면 칸만 채웁니다
+- 슬롯 호출에는 Audience 날짜 목록 전체를 넣지 않습니다
+
 ## 12.2.0 — 2026-08-17
 
 - Audience DNA는 X Analytics와 「지금 동기화」 공백만 보고합니다. RETURN/BRIDGE와 글 종류는 Creator DNA가 칸마다 판단합니다
