@@ -37,7 +37,6 @@ async function resolveTwitterAccounts(
  * Operator pipeline + Specific DateTime. Slot times come from For You spacing in AP.
  */
 export class FedicaProvider implements PublisherProvider {
-export class FedicaProvider implements PublisherProvider {
   readonly name = "fedica";
 
   async uploadMediaFromUrl(

@@ -29,8 +29,8 @@ mustInclude(helper, "timeZoneName: \"longOffset\"", "Pacific offset");
 
 const svc = readFileSync("lib/services/schedule-service.ts", "utf8");
 mustInclude(svc, "persistScheduled", "verifies scheduled persist");
-mustInclude(svc, "if (!info.providerPostId) return false", "no scheduled without Fedica Id");
 mustInclude(svc, 'status: "scheduling"', "claim is scheduling only");
+mustNotInclude(svc, "if (!info.providerPostId) return false", "Success is enough without Fedica Id");
 
 const sch = readFileSync("lib/schedule.ts", "utf8");
 mustInclude(sch, "FOR_YOU_START_HOUR = 14", "For You start");
@@ -40,7 +40,7 @@ const batch = readFileSync("app/api/fedica/batch-schedule/route.ts", "utf8");
 mustInclude(batch, "post.pipeline_id || pipelineId", "uses the post's assigned pipeline");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.5.2"', "version 12.5.2");
+mustInclude(ver, 'APP_VERSION = "12.5.3"', "version 12.5.3");
 
 const { formatFedicaDateTime, fedicaPostAccepted, fedicaPipelineId } = await import(
   pathToFileURL(path.join(process.cwd(), "lib/fedica.ts")).href
@@ -64,8 +64,8 @@ if (fedicaPostAccepted(true, { Success: true, Id: "9" }) !== true) {
   console.error("FAIL accepted Success+Id");
   process.exit(1);
 }
-if (fedicaPostAccepted(true, { Success: true }) !== false) {
-  console.error("FAIL Success without Id must not schedule");
+if (fedicaPostAccepted(true, { Success: true }) !== true) {
+  console.error("FAIL Success without Id must still schedule");
   process.exit(1);
 }
 

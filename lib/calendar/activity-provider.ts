@@ -137,8 +137,7 @@ export async function getOperationalActivities(
       .select("id, content, scheduled_at, status, pipeline_id, fedica_post_id")
       .eq("user_id", user.id)
       .eq("status", "scheduled")
-      .not("scheduled_at", "is", null)
-      .not("fedica_post_id", "is", null);
+      .not("scheduled_at", "is", null);
 
     for (const row of planned || []) {
       const m = mapPlanned(row);
@@ -264,7 +263,7 @@ async function buildTodaySummary(): Promise<ControlCenterSummary> {
       .from("SeungContent")
       .select("id", { count: "exact", head: true })
       .eq("status", "scheduled")
-      .not("fedica_post_id", "is", null)
+      .not("scheduled_at", "is", null)
       .gte("scheduled_at", `${today}T00:00:00`)
       .lte("scheduled_at", `${today}T23:59:59`);
 
@@ -343,8 +342,7 @@ export async function getQueueMonthInscription(year: number, month1to12: number)
       .select("scheduled_at")
       .eq("user_id", user.id)
       .eq("status", "scheduled")
-      .not("scheduled_at", "is", null)
-      .not("fedica_post_id", "is", null);
+      .not("scheduled_at", "is", null);
     let synced: ActivityForInscribe[] = [];
     if (conn?.id) {
       const fromDate = new Date(Date.UTC(year, month1to12 - 1, 0));

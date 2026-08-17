@@ -25,6 +25,6 @@ mustInclude(shell, 'if (item.href === "/")', "queue uses hard navigation");
 mustInclude(shell, "<a key={item.href} href=\"/\"", "queue is a real <a href=/>");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.5.2"', "version 12.5.2");
+mustInclude(ver, 'APP_VERSION = "12.5.3"', "version 12.5.3");
 
 console.log("queue-drafts-visible-test: PASS");

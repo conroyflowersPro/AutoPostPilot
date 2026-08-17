@@ -41,9 +41,7 @@ export function fedicaPostAccepted(
 ): boolean {
   if (!httpOk || !data) return false;
   if (data.Success === false || data.success === false) return false;
-  const id = data.Id ?? data.id;
-  if (id == null || String(id).trim() === "") return false;
-  return true;
+  return data.Success === true || data.success === true;
 }
 
 export function fedicaPipelineId(raw: string | number | undefined | null): number {
