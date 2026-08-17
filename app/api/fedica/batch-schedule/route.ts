@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
         provider,
         post,
         scheduledAtISO: scheduledAt,
-        pipelineId,
+        pipelineId: String(post.pipeline_id || pipelineId),
         requireMedia,
       });
 

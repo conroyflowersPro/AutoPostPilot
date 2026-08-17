@@ -53,7 +53,7 @@ export default function QueueMonthCalendar(props: {
         </div>
       </div>
       <p className="mb-3 text-[11px] text-zinc-500">
-        Planner가 「지금 동기화」 기록과, 큐에서 시각이 잡힌 예약을 기입합니다. 수제·AP·인용·재게시는 그날 있는 종류만 숫자로 나옵니다.
+        Planner가 「지금 동기화」 기록과, Fedica 글 ID가 있는 scheduled만 예약으로 기입합니다. 수제·AP·인용·재게시는 그날 있는 종류만 숫자로 나옵니다.
       </p>
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-500">
         {WEEKDAYS.map((w) => (

@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.5.2 — 2026-08-17
+
+- Fedica 예약은 글에 지정된 파이프라인으로 들어가고, 날짜·시각도 같이 보냅니다. 간격은 For You 14:00–22:00 PT, 약 2시간입니다
+- Fedica가 글 ID를 준 뒤에만 AP를 scheduled로 바꿉니다. 예약 시작만으로 scheduled에 쌓이지 않습니다
+- 달력 예약은 Fedica 글 ID가 있는 scheduled만 셉니다. draft·reviewed는 넣지 않습니다
+
 ## 12.5.1 — 2026-08-17
 
 - Fedica는 파이프라인 다음 칸이 아니라 Specific Date입니다. 태평양시 날짜와 시각(타임존 오프셋)을 보냅니다. 계정은 `/accounts`에서 맞춥니다

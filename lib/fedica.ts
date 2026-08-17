@@ -7,8 +7,8 @@ const FEDICA_BASE = "https://fedica.com/api/publish";
 const PT = "America/Los_Angeles";
 
 /**
- * Fedica Specific Date: ISO-8601 with timezone offset (Pacific wall clock).
- * Do not send this together with PipelineId.
+ * Operator pipeline + Specific Date: ISO-8601 with timezone offset (Pacific wall clock).
+ * Slot spacing is assigned in AP from the For You 14:00–22:00 PT window.
  */
 export function formatFedicaDateTime(iso: string, timeZone = PT): string {
   const d = new Date(iso);
@@ -41,8 +41,15 @@ export function fedicaPostAccepted(
 ): boolean {
   if (!httpOk || !data) return false;
   if (data.Success === false || data.success === false) return false;
-  if (data.Success === true || data.success === true) return true;
-  return data.Id != null || data.id != null;
+  const id = data.Id ?? data.id;
+  if (id == null || String(id).trim() === "") return false;
+  return true;
+}
+
+export function fedicaPipelineId(raw: string | number | undefined | null): number {
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return n;
+  return 42303;
 }
 
 function getToken() {
@@ -202,6 +209,7 @@ export async function scheduleFedicaPost(params: {
 }): Promise<{ id?: string; success: boolean; raw: any }> {
   const accountId = params.accountId || "Seung4680";
   const body: any = {
+    PipelineId: fedicaPipelineId(params.pipelineId),
     Posts: [
       {
         Accounts: [{ Platform: "Twitter", AccountId: accountId }],
@@ -212,8 +220,6 @@ export async function scheduleFedicaPost(params: {
   };
   if (params.dateTime) {
     body.DateTime = formatFedicaDateTime(params.dateTime);
-  } else {
-    body.PipelineId = Number(params.pipelineId) || params.pipelineId;
   }
   if (params.mediaIds && params.mediaIds.length > 1) {
     body.Posts[0].MediaIds = params.mediaIds;

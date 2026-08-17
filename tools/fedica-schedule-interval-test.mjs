@@ -17,29 +17,32 @@ function mustNotInclude(hay, needle, label) {
 }
 
 const src = readFileSync("lib/publishers/fedica-provider.ts", "utf8");
-mustInclude(src, "DateTime: dateTime", "sends DateTime variable");
+mustInclude(src, "DateTime: dateTime", "sends DateTime");
+mustInclude(src, "PipelineId: pipelineId", "sends operator PipelineId");
 mustInclude(src, "resolveTwitterAccounts", "resolves /accounts");
-mustNotInclude(src, "PipelineId: Number(input.pipelineId)", "must not send PipelineId with DateTime");
-mustNotInclude(src, "PipelineId: Number(input.pipelineId) || 42303", "old pipeline+datetime combo");
 
 const helper = readFileSync("lib/fedica.ts", "utf8");
-mustInclude(helper, "if (params.dateTime)", "legacy helper DateTime path");
-mustInclude(helper, "body.PipelineId = Number(params.pipelineId)", "pipeline only without DateTime");
+mustInclude(helper, "PipelineId: fedicaPipelineId(params.pipelineId)", "helper always sends pipeline");
+mustInclude(helper, "body.DateTime = formatFedicaDateTime(params.dateTime)", "helper sends DateTime with pipeline");
 mustInclude(helper, "Messages: [params.message]", "messages are strings");
-mustInclude(helper, "timeZoneName: \"longOffset\"", "Pacific offset not Z-only");
+mustInclude(helper, "timeZoneName: \"longOffset\"", "Pacific offset");
 
 const svc = readFileSync("lib/services/schedule-service.ts", "utf8");
-mustInclude(svc, "scheduled_at: scheduledAtISO", "claim writes scheduled_at");
 mustInclude(svc, "persistScheduled", "verifies scheduled persist");
+mustInclude(svc, "if (!info.providerPostId) return false", "no scheduled without Fedica Id");
+mustInclude(svc, 'status: "scheduling"', "claim is scheduling only");
 
-const cal = readFileSync("lib/calendar/activity-provider.ts", "utf8");
-mustInclude(cal, "mergeBookedScheduleDays", "queue month includes booked");
-mustInclude(cal, "eq(\"user_id\", user.id)", "planned posts scoped to user");
+const sch = readFileSync("lib/schedule.ts", "utf8");
+mustInclude(sch, "FOR_YOU_START_HOUR = 14", "For You start");
+mustInclude(sch, "FOR_YOU_PREFERRED_GAP_MS = 2 * 60 * 60 * 1000", "For You ~2h gap");
+
+const batch = readFileSync("app/api/fedica/batch-schedule/route.ts", "utf8");
+mustInclude(batch, "post.pipeline_id || pipelineId", "uses the post's assigned pipeline");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.5.1"', "version 12.5.1");
+mustInclude(ver, 'APP_VERSION = "12.5.2"', "version 12.5.2");
 
-const { formatFedicaDateTime, fedicaPostAccepted } = await import(
+const { formatFedicaDateTime, fedicaPostAccepted, fedicaPipelineId } = await import(
   pathToFileURL(path.join(process.cwd(), "lib/fedica.ts")).href
 );
 
@@ -53,12 +56,16 @@ if (!summer.startsWith("2026-08-17T14:00:00-07:00")) {
   console.error("FAIL summer PT offset", summer);
   process.exit(1);
 }
-if (fedicaPostAccepted(true, { Success: true, Id: "9" }) !== true) {
-  console.error("FAIL accepted Success true");
+if (fedicaPipelineId("42303") !== 42303) {
+  console.error("FAIL pipeline id");
   process.exit(1);
 }
-if (fedicaPostAccepted(true, { Success: false }) !== false) {
-  console.error("FAIL rejected Success false");
+if (fedicaPostAccepted(true, { Success: true, Id: "9" }) !== true) {
+  console.error("FAIL accepted Success+Id");
+  process.exit(1);
+}
+if (fedicaPostAccepted(true, { Success: true }) !== false) {
+  console.error("FAIL Success without Id must not schedule");
   process.exit(1);
 }
 
