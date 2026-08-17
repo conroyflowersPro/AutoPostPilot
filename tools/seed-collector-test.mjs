@@ -29,7 +29,7 @@ function meetsPublicSeedEngagement(likes, replies) {
   return Number(likes || 0) >= 80 || Number(replies || 0) >= 20;
 }
 
-console.log("Seed collector (v12.4.1)");
+console.log("Seed collector (v12.4.2)");
 ok("S1. likes 80 or replies 20, impressions ignored",
   /PUBLIC_SEED_MIN_LIKES = 80/.test(pub) && /PUBLIC_SEED_MIN_REPLIES = 20/.test(pub) &&
   /Impressions are not a gate/.test(dna) && meetsPublicSeedEngagement(80, 0) &&
@@ -50,8 +50,8 @@ ok("S6. official search filters engagement and ads",
   /like_count/.test(pub) && /isPublicSeedAdOrBait/.test(pub) && /meetsPublicSeedEngagement/.test(pub));
 ok("S7. job public search is 7 days every expand",
   /st.public_search_half = "near7"/.test(job) && !/half === "far"/.test(job));
-ok("S8. version 12.4.1",
-  /"version": "12.4.1"/.test(pkg) && /APP_VERSION = "12.4.1"/.test(ver) && /APP_VERSION = "12.4.1"/.test(ix));
+ok("S8. version 12.4.2",
+  /"version": "12.4.2"/.test(pkg) && /APP_VERSION = "12.4.2"/.test(ver) && /APP_VERSION = "12.4.2"/.test(ix));
 
 console.log("========================================");
 console.log(`SEED COLLECTOR: ${pass} PASS / ${fail} FAIL`);

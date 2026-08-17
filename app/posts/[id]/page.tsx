@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import PostActions from "./PostActions";
 import PostContentEditor from "./PostContentEditor";
 
@@ -62,9 +61,9 @@ export default async function PostDetailPage({
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-4">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-zinc-400 hover:text-zinc-200">
+          <a href="/" className="text-zinc-400 hover:text-zinc-200">
             ← 큐
-          </Link>
+          </a>
           <span className="ml-auto text-[10px] text-zinc-500">
             {idx >= 0 ? `${idx + 1} / ${ids.length}` : ""}
           </span>

@@ -85,15 +85,17 @@ export default function PostList({ posts }: { posts: Post[] }) {
   const [scheduleResult, setScheduleResult] = useState<any>(null);
   const router = useRouter();
   const supabase = createClient();
-  const queue = livePosts || posts;
+  const queue = livePosts !== null ? livePosts : posts;
 
   const loadQueue = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    // Only columns that exist on production SeungContent. Asking for
+    // topic/final_text/strategy_json 400s the query and used to wipe the list.
     const cols =
-      "id, content, final_text, topic, status, pipeline_id, media_urls, scheduled_at, created_at, strategy_json";
+      "id, content, status, pipeline_id, media_urls, scheduled_at, created_at, user_id";
     const [active, rest] = await Promise.all([
       supabase
         .from("SeungContent")
@@ -110,6 +112,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
         .order("created_at", { ascending: false })
         .limit(200),
     ]);
+    if (active.error || rest.error) return;
     const byId = new Map<string, Post>();
     for (const row of [...(active.data || []), ...(rest.data || [])] as Post[]) {
       if (row?.id) byId.set(row.id, row);
@@ -124,6 +127,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
   useEffect(() => {
     loadQueue();
     const onFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       loadQueue();
       router.refresh();
     };

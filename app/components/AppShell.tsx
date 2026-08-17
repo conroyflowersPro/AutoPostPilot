@@ -42,16 +42,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="hidden items-center gap-1 sm:flex">
             {NAV.map((item) => {
               const active = item.match(pathname);
+              const className = active
+                ? "rounded-lg bg-zinc-800 px-2.5 py-1.5 text-xs font-medium text-white"
+                : "rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200";
+              // Hard load the queue so iPhone Safari does not stay on /generate.
+              if (item.href === "/") {
+                return (
+                  <a key={item.href} href="/" className={className}>
+                    {item.label}
+                  </a>
+                );
+              }
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    active
-                      ? "rounded-lg bg-zinc-800 px-2.5 py-1.5 text-xs font-medium text-white"
-                      : "rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
-                  }
-                >
+                <Link key={item.href} href={item.href} className={className}>
                   {item.label}
                 </Link>
               );
@@ -70,16 +73,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto flex max-w-3xl items-stretch justify-around px-1 py-1">
             {NAV.map((item) => {
               const active = item.match(pathname);
+              const className = active
+                ? "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] font-medium text-emerald-400"
+                : "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] text-zinc-500";
+              if (item.href === "/") {
+                return (
+                  <a key={item.href} href="/" className={className}>
+                    <span className="truncate">{item.label}</span>
+                  </a>
+                );
+              }
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    active
-                      ? "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] font-medium text-emerald-400"
-                      : "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg py-2 text-[11px] text-zinc-500"
-                  }
-                >
+                <Link key={item.href} href={item.href} className={className}>
                   <span className="truncate">{item.label}</span>
                 </Link>
               );

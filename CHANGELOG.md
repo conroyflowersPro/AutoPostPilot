@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.4.2 — 2026-08-17
+
+- 방금 저장한 draft가 큐에서 사라지던 문제를 고칩니다. 없는 컬럼(`topic`, `final_text`, `strategy_json`)을 조회하다 실패하면 목록을 비우지 않습니다
+- 위·아래 **큐**는 `/`로 새로 들어가서 생성 화면에 머물지 않습니다. DB에 있는 draft는 그대로입니다
+
 ## 12.4.1 — 2026-08-17
 
 - 텍스트만 있는 reviewed 글도 스케줄할 수 있습니다. 미디어는 있을 때만 붙입니다
