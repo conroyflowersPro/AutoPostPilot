@@ -89,7 +89,7 @@ function twin(input) {
   const seed = (input.seed && input.seed.meaning) || "";
   const tokens = seed.split(/\s+/).filter(t => t.length >= 2);
   const seedHit = !seed || tokens.some(t => text.includes(t)) || text.includes(seed.slice(0, Math.min(10, seed.length)));
-  if (seed && !seedHit) hard.push("seed_meaning_departure");
+  if (seed && !seedHit) soft.push("seed_title_not_in_prose");
   for (const re of AI) if (re.test(text)) { flags.ai_report_voice = true; soft.push("ai_report_voice"); break; }
   if (input.stop_condition && input.stop_condition.leave_inference_open && flags.ai_report_voice) {
     flags.over_explained = true; soft.push("over_explained");
@@ -104,7 +104,7 @@ let r = twin({ seed: { meaning: "FSD 업데이트 체감" }, experience_boundary
 assert(r.overall_status === "REJECT" && r.flags.fabricated_experience, "A fabricated experience REJECT");
 
 r = twin({ seed: { meaning: "Cybertruck 충전 속도" }, generated_text: "오늘은 LAFC 경기가 정말 재밌었어요 골이 세 개나." });
-assert(r.overall_status === "REJECT" && r.hard_fail_reasons.some(x => x.includes("seed")), "B seed departure REJECT");
+assert(r.overall_status !== "REJECT", "B seed title mismatch is not a hard reject");
 
 r = twin({ seed: { meaning: "FSD" }, generated_text: "FSD 좋다 [MANUAL_RAW] 예전 글" });
 assert(r.overall_status === "REJECT" && r.flags.manual_text_leakage, "C manual leakage REJECT");

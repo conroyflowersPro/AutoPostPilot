@@ -81,11 +81,11 @@ export function inferPersonalCluster(text: string, cluster?: string): string {
   const c = String(cluster || "").toUpperCase();
   if ((PERSONAL_CLUSTERS as readonly string[]).includes(c)) return c;
   const t = String(text || "").toLowerCase();
-  if (/fsd|hw3|v14|오토파일럿|자율/.test(t)) return "FSD";
+  if (/fsd|hw3|v14|오토파일럿/.test(t)) return "FSD";
   if (/cybertruck|사이버트럭/.test(t)) return "CYBERTRUCK";
   if (/lafc|축구|손흥민|\bbmo\b/.test(t)) return "LAFC";
   if (/게임|스팀|\bsteam\b|매치메이킹|큐 대기/.test(t)) return "GAMING";
-  if (/테슬라|tesla|\bgrok\b|그록|충전|슈퍼차저|supercharger/.test(t)) return "TESLA";
+  if (/테슬라|tesla/.test(t)) return "TESLA";
   return c;
 }
 
@@ -146,10 +146,32 @@ export function massSectorFromText(text: string): MassSector {
   return "WEATHER_OUT";
 }
 
-/** Expert/internal terms the operator forbade in seeds and posts. */
-export function hasExpertJargon(text: string): boolean {
+/** Deep internal terms. Everyday Tesla/FSD/충전 language is not this list. */
+const DEEP_JARGON_RE = /(?<!플)레이어\s*\d+|(?<!플)레이어2|(?<!플)레이어|페이로드|엔드포인트|엔트리\s*포인트|프로토콜|\b메커니즘\b|\bM[1-9]_\w+/gi;
+
+export function lastSentenceKo(text: string): string {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const parts = t.split(/(?<=[.?!？！])\s+/);
+  return parts[parts.length - 1] || t;
+}
+
+/** Reply-bait / follower-beg in the last sentence only. A thinking ? is allowed. */
+export function isEngagementBaitCloser(text: string): boolean {
+  const last = lastSentenceKo(text);
+  return /어떻게\s*생각|어떠신가요|보이시나요|댓글로|의견을\s*남겨|팔로우|리트윗|궁금하(신)?가요/.test(last);
+}
+
+export function deepJargonCount(text: string): number {
   const t = String(text || "");
-  return /레이어|레이어\s*\d|\bL2\b|\bL1\b|스택\b|프로토콜|엔드포인트|페이로드|엔트리\s*포인트|메커니즘|\bM[1-9]_\w+/i.test(t);
+  const a = t.match(DEEP_JARGON_RE) || [];
+  const stack = t.match(/(^|[^가-힣])스택([^가-힣]|$)/g) || [];
+  return a.length + stack.length;
+}
+
+/** Too many deep terms in one post. One necessary term still passes. */
+export function hasExpertJargon(text: string): boolean {
+  return deepJargonCount(text) >= 2;
 }
 
 export function lengthBandForMode(_mode: string): string {

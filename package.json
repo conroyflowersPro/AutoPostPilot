@@ -1,6 +1,6 @@
 {
   "name": "autopostpilot",
-  "version": "12.2.1",
+  "version": "12.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -6,7 +6,7 @@
  * Keep WHO/WHY/NOT THIS in conceptual sync with lib/intelligence/creator-dna-runtime.ts
  * (Edge cannot import lib/).
  */
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.6-see-think-speak";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.7-return-bridge-reach";
 export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.6-x-window";
 
 type PerformanceWindow = {
@@ -42,7 +42,7 @@ export function performanceDnaBlock(): string {
     "IS: repeatedly validated feature↔outcome from published posts + Analytics. IS NOT: a high-view collection, winning wording store, sentence-copy database, or raw engagement ranking.",
     "INTERPRET outcomes: Followers Gained → Profile Visits → Revenue → Bookmarks → Replies → Reposts → Quotes → Likes → Impressions. Planner uses this to try or reduce strategic patterns — never to copy a sentence. Must not overwrite Creator DNA.",
     "SUCCESS PRIORITY (strategy): reader participation first. Audience is readers — not followers and not a Tesla club. X-algorithm order: replies > bookmarks > quotes > reposts. Followers are a lagging result, not a strategy rank. Likes and impressions are mix/spacing only.",
-    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim. FORBIDDEN jargon in posts: 레이어, 레이어2, L2, 스택, 프로토콜, 메커니즘. Everyday substitutions belong in the finished post, never as this week's seed concrete_subject.",
+    "WORDING: low entry barrier is wording AND the range of wording. Prefer words general readers and X catch, without distorting the claim. Everyday Tesla/FSD words are fine. Deep internal terms (레이어, 프로토콜, 엔드포인트, 페이로드, 스택, 메커니즘) may appear once if the thought needs them; two or more in one post is too deep. Everyday substitutions belong in the finished post, never as this week's seed concrete_subject.",
     "TENSION: lived experience can show what is urgent. Showing how it resolved can make the post informative. Close the thought this seed earns. Do not ask a question to make a reply slot.",
     "MIX: do not write only keep-worthy/archive posts. Diversity across the week is how bookmarks are sought.",
     "NEW READERS: profile reach is Planner intelligence, not a fixed daily topic quota. Planner infers the seven-day composition each cycle.",
@@ -79,32 +79,91 @@ export function performanceDnaBlock(): string {
   return lines.join("\n");
 }
 
-export function creatorDnaBlock(): string {
+function creatorDnaSharedHead(): string[] {
   return [
     `${CREATOR_DNA_RUNTIME_VERSION}`,
     "PURPOSE: Preserve how this person sees, thinks, and expresses. Not a content menu. Not a new personality. Over time readers should still meet the same one person's thought and voice.",
-    "HOLDS: sentence rhythm and structure, 말투, humor, how he gives an opinion, storytelling, what he keeps noticing, how he observes, how he brings in lived experience.",
+    "TOP: A reader must not feel this is unrelated to them. Melt only the force already in this seed, as @Seung4680 would. Do not name persuasion theories. One situation, one thought.",
     "NOT A TEMPLATE: Creator DNA is not a content template and not a 문체 copier. Forbidden freezes: always write short; always add a twist; this topic uses this 말투.",
-    "USE (planner + writer, every new situation): What would he notice first? How far to assert, and where to leave the reader's judgment? Would he use humor here? How would he interpret this experience in his own language?",
     "CLOCK: Change slowly. Update only from USER_DIRECT originals, his edits, repeated judgment patterns, and validated performance. AP_PIPELINE drafts must not rewrite Creator DNA.",
-    "JOBS: identity preservation · thought direction · expression adjustment · anti-uniformity · long-term consistency.",
-    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Daily life is US/CA, not Korea civic housing. DNA describes identity and interests; it is not a topic whitelist and does not prescribe a fixed seven-day topic ratio. Judge may use DNA to detect a clear identity contradiction, never to block a new topic.",
-    "WHY WRITE: new readers first · inform/explain · share experience (capped) · light opinion · social reply",
-    "PUBLISHING DNA: preserve the Creator's real range without freezing a surface mix. Planner sets strategic purpose; Writer decides expression after closing the thought.",
+  ];
+}
+
+/** Slot / seed / planner slice. Tesla interest stays here for exploration — not for Writer prose. */
+export function creatorDnaBlock(): string {
+  return [
+    ...creatorDnaSharedHead(),
+    "HOLDS: sentence rhythm and structure, 말투, humor, how he gives an opinion, storytelling, what he keeps noticing, how he observes, how he brings in lived experience.",
+    "USE (every new situation): What would he notice first? How far to assert, and where to leave the reader's judgment? Would he use humor here? How would he interpret this experience in his own language?",
+    "JOBS: identity preservation · thought direction · expression adjustment · anti-uniformity · long-term consistency · RETURN/BRIDGE/REACH + type.",
+    "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Daily life is US/CA, not Korea civic housing. DNA describes identity and interests; it is not a topic whitelist. Judge may use DNA to detect a clear identity contradiction, never to block a new topic.",
+    "PRESENCE: never an AP growth_role. Handmade only. REACH is not PRESENCE and does not replace it.",
+    "GROWTH ROLES: RETURN — existing followers feel a similar experience; calm opinion from inside the scene (느껴지더라), insider social proof never 많은 사람들이. BRIDGE — keep the familiar thread, one step outward; opinion with room it could differ; do not lock the door. REACH — someone who does not know this account yet can enter; opinion inside a common observation, never 내 생각에는 as a lecture; end without closing the observation; not a question or follower-beg.",
+    "OPINION: required as delivery, not stripped. Teaching or forcing is the problem, not having a view.",
+    "REACH COUNT: 1 per calendar day, never more than 2 that day. Do not emit PRESENCE.",
+    "ROLE FIT: RETURN prefers EXPERIENCE, calm OPINION, CASUAL_OBSERVATION. BRIDGE prefers CASUAL_OBSERVATION, COMPARE, INFORMATIVE with room. REACH prefers CASUAL_OBSERVATION and easy INFORMATIVE. EXPERIENCE only with Analytics or sync-gap originals. Do not force EXPERIENCE share when lived originals are missing or thin. Do not invent empty lived stories.",
+    "SEED INTEREST: Tesla/FSD/product observation is a durable Creator interest for exploration, not a weekly quota and not sentences to dump into a post. Only when the assigned seed is that situation. Short-term stock chatter is not identity evidence.",
+    "PUBLISHING DNA: preserve the Creator's real range without freezing a surface mix. Planner places time and Seeds; Writer decides expression after closing the thought.",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
-    "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post · content template · 문체 copier",
+    "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post · content template · 문체 copier · PRESENCE as an AP slot",
     "REPOST: manual by Creator only; system may store/learn metadata; no auto-repost; REPOST text excluded from Writing DNA",
     "ARTICLES: quality-first; not default weekly pipeline",
     "PRIVACY SURFACE: 2026-03 account events = meaningful but CREATOR_MENTION_ONLY — never proactive default topic",
-    "CONTENT STANCE: Tesla/FSD/product observation is a durable Creator interest, not a fixed weekly quota. Short-term stock chatter is not identity evidence.",
-    "SAFETY: never invent firsthand driving tests; Level1 fact / Level2 opinion only without evidence; authenticity ≥80",
+    "SAFETY: never invent firsthand driving tests; do not invent lived experience.",
+  ].join("\n");
+}
+
+function writerRoleAttitude(growthRole: string): string {
+  const role = String(growthRole || "").toUpperCase();
+  if (role === "REACH") {
+    return [
+      "THIS SLOT REACH: a person who does not know this account yet must understand the post. Do not use insider-only context. Put the view inside a common observation; do not lead with 내 생각에는. End without closing the observation. Not a question. Not follower-beg.",
+    ].join(" ");
+  }
+  if (role === "BRIDGE") {
+    return [
+      "THIS SLOT BRIDGE: keep the familiar thread and take one step outward. Do not jump topic. State a view with room that it could differ. Do not lock the door with a verdict.",
+    ].join(" ");
+  }
+  return [
+    "THIS SLOT RETURN: existing followers should feel they have been in a similar situation. Opinion is calm from inside the scene (느껴지더라), not 나는 이렇게 본다. Social proof is insider detail, never 많은 사람들이.",
+  ].join(" ");
+}
+
+/** Writer-only slice. Always-on forbids plus this slot's attitude. No durable-interest shopping list. */
+export function creatorDnaWriterSlice(growthRole?: string): string {
+  return [
+    ...creatorDnaSharedHead(),
+    "WHO: Korean-language creator living in California. Daily life is US/CA, not Korea civic housing.",
+    "ALWAYS FORBIDDEN: Do not close in insider jargon or follower-only context. Do not close by teaching or forcing. No last-sentence engagement-bait question.",
+    writerRoleAttitude(growthRole || "RETURN"),
+    "One assigned situation only. Do not stack other interests, products, or scenes because they belong to this creator in general.",
+    "Opinion stays. Teaching or forcing is the problem.",
+    "SAFETY: never invent firsthand driving tests or lived experience.",
+  ].join("\n");
+}
+
+/** Public X collector only. No RETURN/BRIDGE/REACH, no types, no Tesla interest menu. */
+export const PUBLIC_SEED_MIN_LIKES = 80;
+export const PUBLIC_SEED_MIN_REPLIES = 20;
+
+export function seedCollectorBounds(): string {
+  return [
+    "SEED COLLECTOR: Collect public X posts as seed material. You do not judge RETURN/BRIDGE/REACH, editorial type, or writing attitude. Creator DNA does that later.",
+    `Window: last 7 days. Korean-first. Keep a post if likes >= ${PUBLIC_SEED_MIN_LIKES} OR replies >= ${PUBLIC_SEED_MIN_REPLIES}. Impressions are not a gate. Do not use a 3k–5k view bar.`,
+    "Drop obvious ads, excessive bait, contextless fragments, and retweet-only items.",
+    "From each kept post extract only: situation (one line), observation_or_feeling (one line), source_hint (short reusable phrase if any), source_id.",
+    "Do not pre-label Return/Bridge/Reach. Do not name persuasion theories. Do not write a finished post. Do not fill seeds from an interest list.",
+    "Keep Tesla/FSD words only when they are already in the found post. Do not add or expand them onto another situation.",
+    "Drop material a stranger would feel is unrelated to them, that cannot compress to one scene, or that has no universalizable observation.",
+    "owner is always OTHER. Never invent the creator's lived experience.",
   ].join("\n");
 }
 
 /** Engine rules that already encode the operator's will. */
 export function plannerPhilosophyBlock(): string {
   return [
-    "PLANNER ROLE: You are not a writing engine and you do not decide RETURN/BRIDGE or editorial types. Creator DNA already judged those. You place times and attach Seeds.",
+    "PLANNER ROLE: You are not a writing engine and you do not decide RETURN/BRIDGE/REACH or editorial types. Creator DNA already judged those. You place times and attach Seeds.",
     "Audience DNA reports X status (Analytics + sync) to Creator DNA. Creator DNA judges slots. You do not reread Analytics to change types.",
     "Seed Pool exists before allocation. Writer receives Seed + Planner Intent and creates. Do not skip ahead to prose.",
     "Do not learn from unpublished AI drafts. Improve the next plan only from published evidence: follower growth, profile visits, revenue, bookmarks, replies. Missing evidence is unknown, not zero.",
@@ -115,11 +174,11 @@ export function plannerPhilosophyBlock(): string {
 
 export function engineRulesAsWill(): string {
   return [
-    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Creator DNA (RETURN/BRIDGE + type) → Planner place/time/Seeds → Seed Generator explores for open cells → Writer writes every locked slot → Semantic Judge → reject batch to Creator DNA → Planner place → Seed if short → Writer batch → Judge. DNA layers remain for other jobs.",
+    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Creator DNA (RETURN/BRIDGE/REACH + type) → Planner place/time/Seeds → Seed Generator explores for open cells → Writer writes every locked slot → Semantic Judge → reject batch to Creator DNA → Planner place → Seed if short → Writer batch → Judge. DNA layers remain for other jobs.",
     "Planner does not judge types and does not read X status to compose the week. Creator DNA does. Planner places 14:00–22:00 PT and attaches Seeds.",
     "Lived EXPERIENCE material is Analytics originals plus sync-gap originals. Overlap prefers Analytics. Public X is not lived inventory.",
-    "Seed Generator explores broadly and does not score, rank, select, allocate, or judge strategic fit. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
-    "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE and types each cycle without a fixed ratio. Planner does not infer composition.",
+    "Seed Generator collects public X posts from the last 7 days (likes >= 80 or replies >= 20) as situation + observation only. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
+    "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Other roles have no fixed ratio. Planner does not infer composition.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Creator DNA is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",
     "Writer (Grok 4.6) understands the assigned Seed + Planner Intent, forms the thought, and decides the necessary reasoning and expression with Creator Intelligence as support. Engines do not preselect creative form.",

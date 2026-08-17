@@ -1,6 +1,6 @@
 /**
  * Audience DNA status for Creator DNA only.
- * Does not decide RETURN/BRIDGE or editorial types.
+ * Does not decide RETURN/BRIDGE/REACH or editorial types.
  */
 export type AudienceDayPulse = {
   d: string;

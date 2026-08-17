@@ -1,6 +1,7 @@
 /**
- * Creator DNA judges seven-day AP slots: RETURN|BRIDGE + editorial type.
+ * Creator DNA judges seven-day AP slots: RETURN|BRIDGE|REACH + editorial type.
  * Audience DNA supplies X status only. Planner does not judge types.
+ * REACH is 1 per day, max 2. PRESENCE is not a role.
  */
 import { creatorDnaBlock } from "./engine-dna.ts";
 import {
@@ -26,10 +27,46 @@ function mode(v: unknown): EditorialMode {
   return (ok.includes(value) ? value : "INFORMATIVE") as EditorialMode;
 }
 
-function growthRole(v: unknown): "RETURN" | "BRIDGE" {
+export type GrowthRole = "RETURN" | "BRIDGE" | "REACH";
+
+export const REACH_PER_DAY_TARGET = 1;
+export const REACH_PER_DAY_MAX = 2;
+
+export function growthRole(v: unknown): GrowthRole {
   const value = s(v, 20).toUpperCase();
+  if (value === "PRESENCE") return "RETURN";
+  if (value === "REACH") return "REACH";
   if (value === "BRIDGE") return "BRIDGE";
   return "RETURN";
+}
+
+/** One REACH per day, never more than two. Extra REACH becomes RETURN. Missing REACH takes a non-EXPERIENCE slot when possible. */
+export function enforceReachDailyCap<T extends { day_offset: number; strategic_role: string; editorial_mode?: string }>(
+  slots: T[],
+): T[] {
+  const byDay = new Map<number, T[]>();
+  for (const slot of slots) {
+    const day = Number(slot.day_offset);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(slot);
+  }
+  for (const daySlots of byDay.values()) {
+    const reachAt: number[] = [];
+    for (let i = 0; i < daySlots.length; i += 1) {
+      if (String(daySlots[i].strategic_role || "").toUpperCase() === "REACH") reachAt.push(i);
+    }
+    while (reachAt.length > REACH_PER_DAY_MAX) {
+      const idx = reachAt.pop();
+      if (idx == null) break;
+      daySlots[idx].strategic_role = "RETURN";
+    }
+    if (reachAt.length === 0 && daySlots.length) {
+      let pick = daySlots.findIndex((slot) => String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE");
+      if (pick < 0) pick = daySlots.length - 1;
+      daySlots[pick].strategic_role = "REACH";
+    }
+  }
+  return slots;
 }
 
 function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
@@ -38,8 +75,9 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     "You are Creator DNA filling AP slot intents for the listed day_offset values only.",
     creatorDnaBlock(),
     `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
-    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
-    "Do not emit PRESENCE. RETURN+EXPERIENCE must stay within lived_scene_count remaining. BRIDGE+EXPERIENCE almost never.",
+    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
+    "REACH: 1 per day_offset, never more than 2. Prefer CASUAL_OBSERVATION or easy INFORMATIVE. PRESENCE is not a role and is not REACH.",
+    "EXPERIENCE only within lived_scene_count. Do not force EXPERIENCE share when lived originals are missing or thin. BRIDGE+EXPERIENCE almost never. REACH+EXPERIENCE only if universalized.",
     "planner_intent says why the slot exists, not how to write it.",
     "Return strict JSON: { \"slots\": [ ... ] }. Fill every required slot. No prose outside JSON.",
   ].join("\n");
@@ -140,7 +178,8 @@ export function parseCreatorDaySlots(args: {
       });
     }
   }
-  return slots.length === want ? slots : null;
+  if (slots.length !== want) return null;
+  return enforceReachDailyCap(slots);
 }
 
 export async function inferCreatorWeekVolume(args: {
@@ -227,7 +266,7 @@ export async function creatorRelabelRejectBatch(args: {
     system: [
       "You are Creator DNA relabeling a batch of Judge-rejected AP slots.",
       creatorDnaBlock(),
-      "Keep RETURN or BRIDGE and one of the five types. Do not write posts. Planner will place and pick Seeds.",
+      "Keep RETURN, BRIDGE, or REACH and one of the five types. REACH stays 1 per day, max 2 — do not relabel a batch into extra REACH. Do not write posts. Planner will place and pick Seeds.",
       "Return strict JSON: slots array with strategy_slot_id, growth_role, editorial_mode, planner_intent.",
     ].join("\n"),
     user: {

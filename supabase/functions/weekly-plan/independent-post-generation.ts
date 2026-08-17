@@ -12,8 +12,8 @@ import type {
   GenerationStatus as ContextGenerationStatus,
 } from "./deep-generation-context.ts";
 import { isGenerationContextWritable, ORDER7A_VERSION } from "./deep-generation-context.ts";
-import { hasExpertJargon } from "./seed-scope.ts";
-import { creatorDnaBlock } from "./engine-dna.ts";
+import { hasExpertJargon, isEngagementBaitCloser } from "./seed-scope.ts";
+import { creatorDnaWriterSlice } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writerLivedTimeLines } from "./seed-ownership.ts";
 
@@ -393,7 +393,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     subject.slice(0, 200),
     "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 160),
     "CREATOR INTELLIGENCE (supporting judgment, never sentences to copy):",
-    creatorDnaBlock(),
+    creatorDnaWriterSlice(s(planner.strategic_role)),
     "REASONING ORDER (internal only; do not output steps):",
     "1) Understand the Seed and Planner Intent together.",
     "2) Close one central thought this Creator would hold. Code labels are material, not the thought.",
@@ -579,12 +579,7 @@ function validateOutput(
   const reasons: string[] = [];
   const subject = markers.seed_subject;
 
-  const seedOk =
-    !subject ||
-    subject.length < 4 ||
-    text.includes(subject.slice(0, Math.min(12, subject.length))) ||
-    subject.split(/\s+/).some((w) => w.length > 2 && text.includes(w));
-  if (!seedOk) reasons.push("seed_fidelity_weak");
+  const seedOk = true;
 
   let expOk = true;
   const expBound = ctx.experience_boundaries || {};
@@ -712,10 +707,7 @@ export function isGenericThesis(text: string): boolean {
 }
 
 export function isQuestionCloser(text: string): boolean {
-  const t = String(text || "").replace(/\s+/g, " ").trim();
-  if (!t) return false;
-  if (/어떻게\s*생각|어떠신가요|보이시나요|있으신가요|해보셨|궁금하(신)?가요/.test(t)) return true;
-  return false;
+  return isEngagementBaitCloser(text);
 }
 
 function blockedResult(

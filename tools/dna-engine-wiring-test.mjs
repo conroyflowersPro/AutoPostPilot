@@ -42,16 +42,16 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v12.2.1)");
+console.log("DNA + engine live-path wiring (v12.4.0)");
 
-ok("D1. Grok Writer gets Creator Intelligence", /creatorDnaBlock\(\)/.test(wr) && /CREATOR INTELLIGENCE/.test(wr));
+ok("D1. Grok Writer gets Creator Intelligence writer slice", /creatorDnaWriterSlice\(/.test(wr) && /CREATOR INTELLIGENCE/.test(wr) && !/creatorDnaBlock\(\)/.test(wr));
 ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
 ok("D3. Writer does not use Performance DNA as writing input",
   /writerArchitectureLock/.test(wr) &&
   /Performance DNA is Planner-only/.test(arch) &&
   !/performanceDnaBlock\(\)/.test(wr));
 ok("D4. horizon bounds are not a Quota xAI call", /SEED_POOL_BUFFER = 10/.test(quota) && !/inferWeeklyQuota/.test(quota) && !/plannerArchitectureLock/.test(quota));
-ok("D5. Grok Seed gets Creator bounds without strategic intelligence", /creatorDnaBlock\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason));
+ok("D5. Grok Seed gets collector bounds without strategic intelligence", /seedCollectorBounds\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason) && !/creatorDnaBlock\(\)/.test(seedReason));
 
 ok("D6. interpretSeed emits why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(interp));
 ok("D7. deep context maps why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(dgc));
@@ -92,7 +92,7 @@ ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 12.2.1", /APP_VERSION = "12.2.1"/.test(ver) && /APP_VERSION = "12.2.1"/.test(ix));
+ok("D28. version 12.4.0", /APP_VERSION = "12.4.0"/.test(ver) && /APP_VERSION = "12.4.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));
@@ -111,7 +111,7 @@ ok("D32. Planner places clock and Seeds after Creator DNA judges types",
   /attachSeedsForSlots/.test(planner) &&
   /PLANNER ROLE/.test(dna) &&
   /not a writing engine/.test(dna) &&
-  /do not decide RETURN\/BRIDGE/.test(dna) &&
+  /do not decide RETURN\/BRIDGE\/REACH/.test(dna) &&
   /stronger months from now/.test(dna) &&
   /Do not learn from unpublished AI drafts/.test(dna));
 ok("D33. Architecture lock: no engine replaces the Creator",
@@ -122,8 +122,8 @@ ok("D33. Architecture lock: no engine replaces the Creator",
   /writerArchitectureLock/.test(wr) &&
   /ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR/.test(judge));
 ok("D34. Seven-day role pipeline is locked in docs and runtime",
-  /Creator DNA \(RETURN\/BRIDGE \+ type\)/.test(arch) &&
-  /Creator DNA \(RETURN\/BRIDGE \+ type\)/.test(libArch) &&
+  /Creator DNA \(RETURN\/BRIDGE\/REACH \+ type\)/.test(arch) &&
+  /Creator DNA \(RETURN\/BRIDGE\/REACH \+ type\)/.test(libArch) &&
   /stepStrategy/.test(job) && /stepPlannerSelect/.test(job) && /stepRecover/.test(job) &&
   /THOUGHT_FIRST_RUNTIME/.test(pipe) &&
   /selectDeliveryAfterThought/.test(pipe) &&
