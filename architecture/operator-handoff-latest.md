@@ -65,7 +65,7 @@ If 8:29 dumps still exist:
 
 Do **not** treat the full absorb as live until Seung says **반영해** / **넣어** / **이대로**. Name + operating structure are planted in the DNA block; RAG search is coded but not yet on the write path.
 
-**Name:** Creator DNA → **Agent승**. Not a chat agent.
+**Name:** Creator DNA → **Agent승**. 채팅창이 아니라 주를 운영하는 작업자.
 
 **Seed Generator:** candidates only.
 
