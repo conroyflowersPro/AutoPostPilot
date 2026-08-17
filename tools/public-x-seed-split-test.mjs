@@ -27,9 +27,9 @@ const planner = read("supabase/functions/weekly-plan/seven-day-planner.ts");
 const lived = read("supabase/functions/weekly-plan/analytics-lived-seeds.ts");
 const pub = read("supabase/functions/weekly-plan/public-x-seed-search.ts");
 
-console.log("Public X / lived Analytics seed split (v12.4.2)");
-ok("P1. public search is engagement collect not DNA interest list", !/FSD OR Tesla OR Grok/.test(pub + cr) && /PUBLIC_SEED_MIN_LIKES/.test(cr) && /seedCollectorBounds/.test(cr) && !/Infer search interests from Creator DNA/.test(cr));
-ok("P2. public X window is last 7 days", /near7/.test(own) && /st.public_search_half = "near7"/.test(job) && /meetsPublicSeedEngagement/.test(pub));
+console.log("Public X / lived Analytics seed split (v12.5.0)");
+ok("P1. public search is engagement collect not DNA interest list", !/FSD OR Tesla OR Grok/.test(pub + cr) && /PUBLIC_SEED_MIN_REPLIES/.test(cr) && /seedCollectorBounds/.test(cr) && !/Infer search interests from Creator DNA/.test(cr));
+ok("P2. public X window is last 14 days", /last14/.test(own) && /st.public_search_half = "last14"/.test(job) && /meetsPublicSeedEngagement/.test(pub));
 ok("P3. official recent search excludes operator handle", /search\/recent/.test(pub) && /excluded_x_handles/.test(cr) && /Seung4680/.test(pub));
 ok("P4. public seeds owner OTHER + viral", /owner: "OTHER"/.test(cr) && /viral: true/.test(cr) && /owner: "OTHER"/.test(job));
 ok("P5. lived seeds from Analytics plus sync-gap originals", /analyticsLivedSeeds/.test(lived) && /syncGapLivedSeeds/.test(lived) && /BUNDLED_X_ANALYTICS_WINDOW/.test(lived) && !/ARCHIVE_EXPERIENCE_FALLBACK/.test(job));

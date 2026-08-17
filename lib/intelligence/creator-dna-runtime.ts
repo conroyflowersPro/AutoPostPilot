@@ -2,7 +2,7 @@
  * Runtime Creator DNA for Planner — lockstep with weekly-plan/engine-dna.ts.
  * Writer slice lives on Edge (creatorDnaWriterSlice). This block is slot/seed facing.
  */
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.7-return-bridge-reach";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.8-scene-diversity";
 
 /** Compact planner-facing block when DB creator_dna row is empty */
 export function buildCreatorDnaPlannerBlock(): {
@@ -21,8 +21,9 @@ export function buildCreatorDnaPlannerBlock(): {
     "USE (every new situation): What would he notice first? How far to assert, and where to leave the reader's judgment? Would he use humor here? How would he interpret this experience in his own language?",
     "WHO: Korean-language creator living in California; Tesla multi-vehicle owner. Daily life is US/CA, not Korea civic housing. DNA describes identity and interests; it does not prescribe a fixed seven-day topic ratio.",
     "PRESENCE: never an AP growth_role. Handmade only. REACH is not PRESENCE and does not replace it.",
-    "GROWTH ROLES: RETURN / BRIDGE / REACH. REACH COUNT: 1 per calendar day, never more than 2.",
-    "SEED INTEREST: Tesla/FSD/product observation is a durable Creator interest for exploration, not sentences to dump into a post.",
+    "GROWTH ROLES: RETURN / BRIDGE / REACH. REACH COUNT: 1 per calendar day, never more than 2. Do not freeze RETURN/BRIDGE share.",
+    "SCENE DIVERSITY: consecutive slots must not share the same situation cluster. FSD/driving scenes at most 2 per day. Do not repeat the previous verdict angle.",
+    "SEED INTEREST: Tesla/FSD/product observation is a durable Creator interest for exploration, not default material. Only when the assigned seed is that situation. If the seed is not FSD, do not attach charging, Uber, or general driving.",
     "PUBLISHING DNA: preserve the Creator's real range without freezing a surface mix. Planner places time and Seeds; Writer decides expression after closing the thought.",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
     "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post · content template · 문체 copier · PRESENCE as an AP slot",

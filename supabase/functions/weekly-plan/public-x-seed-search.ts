@@ -10,15 +10,32 @@ export type OfficialPublicPost = {
   id?: string;
   likes?: number;
   replies?: number;
+  impressions?: number;
 };
 
 const OPERATOR_HANDLE = "Seung4680";
 
-export const PUBLIC_SEED_MIN_LIKES = 80;
 export const PUBLIC_SEED_MIN_REPLIES = 20;
+export const PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS = 50_000;
+export const PUBLIC_SEED_REPLY_POOL_ENOUGH = 8;
 
-export function meetsPublicSeedEngagement(likes: number, replies: number): boolean {
-  return Number(likes || 0) >= PUBLIC_SEED_MIN_LIKES || Number(replies || 0) >= PUBLIC_SEED_MIN_REPLIES;
+export function meetsPublicSeedPrimary(replies: number): boolean {
+  return Number(replies || 0) >= PUBLIC_SEED_MIN_REPLIES;
+}
+
+export function meetsPublicSeedSupplement(impressions: number): boolean {
+  return Number(impressions || 0) >= PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS;
+}
+
+/** Primary: replies. Supplement impressions only when the caller says the reply pool is short. */
+export function meetsPublicSeedEngagement(
+  replies: number,
+  impressions = 0,
+  allowImpressionSupplement = false,
+): boolean {
+  if (meetsPublicSeedPrimary(replies)) return true;
+  if (allowImpressionSupplement && meetsPublicSeedSupplement(impressions)) return true;
+  return false;
 }
 
 const AD_OR_BAIT =
@@ -26,6 +43,33 @@ const AD_OR_BAIT =
 
 export function isPublicSeedAdOrBait(text: string): boolean {
   return AD_OR_BAIT.test(String(text || ""));
+}
+
+export function isContextlessShort(text: string): boolean {
+  const t = String(text || "").replace(/https?:\/\/\S+/gi, "").trim();
+  return t.length < 40;
+}
+
+export function isRetweetHeavy(text: string): boolean {
+  const t = String(text || "").trim();
+  return /^rt\s+@/i.test(t) || /^rt:/i.test(t);
+}
+
+function keepBase(p: OfficialPublicPost): boolean {
+  if (isContextlessShort(p.text || "")) return false;
+  if (isPublicSeedAdOrBait(p.text || "")) return false;
+  if (isRetweetHeavy(p.text || "")) return false;
+  return true;
+}
+
+export function filterOfficialPublicPosts(rows: OfficialPublicPost[]): OfficialPublicPost[] {
+  const usable = rows.filter(keepBase);
+  const primary = usable.filter((p) => meetsPublicSeedPrimary(p.replies || 0));
+  if (primary.length >= PUBLIC_SEED_REPLY_POOL_ENOUGH) return primary.slice(0, 80);
+  const extra = usable.filter(
+    (p) => !meetsPublicSeedPrimary(p.replies || 0) && meetsPublicSeedSupplement(p.impressions || 0),
+  );
+  return [...primary, ...extra].slice(0, 80);
 }
 
 export async function fetchOfficialPublicPosts(args: {
@@ -46,23 +90,18 @@ export async function fetchOfficialPublicPosts(args: {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return [];
     const rows = Array.isArray(body?.data) ? body.data : [];
-    return rows
-      .map((t: any) => {
-        const metrics = t?.public_metrics || {};
-        return {
-          text: String(t?.text || "").trim(),
-          created_at: t?.created_at ? String(t.created_at) : undefined,
-          id: t?.id ? String(t.id) : undefined,
-          likes: Number(metrics.like_count) || 0,
-          replies: Number(metrics.reply_count) || 0,
-        };
-      })
-      .filter((p: OfficialPublicPost) => {
-        if ((p.text || "").length < 20) return false;
-        if (isPublicSeedAdOrBait(p.text || "")) return false;
-        return meetsPublicSeedEngagement(p.likes || 0, p.replies || 0);
-      })
-      .slice(0, 80);
+    const mapped: OfficialPublicPost[] = rows.map((t: any) => {
+      const metrics = t?.public_metrics || {};
+      return {
+        text: String(t?.text || "").trim(),
+        created_at: t?.created_at ? String(t.created_at) : undefined,
+        id: t?.id ? String(t.id) : undefined,
+        likes: Number(metrics.like_count) || 0,
+        replies: Number(metrics.reply_count) || 0,
+        impressions: Number(metrics.impression_count) || 0,
+      };
+    });
+    return filterOfficialPublicPosts(mapped);
   } catch {
     return [];
   }

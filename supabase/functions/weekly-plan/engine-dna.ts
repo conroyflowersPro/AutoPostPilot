@@ -6,7 +6,7 @@
  * Keep WHO/WHY/NOT THIS in conceptual sync with lib/intelligence/creator-dna-runtime.ts
  * (Edge cannot import lib/).
  */
-export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.7-return-bridge-reach";
+export const CREATOR_DNA_RUNTIME_VERSION = "creator-dna-runtime-v1.8-scene-diversity";
 export const PERFORMANCE_DNA_RUNTIME_VERSION = "performance-dna-runtime-v1.6-x-window";
 
 type PerformanceWindow = {
@@ -100,9 +100,10 @@ export function creatorDnaBlock(): string {
     "PRESENCE: never an AP growth_role. Handmade only. REACH is not PRESENCE and does not replace it.",
     "GROWTH ROLES: RETURN — existing followers feel a similar experience; calm opinion from inside the scene (느껴지더라), insider social proof never 많은 사람들이. BRIDGE — keep the familiar thread, one step outward; opinion with room it could differ; do not lock the door. REACH — someone who does not know this account yet can enter; opinion inside a common observation, never 내 생각에는 as a lecture; end without closing the observation; not a question or follower-beg.",
     "OPINION: required as delivery, not stripped. Teaching or forcing is the problem, not having a view.",
-    "REACH COUNT: 1 per calendar day, never more than 2 that day. Do not emit PRESENCE.",
+    "REACH COUNT: 1 per calendar day, never more than 2 that day. Do not emit PRESENCE. Do not freeze a RETURN/BRIDGE ratio.",
     "ROLE FIT: RETURN prefers EXPERIENCE, calm OPINION, CASUAL_OBSERVATION. BRIDGE prefers CASUAL_OBSERVATION, COMPARE, INFORMATIVE with room. REACH prefers CASUAL_OBSERVATION and easy INFORMATIVE. EXPERIENCE only with Analytics or sync-gap originals. Do not force EXPERIENCE share when lived originals are missing or thin. Do not invent empty lived stories.",
-    "SEED INTEREST: Tesla/FSD/product observation is a durable Creator interest for exploration, not a weekly quota and not sentences to dump into a post. Only when the assigned seed is that situation. Short-term stock chatter is not identity evidence.",
+    "SCENE DIVERSITY: do not place the same situation cluster on consecutive slots. FSD/driving/parking/intersection scenes are at most 2 per calendar day. Do not repeat the previous post's verdict angle (better than before / still ambiguous). If one cluster dominates the pool, prefer a different seed.",
+    "SEED INTEREST: Tesla/FSD/product observation is a durable Creator interest for exploration, not a weekly quota and not default material. Only when the assigned seed is that situation. If the seed is not FSD, do not attach charging, Uber, or general driving theory. Short-term stock chatter is not identity evidence.",
     "PUBLISHING DNA: preserve the Creator's real range without freezing a surface mix. Planner places time and Seeds; Writer decides expression after closing the thought.",
     "REPLY DNA (SEPARATE): short, communicative; ㅋㅋ when thread is funny; relationship maintenance — NEVER average into Publishing voice.",
     "NOT THIS: stock daytrade primary · single global tone · REPOST text as writing voice · personal experience mandatory on every post · content template · 문체 copier · PRESENCE as an AP slot",
@@ -137,24 +138,27 @@ export function creatorDnaWriterSlice(growthRole?: string): string {
     "WHO: Korean-language creator living in California. Daily life is US/CA, not Korea civic housing.",
     "ALWAYS FORBIDDEN: Do not close in insider jargon or follower-only context. Do not close by teaching or forcing. No last-sentence engagement-bait question.",
     writerRoleAttitude(growthRole || "RETURN"),
-    "One assigned situation only. Do not stack other interests, products, or scenes because they belong to this creator in general.",
+    "DIVERSITY: Avoid the previous post's scene and the same judgment angle (better than before / still ambiguous). Handle only the one situation in this seed.",
+    "One assigned situation only. Do not stack other interests, products, or scenes because they belong to this creator in general. Tesla/FSD appears only if this seed is that situation. If the seed is not FSD, do not add charging, Uber, or general driving theory.",
     "Opinion stays. Teaching or forcing is the problem.",
     "SAFETY: never invent firsthand driving tests or lived experience.",
   ].join("\n");
 }
 
 /** Public X collector only. No RETURN/BRIDGE/REACH, no types, no Tesla interest menu. */
-export const PUBLIC_SEED_MIN_LIKES = 80;
 export const PUBLIC_SEED_MIN_REPLIES = 20;
+export const PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS = 50_000;
+export const PUBLIC_SEED_WINDOW_DAYS = 14;
 
 export function seedCollectorBounds(): string {
   return [
-    "SEED COLLECTOR: Collect public X posts as seed material. You do not judge RETURN/BRIDGE/REACH, editorial type, or writing attitude. Creator DNA does that later.",
-    `Window: last 7 days. Korean-first. Keep a post if likes >= ${PUBLIC_SEED_MIN_LIKES} OR replies >= ${PUBLIC_SEED_MIN_REPLIES}. Impressions are not a gate. Do not use a 3k–5k view bar.`,
-    "Drop obvious ads, excessive bait, contextless fragments, and retweet-only items.",
-    "From each kept post extract only: situation (one line), observation_or_feeling (one line), source_hint (short reusable phrase if any), source_id.",
+    "SEED COLLECTOR: Collect public X posts as seed material. You do not judge RETURN/BRIDGE/REACH, editorial type, or writing attitude. Creator DNA does that later. Pass only refined seeds.",
+    `Window: last ${PUBLIC_SEED_WINDOW_DAYS} days. Korean-first. Default keep: replies >= ${PUBLIC_SEED_MIN_REPLIES}. Do not use likes, reposts, or bookmarks as a keep condition.`,
+    `If reply-qualified candidates are short, supplement with impressions >= ${PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS} only. Do not open that bar when the reply pool is enough.`,
+    "Drop obvious ads, contextless short fragments, retweet-heavy items, and posts with no scene.",
+    "If one cluster (FSD, driving, parking, intersection) is overweight, drop or defer extras. Extract only: one core scene, one observation_or_feeling, optional source_hint, source_id.",
     "Do not pre-label Return/Bridge/Reach. Do not name persuasion theories. Do not write a finished post. Do not fill seeds from an interest list.",
-    "Keep Tesla/FSD words only when they are already in the found post. Do not add or expand them onto another situation.",
+    "Keep Tesla/FSD words only when they are already in the found post. Do not expand onto charging, Uber, or generic driving when the found post is not that situation.",
     "Drop material a stranger would feel is unrelated to them, that cannot compress to one scene, or that has no universalizable observation.",
     "owner is always OTHER. Never invent the creator's lived experience.",
   ].join("\n");
@@ -167,7 +171,7 @@ export function plannerPhilosophyBlock(): string {
     "Audience DNA reports X status (Analytics + sync) to Creator DNA. Creator DNA judges slots. You do not reread Analytics to change types.",
     "Seed Pool exists before allocation. Writer receives Seed + Planner Intent and creates. Do not skip ahead to prose.",
     "Do not learn from unpublished AI drafts. Improve the next plan only from published evidence: follower growth, profile visits, revenue, bookmarks, replies. Missing evidence is unknown, not zero.",
-    "JOBS: place Creator-judged slots on the seven-day clock · Seed selection and allocation · request Seed Generator only when the pool lacks a fit. Do not write posts. Do not change types.",
+    "JOBS: place Creator-judged slots on the seven-day clock · Seed selection and allocation · request Seed Generator only when the pool lacks a fit. Do not write posts. Do not change types. If one situation cluster dominates, prefer a different seed. Do not freeze RETURN/BRIDGE share.",
     "THE QUESTION: does this decision make this creator's account stronger months from now?",
   ].join("\n");
 }
@@ -177,8 +181,8 @@ export function engineRulesAsWill(): string {
     "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Creator DNA (RETURN/BRIDGE/REACH + type) → Planner place/time/Seeds → Seed Generator explores for open cells → Writer writes every locked slot → Semantic Judge → reject batch to Creator DNA → Planner place → Seed if short → Writer batch → Judge. DNA layers remain for other jobs.",
     "Planner does not judge types and does not read X status to compose the week. Creator DNA does. Planner places 14:00–22:00 PT and attaches Seeds.",
     "Lived EXPERIENCE material is Analytics originals plus sync-gap originals. Overlap prefers Analytics. Public X is not lived inventory.",
-    "Seed Generator collects public X posts from the last 7 days (likes >= 80 or replies >= 20) as situation + observation only. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
-    "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Other roles have no fixed ratio. Planner does not infer composition.",
+    "Seed Generator collects public X posts from the last 14 days (replies >= 20; impressions >= 50k only if that pool is short) as one scene + one observation. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
+    "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Other roles have no fixed ratio. Consecutive slots must not share the same situation cluster. FSD/driving scenes are at most 2 per day. Planner does not infer composition.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Creator DNA is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",
     "Writer (Grok 4.6) understands the assigned Seed + Planner Intent, forms the thought, and decides the necessary reasoning and expression with Creator Intelligence as support. Engines do not preselect creative form.",

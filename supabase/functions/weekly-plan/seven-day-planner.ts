@@ -13,6 +13,7 @@ import { plannerArchitectureLock } from "./engine-architecture.ts";
 import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { MAX_WEEKLY_SLOTS, MIN_WEEKLY_SLOTS, QUOTA_PER_DAY_MAX, QUOTA_PER_DAY_MIN } from "./quota-inference.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
+import { diversifyAssignments } from "./situation-diversity.ts";
 
 export const STRATEGY_DAYS_PER_TICK = 2;
 
@@ -767,6 +768,7 @@ function selectionSystem(dayScoped: boolean): string {
     "planner_intent may clarify placement for the selected Seed but must remain strategy, not writing instructions.",
     "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
     "EXPERIENCE slots take ANALYTICS_LIVED owner SELF seeds only, newest occurred_at first. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take public seeds; viral is already on those seeds.",
+    "Do not place the same situation cluster on consecutive slots. FSD/driving/parking/intersection at most 2 per day. If the pool is overweight on one cluster, prefer another seed. If the seed is not FSD, do not pick a seed that bolts on charging, Uber, or generic driving.",
     "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request lived SELF scenes only, never public search to invent experience.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
@@ -800,6 +802,7 @@ function parsePlannerSelection(
   slots: PlannerSlotIntent[],
   validSeedIds: Set<string>,
   reservedSeedIds: Set<string>,
+  pool: ConcreteSeed[] = [],
 ): PlannerSelection | null {
   if (!raw || !Array.isArray(raw.assignments) || !Array.isArray(raw.missing)) return null;
   const validSlotIds = new Set(slots.map((slot) => slot.slot_id));
@@ -833,7 +836,10 @@ function parsePlannerSelection(
       missing.push({ slot_id: slot.slot_id, exploration_direction: slot.planner_intent });
     }
   }
-  return { assignments, missing, version: SEVEN_DAY_PLANNER_VERSION };
+  const diversified = pool.length
+    ? diversifyAssignments(assignments, slots, pool)
+    : assignments;
+  return { assignments: diversified, missing, version: SEVEN_DAY_PLANNER_VERSION };
 }
 
 export async function selectSeedsForSevenDayPlan(args: {
@@ -853,7 +859,7 @@ export async function selectSeedsForSevenDayPlan(args: {
       seven_day_strategy: args.strategy,
       seed_pool: pool.map(compactSeedForSelect),
     },
-    parse: (raw) => parsePlannerSelection(raw, args.strategy.slots, validSeedIds, new Set()),
+    parse: (raw) => parsePlannerSelection(raw, args.strategy.slots, validSeedIds, new Set(), pool),
   });
 }
 
@@ -885,7 +891,7 @@ export async function selectSeedsForDays(args: {
       reserved_seed_ids: [...reservedSeedIds],
       seed_pool: pool.map(compactSeedForSelect),
     },
-    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds),
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool),
   });
 }
 
@@ -913,7 +919,7 @@ export async function attachSeedsForSlots(args: {
       reserved_seed_ids: [...reservedSeedIds],
       seed_pool: pool.map(compactSeedForSelect),
     },
-    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds),
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool),
   });
 }
 

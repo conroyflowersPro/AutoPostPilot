@@ -55,6 +55,6 @@ const btn = readFileSync("app/components/BatchScheduleButton.tsx", "utf8");
 mustInclude(btn, "requireMedia: false", "batch button requireMedia false");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.4.2"', "version 12.4.2");
+mustInclude(ver, 'APP_VERSION = "12.5.0"', "version 12.5.0");
 
 console.log("schedule-without-media-test: PASS");

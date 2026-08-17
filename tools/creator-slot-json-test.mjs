@@ -27,7 +27,7 @@ function creatorDaysAreOneBased(rawOffsets, allowed) {
   return oneOk > zeroOk;
 }
 
-console.log("Creator day-slot JSON (v12.4.2)");
+console.log("Creator day-slot JSON (v12.5.0)");
 ok("J1. 1,2 against requested 0,1 is 1-based",
   creatorDaysAreOneBased([1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2], [0, 1]) === true);
 ok("J2. 0,1 against requested 0,1 stays 0-based",
@@ -40,7 +40,7 @@ ok("J4. slot fill sends counts not the full Audience dump",
 ok("J5. empty slots stay unusable; partial fills pad",
   /if \(!slots.length\) return null/.test(creator) && /PAD_MODES/.test(creator));
 ok("J6. prompt says day_offset is 0-based", /day_offset is 0-based/.test(creator));
-ok("J7. version 12.4.2", /APP_VERSION = "12.4.2"/.test(ver) && /APP_VERSION = "12.4.2"/.test(ix));
+ok("J7. version 12.5.0", /APP_VERSION = "12.5.0"/.test(ver) && /APP_VERSION = "12.5.0"/.test(ix));
 
 console.log("========================================");
 console.log(`CREATOR DAY JSON: ${pass} PASS / ${fail} FAIL`);

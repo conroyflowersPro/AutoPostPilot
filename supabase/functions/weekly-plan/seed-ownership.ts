@@ -79,17 +79,13 @@ export function sortLivedNewestFirst<T extends { occurred_at?: string; published
 }
 
 export function publicSearchWindows(now: Date = new Date()): {
-  near: { from: string; to: string; key: "near7" };
-  far: { from: string; to: string; key: "far7" };
+  last14: { from: string; to: string; key: "last14" };
 } {
   const iso = (d: Date) => d.toISOString().slice(0, 10);
-  const nearTo = now;
-  const nearFrom = new Date(now.getTime() - 7 * 86400000);
-  const farTo = nearFrom;
-  const farFrom = new Date(now.getTime() - 14 * 86400000);
+  const to = now;
+  const from = new Date(now.getTime() - 14 * 86400000);
   return {
-    near: { from: iso(nearFrom), to: iso(nearTo), key: "near7" },
-    far: { from: iso(farFrom), to: iso(farTo), key: "far7" },
+    last14: { from: iso(from), to: iso(to), key: "last14" },
   };
 }
 
