@@ -112,7 +112,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
         .order("created_at", { ascending: false })
         .limit(200),
     ]);
-    if (active.error || rest.error) return;
+    if (active.error && rest.error) return;
     const byId = new Map<string, Post>();
     for (const row of [...(active.data || []), ...(rest.data || [])] as Post[]) {
       if (row?.id) byId.set(row.id, row);

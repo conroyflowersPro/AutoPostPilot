@@ -1,27 +1,40 @@
-import { uploadMediaFromUrl } from "@/lib/fedica";
+import { uploadMediaFromUrl, fedicaFetch, formatFedicaDateTime, fedicaPostAccepted } from "@/lib/fedica";
 import type {
   PublisherProvider,
   SchedulePostInput,
   SchedulePostResult,
   MediaUploadResult,
+  PublishAccount,
 } from "./types";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
-export function formatFedicaDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`invalid scheduledAtISO: ${iso}`);
+export { formatFedicaDateTime, fedicaPostAccepted };
+
+async function resolveTwitterAccounts(
+  fallback: PublishAccount[]
+): Promise<PublishAccount[]> {
+  try {
+    const data = await fedicaFetch("/accounts");
+    const rows = Array.isArray(data?.Accounts) ? data.Accounts : [];
+    const matched = rows
+      .map((row: { Platform?: string; AccountId?: string }) => ({
+        Platform: String(row?.Platform || "").trim(),
+        AccountId: String(row?.AccountId || "").trim(),
+      }))
+      .filter(
+        (row: PublishAccount) =>
+          row.AccountId && /^(twitter|x)$/i.test(row.Platform)
+      );
+    if (matched.length > 0) return matched;
+  } catch {
+    /* use fallback */
   }
-  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+  return fallback;
 }
 
 /**
  * Fedica Publishing Provider.
- * Keeps existing Fedica media + post API behavior; isolates endpoints from ScheduleService.
- *
- * Specific DateTime and PipelineId must not be sent together. PipelineId makes
- * Fedica ignore DateTime and fill the pipeline's next slot (often "now"), so
- * batch schedule stacks at the same minute.
+ * Specific Date = DateTime with timezone. Never send PipelineId with DateTime.
  */
 export class FedicaProvider implements PublisherProvider {
   readonly name = "fedica";
@@ -44,20 +57,22 @@ export class FedicaProvider implements PublisherProvider {
       };
     }
 
-    const accounts = input.accounts || [
+    const fallbackAccounts = input.accounts || [
       { Platform: "Twitter", AccountId: "Seung4680" },
     ];
+    const accounts = await resolveTwitterAccounts(fallbackAccounts);
 
     const postBody: Record<string, unknown> = {
       Accounts: accounts,
       Messages: [input.content],
     };
     if (input.mediaIds.length > 0) {
-      postBody.MediaId = input.mediaIds;
+      postBody.MediaId = input.mediaIds.map(String);
     }
 
+    const dateTime = formatFedicaDateTime(input.scheduledAtISO);
     const fedicaBody: Record<string, unknown> = {
-      DateTime: formatFedicaDateTime(input.scheduledAtISO),
+      DateTime: dateTime,
       Posts: [postBody],
     };
 
@@ -83,21 +98,21 @@ export class FedicaProvider implements PublisherProvider {
       }
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.Success) {
+      if (!fedicaPostAccepted(res.ok, data)) {
         const status = res.status;
         const retryable = status >= 500 || status === 429;
         return {
           success: false,
-          error: data.Error || `Fedica post failed (${status})`,
+          error: data.Error || data.error || `Fedica post failed (${status})`,
           retryable,
-          raw: data,
+          raw: { ...data, sentDateTime: dateTime },
         };
       }
 
       return {
         success: true,
-        providerPostId: data.Id != null ? String(data.Id) : undefined,
-        raw: data,
+        providerPostId: data.Id != null ? String(data.Id) : data.id != null ? String(data.id) : undefined,
+        raw: { ...data, sentDateTime: dateTime },
       };
     } catch (e: any) {
       const msg =

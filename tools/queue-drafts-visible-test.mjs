@@ -9,7 +9,7 @@ function mustInclude(hay, needle, label) {
 
 const list = readFileSync("app/components/PostList.tsx", "utf8");
 mustInclude(list, "livePosts !== null ? livePosts : posts", "keep server posts until live load");
-mustInclude(list, "if (active.error || rest.error) return", "do not wipe list on query error");
+mustInclude(list, "if (active.error && rest.error) return", "do not wipe list unless both queries fail");
 mustInclude(
   list,
   "id, content, status, pipeline_id, media_urls, scheduled_at, created_at, user_id",
@@ -25,6 +25,6 @@ mustInclude(shell, 'if (item.href === "/")', "queue uses hard navigation");
 mustInclude(shell, "<a key={item.href} href=\"/\"", "queue is a real <a href=/>");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.5.0"', "version 12.5.0");
+mustInclude(ver, 'APP_VERSION = "12.5.1"', "version 12.5.1");
 
 console.log("queue-drafts-visible-test: PASS");

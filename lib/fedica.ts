@@ -4,6 +4,46 @@
  */
 
 const FEDICA_BASE = "https://fedica.com/api/publish";
+const PT = "America/Los_Angeles";
+
+/**
+ * Fedica Specific Date: ISO-8601 with timezone offset (Pacific wall clock).
+ * Do not send this together with PipelineId.
+ */
+export function formatFedicaDateTime(iso: string, timeZone = PT): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`invalid scheduledAtISO: ${iso}`);
+  }
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZoneName: "longOffset",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "00";
+  let hour = get("hour");
+  if (hour === "24") hour = "00";
+  const tzRaw = parts.find((p) => p.type === "timeZoneName")?.value || "GMT-07:00";
+  const off = tzRaw.match(/([+-]\d{2}:\d{2})/);
+  const offset = off ? off[1] : "-07:00";
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}:${get("second")}${offset}`;
+}
+
+export function fedicaPostAccepted(
+  httpOk: boolean,
+  data: { Success?: unknown; success?: unknown; Id?: unknown; id?: unknown } | null
+): boolean {
+  if (!httpOk || !data) return false;
+  if (data.Success === false || data.success === false) return false;
+  if (data.Success === true || data.success === true) return true;
+  return data.Id != null || data.id != null;
+}
 
 function getToken() {
   const token = process.env.FEDICA_API_TOKEN || process.env.FEDICA_TOKEN || "";
@@ -165,13 +205,13 @@ export async function scheduleFedicaPost(params: {
     Posts: [
       {
         Accounts: [{ Platform: "Twitter", AccountId: accountId }],
-        Messages: [{ Text: params.message }],
+        Messages: [params.message],
         MediaId: params.mediaIds?.[0] || undefined,
       },
     ],
   };
   if (params.dateTime) {
-    body.DateTime = params.dateTime;
+    body.DateTime = formatFedicaDateTime(params.dateTime);
   } else {
     body.PipelineId = Number(params.pipelineId) || params.pipelineId;
   }

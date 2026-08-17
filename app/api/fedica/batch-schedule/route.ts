@@ -9,7 +9,7 @@ import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
 import { scheduleOnePost } from "@/lib/services/schedule-service";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
-export const maxDuration = 26;
+export const maxDuration = 60;
 
 /** Thin API: UI sends chunks of SCHEDULING_CONFIG.batchSize */
 export async function POST(req: NextRequest) {

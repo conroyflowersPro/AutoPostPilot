@@ -121,22 +121,23 @@ export async function scheduleOnePost(opts: {
       .from("SeungContent")
       .update({
         status: "scheduling",
+        scheduled_at: scheduledAtISO,
         last_attempt_at: new Date().toISOString(),
         schedule_provider: provider.name,
       })
       .eq("id", post.id)
       .in("status", ["reviewed", "schedule_failed"])
-      .select("id, attempt_count")
+      .select("id, attempt_count, scheduled_at, status")
       .maybeSingle();
     claimErr = full.error;
     claimed = full.data;
     if (claimErr && /column|schema/i.test(claimErr.message || "")) {
       const basic = await supabase
         .from("SeungContent")
-        .update({ status: "scheduling" })
+        .update({ status: "scheduling", scheduled_at: scheduledAtISO })
         .eq("id", post.id)
         .in("status", ["reviewed", "schedule_failed"])
-        .select("id")
+        .select("id, scheduled_at, status")
         .maybeSingle();
       claimErr = basic.error;
       claimed = basic.data;
@@ -249,34 +250,31 @@ export async function scheduleOnePost(opts: {
       };
     }
 
-    // Duplicate Risk Mitigation: persist provider id ASAP after success
-    const minimalSuccess = {
-      status: "scheduled" as const,
-      scheduled_at: scheduledAtISO,
-      fedica_post_id: providerPostId || null,
-    };
-    {
-      const first = await supabase
-        .from("SeungContent")
-        .update(minimalSuccess)
-        .eq("id", post.id);
-      if (first.error) {
-        await supabase
-          .from("SeungContent")
-          .update(minimalSuccess)
-          .eq("id", post.id);
-      }
+    const persisted = await persistScheduled(supabase, post.id, {
+      scheduledAtISO,
+      providerPostId,
+      providerName: provider.name,
+      attemptCount,
+    });
+    if (!persisted) {
+      await markFailed(supabase, post.id, {
+        errorStage: "update_database",
+        errorInternal: "Fedica accepted but SeungContent did not move to scheduled",
+        errorUser:
+          "Fedica에는 올라갔을 수 있습니다. 앱에서 scheduled로 바뀌지 않으면 새로고침 후 scheduled 탭을 확인하세요.",
+        attemptCount,
+      });
+      return {
+        ok: false,
+        id: post.id,
+        status: "schedule_failed",
+        errorStage: "update_database",
+        errorInternal: "status did not persist as scheduled",
+        errorUser:
+          "Fedica에는 올라갔을 수 있습니다. 앱에서 scheduled로 바뀌지 않으면 새로고침 후 scheduled 탭을 확인하세요.",
+        retryable: true,
+      };
     }
-    await supabase
-      .from("SeungContent")
-      .update({
-        last_error: null,
-        error_stage: null,
-        schedule_provider: provider.name,
-        last_attempt_at: new Date().toISOString(),
-        attempt_count: attemptCount,
-      })
-      .eq("id", post.id);
 
     return {
       ok: true,
@@ -304,6 +302,51 @@ export async function scheduleOnePost(opts: {
       retryable: true,
     };
   }
+}
+
+async function persistScheduled(
+  supabase: SupabaseClient,
+  id: string,
+  info: {
+    scheduledAtISO: string;
+    providerPostId?: string;
+    providerName: string;
+    attemptCount: number;
+  }
+): Promise<boolean> {
+  const payloads: Record<string, unknown>[] = [
+    {
+      status: "scheduled",
+      scheduled_at: info.scheduledAtISO,
+      fedica_post_id: info.providerPostId || null,
+      last_error: null,
+      error_stage: null,
+      schedule_provider: info.providerName,
+      last_attempt_at: new Date().toISOString(),
+      attempt_count: info.attemptCount,
+    },
+    {
+      status: "scheduled",
+      scheduled_at: info.scheduledAtISO,
+      fedica_post_id: info.providerPostId || null,
+    },
+    {
+      status: "scheduled",
+      scheduled_at: info.scheduledAtISO,
+    },
+    { status: "scheduled" },
+  ];
+  for (const body of payloads) {
+    const { data, error } = await supabase
+      .from("SeungContent")
+      .update(body)
+      .eq("id", id)
+      .select("id, status, scheduled_at")
+      .maybeSingle();
+    if (error) continue;
+    if (!data || String(data.status) === "scheduled") return true;
+  }
+  return false;
 }
 
 async function markFailed(

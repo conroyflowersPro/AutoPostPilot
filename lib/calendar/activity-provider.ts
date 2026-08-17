@@ -16,7 +16,7 @@ import {
 } from "./types";
 import { getDemoActivities } from "./demo-data";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { inscribeMonthFromActivities } from "./planner-inscribe";
+import { inscribeMonthFromActivities, mergeBookedScheduleDays, ptDateKey, type ActivityForInscribe } from "./planner-inscribe";
 
 function demoEnabled(): boolean {
   return (
@@ -69,7 +69,7 @@ function mapPlanned(row: {
   fedica_post_id: string | null;
 }): CalendarActivity | null {
   if (!row.scheduled_at) return null;
-  const date = row.scheduled_at.slice(0, 10);
+  const date = ptDateKey(row.scheduled_at);
   let origin: ActivityOrigin = "WEEKLY_PLANNER";
   const pid = String(row.pipeline_id || "");
   if (pid === "42338") origin = "WILD_GROWTH";
@@ -135,13 +135,13 @@ export async function getOperationalActivities(
     const { data: planned } = await supabase
       .from("SeungContent")
       .select("id, content, scheduled_at, status, pipeline_id, fedica_post_id")
+      .eq("user_id", user.id)
       .not("scheduled_at", "is", null)
-      .gte("scheduled_at", `${from}T00:00:00`)
-      .lte("scheduled_at", `${to}T23:59:59`);
+      .in("status", ["draft", "reviewed", "scheduling", "scheduled", "published"]);
 
     for (const row of planned || []) {
       const m = mapPlanned(row);
-      if (m) out.push(m);
+      if (m && m.date >= from && m.date <= to) out.push(m);
     }
 
     return out;
@@ -336,20 +336,35 @@ export async function getQueueMonthInscription(year: number, month1to12: number)
       .eq("user_id", user.id)
       .eq("platform", "x")
       .maybeSingle();
-    if (!conn?.id) return { days: [], accountId: null as string | null };
-    const fromDate = new Date(Date.UTC(year, month1to12 - 1, 0));
-    const toDate = new Date(Date.UTC(year, month1to12, 1));
-    const from = fromDate.toISOString().slice(0, 10);
-    const to = toDate.toISOString().slice(0, 10);
-    const { data } = await supabase
-      .from("account_activities")
-      .select("activity_date, published_at, action_type, post_type, system_origin_class, origin")
-      .eq("account_id", conn.id)
-      .eq("origin", "X_ACTUAL")
-      .gte("activity_date", from)
-      .lte("activity_date", to)
-      .limit(800);
-    return { days: inscribeMonthFromActivities(data || [], year, month1to12), accountId: conn.id };
+    const { data: booked } = await supabase
+      .from("SeungContent")
+      .select("scheduled_at")
+      .eq("user_id", user.id)
+      .not("scheduled_at", "is", null)
+      .in("status", ["draft", "reviewed", "scheduling", "scheduled"]);
+    let synced: ActivityForInscribe[] = [];
+    if (conn?.id) {
+      const fromDate = new Date(Date.UTC(year, month1to12 - 1, 0));
+      const toDate = new Date(Date.UTC(year, month1to12, 1));
+      const from = fromDate.toISOString().slice(0, 10);
+      const to = toDate.toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("account_activities")
+        .select("activity_date, published_at, action_type, post_type, system_origin_class, origin")
+        .eq("account_id", conn.id)
+        .eq("origin", "X_ACTUAL")
+        .gte("activity_date", from)
+        .lte("activity_date", to)
+        .limit(800);
+      synced = data || [];
+    }
+    const days = mergeBookedScheduleDays(
+      inscribeMonthFromActivities(synced, year, month1to12),
+      booked || [],
+      year,
+      month1to12,
+    );
+    return { days, accountId: conn?.id || null };
   } catch {
     return { days: [], accountId: null as string | null };
   }
