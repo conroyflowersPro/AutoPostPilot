@@ -72,7 +72,7 @@ export function enforceReachDailyCap<T extends { day_offset: number; strategic_r
 function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
   const spec = days.map((d) => `day_offset ${d} = ${perDay[d] || QUOTA_PER_DAY_MIN} slots`).join("; ");
   return [
-    "You are Creator DNA filling AP slot intents for the listed day_offset values only.",
+    "You are 승Grok filling AP slot intents for the listed day_offset values only.",
     creatorDnaBlock(),
     `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
     "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
@@ -194,7 +194,7 @@ export async function inferCreatorWeekVolume(args: {
     maxTokens: 1200,
     timeoutMs: args.timeoutMs,
     system: [
-      "You are Creator DNA locking seven-day AP volume only. Do not emit slots.",
+      "You are 승Grok locking seven-day AP volume only. Do not emit slots.",
       creatorDnaBlock(),
       audienceStatusBlock(args.audience),
       "volume_gates: each day 4-8 originals, week 28-56, no empty day. Handmade does not change volume.",
@@ -265,7 +265,7 @@ export async function creatorRelabelRejectBatch(args: {
     maxTokens: 4000,
     timeoutMs: args.timeoutMs,
     system: [
-      "You are Creator DNA relabeling a batch of Judge-rejected AP slots.",
+      "You are 승Grok relabeling a batch of Judge-rejected AP slots.",
       creatorDnaBlock(),
       "Keep RETURN, BRIDGE, or REACH and one of the five types. REACH stays 1 per day, max 2 — do not relabel a batch into extra REACH. Do not write posts. Planner will place and pick Seeds.",
       "Return strict JSON: slots array with strategy_slot_id, growth_role, editorial_mode, planner_intent.",

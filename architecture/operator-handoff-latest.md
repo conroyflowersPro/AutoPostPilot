@@ -61,31 +61,26 @@ If 8:29 dumps still exist:
 - Do not merge to `main` without **배포해**.
 - Do not put this handoff into post engines.
 
-## Stated, not shipped — Creator DNA absorbs Planner (2026-08-17)
+## Stated, not shipped — 승Grok absorbs Planner (2026-08-17)
 
-Do **not** implement until Seung says **반영해** / **넣어** / **이대로**. Do not paste this into Writer/Judge prompts as if it were live.
+Do **not** treat the full absorb as live until Seung says **반영해** / **넣어** / **이대로**. Name + operating structure are planted in the DNA block; RAG search is coded but not yet on the write path.
 
-**Seed Generator:** candidates only. Does not choose, does not assign roles, does not instruct Writer.
+**Name:** Creator DNA → **승Grok**. Not a chat agent.
 
-**Creator DNA does all of:**
-1. Review candidate seeds (account 결 / 알맹이 / 확장 가능성)
-2. Choose which seeds live
-3. Return / Bridge / Reach on kept seeds
-4. Select learned theory
-5. Generate 말투 + structure **Writer instructions**
-6. Assign and schedule the seven days, plus the batch work attached to that schedule
+**Seed Generator:** candidates only.
 
-**Data for seed choice:** 30-day X Analytics. Last-14-day X sync fills holes in that 30-day window. Analytics is primary; sync is the patch, not a second strategy.
+**승Grok operating structure (always in the model, not RAG):**
+choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH · writing theory · Writer 말투/structure instructions · seven-day schedule + batches.
 
-**Theories:** `reaction-mechanisms.ts` (M1–M9, viral-post analysis) is **not** the theory layer. DNA learns theories and uses them as **cards**. Which card “works” for this account is unknown — do **not** rank cards by likes/follows. 30d/14d data is to (1) use card **diversity**, (2) pick a card that **fits the seed**, (3) block **frequent repeating patterns**. Complexity/emergence: do not locally optimize a winning card; the week’s quality emerges from varied fit, not from cloning what converted.
+**Writing theories:** xAI **Collections API** (`POST /v1/documents/search`, hybrid). Server-side search only — do **not** give Grok `collections_search` as a tool (multi-search cost). `limit` 3 chunks. Reinterpret; mix at most 2 cards. Env `XAI_THEORY_COLLECTION_ID`. Skip if unset.
 
-**Writer:** writes body only, following DNA instructions. Does not choose seed, role, theory, or schedule.
+**Cost:** operating structure is prompt (cheap, every call). Theory library is retrieved only when emitting Writer instructions. Judge does not search. One query per slot, not a tool loop.
 
-**Planner:** role absorbed by DNA. No separate Planner strategy/placement job after this ships.
+**Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking. Diversity, seed-fit, anti-repeat.
 
-**Not a chat Agent.** Goal in → judge → tools if needed → artifacts out. One work loop, not a conversation with Seung.
+**Writer:** body only from 승Grok instructions.
 
-Current code is still the old split (DNA types → Planner place Seeds → Writer owns form). This contract replaces that split when implemented.
+**Planner:** absorbed (not fully wired yet).
 
 ## Open
 
