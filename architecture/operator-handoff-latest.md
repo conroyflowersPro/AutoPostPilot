@@ -61,6 +61,30 @@ If 8:29 dumps still exist:
 - Do not merge to `main` without **배포해**.
 - Do not put this handoff into post engines.
 
+## Stated, not shipped — Creator DNA absorbs Planner (2026-08-17)
+
+Do **not** implement until Seung says **반영해** / **넣어** / **이대로**. Do not paste this into Writer/Judge prompts as if it were live.
+
+**Seed Generator:** candidates only. Does not choose, does not assign roles, does not instruct Writer.
+
+**Creator DNA does all of:**
+1. Review candidate seeds (account 결 / 알맹이 / 확장 가능성)
+2. Choose which seeds live
+3. Return / Bridge / Reach on kept seeds
+4. Select learned theory
+5. Generate 말투 + structure **Writer instructions**
+6. Assign and schedule the seven days, plus the batch work attached to that schedule
+
+**Data for seed choice:** 30-day X Analytics. Last-14-day X sync fills holes in that 30-day window. Analytics is primary; sync is the patch, not a second strategy.
+
+**Writer:** writes body only, following DNA instructions. Does not choose seed, role, theory, or schedule.
+
+**Planner:** role absorbed by DNA. No separate Planner strategy/placement job after this ships.
+
+**Not a chat Agent.** Goal in → judge → tools if needed → artifacts out. One work loop, not a conversation with Seung.
+
+Current code is still the old split (DNA types → Planner place Seeds → Writer owns form). This contract replaces that split when implemented.
+
 ## Open
 
-Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Next product request is unknown — wait for Seung.
+Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Creator DNA absorb-Planner is specified, waiting on **반영해**.
