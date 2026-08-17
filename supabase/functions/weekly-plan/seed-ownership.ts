@@ -5,7 +5,7 @@
 export type SeedSourceKind = "PUBLIC_X" | "ANALYTICS_LIVED";
 export type SeedOwner = "OTHER" | "SELF";
 export type FoundForm = "EXPERIENTIAL" | "OTHER";
-export type LivedTimePhrase = "omit" | "어제" | "저번주" | "예전";
+export type LivedTimePhrase = "omit" | "day_before" | "within_week" | "older";
 
 export function seedOwnerOf(seed: Record<string, unknown> | null | undefined): SeedOwner {
   const raw = String(seed?.owner || seed?.seed_owner || "").toUpperCase();
@@ -42,23 +42,31 @@ function dayDiffYmd(later: string, earlier: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-/** Writer lived-time buckets. Never N일 전. */
+/** Recency bound only. Writer infers Korean wording. Never a canned calendar word. Never N일 전. */
 export function livedTimePhrase(occurredAt: string | undefined, now: Date = new Date()): LivedTimePhrase {
   const occurred = occurredAt ? ymdInLosAngeles(occurredAt) : "";
   const today = ymdInLosAngeles(now);
   const diff = dayDiffYmd(today, occurred);
-  if (diff === 1) return "어제";
-  if (diff >= 2 && diff <= 7) return "저번주";
-  if (diff > 7) return "예전";
+  if (diff === 1) return "day_before";
+  if (diff >= 2 && diff <= 7) return "within_week";
+  if (diff > 7) return "older";
   return "omit";
 }
 
 export function writerLivedTimeLines(occurredAt: string | undefined, now: Date = new Date()): string[] {
   const phrase = livedTimePhrase(occurredAt, now);
-  if (phrase === "어제") return ["LIVED TIME: 어제. Do not write 3일 전 / 4일 전."];
-  if (phrase === "저번주") return ["LIVED TIME: 저번주. Do not write 어제 or N일 전."];
-  if (phrase === "예전") return ["LIVED TIME: 예전에 / 그전에 (보편화). Do not write 어제, 저번주, or N일 전."];
-  return ["LIVED TIME: no calendar-day word. Do not write N일 전."];
+  const infer =
+    "Infer Korean recency from this bound. Do not copy a time-word from this prompt. Do not write N일 전.";
+  if (phrase === "day_before") {
+    return [`LIVED TIME BOUND: previous calendar day in America/Los_Angeles. ${infer}`];
+  }
+  if (phrase === "within_week") {
+    return [`LIVED TIME BOUND: a few days before now, still inside the past week. ${infer}`];
+  }
+  if (phrase === "older") {
+    return [`LIVED TIME BOUND: older than a week. Infer as past, not this week. ${infer}`];
+  }
+  return [`LIVED TIME BOUND: no dated recency. ${infer}`];
 }
 
 export function hasForbiddenDayCountPhrase(text: string): boolean {

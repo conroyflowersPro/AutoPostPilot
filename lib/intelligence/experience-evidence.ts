@@ -317,4 +317,4 @@ export function experienceCandidateToSeedFields(c: ExperienceCandidate): Record<
 }
 
 export const HISTORICAL_FRAMING_GUARD =
-  "HISTORICAL EXPERIENCE: You MUST frame as past (예전에 / 그 버전을 쓰던 당시에는 / 지금과 비교하면 당시에는). Never state past software/UI/price/policy as current fact.";
+  "HISTORICAL EXPERIENCE: Infer a past frame from the dated evidence. Do not copy a time-word from this prompt. Never state past software/UI/price/policy as current fact.";

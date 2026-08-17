@@ -34,18 +34,23 @@ ok("P3. official recent search excludes operator handle", /search\/recent/.test(
 ok("P4. public seeds owner OTHER + viral", /owner: "OTHER"/.test(cr) && /viral: true/.test(cr) && /owner: "OTHER"/.test(job));
 ok("P5. lived seeds from Analytics plus sync-gap originals", /analyticsLivedSeeds/.test(lived) && /syncGapLivedSeeds/.test(lived) && /BUNDLED_X_ANALYTICS_WINDOW/.test(lived) && !/ARCHIVE_EXPERIENCE_FALLBACK/.test(job));
 ok("P6. Planner does not extract analytics seeds", /applyNewestLivedExperienceAssignments/.test(job) && /EXPERIENCE slots take ANALYTICS_LIVED/.test(planner));
-ok("P7. Writer OTHER inhabit ban + lived time buckets", /PUBLIC VIRAL/.test(wr) && /writerLivedTimeLines/.test(wr) && /3일 전/.test(own));
+ok("P7. Writer OTHER inhabit ban + lived time buckets", /PUBLIC VIRAL/.test(wr) && /writerLivedTimeLines/.test(wr) && /3일 전/.test(own) === false && /N일 전/.test(own) && /Infer Korean recency/.test(own) && !/LIVED TIME: 저번주/.test(own) && !/요즘 도는/.test(wr) && !/Write .*저번주/.test(wr));
 ok("P8. Judge N일 전 and other viral inhabit", /lived_time_day_count/.test(judge) && /other_viral_inhabited/.test(judge));
 ok("P9. job starts expand before strategy", /step: "expand"/.test(job) && /Seed Generator 공개 X 탐색/.test(job));
 ok("P10. x_search date window on seed generator", /from_date/.test(cr) && /api\.x\.ai\/v1\/responses/.test(cr));
 
 const ownUrl = pathToFileURL(path.join(ROOT, "supabase/functions/weekly-plan/seed-ownership.ts")).href;
-const { livedTimePhrase, applyNewestLivedExperienceAssignments, hasForbiddenDayCountPhrase } = await import(ownUrl);
+const { livedTimePhrase, writerLivedTimeLines, applyNewestLivedExperienceAssignments, hasForbiddenDayCountPhrase } = await import(ownUrl);
 
 const now = new Date("2026-08-16T20:00:00.000Z");
-ok("P11. yesterday → 어제", livedTimePhrase("2026-08-15T20:00:00.000Z", now) === "어제");
-ok("P12. 3 days → 저번주 not N일 전", livedTimePhrase("2026-08-13T20:00:00.000Z", now) === "저번주");
-ok("P13. 20 days → 예전", livedTimePhrase("2026-07-27T20:00:00.000Z", now) === "예전");
+ok("P11. yesterday → day_before", livedTimePhrase("2026-08-15T20:00:00.000Z", now) === "day_before");
+ok("P12. 3 days → within_week not a canned 저번주", livedTimePhrase("2026-08-13T20:00:00.000Z", now) === "within_week");
+ok("P13. 20 days → older", livedTimePhrase("2026-07-27T20:00:00.000Z", now) === "older");
+const cannedKo = /어제|저번주|예전|요즘 도는|그 영상/;
+ok("P13b. writer lived-time lines have no canned Korean time words",
+  !cannedKo.test(writerLivedTimeLines("2026-08-15T20:00:00.000Z", now).join(" ")) &&
+  !cannedKo.test(writerLivedTimeLines("2026-08-13T20:00:00.000Z", now).join(" ")) &&
+  !cannedKo.test(writerLivedTimeLines("2026-07-27T20:00:00.000Z", now).join(" ")));
 ok("P14. forbids 3일 전", hasForbiddenDayCountPhrase("3일 전에 식겁") === true);
 
 const ranked = applyNewestLivedExperienceAssignments({

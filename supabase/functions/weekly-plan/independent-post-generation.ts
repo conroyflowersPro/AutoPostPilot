@@ -402,7 +402,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     ...writerBoundaryConstraintLines(ctx),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "first-person is allowed only within supplied evidence" : "do not claim first-person lived experience"),
     s((expBound as any).owner) === "OTHER"
-      ? "PUBLIC VIRAL: circulating scene. Write 요즘 도는 / 그 영상. Never 어제/저번주/예전에 as your life. Never inhabit the found post's I."
+      ? "PUBLIC VIRAL: circulating scene, not your dated life. Infer that it is going around. Never inhabit the found post's I. Do not write N일 전."
       : "",
     experienced && s((expBound as any).occurred_at)
       ? writerLivedTimeLines(String((expBound as any).occurred_at)).join(" ")
