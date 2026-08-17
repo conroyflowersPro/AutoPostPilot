@@ -77,6 +77,8 @@ Do **not** implement until Seung says **반영해** / **넣어** / **이대로**
 
 **Data for seed choice:** 30-day X Analytics. Last-14-day X sync fills holes in that 30-day window. Analytics is primary; sync is the patch, not a second strategy.
 
+**Theories:** `reaction-mechanisms.ts` (M1–M9, viral-post analysis) is **not** the theory layer. DNA learns theories and uses them as **cards**. Which card “works” for this account is unknown — do **not** rank cards by likes/follows. 30d/14d data is to (1) use card **diversity**, (2) pick a card that **fits the seed**, (3) block **frequent repeating patterns**. Complexity/emergence: do not locally optimize a winning card; the week’s quality emerges from varied fit, not from cloning what converted.
+
 **Writer:** writes body only, following DNA instructions. Does not choose seed, role, theory, or schedule.
 
 **Planner:** role absorbed by DNA. No separate Planner strategy/placement job after this ships.
