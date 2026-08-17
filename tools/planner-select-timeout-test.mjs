@@ -17,7 +17,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Planner select timeout (v12.4.2)");
+console.log("Planner select timeout (v12.4.3)");
 ok("S1. select timeout retries once then uses the existing pool",
   /st\.select_timeouts/.test(job) && /기존 Pool로/.test(job) && /fillUnassignedPlannerSlotsFromPool/.test(job));
 ok("S2. same missing fingerprint is not expanded forever",

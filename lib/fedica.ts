@@ -162,7 +162,6 @@ export async function scheduleFedicaPost(params: {
 }): Promise<{ id?: string; success: boolean; raw: any }> {
   const accountId = params.accountId || "Seung4680";
   const body: any = {
-    PipelineId: Number(params.pipelineId) || params.pipelineId,
     Posts: [
       {
         Accounts: [{ Platform: "Twitter", AccountId: accountId }],
@@ -173,6 +172,8 @@ export async function scheduleFedicaPost(params: {
   };
   if (params.dateTime) {
     body.DateTime = params.dateTime;
+  } else {
+    body.PipelineId = Number(params.pipelineId) || params.pipelineId;
   }
   if (params.mediaIds && params.mediaIds.length > 1) {
     body.Posts[0].MediaIds = params.mediaIds;
