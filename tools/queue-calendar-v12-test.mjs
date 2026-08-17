@@ -39,9 +39,9 @@ ok("Q7. queue shows 계획 and 예약 times", /function queueWhen/.test(list) &&
 ok("Q8. queue still lists all written posts", /select\("\*"\)/.test(page) && /작성된 글 전체/.test(page));
 ok("Q9. month calendar on queue home", /QueueMonthCalendar/.test(page) && /수제/.test(cal) && /재게시/.test(cal) && /예약/.test(cal));
 ok("Q10. login does not sync X", !/runXAccountSync/.test(page) && /href="\/api\/x\/sync"/.test(page));
-ok("Q11. shipping 12.5.2", /APP_VERSION = "12.5.2"/.test(ver) && /APP_VERSION = "12.5.2"/.test(ix));
+ok("Q11. shipping 12.5.3", /APP_VERSION = "12.5.3"/.test(ver) && /APP_VERSION = "12.5.3"/.test(ix));
 ok("Q12. booked schedule days merged into month calendar", /mergeBookedScheduleDays/.test(inscribe) && /booked: "예약"/.test(inscribe));
-ok("Q13. calendar 예약 is Fedica-id scheduled only", /fedica_post_id/.test(prov) && /eq\("status", "scheduled"\)/.test(prov));
+ok("Q13. calendar 예약 is scheduled with a time", /eq\("status", "scheduled"\)/.test(prov) && /not\("scheduled_at", "is", null\)/.test(prov));
 
 console.log("========================================");
 console.log(`QUEUE CALENDAR: ${pass} PASS / ${fail} FAIL`);

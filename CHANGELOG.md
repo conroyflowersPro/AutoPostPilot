@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.5.3 — 2026-08-17
+
+- Fedica `/post`는 문서상 `Id`를 줄 수 있지만, 없어도 `Success: true`면 AP는 scheduled로 바꿉니다. 글 ID는 있을 때만 저장합니다
+- 달력 예약은 scheduled + 시각입니다. draft·reviewed는 넣지 않습니다. Fedica를 비웠으면 AP scheduled 탭의 예전 글도 큐에서 지우면 됩니다
+
 ## 12.5.2 — 2026-08-17
 
 - Fedica 예약은 글에 지정된 파이프라인으로 들어가고, 날짜·시각도 같이 보냅니다. 간격은 For You 14:00–22:00 PT, 약 2시간입니다

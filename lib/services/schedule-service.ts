@@ -228,13 +228,13 @@ export async function scheduleOnePost(opts: {
       await sleep(SCHEDULING_CONFIG.retryDelayMs * (attempt + 1));
     }
 
-    if (!published || !providerPostId) {
+    if (!published) {
       const userMsg = /timeout|abort|5\d\d|temporarily/i.test(lastPubErr)
         ? "일시적으로 예약에 실패했습니다. 잠시 후 다시 시도해 주세요."
-        : "예약 등록에 실패했습니다. Fedica 글 ID가 없으면 scheduled로 두지 않습니다.";
+        : "예약 등록에 실패했습니다.";
       await markFailed(supabase, post.id, {
         errorStage: "publish_post",
-        errorInternal: lastPubErr || "missing Fedica Id",
+        errorInternal: lastPubErr,
         errorUser: userMsg,
         attemptCount,
       });
@@ -315,12 +315,11 @@ async function persistScheduled(
     pipelineId?: string;
   }
 ): Promise<boolean> {
-  if (!info.providerPostId) return false;
   const payloads: Record<string, unknown>[] = [
     {
       status: "scheduled",
       scheduled_at: info.scheduledAtISO,
-      fedica_post_id: info.providerPostId,
+      fedica_post_id: info.providerPostId || null,
       pipeline_id: info.pipelineId || null,
       last_error: null,
       error_stage: null,
@@ -331,7 +330,11 @@ async function persistScheduled(
     {
       status: "scheduled",
       scheduled_at: info.scheduledAtISO,
-      fedica_post_id: info.providerPostId,
+      fedica_post_id: info.providerPostId || null,
+    },
+    {
+      status: "scheduled",
+      scheduled_at: info.scheduledAtISO,
     },
   ];
   for (const body of payloads) {
