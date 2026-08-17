@@ -22,12 +22,12 @@ function ok(name, cond) {
   }
 }
 
-console.log("Judge context pass (v12.4.3)");
+console.log("Judge context pass (v12.5.0)");
 ok("J1. seed title mismatch is soft", /seed_title_not_in_prose/.test(judge) && !/hard\.push\("seed_meaning_departure"\)/.test(judge));
 ok("J2. Writer does not hard-fail seed_fidelity_weak", !/reasons\.push\("seed_fidelity_weak"\)/.test(wr));
 ok("J3. bait closer is last sentence", /isEngagementBaitCloser/.test(judge) && /lastSentenceKo/.test(scope));
 ok("J4. jargon hard fail is density 2+", /deepJargonCount\(text\) >= 2/.test(scope) && /expert_jargon_once/.test(judge));
-ok("J5. version 12.4.3", /APP_VERSION = "12.4.3"/.test(ver) && /APP_VERSION = "12.4.3"/.test(ix));
+ok("J5. version 12.5.0", /APP_VERSION = "12.5.0"/.test(ver) && /APP_VERSION = "12.5.0"/.test(ix));
 
 console.log("========================================");
 console.log(`JUDGE CONTEXT: ${pass} PASS / ${fail} FAIL`);

@@ -55,7 +55,7 @@ ok("S9. followJob resumes on any transient drop", /if \(!isTransientEdgeError\(e
 ok("S10. job_start drop polls status then follows", /phase: "job_start"/.test(gen) && /isTransientEdgeError\(e\)/.test(gen) && /다시 눌러 주세요/.test(gen));
 ok("S11. setError uses koreanEdgeError", /setError\(koreanEdgeError\(e\)\)/.test(gen));
 ok("S12. job_status retries 3 times", /phaseName === "job_status" \? 3 : 1/.test(gen));
-ok("S13. version lockstep 12.4.3", /APP_VERSION = "12.4.3"/.test(ver) && /APP_VERSION = "12.4.3"/.test(ix));
+ok("S13. version lockstep 12.5.0", /APP_VERSION = "12.5.0"/.test(ver) && /APP_VERSION = "12.5.0"/.test(ix));
 ok("S14. helper documents iPhone Safari as primary", /iPhone Safari is the primary client/.test(helperSrc));
 ok("S15. Korean timeout copy is kept as-is", koreanEdgeError(new Error("job_tick이 55초 안에 끝나지 않았습니다.")) === "job_tick이 55초 안에 끝나지 않았습니다.");
 

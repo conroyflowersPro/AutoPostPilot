@@ -10,9 +10,13 @@ import { seedCandidatePhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { isFrozenHumorClone } from "./humor-fill.ts";
 import {
   isPublicSeedAdOrBait,
-  PUBLIC_SEED_MIN_LIKES,
   PUBLIC_SEED_MIN_REPLIES,
+  PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS,
 } from "./public-x-seed-search.ts";
+import {
+  deferOverweightDrivingFamily,
+  hasUnseededDrivingBoltOn,
+} from "./situation-diversity.ts";
 import {
   inferPersonalCluster,
   isKoreaOnlySituation,
@@ -153,6 +157,9 @@ function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
   const dimension = clean(x?.dimension, 60) || "PUBLIC_SCENE";
   const observation = clean(x?.observation_or_feeling || x?.point_or_tension, 140);
   const sourceHint = clean(x?.source_hint || x?.viral_hook, 120);
+  if (hasUnseededDrivingBoltOn(situation, observation + " " + sourceHint)) {
+    return { seed: null, reason: "UNSEEDED_DRIVING_BOLT_ON" };
+  }
   const sourceId = clean(x?.source_id || (Array.isArray(x?.evidence_source_ids) ? x.evidence_source_ids[0] : ""), 40);
   const angle = clean(x?.idea_angle_family, 80) || `${cluster}|${dimension}|${i + 1}`;
   return { seed: {
@@ -245,7 +252,7 @@ export async function reasonCreatorSeeds(
 
   const compact = !!args.compactRetry;
   const collectRule =
-    `Collect from public Korean X in the last 7 days. Keep a post if likes >= ${PUBLIC_SEED_MIN_LIKES} OR replies >= ${PUBLIC_SEED_MIN_REPLIES}. Impressions are not a gate. Extract situation + observation_or_feeling + optional source_hint + source_id. Do not judge RETURN/BRIDGE/REACH or editorial type.`;
+    `Collect from public Korean X in the last 14 days. Default keep: replies >= ${PUBLIC_SEED_MIN_REPLIES}. Do not use likes, reposts, or bookmarks as a keep gate. If that pool is short, supplement impressions >= ${PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS} only. Extract one scene + one observation_or_feeling + optional source_hint + source_id. Do not judge RETURN/BRIDGE/REACH or editorial type.`;
   const system = compact
     ? [
       "You collect public X seed material for @Seung4680. Not a strategist. Not a writer.",
@@ -253,7 +260,7 @@ export async function reasonCreatorSeeds(
       collectRule,
       "Return DIRECTION seeds only — never finished posts, never example prose.",
       "Do NOT invent lived experiences. Do NOT copy already_held or recent_published.",
-      "Do not fill from an interest list. Tesla/FSD only if already in the found post.",
+      "Do not fill from an interest list. Tesla/FSD only if already in the found post. Do not bolt charging/Uber/generic driving onto another scene.",
       "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
       "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id. owner OTHER. No scores, rankings, strategy, selection, allocation, or prose outside JSON.",
     ].join("\n")
@@ -265,7 +272,7 @@ export async function reasonCreatorSeeds(
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
     "Do NOT copy DIMENSION labels as the seed body.",
-    "situation is one scene. observation_or_feeling is one observation. Distinct from every other seed this week.",
+    "situation is one scene. observation_or_feeling is one observation. Distinct from every other seed this week. If FSD/driving/parking/intersection is overweight, drop extras.",
     "observation_or_feeling / point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
     "Do not copy already_held_seeds or recent_published_angles.",
     "Do not score Creator fit, Audience fit, performance potential, strategic relevance, or selection priority. Do not rank candidates.",
@@ -292,16 +299,23 @@ export async function reasonCreatorSeeds(
     already_held_seeds: existingAbstract,
     recent_published_angles_avoid_repeat: recent,
     public_search_window: args.searchWindow || null,
-    engagement_gate: { likes_or_more: PUBLIC_SEED_MIN_LIKES, replies_or_more: PUBLIC_SEED_MIN_REPLIES, impressions: "ignored" },
+    engagement_gate: {
+      replies_or_more: PUBLIC_SEED_MIN_REPLIES,
+      impressions_supplement_or_more: PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS,
+      likes: "not a keep gate",
+      reposts: "not a keep gate",
+      bookmarks: "not a keep gate",
+    },
     official_public_posts: (args.officialPublicPosts || []).slice(0, 40).map((p) => ({
       text: clean(p.text, 140),
       created_at: p.created_at || null,
       id: clean((p as any).id, 24) || null,
       likes: Number((p as any).likes) || 0,
       replies: Number((p as any).replies) || 0,
+      impressions: Number((p as any).impressions) || 0,
     })),
     weekly_goal_note:
-      "Return requested_seed_count distinct PUBLIC X scene/observation candidates. owner OTHER. No invented creator experience. No Tesla/FSD unless in the found post.",
+      "Return requested_seed_count distinct PUBLIC X scene/observation candidates. owner OTHER. No invented creator experience. No Tesla/FSD unless in the found post. No charging/Uber bolt-on.",
     requirement:
       "No finished posts. No invented experience. No Return/Bridge/Reach labels. No interest-list fill.",
   });
@@ -381,16 +395,17 @@ export async function reasonCreatorSeeds(
       seeds.push(n);
       if (seeds.length >= requested) break;
     }
+    const diversified = deferOverweightDrivingFamily(seeds);
     const finish = clean(body?.choices?.[0]?.finish_reason, 24);
     return {
       ...base,
       attempted: true,
-      succeeded: seeds.length > 0,
-      seeds,
-      returned: seeds.length,
+      succeeded: diversified.length > 0,
+      seeds: diversified,
+      returned: diversified.length,
       raw_returned: rawList.length,
       reject_reasons,
-      error: seeds.length
+      error: diversified.length
         ? null
         : clean(
           `zero_usable raw=${rawList.length} finish=${finish || "none"} preview=${content.slice(0, 80)}`,

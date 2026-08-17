@@ -24,6 +24,6 @@ mustInclude(helper, "if (params.dateTime)", "legacy helper DateTime path");
 mustInclude(helper, "body.PipelineId = Number(params.pipelineId)", "pipeline only without DateTime");
 
 const ver = readFileSync("lib/version.ts", "utf8");
-mustInclude(ver, 'APP_VERSION = "12.4.3"', "version 12.4.3");
+mustInclude(ver, 'APP_VERSION = "12.5.0"', "version 12.5.0");
 
 console.log("fedica-schedule-interval-test: PASS");

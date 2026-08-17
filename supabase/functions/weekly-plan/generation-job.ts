@@ -42,6 +42,11 @@ import {
   placeableSeedCount,
 } from "./seed-scope.ts";
 import {
+  canPlaceAfterPrevious,
+  isDrivingFamilyCluster,
+  situationCluster,
+} from "./situation-diversity.ts";
+import {
   isHumorFillSeed,
   isFrozenHumorClone,
 } from "./humor-fill.ts";
@@ -1079,8 +1084,8 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const candidates: any[] = [...(st.gated || []), ...(gated.passed || [])];
   const compact = !!st.compact_next || !!targetedExploration;
   const windows = publicSearchWindows();
-  const searchWindow = windows.near;
-  st.public_search_half = "near7";
+  const searchWindow = windows.last14;
+  st.public_search_half = "last14";
   const token = await loadEdgeXAccessToken(supabase);
   const officialPublicPosts = await fetchOfficialPublicPosts({ accessToken: token, maxResults: 100 });
   const xaiRes = await expandSeedSupplyWithXai({
@@ -2035,6 +2040,14 @@ async function legacyLocalSelectUnused(supabase: any, row: any) {
       const personal = isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || "")) ||
         mode === "EXPERIENCE";
       if (!personal && pickDayForMass(outDays, postsPerDay, MASS_PER_DAY_MAX) < 0) continue;
+      const prev = selectedWeekly[selectedWeekly.length - 1];
+      if (prev && !canPlaceAfterPrevious({
+        nextSubject: String(s.concrete_subject || ""),
+        nextObservation: String(s.point_or_tension || ""),
+        prevSubject: String(prev.concrete_subject || ""),
+        prevObservation: String(prev.point_or_tension || ""),
+        dayDrivingCount: 0,
+      })) continue;
       picked = s;
       pool.splice(i, 1);
       break;
@@ -2052,7 +2065,18 @@ async function legacyLocalSelectUnused(supabase: any, row: any) {
         const n = outDays[d].posts.filter(
           (p) => majorKey(p.cluster, p.concrete_subject) === majorKey(picked!.cluster, picked!.concrete_subject),
         ).length;
-        const score = n * 10 + outDays[d].posts.length;
+        const drivingN = outDays[d].posts.filter((p) =>
+          isDrivingFamilyCluster(situationCluster(String(p.concrete_subject || ""))),
+        ).length;
+        const last = outDays[d].posts[outDays[d].posts.length - 1];
+        const placeOk = canPlaceAfterPrevious({
+          nextSubject: String(picked!.concrete_subject || ""),
+          nextObservation: String(picked!.point_or_tension || ""),
+          prevSubject: last ? String(last.concrete_subject || "") : undefined,
+          prevObservation: last ? String(last.point_or_tension || "") : undefined,
+          dayDrivingCount: drivingN,
+        });
+        const score = (placeOk ? 0 : 50) + n * 10 + outDays[d].posts.length;
         if (score < bestScore) {
           bestScore = score;
           bestDay = d;

@@ -17,7 +17,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("Expand unstick (v12.4.3)");
+console.log("Expand unstick (v12.5.0)");
 ok("U1. pre-strategy pool target is one public batch, not week-size 38",
   /if \(required <= 0\) return EXPAND_BATCH/.test(job) &&
   !/const base = required > 0 \? required : MIN_WEEKLY_SLOTS/.test(job));
