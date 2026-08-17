@@ -74,7 +74,7 @@ choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH from **data** (no
 
 **RETURN/BRIDGE/REACH:** decided on kept seeds from 30-day Analytics + 14-day sync fill. Collections is not called.
 
-**Writing theories:** xAI Collections, server search only (`POST /v1/documents/search`, hybrid, `limit` 3, one query per slot). Do **not** give Grok `collections_search` as a tool. Agent승 reinterprets/mixes cards internally. **Never send theory cards or theory names to Writer.** Writer gets **conclusions only** — designed form (what to close, what structure, what 말투 bounds) so Writer executes a designed post, not free creation.
+**Collections doc:** one file `architecture/agent-seung-theory-collection.md` (9 theories after one-by-one operator agreement). Empty until each theory is discussed. Writer never sees it.
 
 **Cost:** operating structure is prompt. Collections only when Agent승 is extracting Writer conclusions. Skip: volume lock, Judge, clock-only ticks, unset `XAI_THEORY_COLLECTION_ID`.
 
