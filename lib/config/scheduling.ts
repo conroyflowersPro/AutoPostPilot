@@ -16,7 +16,7 @@ export const SCHEDULING_CONFIG = {
 
   /** Delays (ms) */
   retryDelayMs: 800,
-  providerTimeoutMs: 25_000,
+  providerTimeoutMs: 15_000,
 
   /** Media limits (bytes) — soft guards before provider */
   maxImageBytes: 15 * 1024 * 1024,

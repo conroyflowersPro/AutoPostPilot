@@ -5,7 +5,7 @@ import { scheduleOnePost } from "@/lib/services/schedule-service";
 import { computeKRBatchStartISO } from "@/lib/schedule";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
-export const maxDuration = 26;
+export const maxDuration = 60;
 
 /** Single-post schedule — same core as batch-schedule. */
 export async function POST(req: NextRequest) {

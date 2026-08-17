@@ -39,6 +39,7 @@ const ORIGIN_COLOR: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "draft",
+  APPROVED: "reviewed",
   SCHEDULED: "scheduled",
   PUBLISHED: "published",
   GENERATED: "generated",

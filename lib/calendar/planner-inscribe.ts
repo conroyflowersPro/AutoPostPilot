@@ -4,7 +4,7 @@
  * Source is the last 「지금 동기화」 rows, never a login fetch and never leftover drafts.
  */
 
-export type CalendarKindKey = "handmade" | "ap" | "quote" | "repost";
+export type CalendarKindKey = "handmade" | "ap" | "quote" | "repost" | "booked";
 
 export type CalendarKindCount = {
   key: CalendarKindKey;
@@ -31,6 +31,7 @@ const KIND_LABEL: Record<CalendarKindKey, string> = {
   ap: "AP",
   quote: "인용",
   repost: "재게시",
+  booked: "예약",
 };
 
 const AP_CLASS = /AP_PIPELINE|FEDICA_AUTO|AUTOPOST|GENERATED/;
@@ -123,7 +124,7 @@ export function inscribeMonthFromActivities(
     if (!key.startsWith(prefix)) continue;
     const kind = classifySyncedAction(row);
     if (!kind) continue;
-    const cur = bag.get(key) || { handmade: 0, ap: 0, quote: 0, repost: 0 };
+    const cur = bag.get(key) || { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
     cur[kind] += 1;
     bag.set(key, cur);
   }
@@ -135,4 +136,35 @@ export function inscribeMonthFromActivities(
     if (kinds.length) days.push({ date, kinds });
   }
   return days;
+}
+
+/** Upcoming AP posts that already have a wall-clock time. */
+export function mergeBookedScheduleDays(
+  days: InscribedDay[],
+  rows: { scheduled_at?: string | null }[],
+  year: number,
+  month1to12: number,
+): InscribedDay[] {
+  const prefix = `${year}-${String(month1to12).padStart(2, "0")}-`;
+  const bag = new Map<string, Record<CalendarKindKey, number>>();
+  for (const d of days) {
+    const cur = { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
+    for (const k of d.kinds) cur[k.key] = k.n;
+    bag.set(d.date, cur);
+  }
+  for (const row of rows || []) {
+    const key = ptDateKey(String(row.scheduled_at || ""));
+    if (!key.startsWith(prefix)) continue;
+    const cur = bag.get(key) || { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
+    cur.booked += 1;
+    bag.set(key, cur);
+  }
+  const out: InscribedDay[] = [];
+  for (const [date, counts] of [...bag.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const kinds: CalendarKindCount[] = (Object.keys(KIND_LABEL) as CalendarKindKey[])
+      .filter((k) => counts[k] > 0)
+      .map((k) => ({ key: k, label: KIND_LABEL[k], n: counts[k] }));
+    if (kinds.length) out.push({ date, kinds });
+  }
+  return out;
 }

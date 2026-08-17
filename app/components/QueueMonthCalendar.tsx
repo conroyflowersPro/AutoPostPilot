@@ -53,7 +53,7 @@ export default function QueueMonthCalendar(props: {
         </div>
       </div>
       <p className="mb-3 text-[11px] text-zinc-500">
-        Planner가 「지금 동기화」 기록만 기입합니다. 수제·AP·인용·재게시는 그날 있는 종류만 숫자로 나옵니다. 큐에서 지운 초안은 여기 없습니다.
+        Planner가 「지금 동기화」 기록과, 큐에서 시각이 잡힌 예약을 기입합니다. 수제·AP·인용·재게시는 그날 있는 종류만 숫자로 나옵니다.
       </p>
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-zinc-500">
         {WEEKDAYS.map((w) => (
@@ -88,7 +88,7 @@ export default function QueueMonthCalendar(props: {
       {lastSyncAt ? (
         <p className="mt-2 text-[10px] text-zinc-600">마지막 동기화 {lastSyncAt}</p>
       ) : (
-        <p className="mt-2 text-[10px] text-zinc-600">동기화 전이면 달력은 비어 있습니다.</p>
+        <p className="mt-2 text-[10px] text-zinc-600">동기화 전이면 게시 숫자는 비어 있고, 예약만 보일 수 있습니다.</p>
       )}
     </section>
   );

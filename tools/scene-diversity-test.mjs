@@ -24,7 +24,7 @@ function situationCluster(text) {
   return "OTHER";
 }
 
-console.log("Scene diversity (v12.5.0)");
+console.log("Scene diversity (v12.5.1)");
 const src = read("supabase/functions/weekly-plan/situation-diversity.ts");
 ok("C1. FSD vs parking vs other lockstep",
   situationCluster("FSD가 교차로에서") === "FSD" &&
@@ -62,7 +62,7 @@ ok("C9. Creator slots + Planner attach diversity",
   /consecutive slots must not share the same situation cluster/.test(slots) &&
   /Do not freeze RETURN\/BRIDGE share/.test(slots) &&
   /diversifyAssignments/.test(planner));
-ok("C10. version 12.5.0", /APP_VERSION = "12.5.0"/.test(read("lib/version.ts")));
+ok("C10. version 12.5.1", /APP_VERSION = "12.5.1"/.test(read("lib/version.ts")));
 
 console.log("========================================");
 console.log(`SCENE DIVERSITY: ${pass} PASS / ${fail} FAIL`);

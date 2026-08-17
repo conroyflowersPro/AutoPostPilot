@@ -36,9 +36,10 @@ ok("Q5. sync is not all USER_DIRECT", !/systemOriginClass: "USER_DIRECT"/.test(s
 ok("Q6. evidence uses this sync's origin", /system_origin_class: keptOrigin/.test(evidence) === false);
 ok("Q7. queue shows 계획 and 예약 times", /function queueWhen/.test(list) && /kind: "예약"/.test(list) && /kind: "계획"/.test(list) && /시각 없음/.test(list));
 ok("Q8. queue still lists all written posts", /select\("\*"\)/.test(page) && /작성된 글 전체/.test(page));
-ok("Q9. month calendar on queue home", /QueueMonthCalendar/.test(page) && /수제/.test(cal) && /재게시/.test(cal));
+ok("Q9. month calendar on queue home", /QueueMonthCalendar/.test(page) && /수제/.test(cal) && /재게시/.test(cal) && /예약/.test(cal));
 ok("Q10. login does not sync X", !/runXAccountSync/.test(page) && /href="\/api\/x\/sync"/.test(page));
-ok("Q11. shipping 12.5.0", /APP_VERSION = "12.5.0"/.test(ver) && /APP_VERSION = "12.5.0"/.test(ix));
+ok("Q11. shipping 12.5.1", /APP_VERSION = "12.5.1"/.test(ver) && /APP_VERSION = "12.5.1"/.test(ix));
+ok("Q12. booked schedule days merged into month calendar", /mergeBookedScheduleDays/.test(inscribe) && /booked: "예약"/.test(inscribe));
 
 console.log("========================================");
 console.log(`QUEUE CALENDAR: ${pass} PASS / ${fail} FAIL`);

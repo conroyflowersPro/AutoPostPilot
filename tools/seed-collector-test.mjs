@@ -28,7 +28,7 @@ function meetsPrimary(replies) {
   return Number(replies || 0) >= 20;
 }
 
-console.log("Seed collector (v12.5.0)");
+console.log("Seed collector (v12.5.1)");
 ok("S1. replies 20 primary; impressions 50k only as supplement",
   /PUBLIC_SEED_MIN_REPLIES = 20/.test(pub) && /PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS = 50_000/.test(pub) &&
   /Do not use likes, reposts, or bookmarks/.test(dna) && meetsPrimary(20) && !meetsPrimary(19));
@@ -48,8 +48,8 @@ ok("S6. official search filters replies, ads, short, RT",
   /isContextlessShort/.test(pub) && /isRetweetHeavy/.test(pub));
 ok("S7. job public search is 14 days",
   /st.public_search_half = "last14"/.test(job) && /PUBLIC_SEED_WINDOW_DAYS = 14/.test(dna));
-ok("S8. version 12.5.0",
-  /"version": "12.5.0"/.test(pkg) && /APP_VERSION = "12.5.0"/.test(ver) && /APP_VERSION = "12.5.0"/.test(ix));
+ok("S8. version 12.5.1",
+  /"version": "12.5.1"/.test(pkg) && /APP_VERSION = "12.5.1"/.test(ver) && /APP_VERSION = "12.5.1"/.test(ix));
 
 console.log("========================================");
 console.log(`SEED COLLECTOR: ${pass} PASS / ${fail} FAIL`);
