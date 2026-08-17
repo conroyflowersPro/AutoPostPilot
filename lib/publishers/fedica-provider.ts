@@ -7,9 +7,21 @@ import type {
 } from "./types";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
+export function formatFedicaDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`invalid scheduledAtISO: ${iso}`);
+  }
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 /**
  * Fedica Publishing Provider.
  * Keeps existing Fedica media + post API behavior; isolates endpoints from ScheduleService.
+ *
+ * Specific DateTime and PipelineId must not be sent together. PipelineId makes
+ * Fedica ignore DateTime and fill the pipeline's next slot (often "now"), so
+ * batch schedule stacks at the same minute.
  */
 export class FedicaProvider implements PublisherProvider {
   readonly name = "fedica";
@@ -44,9 +56,8 @@ export class FedicaProvider implements PublisherProvider {
       postBody.MediaId = input.mediaIds;
     }
 
-    const fedicaBody = {
-      PipelineId: Number(input.pipelineId) || 42303,
-      DateTime: input.scheduledAtISO,
+    const fedicaBody: Record<string, unknown> = {
+      DateTime: formatFedicaDateTime(input.scheduledAtISO),
       Posts: [postBody],
     };
 
