@@ -81,11 +81,11 @@ export function inferPersonalCluster(text: string, cluster?: string): string {
   const c = String(cluster || "").toUpperCase();
   if ((PERSONAL_CLUSTERS as readonly string[]).includes(c)) return c;
   const t = String(text || "").toLowerCase();
-  if (/fsd|hw3|v14|오토파일럿|자율/.test(t)) return "FSD";
+  if (/fsd|hw3|v14|오토파일럿/.test(t)) return "FSD";
   if (/cybertruck|사이버트럭/.test(t)) return "CYBERTRUCK";
   if (/lafc|축구|손흥민|\bbmo\b/.test(t)) return "LAFC";
   if (/게임|스팀|\bsteam\b|매치메이킹|큐 대기/.test(t)) return "GAMING";
-  if (/테슬라|tesla|\bgrok\b|그록|충전|슈퍼차저|supercharger/.test(t)) return "TESLA";
+  if (/테슬라|tesla/.test(t)) return "TESLA";
   return c;
 }
 

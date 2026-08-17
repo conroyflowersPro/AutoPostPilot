@@ -5,11 +5,15 @@
  * Output = direction seeds only (no finished post prose).
  */
 import { isUsableKeywordSubject, subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
-import { creatorDnaBlock } from "./engine-dna.ts";
+import { seedCollectorBounds } from "./engine-dna.ts";
 import { seedCandidatePhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { isFrozenHumorClone } from "./humor-fill.ts";
 import {
-  buildOpenSlots,
+  isPublicSeedAdOrBait,
+  PUBLIC_SEED_MIN_LIKES,
+  PUBLIC_SEED_MIN_REPLIES,
+} from "./public-x-seed-search.ts";
+import {
   inferPersonalCluster,
   isKoreaOnlySituation,
   isPersonalInterestSubject,
@@ -18,7 +22,7 @@ import {
   type OpenSeedSlot,
 } from "./seed-scope.ts";
 
-export const CREATOR_SEED_REASONING_VERSION = "creator_seed_reasoning_v2_inferred";
+export const CREATOR_SEED_REASONING_VERSION = "creator_seed_collector_v1";
 
 export type ViralCandidate = {
   text: string;
@@ -65,7 +69,7 @@ export type CreatorSeedReasoningResult = {
   raw_returned: number;
   reject_reasons: Record<string, number>;
   version: string;
-  used_creator_dna: true;
+  used_creator_dna: false;
   used_dimension_registry_as_seed_body: false;
 };
 
@@ -127,50 +131,54 @@ function seedListFromParsed(parsed: any): any[] {
 type NormalizeSeedResult = { seed: ConcreteSeed | null; reason?: string };
 
 function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
-  const subject = clean(x?.concrete_subject, 100);
-  if (!isUsableKeywordSubject(subject)) return { seed: null, reason: "WEAK_SUBJECT" };
+  const situation = clean(x?.situation || x?.concrete_subject, 100);
+  if (!isUsableKeywordSubject(situation)) return { seed: null, reason: "WEAK_SUBJECT" };
+  if (isPublicSeedAdOrBait(situation)) return { seed: null, reason: "AD_OR_BAIT" };
   // Reject invented lived-experience claims at seed level
-  if (/어제\s*내가|오늘\s*직접|방금\s*테스트했/i.test(subject)) {
+  if (/어제\s*내가|오늘\s*직접|방금\s*테스트했/i.test(situation)) {
     return { seed: null, reason: "INVENTED_LIVED_CLAIM" };
   }
-  if (/관찰·판단 축|차원 기반 신규 각도/.test(subject)) {
+  if (/관찰·판단 축|차원 기반 신규 각도/.test(situation)) {
     return { seed: null, reason: "ENGINE_LABEL_BODY" };
   }
-  if (isFrozenHumorClone(subject)) return { seed: null, reason: "FROZEN_CLONE" };
-  if (isSlotTypeLabel(subject)) return { seed: null, reason: "SLOT_LABEL_BODY" };
+  if (isFrozenHumorClone(situation)) return { seed: null, reason: "FROZEN_CLONE" };
+  if (isSlotTypeLabel(situation)) return { seed: null, reason: "SLOT_LABEL_BODY" };
+  if (/^(RETURN|BRIDGE|REACH)$/i.test(situation)) {
+    return { seed: null, reason: "ROLE_LABEL_BODY" };
+  }
+  if (/사회적 증명|인지 부조화|호기심 공백|단순 노출 효과|감정 전염/.test(situation + " " + clean(x?.observation_or_feeling || x?.point_or_tension, 80))) {
+    return { seed: null, reason: "THEORY_LABEL_BODY" };
+  }
   const cluster = clean(x?.cluster, 40) || "OBSERVATION";
-  const dimension = clean(x?.dimension, 60) || "CREATOR_REASONED";
+  const dimension = clean(x?.dimension, 60) || "PUBLIC_SCENE";
+  const observation = clean(x?.observation_or_feeling || x?.point_or_tension, 140);
+  const sourceHint = clean(x?.source_hint || x?.viral_hook, 120);
+  const sourceId = clean(x?.source_id || (Array.isArray(x?.evidence_source_ids) ? x.evidence_source_ids[0] : ""), 40);
   const angle = clean(x?.idea_angle_family, 80) || `${cluster}|${dimension}|${i + 1}`;
-  const entry = clean(x?.entry_direction, 80);
-  const wording = clean(x?.wording_note, 80);
-  const tension = clean(x?.point_or_tension, 140) ||
-    (entry ? `진입: ${entry}` : "관찰·판단 각도");
   return { seed: {
     seed_id: `creator-reason-${i + 1}`,
     cluster,
     dimension,
-    concrete_subject: subject,
-    subject_signature: subjectSignature(subject),
-    point_or_tension: tension,
-    topic: clean(x?.topic, 60) || cluster,
-    subtopic: clean(x?.subtopic, 80) || dimension,
+    concrete_subject: situation,
+    subject_signature: subjectSignature(situation),
+    point_or_tension: observation || "관찰 한 줄",
+    topic: cluster,
+    subtopic: dimension,
     primary_source: "PUBLIC_X",
-    supporting_sources: ["CREATOR_DNA", "PUBLIC_X_SEARCH", "XAI_REASONING"].concat(
-      wording ? ["WORDING_INTENT"] : [],
-    ),
-    evidence_source_ids: [],
+    supporting_sources: ["PUBLIC_X_SEARCH"],
+    evidence_source_ids: sourceId ? [sourceId] : [],
     creator_evidence_available: false,
     experience_required: false,
     source_type: "PUBLIC_X",
     owner: "OTHER",
     seed_source: "PUBLIC_X",
     viral: true,
-    found_form: String(x?.found_form || "").toUpperCase() === "EXPERIENTIAL" || /내가|어제|직접 해/.test(subject)
+    found_form: String(x?.found_form || "").toUpperCase() === "EXPERIENTIAL" || /내가|어제|직접 해/.test(situation)
       ? "EXPERIENTIAL"
       : "OTHER",
-    viral_hook: clean(x?.viral_hook, 120),
+    viral_hook: sourceHint,
     claim_types: ["OBSERVATION"],
-    inference_type: "CREATOR_REASONED_DIRECTION",
+    inference_type: "PUBLIC_SCENE_COLLECTED",
     grounding_status: "GROUNDED",
     grounding_reasons: ["DIRECTION_SEED_NO_FINISHED_PROSE", "NO_INVENTED_LIVED_EXPERIENCE"],
     idea_angle_family: angle,
@@ -192,8 +200,6 @@ function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
     creator_opinion: [],
     status: "ELIGIBLE",
     source_role: "SEED_SOURCE",
-    ...(entry ? { entry_direction: entry } : {}),
-    ...(wording ? { wording_note: wording } : {}),
   } as ConcreteSeed };
 }
 
@@ -214,7 +220,7 @@ export async function reasonCreatorSeeds(
     raw_returned: 0,
     reject_reasons: {},
     version: CREATOR_SEED_REASONING_VERSION,
-    used_creator_dna: true,
+    used_creator_dna: false,
     used_dimension_registry_as_seed_body: false,
   };
   if (!requested) return base;
@@ -238,96 +244,66 @@ export async function reasonCreatorSeeds(
   const intent = clean(args.explicitCreatorIntent, 180);
 
   const compact = !!args.compactRetry;
-  const openSlots = (args.openSlots?.length
-    ? args.openSlots
-    : buildOpenSlots({
-      needed: requested,
-      existing: args.existing,
-    })).slice(0, requested);
-  const slotFillRule =
-    "open_slots are candidate-discovery cells, not final publish slots. Fill each concrete_subject by exploring from Creator DNA bounds. Leave no cell empty. Do not copy slot_kind, cluster_bound, or cluster enum names into concrete_subject. Do not write example sentences or sample phrases. Infer a NEW situation or usable short keyword per cell.";
+  const collectRule =
+    `Collect from public Korean X in the last 7 days. Keep a post if likes >= ${PUBLIC_SEED_MIN_LIKES} OR replies >= ${PUBLIC_SEED_MIN_REPLIES}. Impressions are not a gate. Extract situation + observation_or_feeling + optional source_hint + source_id. Do not judge RETURN/BRIDGE/REACH or editorial type.`;
   const system = compact
     ? [
-      "You infer X direction seeds for @Seung4680 (Korean track, California life).",
+      "You collect public X seed material for @Seung4680. Not a strategist. Not a writer.",
+      seedCollectorBounds(),
+      collectRule,
       "Return DIRECTION seeds only — never finished posts, never example prose.",
-      "Infer NEW situations from Creator DNA interest domains this run. Mix the domains. Do not rotate a canned list.",
-      "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
-      "Do NOT copy DIMENSION labels. Do NOT emit a canned keyword list. Do not copy already_held or recent_published.",
-      slotFillRule,
-      "Each concrete_subject is a distinct writable situation or a usable short Korean/English keyword, different from already_held and recent_published.",
-      "Explore Creator interests and adjacent public situations. Final selection—not candidate generation—applies the daily public-topic mix.",
+      "Do NOT invent lived experiences. Do NOT copy already_held or recent_published.",
+      "Do not fill from an interest list. Tesla/FSD only if already in the found post.",
       "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
-      "Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, and wording_note. No scores, rankings, strategy, selection, allocation, or prose outside JSON.",
+      "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id. owner OTHER. No scores, rankings, strategy, selection, allocation, or prose outside JSON.",
     ].join("\n")
     : [
-    "You are the seed-reasoning layer for X account @Seung4680 (Korean track).",
+    "You collect public X seed material for @Seung4680. Not a strategist. Not a writer.",
     seedCandidatePhilosophyBlock(),
+    seedCollectorBounds(),
+    collectRule,
     "Return seed DIRECTIONS only — never finished posts, never example prose paragraphs. Never store raw chain-of-thought.",
-    "Explore broadly within Creator DNA interests, adjacent areas, and plausible new expansion areas. Do not decide which candidate is strategically good; Planner owns that.",
     "Do NOT invent lived experiences, drives, tests, prices, dates, or private events.",
-    "Do NOT copy DIMENSION labels as the seed body. Do NOT rotate a fixed 8-axis template list.",
-    "Do not dump CLUSTER + DIMENSION labels as concrete_subject. Code drops registry-label bodies.",
-    slotFillRule,
-    "Each concrete_subject names a writable situation OR a short keyword the writer may infer from. Distinct from every other seed this week.",
-    "A short keyword subject is a thinking material, not yet the post topic. Do not auto-promote a keyword into the published subject.",
-    "point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
-    "Thin or missing learned evidence is expected at cold start. Still return requested_seed_count seeds. Do not return an empty seeds array because evidence is incomplete.",
-    "Explore current interests, adjacent areas, and plausible new expansion areas without deciding strategic value.",
-    "Creator lives in California. Seeds are Korean words about US/CA daily life. Do not invent Korea-only civic or housing situations the creator does not live. Code drops those.",
-    "Candidate generation has no topic, domain, Editorial Mode, or personal/public quota. Do not invent lived episodes.",
-    "Do not copy already_held_seeds or recent_published_angles. Do not rotate last week's subjects. Infer a NEW situation each seed.",
+    "Do NOT copy DIMENSION labels as the seed body.",
+    "situation is one scene. observation_or_feeling is one observation. Distinct from every other seed this week.",
+    "observation_or_feeling / point_or_tension is an optional angle, not a required snag. Do not invent conflict. Do not invent lived experience.",
+    "Do not copy already_held_seeds or recent_published_angles.",
     "Do not score Creator fit, Audience fit, performance potential, strategic relevance, or selection priority. Do not rank candidates.",
-    "this_run_note and planner_exploration_direction are exploration bounds only. They do not authorize selection or allocation.",
-    "When Planner has locked the week, requested_seed_count is the Planner count plus a small week buffer. Return that many candidates. planner_slot_intents describe locked cells so exploration can cover them. They are not a per-mode production quota.",
-    "When planner_exploration_direction is set, explore THAT field only. Return requested_seed_count distinct candidates in that field (a batch, never a single seed). Do not refill unrelated types or restart the whole week pool.",
-    "Search public X. Infer search interests from Creator DNA this run. Do not freeze an interest list. Split coverage across those interests.",
-    "Every public seed must include a viral hook from circulating posts in the given date window. Experience-shaped found posts are owner OTHER — never the creator's lived episode.",
-    "If a found post is written as lived experience, set found_form EXPERIENTIAL and concrete_subject as a third-person circulating scene, not 내가/어제 내.",
-    "Do not search or emit the operator's own posts. Do not copy already_held or recent_published.",
-    "Lived evidence seeds are not your job in this call. Never clone the same content.",
+    "planner_exploration_direction is a field bound only. It does not authorize selection, allocation, or type labels.",
+    "If a found post is written as lived experience, set found_form EXPERIENTIAL and situation as a third-person circulating scene, not 내가/어제 내.",
+    "Do not search or emit the operator's own posts.",
     "Lived evidence seeds are not your job in this call.",
-    'Output strict JSON with a seeds array. Each Seed has cluster, dimension, concrete_subject, topic, subtopic, point_or_tension, idea_angle_family, entry_direction, wording_note, viral_hook, found_form. owner is always OTHER. No scores, rankings, strategy, selection, allocation, or prose outside JSON.',
+    "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id, found_form. owner is always OTHER. No scores, rankings, strategy, selection, allocation, growth_role, editorial_mode, or prose outside JSON.",
   ].join("\n");
 
-  const plannerSlots = (args.plannerSlotIntents || []).slice(0, 56).map((slot) => ({
-    slot_id: clean(slot.slot_id, 40),
-    day_offset: Number(slot.day_offset) || 0,
-    editorial_mode: clean(slot.editorial_mode, 40),
-    planner_intent: clean(slot.planner_intent, 180),
-    strategic_role: clean(slot.strategic_role, 80),
-  }));
   const user = compact
     ? JSON.stringify({
       requested_seed_count: requested,
-      planner_requested_count: args.plannerRequestedCount || requested,
-      planner_slot_intents: plannerSlots.length ? plannerSlots : null,
-      open_slots: openSlots,
-      creator_dna: creatorDnaBlock(),
       already_held_seeds: existingAbstract,
       recent_published_angles_avoid_repeat: recent,
       planner_exploration_direction: clean(args.explorationDirection, 240) || null,
       weekly_goal_note:
-        "Fill every open_slot.concrete_subject by inference. Return requested_seed_count seeds. No frozen keyword list. No last-week clones. No invented experience. No example sentences.",
+        "Collect situation + observation only. No frozen keyword list. No last-week clones. No invented experience. No role labels.",
     })
     : JSON.stringify({
     requested_seed_count: requested,
-    planner_requested_count: args.plannerRequestedCount || requested,
-    planner_slot_intents: plannerSlots.length ? plannerSlots : null,
-    open_slots: openSlots,
-    creator_dna: creatorDnaBlock(),
     this_run_note_overlay_only: intent || null,
     planner_exploration_direction: clean(args.explorationDirection, 240) || null,
     already_held_seeds: existingAbstract,
     recent_published_angles_avoid_repeat: recent,
     public_search_window: args.searchWindow || null,
+    engagement_gate: { likes_or_more: PUBLIC_SEED_MIN_LIKES, replies_or_more: PUBLIC_SEED_MIN_REPLIES, impressions: "ignored" },
     official_public_posts: (args.officialPublicPosts || []).slice(0, 40).map((p) => ({
       text: clean(p.text, 140),
       created_at: p.created_at || null,
+      id: clean((p as any).id, 24) || null,
+      likes: Number((p as any).likes) || 0,
+      replies: Number((p as any).replies) || 0,
     })),
     weekly_goal_note:
-      "Return requested_seed_count distinct PUBLIC X candidates. Infer interests from Creator DNA this run. Attach viral_hook on every seed. owner OTHER. No invented creator experience.",
+      "Return requested_seed_count distinct PUBLIC X scene/observation candidates. owner OTHER. No invented creator experience. No Tesla/FSD unless in the found post.",
     requirement:
-      "Fill typed empty cells by inference. No example sentences. No finished posts. No invented experience. No template rotation. No registry-label bodies.",
+      "No finished posts. No invented experience. No Return/Bridge/Reach labels. No interest-list fill.",
   });
 
   try {

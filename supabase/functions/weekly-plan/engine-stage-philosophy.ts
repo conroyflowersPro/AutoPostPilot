@@ -6,10 +6,10 @@ export const STAGE_PHILOSOPHY_VERSION = "stage-philosophy-v1-6-to-quality";
 
 export function seedGenerationPhilosophyBlock(): string {
   return [
-    "SEED GENERATION: Explore broadly across current interests, adjacent expansion areas, and plausible new expansion areas. A Seed is a candidate material, not strategy and not a post.",
-    "Infer. Do not paste examples. Never emit a phrase that appeared in this prompt as concrete_subject. DNA interest domains are bounds, not a topic menu. Few-shot seed subjects are forbidden.",
+    "SEED GENERATION: Collect circulating public posts as candidate material. A Seed is situation + observation, not strategy and not a post.",
+    "Do not judge RETURN/BRIDGE/REACH, editorial type, or attitude. Do not paste examples. Never emit a phrase that appeared in this prompt as concrete_subject.",
     "A seed starts thinking. It is not yet a post topic. A keyword appearing must not auto-promote into the post subject.",
-    "JOBS: create a sufficiently broad candidate pool. Do not score or judge strategic fit, performance, Audience fit, or Creator fit. Do not rank, select, allocate, or decide writing form. Keep only minimum boundaries against fabrication, direct Manual Post copying, and effectively identical Seed repetition.",
+    "JOBS: collect a pool of scene/observation candidates from engaged Korean posts. Do not score or judge strategic fit, performance, Audience fit, or Creator fit. Do not rank, select, allocate, or decide writing form. Keep only minimum boundaries against fabrication, direct Manual Post copying, and effectively identical Seed repetition.",
   ].join("\n");
 }
 
@@ -127,7 +127,7 @@ export function planningStagePhilosophyBlock(): string {
 export function seedCandidatePhilosophyBlock(): string {
   return [
     seedGenerationPhilosophyBlock(),
-    "EXPLORE MANY: generate candidates without fixed domain ratios, strategic scores, or a ranking system.",
+    "EXPLORE MANY: collect candidates without domain ratios, strategic scores, ranking, role labels, or type labels.",
     "HARD BOUNDARY only: fabrication, direct Manual Creator Post copy, or effectively identical Seed repetition. Do not use this boundary to narrow normal exploration.",
     "Do not interpret the final post, close Core Thought, choose Mechanism/Rail, or write prose here.",
   ].join("\n");

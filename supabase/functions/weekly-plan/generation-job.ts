@@ -1079,14 +1079,10 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const candidates: any[] = [...(st.gated || []), ...(gated.passed || [])];
   const compact = !!st.compact_next || !!targetedExploration;
   const windows = publicSearchWindows();
-  const half = String(st.public_search_half || "") === "far7" ? "far" : "near";
-  st.public_search_half = half === "near" ? "far7" : "near7";
-  const searchWindow = half === "far" ? windows.far : windows.near;
-  let officialPublicPosts: Array<{ text: string; created_at?: string }> = [];
-  if (half === "near") {
-    const token = await loadEdgeXAccessToken(supabase);
-    officialPublicPosts = await fetchOfficialPublicPosts({ accessToken: token, maxResults: 100 });
-  }
+  const searchWindow = windows.near;
+  st.public_search_half = "near7";
+  const token = await loadEdgeXAccessToken(supabase);
+  const officialPublicPosts = await fetchOfficialPublicPosts({ accessToken: token, maxResults: 100 });
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
     needed: requestedNow,

@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.4.0 — 2026-08-17
+
+- Seed Generator는 유형·태도를 고르지 않습니다. 최근 7일 한국어 글 중 좋아요 80 또는 댓글 20 이상에서 장면·관찰만 모읍니다
+- Tesla/FSD는 원문에 있을 때만 시드에 남습니다. 관심 목록으로 시드를 채우지 않습니다
+- 조회수는 조건이 아닙니다. Return/Bridge/Reach와 글 종류는 Creator DNA가 붙입니다
+
 ## 12.3.0 — 2026-08-17
 
 - Creator DNA가 RETURN / BRIDGE / REACH를 판단합니다. REACH는 하루 1개, 같은 날 최대 2개입니다. PRESENCE 칸은 없습니다

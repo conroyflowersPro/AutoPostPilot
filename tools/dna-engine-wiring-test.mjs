@@ -42,7 +42,7 @@ function ok(name, cond) {
   }
 }
 
-console.log("DNA + engine live-path wiring (v12.3.0)");
+console.log("DNA + engine live-path wiring (v12.4.0)");
 
 ok("D1. Grok Writer gets Creator Intelligence writer slice", /creatorDnaWriterSlice\(/.test(wr) && /CREATOR INTELLIGENCE/.test(wr) && !/creatorDnaBlock\(\)/.test(wr));
 ok("D2. Grok Writer gets Planner Intent, not strategy engine rules", /ASSIGNED PLANNER INTENT/.test(wr) && !/engineRulesAsWill\(\)/.test(wr));
@@ -51,7 +51,7 @@ ok("D3. Writer does not use Performance DNA as writing input",
   /Performance DNA is Planner-only/.test(arch) &&
   !/performanceDnaBlock\(\)/.test(wr));
 ok("D4. horizon bounds are not a Quota xAI call", /SEED_POOL_BUFFER = 10/.test(quota) && !/inferWeeklyQuota/.test(quota) && !/plannerArchitectureLock/.test(quota));
-ok("D5. Grok Seed gets Creator bounds without strategic intelligence", /creatorDnaBlock\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason));
+ok("D5. Grok Seed gets collector bounds without strategic intelligence", /seedCollectorBounds\(\)/.test(seedReason) && !/engineRulesAsWill\(\)/.test(seedReason) && !/performanceDnaBlock\(\)/.test(seedReason) && !/creatorDnaBlock\(\)/.test(seedReason));
 
 ok("D6. interpretSeed emits why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(interp));
 ok("D7. deep context maps why_it_might_matter_to_creator", /why_it_might_matter_to_creator/.test(dgc));
@@ -92,7 +92,7 @@ ok("D26. Edge/lib DNA both forbid a fixed personal-public mix",
 ok("D27. Edge WHO California lockstep with lib",
   /Korean-language creator living in California/.test(libDna) &&
   /Creator lives in California/.test(dna));
-ok("D28. version 12.3.0", /APP_VERSION = "12.3.0"/.test(ver) && /APP_VERSION = "12.3.0"/.test(ix));
+ok("D28. version 12.4.0", /APP_VERSION = "12.4.0"/.test(ver) && /APP_VERSION = "12.4.0"/.test(ix));
 
 ok("D29. seed-bootstrap stays off generate job",
   !/from "\.\/seed-bootstrap\.ts"/.test(job));

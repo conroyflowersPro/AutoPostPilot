@@ -143,6 +143,23 @@ export function creatorDnaWriterSlice(growthRole?: string): string {
   ].join("\n");
 }
 
+/** Public X collector only. No RETURN/BRIDGE/REACH, no types, no Tesla interest menu. */
+export const PUBLIC_SEED_MIN_LIKES = 80;
+export const PUBLIC_SEED_MIN_REPLIES = 20;
+
+export function seedCollectorBounds(): string {
+  return [
+    "SEED COLLECTOR: Collect public X posts as seed material. You do not judge RETURN/BRIDGE/REACH, editorial type, or writing attitude. Creator DNA does that later.",
+    `Window: last 7 days. Korean-first. Keep a post if likes >= ${PUBLIC_SEED_MIN_LIKES} OR replies >= ${PUBLIC_SEED_MIN_REPLIES}. Impressions are not a gate. Do not use a 3k–5k view bar.`,
+    "Drop obvious ads, excessive bait, contextless fragments, and retweet-only items.",
+    "From each kept post extract only: situation (one line), observation_or_feeling (one line), source_hint (short reusable phrase if any), source_id.",
+    "Do not pre-label Return/Bridge/Reach. Do not name persuasion theories. Do not write a finished post. Do not fill seeds from an interest list.",
+    "Keep Tesla/FSD words only when they are already in the found post. Do not add or expand them onto another situation.",
+    "Drop material a stranger would feel is unrelated to them, that cannot compress to one scene, or that has no universalizable observation.",
+    "owner is always OTHER. Never invent the creator's lived experience.",
+  ].join("\n");
+}
+
 /** Engine rules that already encode the operator's will. */
 export function plannerPhilosophyBlock(): string {
   return [
@@ -160,7 +177,7 @@ export function engineRulesAsWill(): string {
     "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Creator DNA (RETURN/BRIDGE/REACH + type) → Planner place/time/Seeds → Seed Generator explores for open cells → Writer writes every locked slot → Semantic Judge → reject batch to Creator DNA → Planner place → Seed if short → Writer batch → Judge. DNA layers remain for other jobs.",
     "Planner does not judge types and does not read X status to compose the week. Creator DNA does. Planner places 14:00–22:00 PT and attaches Seeds.",
     "Lived EXPERIENCE material is Analytics originals plus sync-gap originals. Overlap prefers Analytics. Public X is not lived inventory.",
-    "Seed Generator explores broadly and does not score, rank, select, allocate, or judge strategic fit. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
+    "Seed Generator collects public X posts from the last 7 days (likes >= 80 or replies >= 20) as situation + observation only. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
     "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Other roles have no fixed ratio. Planner does not infer composition.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Creator DNA is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",

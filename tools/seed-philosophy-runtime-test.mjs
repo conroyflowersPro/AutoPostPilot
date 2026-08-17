@@ -29,11 +29,11 @@ function ok(name, condition) {
   }
 }
 
-console.log("Seed philosophy runtime (v12.3.0)");
+console.log("Seed philosophy runtime (v12.4.0)");
 ok("P1. candidate reserve is Planner slots plus week buffer", /candidatePoolTarget/.test(job) && /SEED_POOL_BUFFER/.test(job) && !/CANDIDATE_POOL_MULTIPLIER/.test(job));
 ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));
-ok("P4. short usable keywords survive normalize", /isUsableKeywordSubject\(subject\)/.test(seed) && !/subject\.length < 8/.test(seed));
+ok("P4. short usable keywords survive normalize", /isUsableKeywordSubject\(situation\)/.test(seed) && !/subject\.length < 8/.test(seed));
 ok("P5. candidate generation has no maxMass hard drop", !/const maxMass/.test(seed) && !/massN >= maxMass/.test(seed));
 ok("P6. Seed Generator does not hard-reject strategic ticker/news value", !/isForbiddenDefaultSubject/.test(seed));
 ok("P7. cross-interest is hypothesis-only, not reject", /CROSS_INTEREST_HYPOTHESIS_ONLY/.test(grounding) && !/CROSS_INTEREST_WITHOUT_RELATIONSHIP/.test(grounding));
