@@ -146,10 +146,32 @@ export function massSectorFromText(text: string): MassSector {
   return "WEATHER_OUT";
 }
 
-/** Expert/internal terms the operator forbade in seeds and posts. */
-export function hasExpertJargon(text: string): boolean {
+/** Deep internal terms. Everyday Tesla/FSD/충전 language is not this list. */
+const DEEP_JARGON_RE = /(?<!플)레이어\s*\d+|(?<!플)레이어2|(?<!플)레이어|페이로드|엔드포인트|엔트리\s*포인트|프로토콜|\b메커니즘\b|\bM[1-9]_\w+/gi;
+
+export function lastSentenceKo(text: string): string {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const parts = t.split(/(?<=[.?!？！])\s+/);
+  return parts[parts.length - 1] || t;
+}
+
+/** Reply-bait / follower-beg in the last sentence only. A thinking ? is allowed. */
+export function isEngagementBaitCloser(text: string): boolean {
+  const last = lastSentenceKo(text);
+  return /어떻게\s*생각|어떠신가요|보이시나요|댓글로|의견을\s*남겨|팔로우|리트윗|궁금하(신)?가요/.test(last);
+}
+
+export function deepJargonCount(text: string): number {
   const t = String(text || "");
-  return /레이어|레이어\s*\d|\bL2\b|\bL1\b|스택\b|프로토콜|엔드포인트|페이로드|엔트리\s*포인트|메커니즘|\bM[1-9]_\w+/i.test(t);
+  const a = t.match(DEEP_JARGON_RE) || [];
+  const stack = t.match(/(^|[^가-힣])스택([^가-힣]|$)/g) || [];
+  return a.length + stack.length;
+}
+
+/** Too many deep terms in one post. One necessary term still passes. */
+export function hasExpertJargon(text: string): boolean {
+  return deepJargonCount(text) >= 2;
 }
 
 export function lengthBandForMode(_mode: string): string {

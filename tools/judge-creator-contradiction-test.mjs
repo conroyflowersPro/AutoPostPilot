@@ -45,7 +45,7 @@ function judgeTwin(text, seedMeaning) {
   }
   const tokens = String(seedMeaning || "").split(/\s+/).filter((t) => t.length >= 2);
   const seedHit = !seedMeaning || tokens.some((t) => text.includes(t));
-  if (seedMeaning && !seedHit) hard.push("seed_meaning_departure");
+  if (seedMeaning && !seedHit) { /* title mismatch is not a hard reject */ }
   return {
     overall_status: hard.length ? "REJECT" : "PASS",
     hard_fail_reasons: hard,

@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.2.2 — 2026-08-17
+
+- Judge는 시드 제목 단어가 초안에 없어도 하드 거절하지 않습니다
+- 물음표는 마지막 문장의 참여 유도·팔로워 구걸만 거절합니다
+- 레이어·프로토콜 같은 깊은 말은 한 글에 두 개 이상일 때만 거절합니다
+
 ## 12.2.1 — 2026-08-17
 
 - Creator DNA 1·2일차 슬롯이 `planner_json_unusable`로 멈추던 문제를 고칩니다. Grok이 1일차를 `day_offset: 1`로 보내도 받고, JSON이 조금 모자라면 칸만 채웁니다

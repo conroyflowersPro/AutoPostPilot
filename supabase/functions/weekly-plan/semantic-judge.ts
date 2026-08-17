@@ -14,7 +14,7 @@ import {
   ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR,
 } from "./engine-architecture.ts";
 import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
-import { isKoreaOnlySituation } from "./seed-scope.ts";
+import { isKoreaOnlySituation, hasExpertJargon, isEngagementBaitCloser, deepJargonCount } from "./seed-scope.ts";
 import { hasForbiddenDayCountPhrase, inhabitsOtherLivedViral } from "./seed-ownership.ts";
 
 export {
@@ -397,8 +397,8 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   } else if (hasAnyToken(text, tokens) || text.includes(seedMeaning.slice(0, Math.min(10, seedMeaning.length)))) {
     seedScore = 0.9;
   } else {
-    seedScore = 0.25;
-    hard.push("seed_meaning_departure");
+    seedScore = 0.55;
+    soft.push("seed_title_not_in_prose");
   }
   scores.seed_fidelity = clamp01(seedScore);
 
@@ -448,12 +448,15 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
       break;
     }
   }
-  if (FORCED_QUESTION_PATTERNS.some((re) => re.test(text))) {
+  if (isEngagementBaitCloser(text)) {
     flags.forced_question = true;
     hard.push("question_closer");
   }
-  if (/레이어|\bL2\b|\bL1\b|프로토콜|엔드포인트|메커니즘/i.test(text)) {
+  const jargonN = deepJargonCount(text);
+  if (hasExpertJargon(text)) {
     hard.push("expert_jargon");
+  } else if (jargonN === 1) {
+    soft.push("expert_jargon_once");
   }
 
   let aiHits = 0;
