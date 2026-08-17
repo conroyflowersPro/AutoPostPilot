@@ -306,7 +306,7 @@ export type PlannerRecovery = {
   version: string;
 };
 
-type PlannerCallResult<T> = {
+export type PlannerCallResult<T> = {
   ok: boolean;
   value: T | null;
   error: string | null;
@@ -347,7 +347,7 @@ function messageText(body: any): string {
   return content && typeof content === "object" ? JSON.stringify(content) : "";
 }
 
-async function callPlanner<T>(args: {
+export async function callPlanner<T>(args: {
   xaiKey: string;
   system: string;
   user: Record<string, unknown>;
@@ -758,16 +758,16 @@ export async function inferSevenDayStrategy(args: {
 
 function selectionSystem(dayScoped: boolean): string {
   return [
-    "You are the seven-day Planner selecting and allocating Seeds after strategy already exists.",
+    "You are the seven-day Planner attaching Seeds. Creator DNA already judged RETURN/BRIDGE and editorial types. Do not change those.",
     dayScoped
       ? "This call covers only the listed day offsets. Leave other days untouched. Do not emit assignments for slots not in this batch."
-      : "Preserve the supplied strategy. Select one Seed from seed_pool for each strategy slot.",
+      : "Preserve the supplied strategy types. Select one Seed from seed_pool for each strategy slot.",
     "Do not write posts and do not decide prose, tone, thought order, humor, Mechanism, Rail, hook, ending, or sentence form.",
-    "Seed Generator explored; you own strategic fit, selection, and allocation. Do not use a fixed ratio, numeric ranking system, or frozen mapping.",
-    "planner_intent may clarify the strategic purpose for the selected Seed but must remain strategy, not writing instructions.",
+    "Do not judge types. Do not close a type because the pool is empty — leave missing and request Seed Generator.",
+    "planner_intent may clarify placement for the selected Seed but must remain strategy, not writing instructions.",
     "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
     "EXPERIENCE slots take ANALYTICS_LIVED owner SELF seeds only, newest occurred_at first. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take public seeds; viral is already on those seeds.",
-    "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request type EXPERIENCE only.",
+    "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request lived SELF scenes only, never public search to invent experience.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
 }
@@ -889,14 +889,42 @@ export async function selectSeedsForDays(args: {
   });
 }
 
+/** Attach Seeds to already-judged slots. Does not change RETURN/BRIDGE or types. */
+export async function attachSeedsForSlots(args: {
+  xaiKey: string;
+  strategy: SevenDayStrategy;
+  slots: PlannerSlotIntent[];
+  seedPool: ConcreteSeed[];
+  reservedSeedIds?: string[];
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSelection>> {
+  const reservedSeedIds = new Set((args.reservedSeedIds || []).filter(Boolean));
+  const slots = args.slots || [];
+  const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || ""))).slice(0, 96);
+  const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 2000,
+    timeoutMs: args.timeoutMs ?? 28000,
+    system: selectionSystem(true),
+    user: {
+      strategy_summary: args.strategy.strategy_summary,
+      slots: slots.map(compactSlotForSelect),
+      reserved_seed_ids: [...reservedSeedIds],
+      seed_pool: pool.map(compactSeedForSelect),
+    },
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds),
+  });
+}
+
 function recoverySystem(): string {
   return [
-    "You are the seven-day Planner recovering one slot after Semantic Judge rejected a completed post.",
-    "Judge rejection is not permanent Seed rejection. Reconsider the slot in the context of the whole seven-day strategy.",
-    "Use the existing Seed pool first. You may preserve or adjust the slot strategic role, Editorial Mode, and Planner Intent. Do not write the post and do not prescribe creative form.",
+    "You are the seven-day Planner attaching a Seed after Creator DNA relabeled a Judge-rejected slot.",
+    "Do not change growth_role or editorial_mode. Creator DNA already judged those. Place a Seed only.",
+    "Use the existing Seed pool first. Do not write the post and do not prescribe creative form.",
     "If an existing Seed fits, choose RESELECT_EXISTING and a seed_id from available_seed_pool. Reusing the rejected Seed is allowed when the seven-day plan still needs that kind, unless it is in abandoned_seed_ids. abandoned_seed_ids are discarded Seeds: never pick them. already_saved_seed_ids and remaining_unwritten_seed_ids are facts, not bans. If none fits, choose TARGETED_EXPLORE and describe only the field/direction Seed Generator should explore. Seed Generator will then return a batch of candidates in that field, not one seed.",
     "Do not treat a different possible writing choice as a reason to redesign strategy. Use Judge reasons only to understand why the final post was not publishable.",
-    "Return strict JSON with action, seed_id, strategic_role, editorial_mode, planner_intent, exploration_direction. No prose outside JSON.",
+    "Return strict JSON with action, seed_id, strategic_role, editorial_mode, planner_intent, exploration_direction. Copy the supplied role and mode. No prose outside JSON.",
   ].join("\n");
 }
 

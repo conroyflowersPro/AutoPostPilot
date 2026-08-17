@@ -77,7 +77,7 @@ function promote(prev, signal) {
   return { stage, signalCycles: cycles };
 }
 
-console.log("Week-depth engines (v12.1.4)");
+console.log("Week-depth engines (v12.2.0)");
 
 ok("E1. twist+reinterp is the AI unfold",
   inferDiscourseShape("충전 중 알림이 겹친다. 그런데 화면이 가린다. 다시 보면 손이 먼저 간다.") === DISCOURSE_TWIST_REINTERPRET);
@@ -109,8 +109,8 @@ ok("E9. REJECT returns the slot to Planner",
   /pending_recovery/.test(job) && /row\.step = "recover"/.test(job));
 ok("E10. Planner recovery receives Judge reasons, not failed post prose",
   /semantic_judge_reasons/.test(planner) && !/previous_final_text/.test(planner));
-ok("E11. Planner recovery returns through Writer then Judge",
-  /recoverRejectedPlannerSlot/.test(job) && /st\.write_flat\.splice\(insertAt, 0, replacement\)/.test(job) &&
+ok("E11. Reject recovery returns through Writer then Judge",
+  /attachSeedsForSlots/.test(job) && /st\.write_flat\.splice\(insertAt, 0, \.\.\.replacements\)/.test(job) &&
   /st\.write_index = insertAt/.test(job) && /row\.step = "write"/.test(job));
 ok("E12. Job calls weekly-count-ledger",
   /evaluateOrder8cCompletionGate/.test(job) &&
@@ -136,8 +136,8 @@ ok("E17. Core Creator topics stay core",
   /CREATOR_CORE_TOPICS/.test(promo) && /fsd_field/.test(promo) && /lafc/.test(promo));
 ok("E18. Writer still does not ingest Performance DNA",
   !/performanceDnaBlock\(\)/.test(wr) && /Performance DNA is Planner-only/.test(read("supabase/functions/weekly-plan/engine-architecture.ts")));
-ok("E19. shipping 12.1.4",
-  /APP_VERSION = "12.1.4"/.test(ver) && /APP_VERSION = "12.1.4"/.test(ix));
+ok("E19. shipping 12.2.0",
+  /APP_VERSION = "12.2.0"/.test(ver) && /APP_VERSION = "12.2.0"/.test(ix));
 ok("E20. profile repetition belongs to Planner actual-X strategy",
   /recent_x_analytics/.test(planner) && !/hard\.push\("structural_repetition_high"\)/.test(judge));
 

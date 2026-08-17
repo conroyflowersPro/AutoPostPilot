@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.2.0 — 2026-08-17
+
+- Audience DNA는 X Analytics와 「지금 동기화」 공백만 보고합니다. RETURN/BRIDGE와 글 종류는 Creator DNA가 칸마다 판단합니다
+- Planner는 14:00–22:00 PT 시각과 Seed만 붙입니다. 종류를 고르거나 Analytics로 주를 짜지 않습니다
+- 경험 재료는 Analytics 원글과 동기화 공백 원글입니다. 겹치면 Analytics가 이깁니다
+- Judge 거절은 묶음으로 Creator DNA가 다시 붙인 뒤, Seed가 다 채워지면 Writer가 묶음으로 다시 씁니다
+
 ## 12.1.4 — 2026-08-16
 
 - 5/38 미완은 시드가 없어서가 아닙니다. 경험 시드를 같은 제목으로 한 개만 남기고, 이틀 배차 뒤에 주를 끝낸 것입니다

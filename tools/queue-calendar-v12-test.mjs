@@ -38,7 +38,7 @@ ok("Q7. queue shows 계획 and 예약 times", /function queueWhen/.test(list) &&
 ok("Q8. queue still lists all written posts", /select\("\*"\)/.test(page) && /작성된 글 전체/.test(page));
 ok("Q9. month calendar on queue home", /QueueMonthCalendar/.test(page) && /수제/.test(cal) && /재게시/.test(cal));
 ok("Q10. login does not sync X", !/runXAccountSync/.test(page) && /href="\/api\/x\/sync"/.test(page));
-ok("Q11. shipping 12.1.4", /APP_VERSION = "12.1.4"/.test(ver) && /APP_VERSION = "12.1.4"/.test(ix));
+ok("Q11. shipping 12.2.0", /APP_VERSION = "12.2.0"/.test(ver) && /APP_VERSION = "12.2.0"/.test(ix));
 
 console.log("========================================");
 console.log(`QUEUE CALENDAR: ${pass} PASS / ${fail} FAIL`);

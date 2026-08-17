@@ -29,7 +29,7 @@ function ok(name, condition) {
   }
 }
 
-console.log("Seed philosophy runtime (v12.1.4)");
+console.log("Seed philosophy runtime (v12.2.0)");
 ok("P1. candidate reserve is Planner slots plus week buffer", /candidatePoolTarget/.test(job) && /SEED_POOL_BUFFER/.test(job) && !/CANDIDATE_POOL_MULTIPLIER/.test(job));
 ok("P2. server calls stay at max 10 seeds per tick", /const EXPAND_BATCH = 10/.test(job) && /Math\.min\(EXPAND_BATCH/.test(job));
 ok("P3. discovery slots are not final personal-mass quotas", /OPEN_DISCOVERY/.test(scope) && /CREATOR_DNA_OR_ADJACENT/.test(scope));
@@ -42,7 +42,7 @@ ok("P9. duplicate comparison is USER_DIRECT originals only", /USER_DIRECT\|MANUA
 ok("P10. manual semantic HIGH requires clone overlap, not shared context", /bestClone >= 0\.72/.test(leakage) && /bestContext >= 0\.45/.test(leakage));
 ok("P11. Seed strategic ranking is removed", !/seedSelectionValueScore/.test(engine + job) && /Do not rank candidates/.test(seed));
 ok("P12. Seed Grok receives candidate-only philosophy", /seedCandidatePhilosophyBlock/.test(seed) && /EXPLORE MANY/.test(stage));
-ok("P13. Planner recovery uses existing Pool before targeted exploration", /recoverRejectedPlannerSlot/.test(job) && /availableSeedPool/.test(job));
+ok("P13. recovery uses existing Pool before targeted exploration", /attachSeedsForSlots/.test(job) && /recoverSeedPool/.test(job));
 ok("P14. seed rejection telemetry persists by reason", /seed_metrics/.test(job) && /rejected_by_reason/.test(job) && /raw_returned/.test(seed));
 ok("P15. expansion and Planner recovery are bounded", /return Number\(st\.dim_batch/.test(job) && /pending\.attempts > 4/.test(job));
 ok("P16. live seed, planner, and writer external endpoints are xAI only",

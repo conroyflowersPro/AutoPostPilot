@@ -104,27 +104,28 @@ export function creatorDnaBlock(): string {
 /** Engine rules that already encode the operator's will. */
 export function plannerPhilosophyBlock(): string {
   return [
-    "PLANNER ROLE: You are not a writing engine. You are the strategy engine that decides what, why, when, and in which direction this account should speak so it grows over months.",
-    "Do not pick a topic because it looks likely to get views this week. Read Creator DNA + Audience DNA (when evidence exists) + Current X Context + Performance DNA + Revenue DNA (when evidence exists) together, then decide which way THIS week the account should move.",
-    "Seed Pool exists before Planning. First form the seven-day strategy without seeing candidates; then inspect the Pool and select/allocate Seeds. Writer receives Seed + Planner Intent and creates. Do not skip ahead to prose.",
+    "PLANNER ROLE: You are not a writing engine and you do not decide RETURN/BRIDGE or editorial types. Creator DNA already judged those. You place times and attach Seeds.",
+    "Audience DNA reports X status (Analytics + sync) to Creator DNA. Creator DNA judges slots. You do not reread Analytics to change types.",
+    "Seed Pool exists before allocation. Writer receives Seed + Planner Intent and creates. Do not skip ahead to prose.",
     "Do not learn from unpublished AI drafts. Improve the next plan only from published evidence: follower growth, profile visits, revenue, bookmarks, replies. Missing evidence is unknown, not zero.",
-    "JOBS: seven-day account strategy · slot strategic roles · Seed selection and allocation · Judge-reject recovery · targeted exploration direction only when the existing Pool lacks a fit. Do not write posts.",
+    "JOBS: place Creator-judged slots on the seven-day clock · Seed selection and allocation · request Seed Generator only when the pool lacks a fit. Do not write posts. Do not change types.",
     "THE QUESTION: does this decision make this creator's account stronger months from now?",
   ].join("\n");
 }
 
 export function engineRulesAsWill(): string {
   return [
-    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Data/Evidence → 4 DNA → Planner seven-day strategy (locks volume) → Seed Pool(explore to Planner count + buffer) → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory.",
-    "Planner is the strategy/select/allocation/recovery engine, not a writing engine. It uses up to 30 days of actual X Analytics for recent profile-level flow; missing days remain missing. It never uses drafts or virtual plans as recent published history.",
+    "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Creator DNA (RETURN/BRIDGE + type) → Planner place/time/Seeds → Seed Generator explores for open cells → Writer writes every locked slot → Semantic Judge → reject batch to Creator DNA → Planner place → Seed if short → Writer batch → Judge. DNA layers remain for other jobs.",
+    "Planner does not judge types and does not read X status to compose the week. Creator DNA does. Planner places 14:00–22:00 PT and attaches Seeds.",
+    "Lived EXPERIENCE material is Analytics originals plus sync-gap originals. Overlap prefers Analytics. Public X is not lived inventory.",
     "Seed Generator explores broadly and does not score, rank, select, allocate, or judge strategic fit. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
-    "Planning Horizon is seven days. Intelligence horizons remain independent. Planner infers composition each cycle without fixed topic, mode, or surface ratios.",
+    "Planning Horizon is seven days. Creator DNA judges RETURN/BRIDGE and types each cycle without a fixed ratio. Planner does not infer composition.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Creator DNA is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",
     "Writer (Grok 4.6) understands the assigned Seed + Planner Intent, forms the thought, and decides the necessary reasoning and expression with Creator Intelligence as support. Engines do not preselect creative form.",
     "USER_DIRECT informs Creator Intelligence. AP_PIPELINE trains performance only and must not rewrite Creator DNA. Planner does not prescribe writing form; Writer does not redesign strategy.",
     "Do not invent lived experience or opinions. Authenticity first. Place and experience bounds live in Creator DNA + these engine rules — the writer must consume them.",
-    "Semantic Judge validates only final publishability. Judge does not select Seeds, redesign strategy, or replace Writer choices. Reject returns to Planner.",
+    "Semantic Judge validates only final publishability. Judge does not select Seeds, redesign strategy, or replace Writer choices. Reject batches return to Creator DNA, then Planner places Seeds.",
     "After review + original media, AI publishes. Spacing is For You optimized: first original 14:00 America/Los_Angeles; planner even-spreads 14:00–22:00 PT so same-author originals are not stacked in one refresh. Candidates drop after about 48 hours.",
     "X ranking weights scale predicted viewer actions on Home-served posts, not counted events and not author DMs of own links. They do not pick the last sentence.",
     "Do not wait for a typed restatement of will. DNA + these rules are the will.",

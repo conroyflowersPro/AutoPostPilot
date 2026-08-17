@@ -11,7 +11,7 @@ export const ARCHITECTURE_REVENUE_DOES_NOT_DOMINATE = true as const;
 export const ARCHITECTURE_WRITER_IS_NOT_PLANNER = true as const;
 
 export const ARCHITECTURE_PIPELINE =
-  "Data/Evidence → 4 DNA → Planner seven-day strategy (locks volume) → Seed Pool(explore to Planner count + buffer) → Planner select/allocate → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Planner recovery → Publish → Analytics → Validated Learning → Planner Memory";
+  "Data/Evidence → Audience DNA (X status) → Creator DNA (RETURN/BRIDGE + type) → Planner place/time/Seeds → Seed Pool(explore to locked count + buffer) → Planner allocate Seeds → Writer understands Seed + Planner Intent then creates → Semantic Judge final validate → Creator DNA reject relabel → Planner Seeds → Writer batch → Publish → Analytics → Validated Learning → Planner Memory";
 
 export function architecturePrincipleBlock(): string {
   return [
@@ -24,7 +24,7 @@ export function architecturePrincipleBlock(): string {
 
 export function dnaLayerBlock(): string {
   return [
-    "DNA LAYERS (read together; missing evidence is UNKNOWN, not zero). The seven-day Planner MUST read all of them:",
+    "DNA LAYERS (read together; missing evidence is UNKNOWN, not zero). Layers stay. Creator DNA judges AP slots from Audience X status. Planner places clock and Seeds:",
     "Creator DNA: who this person is — how he thinks, expresses, observes. Not overwritten by audience or performance.",
     "Audience DNA: X Analytics primary, Fedica auxiliary. What readers react to now and where interest is moving. Not follow-the-followers. Must not overwrite Creator DNA.",
     "Performance DNA: validated feature↔outcome from published posts + Analytics only. Not a winning-post wording store. Planner uses it to try or reduce patterns, never to copy sentences.",
@@ -36,7 +36,7 @@ export function dnaLayerBlock(): string {
 
 export function engineCatalogBlock(): string {
   return [
-    "SEED: Seed Generator explores a candidate pool sized by Planner (locked slots + week buffer). It does not strategize, rank, select, allocate, or judge final quality. PLANNING: Planner locks seven-day volume and placement first, then Seed explores, then Planner selects and allocates. Recent-flow context comes only from up to 30 days of actual X Analytics and never hard-bans a mode. Writer receives the assigned Seed + Planner Intent.",
+    "SEED: Seed Generator explores a candidate pool sized by locked slots + week buffer. It does not strategize, rank, select, allocate, or judge final quality. PLANNING: Creator DNA judges RETURN/BRIDGE and types. Planner places 14:00–22:00 PT and allocates Seeds. Recent-flow lived material is Analytics originals plus sync-gap originals. Writer receives the assigned Seed + Planner Intent.",
     "WRITING: Thought first, style follows. Grok 4.6 Writer closes ONE central judgment on this Seed (would this creator hold it? is it grounded?) then writes it in his language. Everyday language, 말투, humor, Mechanism, and Rail follow only to deliver that thought. They must not choose it. Do not invent identity. Do not invent lived experience.",
     "QUALITY: Semantic Judge sees only the completed post and decides final publishability. Creator-related judgment is a Contradiction Check, not a Creator Fit / topic-similarity score. It does not select Seeds, redesign strategy, undo Planner expansion, or rewrite. Reject returns the slot to Planner; Planner reselects from the existing pool first and requests targeted Seed exploration only when needed. Week count is Judge: N Judge-PASS saved posts for N planned slots. Planner locks the plan and does not close the week.",
     "LEARNING: Closed loop — Publish → Analytics Import → Feature Extraction → Performance/Revenue Analysis → Learning → DNA/Memory Update → next seven-day Planner reads → new Planning. Analytics Import takes X Analytics first into a canonical model (Fedica is an adapter). Features are learned, not sentences. Manual published success is a stronger Creator Signal than an AI draft. One-off success stays hypothesis. Learning that the Planner does not read is not a closed loop.",
