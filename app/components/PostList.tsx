@@ -280,7 +280,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\n시작일: ${startDate} (LA) · For You 14:00–22:00 PT · 약 2시간 간격\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩 자동 연속`
+        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\n시작일: ${startDate} (LA) · 이미 예약된 시각 다음부터 · For You 14:00–22:00 PT\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩`
       )
     )
       return;
@@ -377,11 +377,16 @@ export default function PostList({ posts }: { posts: Post[] }) {
         </summary>
         <div className="mt-3 space-y-3">
         <p className="text-xs text-zinc-400">
-          글에 지정된 Fedica 파이프라인으로 날짜·시각을 넣습니다. 간격은 For You
-          14:00–22:00 PT, 약 2시간입니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
+          글에 지정된 Fedica 파이프라인으로 날짜·시각을 넣습니다. 같은 날 이미 예약된
+          글(예: 먼저 올린 3개)이 있으면 그날 14:00을 다시 쓰지 않고 그 다음 For You
+          칸부터 이어갑니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div
+          className="grid grid-cols-2 gap-3"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <div>
             <label className="mb-1 block text-[11px] text-zinc-500">
               스케줄 시작일 (LA)
@@ -392,6 +397,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
               onChange={(e) => setStartDate(e.target.value)}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
             />
+            <p className="mt-1 text-[10px] text-zinc-500">선택일 {startDate}</p>
           </div>
           <div>
             <label className="mb-1 block text-[11px] text-zinc-500">

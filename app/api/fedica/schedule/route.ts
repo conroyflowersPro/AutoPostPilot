@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
 import { scheduleOnePost } from "@/lib/services/schedule-service";
-import { computeKRBatchStartISO } from "@/lib/schedule";
+import { computeKRBatchStartISO, nextForYouSlotAfterOccupied } from "@/lib/schedule";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
 export const maxDuration = 60;
@@ -16,10 +16,6 @@ export async function POST(req: NextRequest) {
       body.pipelineId || SCHEDULING_CONFIG.defaultPipelineId
     );
     const requireMedia = body.requireMedia === true;
-    const scheduledAt =
-      typeof body.scheduledAt === "string" && body.scheduledAt.trim()
-        ? body.scheduledAt.trim()
-        : computeKRBatchStartISO();
 
     if (!postId) {
       return NextResponse.json({ error: "postId required" }, { status: 400 });
@@ -38,6 +34,21 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+
+    const { data: occupiedRows } = await supabase
+      .from("SeungContent")
+      .select("scheduled_at")
+      .eq("user_id", user.id)
+      .in("status", ["scheduled", "scheduling"])
+      .not("scheduled_at", "is", null)
+      .neq("id", postId);
+    const occupied = (occupiedRows || [])
+      .map((r: { scheduled_at?: string | null }) => String(r.scheduled_at || ""))
+      .filter(Boolean);
+    const scheduledAt =
+      typeof body.scheduledAt === "string" && body.scheduledAt.trim()
+        ? body.scheduledAt.trim()
+        : nextForYouSlotAfterOccupied(computeKRBatchStartISO(), occupied);
 
     const { data: post, error } = await supabase
       .from("SeungContent")

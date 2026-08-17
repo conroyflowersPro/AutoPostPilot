@@ -183,6 +183,52 @@ export function computeKRBatchStartISO(now = new Date()): string {
   return laWallTimeToISO(p.year, p.month, p.day, hour, 0);
 }
 
+/** Snap a timestamp into the For You window (same day 14:00 or next day 14:00). */
+export function snapToForYouWindow(isoOrMs: string | number): string {
+  const ms = typeof isoOrMs === "number" ? isoOrMs : Date.parse(isoOrMs);
+  if (!Number.isFinite(ms)) return computeKRBatchStartISO();
+  const p = getLAParts(new Date(ms));
+  if (p.hour < FOR_YOU_START_HOUR) {
+    return laWallTimeToISO(p.year, p.month, p.day, FOR_YOU_START_HOUR, 0);
+  }
+  if (p.hour > FOR_YOU_END_HOUR) {
+    const next = addCalendarDays(p.year, p.month, p.day, 1);
+    return laWallTimeToISO(next.year, next.month, next.day, FOR_YOU_START_HOUR, 0);
+  }
+  return new Date(ms).toISOString();
+}
+
+/**
+ * Continue after times already on AP/Fedica so a retry does not reuse 14:00
+ * and make the pipeline dump everything at "now".
+ * Always resume after the latest occupied slot when that slot is at/after
+ * the requested start (do not fill holes before existing For You posts).
+ */
+export function nextForYouSlotAfterOccupied(
+  startISO: string,
+  occupiedISOs: string[],
+  gapMs = FOR_YOU_PREFERRED_GAP_MS,
+  hardMs = FOR_YOU_HARD_MIN_GAP_MS
+): string {
+  let cursor = Date.parse(snapToForYouWindow(startISO));
+  if (!Number.isFinite(cursor)) cursor = Date.parse(computeKRBatchStartISO());
+  const occ = occupiedISOs
+    .map((x) => Date.parse(x))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => a - b);
+  const latest = occ.length ? occ[occ.length - 1] : NaN;
+  if (Number.isFinite(latest) && latest + hardMs > cursor) {
+    cursor = Date.parse(snapToForYouWindow(latest + gapMs));
+  }
+  let guard = 0;
+  while (guard++ < 400) {
+    const conflict = occ.find((ms) => Math.abs(ms - cursor) < hardMs);
+    if (!conflict) return snapToForYouWindow(cursor);
+    cursor = Date.parse(snapToForYouWindow(conflict + gapMs));
+  }
+  return snapToForYouWindow(cursor);
+}
+
 /**
  * Spread posts across Pacific days from startISO.
  * Planner even-spreads inside 14:00–22:00 PT. Extra posts that cannot

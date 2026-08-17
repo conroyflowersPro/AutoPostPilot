@@ -1,12 +1,13 @@
 {
   "name": "autopostpilot",
-    "version": "12.5.3",
+    "version": "12.5.4",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning tests/schedule-resume-occupied.test.ts && node tests/lockstep-version.test.mjs"
   },
   "dependencies": {
     "@netlify/plugin-nextjs": "^5.9.2",

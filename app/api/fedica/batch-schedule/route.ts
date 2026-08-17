@@ -4,6 +4,7 @@ import {
   computeKRBatchStartISO,
   computeStartISOForDate,
   buildDaySpreadSlots,
+  nextForYouSlotAfterOccupied,
 } from "@/lib/schedule";
 import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
 import { scheduleOnePost } from "@/lib/services/schedule-service";
@@ -66,12 +67,38 @@ export async function POST(req: NextRequest) {
     const byId = new Map((posts || []).map((p: any) => [p.id, p]));
     const ordered = postIds.map((id) => byId.get(id)).filter(Boolean) as any[];
 
+    const staleIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    await supabase
+      .from("SeungContent")
+      .update({ status: "reviewed" })
+      .eq("user_id", user.id)
+      .eq("status", "scheduling")
+      .lt("last_attempt_at", staleIso);
+    await supabase
+      .from("SeungContent")
+      .update({ status: "reviewed" })
+      .eq("user_id", user.id)
+      .eq("status", "scheduling")
+      .is("last_attempt_at", null)
+      .lt("created_at", staleIso);
+
     const startISO = startDate
       ? computeStartISOForDate(startDate)
       : computeKRBatchStartISO();
 
+    const { data: occupiedRows } = await supabase
+      .from("SeungContent")
+      .select("scheduled_at")
+      .eq("user_id", user.id)
+      .in("status", ["scheduled", "scheduling"])
+      .not("scheduled_at", "is", null);
+    const occupied = (occupiedRows || [])
+      .map((r: { scheduled_at?: string | null }) => String(r.scheduled_at || ""))
+      .filter(Boolean);
+    const resumeISO = nextForYouSlotAfterOccupied(startISO, occupied);
+
     const allSlots = buildDaySpreadSlots(
-      startISO,
+      resumeISO,
       Math.max(totalPlanned, slotOffset + ordered.length),
       maxPerDay
     );
@@ -130,6 +157,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       startISO,
+      resumeISO,
       startDate: startDate || null,
       maxPerDay,
       batchSize: SCHEDULING_CONFIG.batchSize,

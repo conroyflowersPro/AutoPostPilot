@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.5.4 — 2026-08-17
+
+- 일괄 스케줄을 중간에 끊고 다시 하면, 이미 AP에 있는 예약 시각(먼저 성공한 3개 등) 다음 For You 칸부터 이어갑니다. 같은 날 14:00·16:00를 다시 쓰지 않습니다
+- 날짜 입력은 iPhone에서 접힌 패널이 가로채지 않게 했고, 선택한 LA 날짜를 아래에 보여 줍니다
+- 15분 넘게 멈춘 `scheduling`은 다시 reviewed로 돌려 재시도할 수 있습니다
+
 ## 12.5.3 — 2026-08-17
 
 - Fedica `/post`는 문서상 `Id`를 줄 수 있지만, 없어도 `Success: true`면 AP는 scheduled로 바꿉니다. 글 ID는 있을 때만 저장합니다
