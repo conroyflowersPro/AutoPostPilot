@@ -280,7 +280,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 일괄 스케줄할까요?\n시작일: ${startDate} (LA)\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩 자동 연속`
+        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\n시작일: ${startDate} (LA) · For You 14:00–22:00 PT · 약 2시간 간격\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩 자동 연속`
       )
     )
       return;
@@ -377,8 +377,8 @@ export default function PostList({ posts }: { posts: Post[] }) {
         </summary>
         <div className="mt-3 space-y-3">
         <p className="text-xs text-zinc-400">
-          Fedica는 <strong className="text-emerald-300">선택한 포스트만</strong>{" "}
-          · {SCHEDULE_BATCH_SIZE}개씩 자동 배치
+          글에 지정된 Fedica 파이프라인으로 날짜·시각을 넣습니다. 간격은 For You
+          14:00–22:00 PT, 약 2시간입니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
         </p>
 
         <div className="grid grid-cols-2 gap-3">

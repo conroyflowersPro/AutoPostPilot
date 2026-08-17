@@ -121,23 +121,22 @@ export async function scheduleOnePost(opts: {
       .from("SeungContent")
       .update({
         status: "scheduling",
-        scheduled_at: scheduledAtISO,
         last_attempt_at: new Date().toISOString(),
         schedule_provider: provider.name,
       })
       .eq("id", post.id)
       .in("status", ["reviewed", "schedule_failed"])
-      .select("id, attempt_count, scheduled_at, status")
+      .select("id, attempt_count, status")
       .maybeSingle();
     claimErr = full.error;
     claimed = full.data;
     if (claimErr && /column|schema/i.test(claimErr.message || "")) {
       const basic = await supabase
         .from("SeungContent")
-        .update({ status: "scheduling", scheduled_at: scheduledAtISO })
+        .update({ status: "scheduling" })
         .eq("id", post.id)
         .in("status", ["reviewed", "schedule_failed"])
-        .select("id, scheduled_at, status")
+        .select("id, status")
         .maybeSingle();
       claimErr = basic.error;
       claimed = basic.data;
@@ -229,13 +228,13 @@ export async function scheduleOnePost(opts: {
       await sleep(SCHEDULING_CONFIG.retryDelayMs * (attempt + 1));
     }
 
-    if (!published) {
+    if (!published || !providerPostId) {
       const userMsg = /timeout|abort|5\d\d|temporarily/i.test(lastPubErr)
         ? "일시적으로 예약에 실패했습니다. 잠시 후 다시 시도해 주세요."
-        : "예약 등록에 실패했습니다.";
+        : "예약 등록에 실패했습니다. Fedica 글 ID가 없으면 scheduled로 두지 않습니다.";
       await markFailed(supabase, post.id, {
         errorStage: "publish_post",
-        errorInternal: lastPubErr,
+        errorInternal: lastPubErr || "missing Fedica Id",
         errorUser: userMsg,
         attemptCount,
       });
@@ -255,6 +254,7 @@ export async function scheduleOnePost(opts: {
       providerPostId,
       providerName: provider.name,
       attemptCount,
+      pipelineId: String(pipelineId),
     });
     if (!persisted) {
       await markFailed(supabase, post.id, {
@@ -312,13 +312,16 @@ async function persistScheduled(
     providerPostId?: string;
     providerName: string;
     attemptCount: number;
+    pipelineId?: string;
   }
 ): Promise<boolean> {
+  if (!info.providerPostId) return false;
   const payloads: Record<string, unknown>[] = [
     {
       status: "scheduled",
       scheduled_at: info.scheduledAtISO,
-      fedica_post_id: info.providerPostId || null,
+      fedica_post_id: info.providerPostId,
+      pipeline_id: info.pipelineId || null,
       last_error: null,
       error_stage: null,
       schedule_provider: info.providerName,
@@ -328,13 +331,8 @@ async function persistScheduled(
     {
       status: "scheduled",
       scheduled_at: info.scheduledAtISO,
-      fedica_post_id: info.providerPostId || null,
+      fedica_post_id: info.providerPostId,
     },
-    {
-      status: "scheduled",
-      scheduled_at: info.scheduledAtISO,
-    },
-    { status: "scheduled" },
   ];
   for (const body of payloads) {
     const { data, error } = await supabase

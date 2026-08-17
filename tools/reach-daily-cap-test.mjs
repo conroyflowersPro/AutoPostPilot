@@ -49,7 +49,7 @@ function enforceReachDailyCap(list) {
   return list;
 }
 
-console.log("REACH daily cap + Writer DNA slice (v12.5.1)");
+console.log("REACH daily cap + Writer DNA slice (v12.5.2)");
 
 ok("R1. parser constants 1 and max 2",
   /REACH_PER_DAY_TARGET = 1/.test(slots) && /REACH_PER_DAY_MAX = 2/.test(slots) && /enforceReachDailyCap/.test(slots));
@@ -86,8 +86,8 @@ ok("R6. Writer slice has always-forbids and Tesla only if seed", (() => {
 })());
 ok("R7. Slot DNA keeps Tesla as seed interest only",
   /SEED INTEREST: Tesla\/FSD/.test(dna) && /Do not force EXPERIENCE share/.test(dna));
-ok("R8. version 12.5.1",
-  /"version": "12.5.1"/.test(pkg) && /APP_VERSION = "12.5.1"/.test(ver) && /APP_VERSION = "12.5.1"/.test(ix));
+ok("R8. version 12.5.2",
+  /"version": "12.5.2"/.test(pkg) && /APP_VERSION = "12.5.2"/.test(ver) && /APP_VERSION = "12.5.2"/.test(ix));
 
 console.log("========================================");
 console.log(`REACH + WRITER SLICE: ${pass} PASS / ${fail} FAIL`);

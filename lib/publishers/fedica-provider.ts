@@ -1,4 +1,4 @@
-import { uploadMediaFromUrl, fedicaFetch, formatFedicaDateTime, fedicaPostAccepted } from "@/lib/fedica";
+import { uploadMediaFromUrl, fedicaFetch, formatFedicaDateTime, fedicaPostAccepted, fedicaPipelineId } from "@/lib/fedica";
 import type {
   PublisherProvider,
   SchedulePostInput,
@@ -34,8 +34,9 @@ async function resolveTwitterAccounts(
 
 /**
  * Fedica Publishing Provider.
- * Specific Date = DateTime with timezone. Never send PipelineId with DateTime.
+ * Operator pipeline + Specific DateTime. Slot times come from For You spacing in AP.
  */
+export class FedicaProvider implements PublisherProvider {
 export class FedicaProvider implements PublisherProvider {
   readonly name = "fedica";
 
@@ -71,7 +72,9 @@ export class FedicaProvider implements PublisherProvider {
     }
 
     const dateTime = formatFedicaDateTime(input.scheduledAtISO);
+    const pipelineId = fedicaPipelineId(input.pipelineId);
     const fedicaBody: Record<string, unknown> = {
+      PipelineId: pipelineId,
       DateTime: dateTime,
       Posts: [postBody],
     };
@@ -105,14 +108,14 @@ export class FedicaProvider implements PublisherProvider {
           success: false,
           error: data.Error || data.error || `Fedica post failed (${status})`,
           retryable,
-          raw: { ...data, sentDateTime: dateTime },
+          raw: { ...data, sentDateTime: dateTime, sentPipelineId: pipelineId },
         };
       }
 
       return {
         success: true,
         providerPostId: data.Id != null ? String(data.Id) : data.id != null ? String(data.id) : undefined,
-        raw: { ...data, sentDateTime: dateTime },
+        raw: { ...data, sentDateTime: dateTime, sentPipelineId: pipelineId },
       };
     } catch (e: any) {
       const msg =
