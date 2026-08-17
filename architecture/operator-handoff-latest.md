@@ -70,15 +70,17 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 **Seed Generator:** candidates only.
 
 **Agent승 operating structure (always in the model, not RAG):**
-choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH · writing theory · Writer 말투/structure instructions · seven-day schedule + batches.
+choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH from **data** (no Collections) · retrieve writing-theory cards · **extract conclusions** · seven-day schedule + batches.
 
-**Writing theories:** xAI **Collections API** (`POST /v1/documents/search`, hybrid). Server-side search only — do **not** give Grok `collections_search` as a tool (multi-search cost). `limit` 3 chunks. Reinterpret; mix at most 2 cards. Env `XAI_THEORY_COLLECTION_ID`. Skip if unset.
+**RETURN/BRIDGE/REACH:** decided on kept seeds from 30-day Analytics + 14-day sync fill. Collections is not called.
 
-**Cost:** operating structure is prompt (cheap, every call). Theory library is retrieved only when emitting Writer instructions. Judge does not search. One query per slot, not a tool loop.
+**Writing theories:** xAI Collections, server search only (`POST /v1/documents/search`, hybrid, `limit` 3, one query per slot). Do **not** give Grok `collections_search` as a tool. Agent승 reinterprets/mixes cards internally. **Never send theory cards or theory names to Writer.** Writer gets **conclusions only** — designed form (what to close, what structure, what 말투 bounds) so Writer executes a designed post, not free creation.
 
-**Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking. Diversity, seed-fit, anti-repeat.
+**Cost:** operating structure is prompt. Collections only when Agent승 is extracting Writer conclusions. Skip: volume lock, Judge, clock-only ticks, unset `XAI_THEORY_COLLECTION_ID`.
 
-**Writer:** body only from Agent승 instructions.
+**Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking of theories. Diversity, seed-fit, anti-repeat; also the evidence for Return/Bridge/Reach.
+
+**Writer:** 창작이 아님. Agent승 결론대로 설계된 형식의 본문만 작성.
 
 **Planner:** absorbed (not fully wired yet).
 
