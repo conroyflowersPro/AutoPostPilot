@@ -67,16 +67,19 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 
 **Name:** Creator DNA → **Agent승**. 채팅창이 아니라 주를 운영하는 작업자.
 
-**Seed Generator:** candidates only.
+**Seed Generator:** candidates only. Intended: X live search of posts the algo already selected (likes ≥ 50, replies ≥ 20). Seeds already have force.
 
-**Agent승 operating structure (always in the model, not RAG):**
-choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH from **data** (no Collections) · retrieve writing-theory cards · **extract conclusions** · seven-day schedule + batches.
+**Agent승 operating order:** `lib/intelligence/agent-seung.ts` (`AGENT_SEUNG_OPERATING_ORDER`). Always in the model, not RAG. Evaluate seeds vs 30d Analytics + 14d sync fill · recognize force / known force · Return/Bridge/Reach from **data only** · retrieve theory cards only at theory-select · Writer design items only (no theory names, no body) · 7-day schedule + batches.
 
-**RETURN/BRIDGE/REACH:** decided on kept seeds from 30-day Analytics + 14-day sync fill. Collections is not called.
+**RETURN/BRIDGE/REACH:** 30-day Analytics + 14-day sync fill. Collections is not called here.
 
-**Collections doc:** one file `architecture/agent-seung-theory-collection.md` (9 theories after one-by-one operator agreement). Empty until each theory is discussed. Writer never sees it.
+**Collections source (upload these two files):**
+- `architecture/collections/viral-theories.md` — 힘 알아보기. V1 Cialdini Social Proof + Scarcity only. V2–V9 empty until agreed.
+- `architecture/collections/writing-theories.md` — 닫는 형식. W1–W9 empty until agreed.
+- Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID` (fallback `XAI_THEORY_COLLECTION_ID`).
+- Search: one server hybrid search per slot, limit 3. Do not give Grok `collections_search`.
 
-**Cost:** operating structure is prompt. Collections only when Agent승 is extracting Writer conclusions. Skip: volume lock, Judge, clock-only ticks, unset `XAI_THEORY_COLLECTION_ID`.
+**Cost:** operating order is prompt. Collections only at theory-select. Skip: volume lock, Judge, clock-only ticks, unset collection ids.
 
 **Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking of theories. Diversity, seed-fit, anti-repeat; also the evidence for Return/Bridge/Reach.
 
@@ -86,4 +89,4 @@ choose seeds (결 / 알맹이 / 확장) · RETURN|BRIDGE|REACH from **data** (no
 
 ## Open
 
-Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Creator DNA absorb-Planner is specified, waiting on **반영해**.
+Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Agent승 order is planted; Planner absorb not fully wired. Next: agree remaining viral/writing cards one by one. Do not merge to `main` until **배포해**.
