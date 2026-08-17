@@ -9,3 +9,8 @@
 
 [functions."*"]
   timeout = 26
+
+[[headers]]
+  for = "/downloads/*"
+  [headers.values]
+    Content-Disposition = "attachment"
