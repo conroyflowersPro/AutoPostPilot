@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const pipelineId = String(
       body.pipelineId || SCHEDULING_CONFIG.defaultPipelineId
     );
-    const requireMedia = body.requireMedia !== false;
+    const requireMedia = body.requireMedia === true;
     const scheduledAt =
       typeof body.scheduledAt === "string" && body.scheduledAt.trim()
         ? body.scheduledAt.trim()

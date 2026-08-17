@@ -71,26 +71,20 @@ export default function PostActions({
   const hasMedia = !!(post.media_urls && post.media_urls.length > 0);
   const mediaLocked = post.status === "scheduled";
 
-  /** Next = mark reviewed (if media) then navigate */
-  async function goNext(forceWithoutMedia = false) {
+  /** Next = mark reviewed (media optional) then navigate */
+  async function goNext() {
     if (movingNext) return;
     setMovingNext(true);
     setMessage(null);
 
     try {
-      if (post.status !== "scheduled" && post.status !== "published") {
-        if (hasMedia) {
+        if (post.status !== "scheduled" && post.status !== "published") {
           const { error } = await supabase
             .from("SeungContent")
             .update({ status: "reviewed" })
             .eq("id", post.id);
           if (error) throw error;
-        } else if (!forceWithoutMedia) {
-          setMessage("미디어를 올린 뒤 다음을 누르면 reviewed로 들어갑니다.");
-          setMovingNext(false);
-          return;
         }
-      }
 
       if (nextId) {
         router.push(`/posts/${nextId}`);
@@ -397,7 +391,7 @@ export default function PostActions({
         />
 
         <p className="mt-2 text-[11px] text-zinc-500">
-          미디어 후 아래 <strong>다음</strong> → reviewed → 큐에서 선택 일괄 스케줄
+          미디어가 없어도 스케줄할 수 있습니다. 아래 <strong>다음</strong> → reviewed → 큐에서 선택 일괄 스케줄
         </p>
       </div>
 

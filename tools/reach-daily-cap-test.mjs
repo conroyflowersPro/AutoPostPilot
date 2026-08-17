@@ -49,7 +49,7 @@ function enforceReachDailyCap(list) {
   return list;
 }
 
-console.log("REACH daily cap + Writer DNA slice (v12.4.0)");
+console.log("REACH daily cap + Writer DNA slice (v12.4.1)");
 
 ok("R1. parser constants 1 and max 2",
   /REACH_PER_DAY_TARGET = 1/.test(slots) && /REACH_PER_DAY_MAX = 2/.test(slots) && /enforceReachDailyCap/.test(slots));
@@ -75,14 +75,19 @@ ok("R4. missing REACH fills one non-EXPERIENCE", (() => {
 })());
 ok("R5. Writer uses slice not full DNA block",
   /creatorDnaWriterSlice\(s\(planner\.strategic_role\)\)/.test(wr) && !/creatorDnaBlock\(\)/.test(wr));
-ok("R6. Writer slice has always-forbids and no Tesla/FSD list",
-  /ALWAYS FORBIDDEN/.test(dna) && /End without closing the observation/.test(dna) &&
-  /export function creatorDnaWriterSlice/.test(dna) &&
-  !/Tesla\/FSD/.test(dna.slice(dna.indexOf("creatorDnaWriterSlice"))));
+ok("R6. Writer slice has always-forbids and no Tesla/FSD list", (() => {
+  const start = dna.indexOf("export function creatorDnaWriterSlice");
+  const next = dna.indexOf("\nexport function", start + 1);
+  const sliceFn = dna.slice(start, next > start ? next : undefined);
+  return /ALWAYS FORBIDDEN/.test(sliceFn) &&
+    /End without closing the observation/.test(dna) &&
+    start >= 0 &&
+    !/Tesla\/FSD/.test(sliceFn);
+})());
 ok("R7. Slot DNA keeps Tesla as seed interest only",
   /SEED INTEREST: Tesla\/FSD/.test(dna) && /Do not force EXPERIENCE share/.test(dna));
-ok("R8. version 12.4.0",
-  /"version": "12.4.0"/.test(pkg) && /APP_VERSION = "12.4.0"/.test(ver) && /APP_VERSION = "12.4.0"/.test(ix));
+ok("R8. version 12.4.1",
+  /"version": "12.4.1"/.test(pkg) && /APP_VERSION = "12.4.1"/.test(ver) && /APP_VERSION = "12.4.1"/.test(ix));
 
 console.log("========================================");
 console.log(`REACH + WRITER SLICE: ${pass} PASS / ${fail} FAIL`);

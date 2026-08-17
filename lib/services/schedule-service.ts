@@ -63,7 +63,7 @@ export async function scheduleOnePost(opts: {
   pipelineId?: string;
   requireMedia?: boolean;
 }): Promise<ScheduleOneResult> {
-  const { supabase, provider, post, scheduledAtISO, requireMedia = true } = opts;
+  const { supabase, provider, post, scheduledAtISO, requireMedia = false } = opts;
   const pipelineId =
     opts.pipelineId || post.pipeline_id || SCHEDULING_CONFIG.defaultPipelineId;
 

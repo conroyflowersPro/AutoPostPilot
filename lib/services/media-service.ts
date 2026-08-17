@@ -174,7 +174,7 @@ export async function prepareMediaForPublish(
       retryable: boolean;
     }
 > {
-  const requireMedia = opts?.requireMedia !== false;
+  const requireMedia = opts?.requireMedia === true;
   const list = (urls || []).filter(Boolean);
   if (list.length === 0) {
     if (requireMedia) {

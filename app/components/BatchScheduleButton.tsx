@@ -15,7 +15,7 @@ export default function BatchScheduleButton({
 
   async function handleBatch() {
     if (reviewedCount === 0) {
-      setProgress("검수 완료(reviewed) + 미디어가 있는 포스트가 없습니다.");
+      setProgress("검수 완료(reviewed) 포스트가 없습니다.");
       return;
     }
     if (
@@ -36,7 +36,7 @@ export default function BatchScheduleButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pipelineId: "42303",
-          requireMedia: true,
+          requireMedia: false,
         }),
       });
       const data = await res.json();

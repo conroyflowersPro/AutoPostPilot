@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -76,6 +76,7 @@ function todayLA() {
 
 export default function PostList({ posts }: { posts: Post[] }) {
   const [filter, setFilter] = useState<string>("draft");
+  const [livePosts, setLivePosts] = useState<Post[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState(todayLA);
   const [maxPerDay, setMaxPerDay] = useState(5);
@@ -84,24 +85,71 @@ export default function PostList({ posts }: { posts: Post[] }) {
   const [scheduleResult, setScheduleResult] = useState<any>(null);
   const router = useRouter();
   const supabase = createClient();
+  const queue = livePosts || posts;
+
+  const loadQueue = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const cols =
+      "id, content, final_text, topic, status, pipeline_id, media_urls, scheduled_at, created_at, strategy_json";
+    const [active, rest] = await Promise.all([
+      supabase
+        .from("SeungContent")
+        .select(cols)
+        .eq("user_id", user.id)
+        .in("status", ["draft", "reviewed", "scheduling", "schedule_failed"])
+        .order("created_at", { ascending: false })
+        .limit(800),
+      supabase
+        .from("SeungContent")
+        .select(cols)
+        .eq("user_id", user.id)
+        .in("status", ["scheduled", "published"])
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
+    const byId = new Map<string, Post>();
+    for (const row of [...(active.data || []), ...(rest.data || [])] as Post[]) {
+      if (row?.id) byId.set(row.id, row);
+    }
+    setLivePosts(
+      Array.from(byId.values()).sort((a, b) =>
+        String(b.created_at || "").localeCompare(String(a.created_at || ""))
+      )
+    );
+  }, [supabase]);
+
+  useEffect(() => {
+    loadQueue();
+    const onFocus = () => {
+      loadQueue();
+      router.refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [loadQueue, router]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: posts.length };
-    for (const p of posts) c[p.status] = (c[p.status] || 0) + 1;
+    const c: Record<string, number> = { all: queue.length };
+    for (const p of queue) c[p.status] = (c[p.status] || 0) + 1;
     return c;
-  }, [posts]);
+  }, [queue]);
 
   const visible = useMemo(() => {
-    if (filter === "all") return posts;
-    return posts.filter((p) => p.status === filter);
-  }, [posts, filter]);
+    if (filter === "all") return queue;
+    return queue.filter((p) => p.status === filter);
+  }, [queue, filter]);
 
   const selectable = visible.filter(
     (p) =>
       (p.status === "reviewed" || p.status === "schedule_failed") &&
-      p.pipeline_id === "42303" &&
-      p.media_urls &&
-      p.media_urls.length > 0
+      p.pipeline_id === "42303"
   );
 
   function toggle(id: string) {
@@ -135,7 +183,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
 
   async function handleBatchMarkReviewed() {
     const ids = Array.from(selected).filter((id) => {
-      const p = posts.find((x) => x.id === id);
+      const p = queue.find((x) => x.id === id);
       return p && p.status === "draft";
     });
     if (ids.length === 0) {
@@ -158,6 +206,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
       if (error) throw error;
       setSelected(new Set());
       setMsg(`${ids.length}개 draft → reviewed 완료`);
+      await loadQueue();
       router.refresh();
     } catch (e: any) {
       setMsg(e.message || String(e));
@@ -222,7 +271,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
       selectable.some((p) => p.id === id)
     );
     if (ids.length === 0) {
-      setMsg("reviewed(또는 재시도 failed) + 미디어 있는 포스트를 선택하세요.");
+      setMsg("reviewed(또는 재시도 failed) 포스트를 선택하세요.");
       return;
     }
     if (
@@ -253,7 +302,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             pipelineId: "42303",
-            requireMedia: true,
+            requireMedia: false,
             postIds: chunk,
             startDate,
             maxPerDay,
@@ -287,6 +336,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
       setScheduleResult(summary);
       setMsg(summary.message);
       setSelected(new Set());
+      await loadQueue();
       router.refresh();
     } catch (e: any) {
       setMsg(e.message || "실패");
@@ -454,8 +504,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
           {visible.map((post) => {
             const canSchedule =
               (post.status === "reviewed" || post.status === "schedule_failed") &&
-              post.pipeline_id === "42303" &&
-              !!post.media_urls?.length;
+              post.pipeline_id === "42303";
             const checked = selected.has(post.id);
 
             return (

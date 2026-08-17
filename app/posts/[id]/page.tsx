@@ -4,6 +4,11 @@ import Link from "next/link";
 import PostActions from "./PostActions";
 import PostContentEditor from "./PostContentEditor";
 
+export const dynamic = "force-dynamic";
+
+const QUEUE_STATUSES = ["draft", "reviewed", "scheduling", "schedule_failed"] as const;
+const DONE_STATUSES = ["scheduled", "published"] as const;
+
 export default async function PostDetailPage({
   params,
 }: {
@@ -21,16 +26,33 @@ export default async function PostDetailPage({
     .from("SeungContent")
     .select("*")
     .eq("id", id)
-    .single();
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   if (!post) notFound();
 
-  const { data: allIds } = await supabase
-    .from("SeungContent")
-    .select("id")
-    .order("created_at", { ascending: false });
-
-  const ids = (allIds || []).map((r: { id: string }) => r.id);
+  const [{ data: queueIds }, { data: doneIds }] = await Promise.all([
+    supabase
+      .from("SeungContent")
+      .select("id, created_at")
+      .eq("user_id", user.id)
+      .in("status", [...QUEUE_STATUSES])
+      .order("created_at", { ascending: false })
+      .limit(800),
+    supabase
+      .from("SeungContent")
+      .select("id, created_at")
+      .eq("user_id", user.id)
+      .in("status", [...DONE_STATUSES])
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+  const ids = [...(queueIds || []), ...(doneIds || [])]
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    .map((r: { id: string }) => r.id);
   const idx = ids.indexOf(id);
   // list is newest-first: "next" in workflow = older draft (idx+1)
   const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;

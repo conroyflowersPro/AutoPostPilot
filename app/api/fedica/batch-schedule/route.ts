@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const pipelineId = String(
       body.pipelineId || SCHEDULING_CONFIG.defaultPipelineId
     );
-    const requireMedia = body.requireMedia !== false;
+    const requireMedia = body.requireMedia === true;
     const postIds: string[] = Array.isArray(body.postIds)
       ? body.postIds.map(String).slice(0, SCHEDULING_CONFIG.batchSize)
       : [];

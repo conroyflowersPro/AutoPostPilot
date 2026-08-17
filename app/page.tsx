@@ -8,6 +8,11 @@ import PerformanceCoverageButton from "./components/PerformanceCoverageButton";
 import EvidenceExportButton from "./components/EvidenceExportButton";
 import { getAccountSyncState, getQueueMonthInscription } from "@/lib/calendar/activity-provider";
 
+export const dynamic = "force-dynamic";
+
+const QUEUE_STATUSES = ["draft", "reviewed", "scheduling", "schedule_failed"] as const;
+const DONE_STATUSES = ["scheduled", "published"] as const;
+
 function syncLabel(status: string) {
   switch (status) {
     case "ok":
@@ -50,10 +55,25 @@ export default async function HomePage({
   const q = searchParams ? await searchParams : {};
   const { year, month } = parseCal(q.cal);
 
-  const { data: posts } = await supabase
-    .from("SeungContent")
-    .select("*")
-    .order("created_at", { ascending: false });
+    const [{ data: queuePosts }, { data: donePosts }] = await Promise.all([
+        supabase
+            .from("SeungContent")
+            .select("*")
+            .eq("user_id", user.id)
+            .in("status", [...QUEUE_STATUSES])
+            .order("created_at", { ascending: false })
+            .limit(800),
+        supabase
+            .from("SeungContent")
+            .select("*")
+            .eq("user_id", user.id)
+            .in("status", [...DONE_STATUSES])
+            .order("created_at", { ascending: false })
+            .limit(200),
+    ]);
+    const posts = [...(queuePosts || []), ...(donePosts || [])].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
   const [account, inscribed] = await Promise.all([
     getAccountSyncState(),
