@@ -11,6 +11,7 @@ const evidence = read("lib/x/evidence.ts");
 const page = read("app/page.tsx");
 const list = read("app/components/PostList.tsx");
 const cal = read("app/components/QueueMonthCalendar.tsx");
+const prov = read("lib/calendar/activity-provider.ts");
 const ver = read("lib/version.ts");
 const ix = read("supabase/functions/weekly-plan/index.ts");
 
@@ -40,6 +41,7 @@ ok("Q9. month calendar on queue home", /QueueMonthCalendar/.test(page) && /수�
 ok("Q10. login does not sync X", !/runXAccountSync/.test(page) && /href="\/api\/x\/sync"/.test(page));
 ok("Q11. shipping 12.5.2", /APP_VERSION = "12.5.2"/.test(ver) && /APP_VERSION = "12.5.2"/.test(ix));
 ok("Q12. booked schedule days merged into month calendar", /mergeBookedScheduleDays/.test(inscribe) && /booked: "예약"/.test(inscribe));
+ok("Q13. calendar 예약 is Fedica-id scheduled only", /fedica_post_id/.test(prov) && /eq\("status", "scheduled"\)/.test(prov));
 
 console.log("========================================");
 console.log(`QUEUE CALENDAR: ${pass} PASS / ${fail} FAIL`);

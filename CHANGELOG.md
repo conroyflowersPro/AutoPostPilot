@@ -11,7 +11,7 @@
 
 - Fedica 예약은 글에 지정된 파이프라인으로 들어가고, 날짜·시각도 같이 보냅니다. 간격은 For You 14:00–22:00 PT, 약 2시간입니다
 - Fedica가 글 ID를 준 뒤에만 AP를 scheduled로 바꿉니다. 예약 시작만으로 scheduled에 쌓이지 않습니다
-- Fedica 쪽 정리는 직접 하시면 됩니다. AP scheduled에 남은 예전 글은 큐에서 지우면 됩니다
+- 달력 예약은 Fedica 글 ID가 있는 scheduled만 셉니다. draft·reviewed는 넣지 않습니다
 
 ## 12.5.1 — 2026-08-17
 
