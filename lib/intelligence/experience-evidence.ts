@@ -4,6 +4,7 @@
  * Never invent 1st-person experience. Never republish original post text.
  * Evidence constraint > Editorial Ratio fill pressure.
  */
+import { classifyEvidenceOrigin } from "../origin-class";
 
 export type ExperienceProvenance =
   | "RECENT_MANUAL_14D"
@@ -127,8 +128,7 @@ export function buildRecentExperienceCandidates(
   const out: ExperienceCandidate[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    const soc = String(row.system_origin_class || "").toUpperCase();
-    if (soc && /APP|SYSTEM|AUTOPOST|GENERATED/.test(soc)) continue;
+    if (classifyEvidenceOrigin(row.system_origin_class) !== "USER_DIRECT") continue;
     const pt = String(row.post_type || "").toUpperCase();
     if (pt === "REPLY" || pt === "REPOST") continue;
     if (pt && pt !== "ORIGINAL" && pt !== "QUOTE" && pt !== "UNKNOWN" && pt !== "") continue;

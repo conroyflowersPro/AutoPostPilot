@@ -126,12 +126,16 @@ function mostFrequentActions(items: any[]): string[] {
     .slice(0, 8);
 }
 
+function classifyThinkingOrigin(row: ActivityRow): "USER_DIRECT" | "AP_PIPELINE" | "UNKNOWN" {
+  const v = String(row.system_origin_class || row.origin || "").toUpperCase().trim();
+  if (!v) return "UNKNOWN";
+  if (/USER_DIRECT|MANUAL|HANDMADE|CREATOR_DIRECT/.test(v)) return "USER_DIRECT";
+  if (/AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED|SYSTEM_ASSISTED/.test(v)) return "AP_PIPELINE";
+  return "UNKNOWN";
+}
+
 function isCreatorThinkingEvidence(row: ActivityRow): boolean {
-  const soc = String(row.system_origin_class || "").toUpperCase();
-  if (/AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED|SYSTEM_ASSISTED/.test(soc)) return false;
-  const origin = String(row.origin || "").toUpperCase();
-  if (origin && /AP_PIPELINE/.test(origin) && !/USER_DIRECT|MANUAL/.test(origin)) return false;
-  return true;
+  return classifyThinkingOrigin(row) === "USER_DIRECT";
 }
 
 function buildExtractPrompt(
@@ -389,22 +393,8 @@ Deno.serve(async (req: Request) => {
         return json({ error: actErr.message, xAI_API_USED: false }, 400);
       }
 
-      const allowed: ActivityRow[] = [];
-      for (const r of rows || []) {
-        const kind = classifyPostType(r as ActivityRow);
-        if (kind === "REPOST" && !job.include_repost) continue;
-        if (kind === "REPLY" && !job.include_reply) continue;
-        if (kind === "ORIGINAL" && !job.include_original) continue;
-        if (kind === "QUOTE" && !job.include_quote) continue;
-        if (kind !== "ORIGINAL" && kind !== "QUOTE") continue;
-        if (!isCreatorThinkingEvidence(r as ActivityRow)) continue;
-        const text = String((r as ActivityRow).text_body || "").trim();
-        if (text.length < 12) continue;
-        allowed.push(r as ActivityRow);
-        if (allowed.length >= job.batch_size) break;
-      }
-
-      if (allowed.length === 0) {
+      const scanned = (rows || []) as ActivityRow[];
+      if (scanned.length === 0) {
         await supabase
           .from("thinking_extract_jobs")
           .update({
@@ -412,14 +402,63 @@ Deno.serve(async (req: Request) => {
             finished_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             last_error: null,
+            checkpoint_meta: {
+              ...(job.checkpoint_meta || {}),
+              scan_exhausted: true,
+            },
           })
           .eq("id", jobId);
         return json({
           success: true,
           done: true,
-          reason: "no more eligible posts",
+          reason: "no more source rows",
           xAI_API_USED: false,
           auth_mode: authMode,
+        });
+      }
+
+      const allowed: ActivityRow[] = [];
+      let skippedThisScan = 0;
+      for (const r of scanned) {
+        const kind = classifyPostType(r);
+        if (kind === "REPOST" && !job.include_repost) { skippedThisScan++; continue; }
+        if (kind === "REPLY" && !job.include_reply) { skippedThisScan++; continue; }
+        if (kind === "ORIGINAL" && !job.include_original) { skippedThisScan++; continue; }
+        if (kind === "QUOTE" && !job.include_quote) { skippedThisScan++; continue; }
+        if (kind !== "ORIGINAL" && kind !== "QUOTE") { skippedThisScan++; continue; }
+        if (!isCreatorThinkingEvidence(r)) { skippedThisScan++; continue; }
+        const text = String(r.text_body || "").trim();
+        if (text.length < 12) { skippedThisScan++; continue; }
+        allowed.push(r);
+        if (allowed.length >= job.batch_size) break;
+      }
+
+      if (allowed.length === 0) {
+        const lastScanned = scanned[scanned.length - 1];
+        await supabase
+          .from("thinking_extract_jobs")
+          .update({
+            status: "PAUSED",
+            skipped_count: (job.skipped_count || 0) + skippedThisScan,
+            cursor_published_at: lastScanned.published_at,
+            cursor_x_post_id: lastScanned.x_post_id,
+            updated_at: new Date().toISOString(),
+            last_error: null,
+            checkpoint_meta: {
+              ...(job.checkpoint_meta || {}),
+              scanned_none_eligible: true,
+              last_scan_size: scanned.length,
+            },
+          })
+          .eq("id", jobId);
+        return json({
+          success: true,
+          done: false,
+          reason: "scanned_none_eligible_continue",
+          scanned: scanned.length,
+          xAI_API_USED: false,
+          auth_mode: authMode,
+          next: "action=tick again",
         });
       }
 
@@ -506,20 +545,21 @@ Deno.serve(async (req: Request) => {
         if (!upErr) written++;
       }
 
-      const last = batch[batch.length - 1];
+      const lastEligible = batch[batch.length - 1];
+      const filledBatch = batch.length >= job.batch_size;
+      const cursorRow = filledBatch ? lastEligible : scanned[scanned.length - 1];
       const processed_count = job.processed_count + batch.length;
-      const done =
-        processed_count >= job.pilot_max_posts ||
-        batch.length < job.batch_size;
+      const done = processed_count >= job.pilot_max_posts;
 
       await supabase
         .from("thinking_extract_jobs")
         .update({
           status: done ? "COMPLETE" : "PAUSED",
           processed_count,
+          skipped_count: (job.skipped_count || 0) + skippedThisScan,
           xai_calls: (job.xai_calls || 0) + (extractResult.xai_used ? 1 : 0),
-          cursor_published_at: last.published_at,
-          cursor_x_post_id: last.x_post_id,
+          cursor_published_at: cursorRow.published_at,
+          cursor_x_post_id: cursorRow.x_post_id,
           failed_batches:
             (job.failed_batches || 0) + (extractResult.error ? 1 : 0),
           last_error: extractResult.error || null,

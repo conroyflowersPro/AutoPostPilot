@@ -22,10 +22,11 @@ function s(v: unknown, max = 240): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-function mode(v: unknown): EditorialMode {
-  const value = s(v, 40).toUpperCase();
+function parseSlotMode(v: unknown): EditorialMode | null {
+  const value = s(v, 40).toUpperCase().replace(/\s+/g, "_");
+  if (value === "OBSERVATION" || value === "CASUAL") return "CASUAL_OBSERVATION";
   const ok = ["INFORMATIVE", "COMPARE", "OPINION", "EXPERIENCE", "CASUAL_OBSERVATION"];
-  return (ok.includes(value) ? value : "INFORMATIVE") as EditorialMode;
+  return ok.includes(value) ? (value as EditorialMode) : null;
 }
 
 export type GrowthRole = "RETURN" | "BRIDGE" | "REACH";
@@ -33,41 +34,33 @@ export type GrowthRole = "RETURN" | "BRIDGE" | "REACH";
 export const REACH_PER_DAY_TARGET = 1;
 export const REACH_PER_DAY_MAX = 2;
 
-export function growthRole(v: unknown): GrowthRole {
+export function growthRole(v: unknown): GrowthRole | null {
   const value = s(v, 20).toUpperCase();
-  if (value === "PRESENCE") return "RETURN";
   if (value === "REACH") return "REACH";
   if (value === "BRIDGE") return "BRIDGE";
-  return "RETURN";
+  if (value === "RETURN") return "RETURN";
+  return null;
 }
 
-/** One REACH per day, never more than two. Extra REACH becomes RETURN. Missing REACH takes a non-EXPERIENCE slot when possible. */
-export function enforceReachDailyCap<T extends { day_offset: number; strategic_role: string; editorial_mode?: string }>(
+/** Constraint check only. Does not invent REACH or rewrite extra REACH. */
+export function reachDailyConstraintOk<T extends { day_offset: number; strategic_role: string }>(
   slots: T[],
-): T[] {
-  const byDay = new Map<number, T[]>();
+): boolean {
+  const byDay = new Map<number, number>();
+  const dayHas = new Set<number>();
   for (const slot of slots) {
     const day = Number(slot.day_offset);
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day)!.push(slot);
-  }
-  for (const daySlots of byDay.values()) {
-    const reachAt: number[] = [];
-    for (let i = 0; i < daySlots.length; i += 1) {
-      if (String(daySlots[i].strategic_role || "").toUpperCase() === "REACH") reachAt.push(i);
-    }
-    while (reachAt.length > REACH_PER_DAY_MAX) {
-      const idx = reachAt.pop();
-      if (idx == null) break;
-      daySlots[idx].strategic_role = "RETURN";
-    }
-    if (reachAt.length === 0 && daySlots.length) {
-      let pick = daySlots.findIndex((slot) => String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE");
-      if (pick < 0) pick = daySlots.length - 1;
-      daySlots[pick].strategic_role = "REACH";
+    if (!Number.isFinite(day)) continue;
+    dayHas.add(day);
+    if (String(slot.strategic_role || "").toUpperCase() === "REACH") {
+      byDay.set(day, (byDay.get(day) || 0) + 1);
     }
   }
-  return slots;
+  for (const day of dayHas) {
+    const n = byDay.get(day) || 0;
+    if (n < 1 || n > REACH_PER_DAY_MAX) return false;
+  }
+  return true;
 }
 
 function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
@@ -78,6 +71,7 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
     "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent, planned_at (ISO UTC), planned_pt (America/Los_Angeles wall time).",
     "Date and time are strategy. Infer each timestamp from the evidence this job. Adjacent planned originals at least 2 hours. Do not emit a repeating 14:00/16:00/18:00/20:00/22:00 grid. Do not add random jitter. 14:00–22:00 PT are audience hours to consider, not a template.",
+    "If a required field is missing, say so by omitting that slot. The runtime will ask you to re-infer that range. Do not leave Role, Editorial Mode, or timestamp blank for the code to fill.",
     "USER_DIRECT and AP_PIPELINE are separate populations. Do not average them. Do not learn Creator Voice from AP_PIPELINE.",
     "Complexity/Emergence is a judgment, not a ratio or slot recipe. Keep Creator Identity and long-term account growth together.",
     "REACH: 1 per day_offset, never more than 2. Prefer CASUAL_OBSERVATION or easy INFORMATIVE. PRESENCE is not a role and is not REACH. Do not freeze RETURN/BRIDGE share.",
@@ -121,8 +115,6 @@ export function creatorDaysAreOneBased(rawOffsets: number[], allowed: number[]):
   return oneOk > zeroOk;
 }
 
-const PAD_MODES: EditorialMode[] = ["INFORMATIVE", "COMPARE", "OPINION", "CASUAL_OBSERVATION"];
-
 export function parseCreatorDaySlots(args: {
   raw: any;
   days: number[];
@@ -145,48 +137,29 @@ export function parseCreatorDaySlots(args: {
     const n = dayCounts.get(day) || 0;
     if (n >= cap) continue;
     const role = growthRole(item?.growth_role || item?.strategic_role);
+    const editorial_mode = parseSlotMode(item?.editorial_mode);
+    const planned_at = s(item?.planned_at, 48);
+    const planned_pt = s(item?.planned_pt || item?.planned_time, 48);
+    if (!role || !editorial_mode || (!planned_at && !planned_pt)) continue;
+    const intent = s(item?.planner_intent || item?.intent || item?.purpose, 240);
+    if (!intent) continue;
     let slotId = s(item?.slot_id, 40) || `D${day + 1}P${n + 1}`;
     if (seen.has(slotId)) slotId = `D${day + 1}P${n + 1}`;
-    const intent = s(item?.planner_intent || item?.intent || item?.purpose, 240)
-      || `${role} ${mode(item?.editorial_mode)} AP original`;
     seen.add(slotId);
     dayCounts.set(day, n + 1);
     slots.push({
       slot_id: slotId,
       day_offset: day,
       strategic_role: role,
-      editorial_mode: mode(item?.editorial_mode),
+      editorial_mode,
       planner_intent: intent,
-      planned_at: s(item?.planned_at, 48) || undefined,
-      planned_pt: s(item?.planned_pt || item?.planned_time, 48) || undefined,
+      planned_at: planned_at || undefined,
+      planned_pt: planned_pt || undefined,
     });
   }
-  if (!slots.length) return null;
-  for (const day of days) {
-    const cap = args.postsPerDay[day] || QUOTA_PER_DAY_MIN;
-    while ((dayCounts.get(day) || 0) < cap) {
-      const n = dayCounts.get(day) || 0;
-      let seq = n + 1;
-      let slotId = `D${day + 1}P${seq}`;
-      while (seen.has(slotId)) {
-        seq += 1;
-        slotId = `D${day + 1}P${seq}`;
-      }
-      const editorial_mode = PAD_MODES[n % PAD_MODES.length];
-      const role = n % 3 === 0 ? "BRIDGE" : "RETURN";
-      seen.add(slotId);
-      dayCounts.set(day, n + 1);
-      slots.push({
-        slot_id: slotId,
-        day_offset: day,
-        strategic_role: role,
-        editorial_mode,
-        planner_intent: `${role} ${editorial_mode} AP original`,
-      });
-    }
-  }
   if (slots.length !== want) return null;
-  return enforceReachDailyCap(slots);
+  if (!reachDailyConstraintOk(slots)) return null;
+  return slots;
 }
 
 export async function inferCreatorWeekVolume(args: {
@@ -261,6 +234,74 @@ export async function inferCreatorSlotsForDays(args: {
   });
 }
 
+export async function inferCreatorSlotReplan(args: {
+  xaiKey: string;
+  audience: AudienceXStatus;
+  weekSlots: PlannerSlotIntent[];
+  replanSlotId: string;
+  judgeReasons: string[];
+  seedPool: Array<{ seed_id: string; concrete_subject?: string; cluster?: string; editorial_mode?: string }>;
+  planEvidence?: AgentSeungPlanEvidence | null;
+  occupiedTimes?: string[];
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSlotIntent & { seed_id?: string }>> {
+  const current = (args.weekSlots || []).find((slot) => slot.slot_id === args.replanSlotId);
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 1800,
+    timeoutMs: args.timeoutMs,
+    system: [
+      "You are Agent승 replanning ONE AP slot. The rest of the week stays.",
+      creatorDnaBlock(),
+      "Judge flagged this slot's strategy as invalid. You infer the replacement Role, Editorial Mode, timestamp, planner_intent, and seed_id from the evidence and seed pool.",
+      "Do not rewrite other slots. Do not restart the seven-day plan. Code will not invent Role, Mode, REACH, or time if you omit them.",
+      "Adjacent planned originals at least 2 hours. No 14:00 grid. No jitter.",
+      "Return strict JSON: { \"slot\": { slot_id, day_offset, growth_role, editorial_mode, planner_intent, planned_at, planned_pt, seed_id } }.",
+    ].join("\n"),
+    user: {
+      audience_counts: compactAudienceCounts(args.audience),
+      plan_evidence: args.planEvidence ? planEvidenceForModel(args.planEvidence) : null,
+      week_slots: (args.weekSlots || []).map((slot) => ({
+        slot_id: slot.slot_id,
+        day_offset: slot.day_offset,
+        strategic_role: slot.strategic_role,
+        editorial_mode: slot.editorial_mode,
+        planned_at: slot.planned_at || "",
+        planned_pt: slot.planned_pt || "",
+      })),
+      replan_slot_id: args.replanSlotId,
+      current_slot: current || null,
+      judge_invalidation_reasons: (args.judgeReasons || []).map((r) => s(r, 160)).slice(0, 12),
+      available_seeds: (args.seedPool || []).slice(0, 40),
+      occupied_times: (args.occupiedTimes || []).slice(0, 40),
+    },
+    parse: (raw) => {
+      const item = raw?.slot || raw?.slots?.[0] || raw;
+      if (!item) return null;
+      const role = growthRole(item.growth_role || item.strategic_role);
+      const editorial_mode = parseSlotMode(item.editorial_mode);
+      const planned_at = s(item.planned_at, 48);
+      const planned_pt = s(item.planned_pt || item.planned_time, 48);
+      const intent = s(item.planner_intent || item.intent, 240);
+      const slot_id = s(item.slot_id || args.replanSlotId, 40);
+      if (!role || !editorial_mode || (!planned_at && !planned_pt) || !intent || !slot_id) return null;
+      const seed_id = s(item.seed_id, 80);
+      if (args.seedPool.length && !seed_id) return null;
+      if (args.seedPool.length && !args.seedPool.some((seed) => seed.seed_id === seed_id)) return null;
+      return {
+        slot_id,
+        day_offset: Number.isFinite(Number(item.day_offset)) ? Number(item.day_offset) : Number(current?.day_offset || 0),
+        strategic_role: role,
+        editorial_mode,
+        planner_intent: intent,
+        planned_at: planned_at || undefined,
+        planned_pt: planned_pt || undefined,
+        seed_id: seed_id || undefined,
+      };
+    },
+  });
+}
+
 export async function creatorRelabelRejectBatch(args: {
   xaiKey: string;
   audience: AudienceXStatus;
@@ -298,10 +339,13 @@ export async function creatorRelabelRejectBatch(args: {
       for (const item of items) {
         const id = s(item.strategy_slot_id || item.slot_id, 40);
         if (!id) continue;
+        const role = growthRole(item.growth_role || item.strategic_role);
+        const editorial_mode = parseSlotMode(item.editorial_mode);
+        if (!role || !editorial_mode) continue;
         out.push({
           strategy_slot_id: id,
-          strategic_role: growthRole(item.growth_role || item.strategic_role),
-          editorial_mode: mode(item.editorial_mode),
+          strategic_role: role,
+          editorial_mode,
           planner_intent: s(item.planner_intent, 240),
         });
       }

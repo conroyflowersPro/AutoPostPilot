@@ -8,6 +8,7 @@ import {
 import {
   enforceMinGapOnPlannedTimes,
   MIN_PLANNED_GAP_MS,
+  spacingConstraintHolds,
 } from "../supabase/functions/weekly-plan/for-you-spread.ts";
 import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/fedica-strategy-contract.ts";
 import { parseCreatorDaySlots } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
@@ -59,6 +60,8 @@ assert.equal((compact as { eng?: number }).eng, undefined);
 
 assert.equal(classifyPlanOrigin("USER_DIRECT"), "USER_DIRECT");
 assert.equal(classifyPlanOrigin("AP_PIPELINE"), "AP_PIPELINE");
+assert.equal(classifyPlanOrigin(""), "UNKNOWN");
+assert.equal(classifyPlanOrigin("mystery"), "UNKNOWN");
 
 const evidence = buildAgentSeungPlanEvidence({
   startDate: "2026-08-19",
@@ -74,6 +77,12 @@ const evidence = buildAgentSeungPlanEvidence({
       published_at: "2026-08-11T21:00:00.000Z",
       content: "AP가 예약한 글 본문",
       metrics: { followers_gained: 3, likes: 10, impressions: 900, replies: 1 },
+    },
+    {
+      post_id: "u1",
+      published_at: "2026-08-12T21:00:00.000Z",
+      content: "출처 불명 본문",
+      metrics: { followers_gained: 1, likes: 8, impressions: 400, replies: 1 },
     },
   ],
   originByPostId: { a1: "USER_DIRECT", p1: "AP_PIPELINE" },
@@ -97,6 +106,9 @@ const evidence = buildAgentSeungPlanEvidence({
 });
 assert.equal(evidence.user_direct.posts.length, 1);
 assert.equal(evidence.ap_pipeline.posts.length, 1);
+assert.equal(evidence.unknown.posts.length, 1);
+assert.equal(evidence.unknown.posts[0].lk, 8);
+assert.equal(evidence.unknown.posts[0].t, "");
 assert.equal(evidence.ap_pipeline.posts[0].t, "");
 assert.match(evidence.user_direct.posts[0].t, /장면/);
 assert.equal(evidence.sync_gap.user_direct.length, 1);
@@ -108,11 +120,11 @@ const slots = enforceMinGapOnPlannedTimes("2026-08-19", [
   { day_offset: 0, planned_at: "2026-08-19T22:40:00.000Z" },
   { day_offset: 0, planned_at: "2026-08-20T03:11:00.000Z" },
 ]);
-const times = slots.map((s) => Date.parse(String(s.planned_at)));
-assert.equal(times[0], Date.parse("2026-08-19T22:07:00.000Z"));
-assert.ok(times[1] - times[0] >= MIN_PLANNED_GAP_MS);
-assert.ok(times[2] - times[1] >= MIN_PLANNED_GAP_MS);
-assert.notEqual(new Date(times[1]).toISOString(), "2026-08-19T23:00:00.000Z");
+assert.equal(slots[0].planned_at, "2026-08-19T22:07:00.000Z");
+assert.equal(slots[1].planned_at, "2026-08-19T22:40:00.000Z");
+assert.equal(slots[2].planned_at, "2026-08-20T03:11:00.000Z");
+assert.equal(spacingConstraintHolds(slots), false);
+assert.ok(MIN_PLANNED_GAP_MS >= 2 * 60 * 60 * 1000);
 
 const parsed = parseCreatorDaySlots({
   raw: {
@@ -140,6 +152,8 @@ const parsed = parseCreatorDaySlots({
         growth_role: "REACH",
         editorial_mode: "CASUAL_OBSERVATION",
         planner_intent: "easy entry",
+        planned_at: "2026-08-19T20:10:00.000Z",
+        planned_pt: "2026-08-19 13:10 PT",
       },
       {
         slot_id: "D1P4",
@@ -147,6 +161,8 @@ const parsed = parseCreatorDaySlots({
         growth_role: "RETURN",
         editorial_mode: "COMPARE",
         planner_intent: "compare without cloning",
+        planned_at: "2026-08-19T23:20:00.000Z",
+        planned_pt: "2026-08-19 16:20 PT",
       },
     ],
   },
@@ -156,6 +172,23 @@ const parsed = parseCreatorDaySlots({
 assert.ok(parsed);
 assert.equal(parsed![0].planned_at, "2026-08-19T22:15:00.000Z");
 assert.match(String(parsed![1].planned_pt), /17:40/);
+
+const incomplete = parseCreatorDaySlots({
+  raw: {
+    slots: [
+      {
+        slot_id: "D1P1",
+        day_offset: 0,
+        growth_role: "RETURN",
+        editorial_mode: "INFORMATIVE",
+        planner_intent: "keep identity",
+      },
+    ],
+  },
+  days: [0],
+  postsPerDay: [1, 4, 4, 4, 4, 4, 4],
+});
+assert.equal(incomplete, null);
 
 assert.equal(FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT, false);
 const fedicaBatch = readFileSync("app/api/fedica/batch-schedule/route.ts", "utf8");

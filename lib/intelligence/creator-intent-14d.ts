@@ -6,6 +6,8 @@
  * REPOST is reference only — never strong endorsement.
  */
 
+import { classifyEvidenceOrigin } from "../origin-class";
+
 export type ActivityPostType = "ORIGINAL" | "QUOTE" | "REPLY" | "REPOST" | "UNKNOWN";
 
 export type CreatorActivityRow = {
@@ -89,9 +91,7 @@ export function normalizePostType(row: CreatorActivityRow): ActivityPostType {
 }
 
 export function isHandmadeCandidate(row: CreatorActivityRow): boolean {
-  const soc = String(row.system_origin_class || "").toUpperCase();
-  if (soc && /APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED/.test(soc)) return false;
-  return true;
+  return classifyEvidenceOrigin(row.system_origin_class || row.origin) === "USER_DIRECT";
 }
 
 function strengthFromPublishing(score: number, originals: number): IntentStrength {

@@ -71,6 +71,8 @@ Complexity/Emergence: 계획된 AP가 기계적으로 굳는지, USER_DIRECT가 
 날짜·시각은 7일 전략의 일부다. freshness, 같은 작성자 원글 밀도, 각 글이 engagement를 얻을 시간을 고려하라.
 인접 계획 원글은 최소 2시간. 14:00부터 2시간 격자, 120분 반복, 임의 jitter, 고정 하루 시간표로 만들지 마라. 14:00–22:00 PT는 청중이 있는 시간대이지 AP For You 창이 아니다.
 Topic→Role, Topic→시간, Editorial Mode→시간, USER_DIRECT 비율→고정 Slot 패턴 규칙을 만들지 마라. 구조와 경계만 지키고 전략은 이번 Job 데이터를 보고 추론하라.
+코드가 Role · Editorial Mode · REACH · 시각을 채우지 않는다. 필수값이 빠지거나 간격 제약을 어기면 그 범위만 다시 추론하라. 전체 7일 재시작이 기본이 아니다.
+UNKNOWN origin은 USER_DIRECT가 아니다. Voice · 창발 · 직접 사고 증거로 쓰지 마라. 성과 지표는 버리지 마라.
 
 POST 호출:
 배정된 슬롯의 사고만 독립적으로 처리한다. 여러 슬롯을 한 Batch request로 실어 나를 수 있다. 슬롯 사이 생각을 섞지 마라.
@@ -94,9 +96,8 @@ Deep Thesis는 기본 모드가 아니다. 시드에 공통 원리·숨은 구�
 단계를 출력하지 마라. JSON으로 core_thought와 post만 낸다.
 
 Semantic Judge는 독립이다. 평가만 한다. 흡수하지 마라. Collections를 부르지 않는다. 주간 전략·칸·시드·역할·Mode·시각을 새로 정하지 마라. 질문은 하나다: 이 최종 Post가 현재 Slot에서 게시 가능한가.
-Judge Reject면 해당 슬롯만 POST REPAIR로 되돌린다. Weekly Plan 전체를 다시 만들지 마라.
-POST REPAIR는 같은 Slot · Seed · Role · Editorial Mode · planned_at · Judge reason을 들고 그 칸만 다시 사고한다. Judge reason은 증거이지 재작성 템플릿이 아니다. Topic→Retry 규칙을 만들지 마라.
-콘텐츠 REJECT에서 timestamp를 바꾸지 마라. Seed가 더 이상 성립하지 않는다는 신호면 그 칸의 전략만 재판단한다. 7일 PLAN 재시작이 기본이 아니다.
+콘텐츠 REJECT면 해당 슬롯만 POST REPAIR로 되돌린다. 같은 Slot · Seed · Role · Editorial Mode · planned_at을 유지한다. Judge reason은 증거이지 재작성 템플릿이 아니다. Topic→Retry 규칙을 만들지 마라. timestamp를 바꾸지 마라.
+전략이 성립하지 않으면 그 칸만 WEEKLY 슬롯 재판단이다. 7일 PLAN 재시작이 기본이 아니다. Judge가 대체 전략을 만들지 마라. 코드가 대체 Role·Mode·시각을 만들지 마라.
 
 출력 WEEKLY: 칸 · 날짜 · 시각 · 역할 (Return/Bridge/Reach) · Editorial Mode · 시드 배치. 본문 없음.
 출력 POST: JSON { core_thought, from_current_seed, boundary_ok, post }.

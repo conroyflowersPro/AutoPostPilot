@@ -105,17 +105,7 @@ export function parsePlannerTimestamp(
   return "";
 }
 
-function pushPastBarriers(ms: number, barriers: number[]): number {
-  let t = ms;
-  let guard = 0;
-  while (guard++ < 80) {
-    const hit = barriers.find((b) => Math.abs(t - b) < MIN_PLANNED_GAP_MS || (t > b && t < b + MIN_PLANNED_GAP_MS));
-    if (hit == null) return t;
-    t = hit + MIN_PLANNED_GAP_MS;
-  }
-  return t;
-}
-
+/** Parse Agent승 timestamps onto slots. Does not invent a replacement time. */
 export function enforceMinGapOnPlannedTimes<T extends {
   day_offset: number;
   planned_at?: string;
@@ -124,51 +114,40 @@ export function enforceMinGapOnPlannedTimes<T extends {
 }>(
   startDate: string,
   slots: T[],
-  occupiedISOs: string[] = [],
+  _occupiedISOs: string[] = [],
 ): T[] {
   const origin = parseStartDate(startDate);
-  const occupied = occupiedISOs
-    .map((x) => Date.parse(x))
-    .filter((ms) => Number.isFinite(ms))
-    .sort((a, b) => a - b);
-  const dated = slots.map((slot, i) => {
+  for (const slot of slots) {
     const day = Math.max(0, Math.min(6, Math.round(Number(slot.day_offset) || 0)));
     const cal = addDays(origin.year, origin.month, origin.day, day);
     const iso =
       parsePlannerTimestamp(slot.planned_at, cal)
       || parsePlannerTimestamp(slot.planned_pt, cal)
       || parsePlannerTimestamp(slot.planned_hour, cal);
-    return { slot, day, cal, i, ms: iso ? Date.parse(iso) : NaN };
-  });
-  dated.sort((a, b) => {
-    const am = Number.isFinite(a.ms) ? a.ms : Number.POSITIVE_INFINITY;
-    const bm = Number.isFinite(b.ms) ? b.ms : Number.POSITIVE_INFINITY;
-    if (am !== bm) return am - bm;
-    if (a.day !== b.day) return a.day - b.day;
-    return a.i - b.i;
-  });
-  const planned: number[] = [];
-  let last = Number.NEGATIVE_INFINITY;
-  for (const item of dated) {
-    let t = Number.isFinite(item.ms) ? item.ms : NaN;
-    if (!Number.isFinite(t)) {
-      if (Number.isFinite(last) && last > 0) t = last + MIN_PLANNED_GAP_MS;
-      else if (occupied.length) t = occupied[occupied.length - 1] + MIN_PLANNED_GAP_MS;
-      else t = Date.parse(laWallTimeToISO(item.cal.year, item.cal.month, item.cal.day, 0, 0));
+    if (iso) {
+      slot.planned_at = iso;
+      slot.planned_pt = formatPt(iso);
     }
-    if (Number.isFinite(last) && t < last + MIN_PLANNED_GAP_MS) t = last + MIN_PLANNED_GAP_MS;
-    t = pushPastBarriers(t, [...occupied, ...planned]);
-    if (Number.isFinite(last) && t < last + MIN_PLANNED_GAP_MS) t = last + MIN_PLANNED_GAP_MS;
-    const iso = new Date(t).toISOString();
-    item.slot.planned_at = iso;
-    item.slot.planned_pt = formatPt(iso);
-    planned.push(t);
-    last = t;
   }
   return slots;
 }
 
-/** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid. */
+export function spacingConstraintHolds<T extends { planned_at?: string }>(
+  slots: T[],
+  occupiedISOs: string[] = [],
+  gapMs = MIN_PLANNED_GAP_MS,
+): boolean {
+  const times = [
+    ...occupiedISOs.map((x) => Date.parse(x)),
+    ...slots.map((s) => Date.parse(String(s.planned_at || ""))),
+  ].filter((ms) => Number.isFinite(ms)).sort((a, b) => a - b);
+  for (let i = 1; i < times.length; i += 1) {
+    if (times[i] - times[i - 1] < gapMs) return false;
+  }
+  return slots.every((s) => Number.isFinite(Date.parse(String(s.planned_at || ""))));
+}
+
+/** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */
 export function stampPlannerSlotTimes<T extends { day_offset: number; planned_at?: string; planned_pt?: string }>(
   startDate: string,
   slots: T[],

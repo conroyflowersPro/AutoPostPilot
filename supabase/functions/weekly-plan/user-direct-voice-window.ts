@@ -3,6 +3,8 @@
  * Discourse-shape variety is judged on the whole unfold (hook, order, ending),
  * not by blacklisting conjunctions. Stats only — never finished-post examples.
  */
+import { classifyPlanOrigin } from "./plan-evidence.ts";
+
 export type VoiceActivityRow = {
   text_body?: string | null;
   post_type?: string | null;
@@ -29,11 +31,8 @@ export type VoiceRegister = {
   notes: string[];
 };
 
-const AP_CLASS = /AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED|SYSTEM_ASSISTED/;
-
 export function isUserDirectOriginal(row: VoiceActivityRow): boolean {
-  const soc = String(row.system_origin_class || "").toUpperCase();
-  if (soc && AP_CLASS.test(soc)) return false;
+  if (classifyPlanOrigin(row.system_origin_class) !== "USER_DIRECT") return false;
   const pt = String(row.post_type || row.action_type || "").toUpperCase();
   if (pt.includes("REPLY") || pt.includes("REPOST") || pt.includes("RETWEET")) return false;
   return true;

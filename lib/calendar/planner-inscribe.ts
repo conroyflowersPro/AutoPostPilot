@@ -3,8 +3,9 @@
  * Writes X-account 현황 counts only. Does not plan slots, mix, or posting times.
  * Source is the last 「지금 동기화」 rows, never a login fetch and never leftover drafts.
  */
+import { classifyEvidenceOrigin } from "../origin-class";
 
-export type CalendarKindKey = "handmade" | "ap" | "quote" | "repost" | "booked";
+export type CalendarKindKey = "handmade" | "ap" | "unknown" | "quote" | "repost" | "booked";
 
 export type CalendarKindCount = {
   key: CalendarKindKey;
@@ -29,6 +30,7 @@ export type ActivityForInscribe = {
 const KIND_LABEL: Record<CalendarKindKey, string> = {
   handmade: "수제",
   ap: "AP",
+  unknown: "미확인",
   quote: "인용",
   repost: "재게시",
   booked: "예약",
@@ -54,7 +56,10 @@ export function classifySyncedAction(row: ActivityForInscribe): CalendarKindKey 
   if (action === "QUOTE") return "quote";
   if (action === "REPOST" || action === "RETWEET") return "repost";
   if (action && action !== "ORIGINAL" && action !== "UNKNOWN") return null;
-  return isApOriginClass(row.system_origin_class) ? "ap" : "handmade";
+  const origin = classifyEvidenceOrigin(row.system_origin_class || row.origin);
+  if (origin === "AP_PIPELINE") return "ap";
+  if (origin === "USER_DIRECT") return "handmade";
+  return "unknown";
 }
 
 export type ApOriginHint = {
@@ -89,7 +94,7 @@ export function classifyXPostOrigin(
   xPostId: string,
   text: string,
   apRows: ApOriginHint[],
-): "USER_DIRECT" | "AP_PIPELINE" {
+): "USER_DIRECT" | "AP_PIPELINE" | "UNKNOWN" {
   const id = String(xPostId || "").trim();
   const body = normalizePostText(text);
   for (const row of apRows || []) {
@@ -109,7 +114,7 @@ export function classifyXPostOrigin(
       return "AP_PIPELINE";
     }
   }
-  return "USER_DIRECT";
+  return "UNKNOWN";
 }
 
 export function inscribeMonthFromActivities(
@@ -124,7 +129,7 @@ export function inscribeMonthFromActivities(
     if (!key.startsWith(prefix)) continue;
     const kind = classifySyncedAction(row);
     if (!kind) continue;
-    const cur = bag.get(key) || { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
+    const cur = bag.get(key) || { handmade: 0, ap: 0, unknown: 0, quote: 0, repost: 0, booked: 0 };
     cur[kind] += 1;
     bag.set(key, cur);
   }
@@ -148,14 +153,14 @@ export function mergeBookedScheduleDays(
   const prefix = `${year}-${String(month1to12).padStart(2, "0")}-`;
   const bag = new Map<string, Record<CalendarKindKey, number>>();
   for (const d of days) {
-    const cur = { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
+    const cur = { handmade: 0, ap: 0, unknown: 0, quote: 0, repost: 0, booked: 0 };
     for (const k of d.kinds) cur[k.key] = k.n;
     bag.set(d.date, cur);
   }
   for (const row of rows || []) {
     const key = ptDateKey(String(row.scheduled_at || ""));
     if (!key.startsWith(prefix)) continue;
-    const cur = bag.get(key) || { handmade: 0, ap: 0, quote: 0, repost: 0, booked: 0 };
+    const cur = bag.get(key) || { handmade: 0, ap: 0, unknown: 0, quote: 0, repost: 0, booked: 0 };
     cur.booked += 1;
     bag.set(key, cur);
   }

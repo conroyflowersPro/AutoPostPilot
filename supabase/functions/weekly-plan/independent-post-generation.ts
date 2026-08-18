@@ -360,21 +360,30 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
 
 function repairInstructionLines(ctx: DeepGenerationContext): string[] {
   const seed = ((ctx as any).seed || {}) as Record<string, unknown>;
-  if (!seed.repair && !Array.isArray(seed.judge_reasons)) return [];
   const reasons = (Array.isArray(seed.judge_reasons) ? seed.judge_reasons : [])
     .map((x) => String(x || "").trim())
     .filter(Boolean);
   const planned = String(seed.planned_at || "").trim();
+  if (seed.replan) {
+    return [
+      "THIS CALL IS CREATE after slot-level PLAN replan. Not content REPAIR of the previous post.",
+      "Use the NEW assigned Seed, Role, Editorial Mode, planner_intent, and planned_at from Agent승 PLAN. The rest of the week stays.",
+      planned ? "planned_at for this replanned slot: " + planned : "Use the assigned slot timestamp from PLAN.",
+      reasons.length
+        ? "Previous Judge invalidation (context, not a rewrite template): " + reasons.join(" · ")
+        : "Slot strategy was replanned. Think and write for the new assignment.",
+      "Do not copy Judge reasons into the post. Do not keep the collapsed previous strategy.",
+    ];
+  }
+  if (!seed.repair && !reasons.length) return [];
   return [
     "THIS CALL IS REPAIR of one slot after independent Judge REJECT. Not a new WEEKLY plan.",
-    "Keep Slot identity, Seed, Role, Editorial Mode, and planned_at unless this slot's strategy actually collapsed.",
+    "Keep Slot identity, Seed, Role, Editorial Mode, and planned_at.",
     planned ? "planned_at to keep: " + planned : "Keep the assigned slot timestamp.",
     reasons.length
       ? "Judge evidence (not a rewrite template): " + reasons.join(" · ")
       : "Judge evidence is present. Do not turn it into a fixed sentence recipe.",
-    seed.strategy_reconsider
-      ? "Judge signaled this slot's strategy may no longer hold. Re-judge this slot only. Do not rebuild the seven-day plan. Change timestamp only if this slot's strategy actually collapsed."
-      : "Content reject. Do not change timestamp, Role, Mode, or Seed as a default.",
+    "Content reject. Do not change timestamp, Role, Mode, or Seed as a default.",
     "Do not copy Judge reasons into the post. Fix the problem, then think and write again.",
   ];
 }

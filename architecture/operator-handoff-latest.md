@@ -4,12 +4,12 @@
 
 ## Current (do not treat older sections as live version)
 
+- **this branch:** v12.11.1 HOTFIX — Strategy Ownership · Evidence Integrity · Slot Replan · Thinking Scan. **Not on main. Do not deploy until 배포해.**
 - **main:** v12.11.0. ORDER 1–3 merged and pushed for production (Netlify + Edge on `main`).
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE. Collection API 호출 0. Hook만 준비.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행. Collection API 호출 0.
-
-PR: https://github.com/conroyflowersPro/AutoPostPilot/pull/84
+- **HOTFIX (v12.11.1):** 코드는 전략을 만들지 않음. UNKNOWN ≠ USER_DIRECT. 전략 붕괴는 그 칸만 Agent승 PLAN 재판단. Thinking scan cursor ≠ eligible count.
 
 ## Who / how
 

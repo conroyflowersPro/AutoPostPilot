@@ -150,7 +150,7 @@ export function buildRecentExperienceCandidates(
   const seen = new Set<string>();
   for (const row of rows) {
     const soc = String(row.system_origin_class || "").toUpperCase();
-    if (soc && /APP|SYSTEM|AUTOPOST|GENERATED/.test(soc)) continue;
+    if (!/USER_DIRECT|MANUAL|HANDMADE|CREATOR_DIRECT/.test(soc)) continue;
     const pt = String(row.post_type || "").toUpperCase();
     if (pt === "REPLY" || pt === "REPOST") continue;
     if (pt && pt !== "ORIGINAL" && pt !== "QUOTE" && pt !== "UNKNOWN" && pt !== "") continue;
