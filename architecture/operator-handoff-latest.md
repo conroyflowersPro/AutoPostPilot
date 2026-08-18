@@ -4,8 +4,8 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** v12.12.2 on **main**. Agent승 plan-evidence digest.
-- **main:** v12.12.2. Agent승 digest then slots. Collection after Core Thought.
+- **this branch:** v12.12.3 on **main**. Digest waits until the page finishes.
+- **main:** v12.12.3. Digest holds until complete. Then slots.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행.

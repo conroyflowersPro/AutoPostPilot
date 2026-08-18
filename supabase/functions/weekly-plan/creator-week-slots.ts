@@ -194,7 +194,7 @@ export async function inferPlanEvidenceDigest(args: {
   return callPlanner({
     xaiKey: args.xaiKey,
     maxTokens: 1200,
-    timeoutMs: args.timeoutMs ?? 25000,
+    timeoutMs: args.timeoutMs ?? 52000,
     system: [
       "You are Agent승 reading AP weekly plan evidence in pages.",
       "Update the running digest from this page plus the previous digest.",

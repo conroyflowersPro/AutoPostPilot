@@ -137,6 +137,7 @@ function isWriterFailure(reasons: unknown[], judgeStatus?: string): boolean {
 /** Slow/unavailable xAI must not end the weekly job. Invalid JSON still uses the 3-try cap. */
 export const PLANNER_XAI_HOLD_MAX = 4 as const;
 export const PLANNER_DAY_SLOT_TIMEOUT_MS = 40000 as const;
+export const PLANNER_DIGEST_TIMEOUT_MS = 52000 as const;
 
 export function isTransientXaiError(err: unknown): boolean {
   const name = err && typeof err === "object" && "name" in err ? String((err as { name?: unknown }).name) : "";
@@ -1428,17 +1429,11 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
         },
         occupiedTimes: planEvidence.occupied_times,
         fedicaBestPostingTime: planEvidence.fedica_best_posting_time,
-        timeoutMs: 25000,
+        timeoutMs: PLANNER_DIGEST_TIMEOUT_MS,
       });
       if (!result.ok || !result.value) {
         if (isTransientXaiError(result.error)) {
-          if (takePlannerHold(st) < PLANNER_XAI_HOLD_MAX) {
-            holdForXai(row, `xAI 응답 대기 · 증거 읽기 ${cursor}/${rows.length}…`, `digest: ${result.error}`);
-            return;
-          }
-          row.status = "error";
-          row.error = `7일 Agent승 증거 읽기 시간 초과: ${result.error || "xai_timeout"}`;
-          row.label_ko = "증거 읽기 실패";
+          holdForXai(row, `xAI 응답 대기 · 증거 읽기 ${cursor}/${rows.length}…`, `digest: ${result.error}`);
           return;
         }
         st.planner_digest_attempts = Number(st.planner_digest_attempts || 0) + 1;
