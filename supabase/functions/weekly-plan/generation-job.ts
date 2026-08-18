@@ -682,10 +682,27 @@ function publicView(row: any): JobPublic {
 const STALE_JOB_KO = "배포로 이전 생성을 멈췄습니다. 다시 눌러 주세요.";
 const STOPPED_JOB_KO = "생성을 멈췄습니다.";
 
+export function jobHasProgress(row: any): boolean {
+  const st = row?.state || {};
+  return (
+    (Array.isArray(st.gated) && st.gated.length > 0)
+    || !!st.planner_digest
+    || !!st.planner_volume
+    || (Array.isArray(st.planner_slots_partial) && st.planner_slots_partial.length > 0)
+    || Number(st.planner_digest_cursor || 0) > 0
+    || !!st.planner_strategy
+  );
+}
+
+/** Version bump must not throw away paid expand/digest. Keep running. */
 function retireStaleRunningJob(row: any, appVersion: string): boolean {
   if (!row || row.status !== "running") return false;
   const stamped = String(row.state?.app_version || "");
   if (stamped && stamped === appVersion) return false;
+  if (jobHasProgress(row)) {
+    row.state = { ...(row.state || {}), app_version: appVersion };
+    return false;
+  }
   row.status = "error";
   row.error = STALE_JOB_KO;
   row.label_ko = "이전 생성 중단";
@@ -693,7 +710,28 @@ function retireStaleRunningJob(row: any, appVersion: string): boolean {
   return true;
 }
 
-async function saveRow(supabase: any, row: any) {
+function resumeIncompleteJob(row: any, appVersion: string): any {
+  const st = { ...(row.state || {}) };
+  st.app_version = appVersion;
+  st.planner_day_batch_attempts = 0;
+  st.planner_xai_holds = 0;
+  st.planner_digest_attempts = 0;
+  st.empty_streak = 0;
+  row.state = st;
+  row.status = "running";
+  row.error = null;
+  row.locked_at = null;
+  row.label_ko = row.label_ko && !/실패|멈춤|중단/.test(String(row.label_ko))
+    ? String(row.label_ko)
+    : `이어서 진행 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`;
+  const line = "이전 작업 이어서 진행 · 시드 재검색 없음";
+  if (!String(row.summary || "").includes(line)) {
+    row.summary = [row.summary, line].filter(Boolean).join("\n");
+  }
+  return row;
+}
+
+async function saveRow(supabase: any, row: any, anyStatus = false) {
   let q = supabase.from("generation_jobs").update({
     status: row.status,
     step: row.step,
@@ -706,7 +744,7 @@ async function saveRow(supabase: any, row: any) {
     locked_at: row.locked_at,
     updated_at: new Date().toISOString(),
   }).eq("id", row.id);
-  if (row.status === "running") q = q.eq("status", "running");
+  if (row.status === "running" && !anyStatus) q = q.eq("status", "running");
   const { error } = await q;
   if (error) throw new Error(error.message);
 }
@@ -791,6 +829,19 @@ export async function startWeeklyJob(args: {
   if (running) {
     if (!retireStaleRunningJob(running, args.appVersion)) return publicView(running);
     await saveRow(args.supabase, running);
+  }
+
+  const { data: latest } = await args.supabase
+    .from("generation_jobs")
+    .select("id, status, step, saved_count, required_slots, label_ko, summary, error, state")
+    .eq("user_id", args.userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest && latest.status !== "done" && jobHasProgress(latest)) {
+    resumeIncompleteJob(latest, args.appVersion);
+    await saveRow(args.supabase, latest, true);
+    return publicView(latest);
   }
 
   const insert = {

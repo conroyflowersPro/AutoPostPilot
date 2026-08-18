@@ -14,6 +14,7 @@ import {
 } from "../lib/origin-class.ts";
 import { staleLivedExperiencePicks } from "../supabase/functions/weekly-plan/seed-ownership.ts";
 import { COLLECTION_API_CALLS_THIS_ORDER } from "../supabase/functions/weekly-plan/collection-ready-hook.ts";
+import { jobHasProgress } from "../supabase/functions/weekly-plan/generation-job.ts";
 
 const creator = readFileSync("supabase/functions/weekly-plan/creator-week-slots.ts", "utf8");
 assert.doesNotMatch(creator, /PAD_MODES/);
@@ -43,7 +44,12 @@ assert.match(job, /STRATEGY_REPLAN_ABANDON/);
 assert.match(job, /CONTENT_REPAIR_ABANDON/);
 assert.match(job, /extractFedicaBestPostingTime/);
 assert.match(job, /public_window_exhausted/);
-assert.match(job, /7일 공개 창/);
+assert.match(job, /jobHasProgress/);
+assert.match(job, /resumeIncompleteJob/);
+assert.match(job, /시드 재검색 없음/);
+assert.equal(jobHasProgress({ state: { gated: [{ seed_id: "p1" }] } }), true);
+assert.equal(jobHasProgress({ state: { gated: [] } }), false);
+assert.match(job, /jobHasProgress\(row\)/);
 assert.doesNotMatch(job, /기존 Seed Pool로 Planner 이어감/);
 assert.match(job, /inferPlanEvidenceDigest/);
 assert.match(job, /planner_digest_complete/);
