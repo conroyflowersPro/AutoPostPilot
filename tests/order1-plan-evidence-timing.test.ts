@@ -18,6 +18,7 @@ import {
 } from "../supabase/functions/weekly-plan/for-you-spread.ts";
 import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/fedica-strategy-contract.ts";
 import { parseCreatorDaySlots, parseCreatorSlotTiming, minSpanHoursForSlotCount } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
+import { nextUnassignedSlotChunk, SEED_ASSIGN_CHUNK } from "../supabase/functions/weekly-plan/seven-day-planner.ts";
 
 const page = readFileSync("app/generate/page.tsx", "utf8");
 assert.match(page, /GENERATION_DAYS = 7/);
@@ -246,7 +247,11 @@ assert.doesNotMatch(fedicaBatch, /allSlots\[i\]/);
 assert.doesNotMatch(fedicaBatch, /buildDaySpreadSlots\(/);
 const weekly = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.doesNotMatch(weekly, /searchAgentSeungTheories\(/);
-assert.match(weekly, /inferCreatorSlotTiming/);
+assert.equal(SEED_ASSIGN_CHUNK, 5);
+assert.equal(nextUnassignedSlotChunk(
+  [{ slot_id: "a" }, { slot_id: "b" }, { slot_id: "c" }, { slot_id: "d" }, { slot_id: "e" }, { slot_id: "f" }],
+  ["a"],
+).map((s) => s.slot_id).join(","), "b,c,d,e,f");
 assert.match(weekly, /planner_slots_pending/);
 assert.match(weekly, /시각만 재추론/);
 assert.equal(minSpanHoursForSlotCount(6), 10);

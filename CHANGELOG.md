@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.14 — 2026-08-18
+
+- Seed 배치는 날짜 고정이 아니라 5칸 bounded chunk입니다
+- timeout은 그 chunk만 다시 받고 이미 ASSIGNED는 유지합니다
+- 후보는 압축하고 주간 Role/Mode/사용 현황은 매번 같이 줍니다
+- Seed 배차 실패로 주간 Job을 죽이지 않습니다
+
 ## 12.12.13 — 2026-08-18
 
 - Agent승 PLAN: Volume → Slot 전략 → Timing 추론 → timestamp lock

@@ -498,6 +498,17 @@ export function clampWeekVolume(postsPerDay: unknown): number[] {
   return out;
 }
 
+export const SEED_ASSIGN_CHUNK = 5;
+
+export function nextUnassignedSlotChunk<T extends { slot_id: string }>(
+  slots: T[],
+  assignedIds: Iterable<string>,
+  size = SEED_ASSIGN_CHUNK,
+): T[] {
+  const have = new Set([...assignedIds].map((id) => String(id || "")));
+  return (slots || []).filter((slot) => !have.has(String(slot.slot_id || ""))).slice(0, Math.max(1, size));
+}
+
 export function nextUnassignedDayOffsets(
   slots: Array<{ slot_id: string; day_offset: number }>,
   assignedIds: Iterable<string>,
@@ -770,7 +781,7 @@ function selectionSystem(dayScoped: boolean): string {
   return [
     "You are the seven-day Planner attaching Seeds. Creator DNA already judged RETURN/BRIDGE/REACH and editorial types. Do not change those.",
     dayScoped
-      ? "This call covers only the listed day offsets. Leave other days untouched. Do not emit assignments for slots not in this batch."
+      ? "Assign Seeds only for chunk_slot_ids. Weekly context is for judgment. Do not emit assignments for already ASSIGNED slots."
       : "Preserve the supplied strategy types. Select one Seed from seed_pool for each strategy slot.",
     "Do not write posts and do not decide prose, tone, thought order, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Do not judge types. Do not close a type because the pool is empty — leave missing and request Seed Generator.",
@@ -786,17 +797,17 @@ function selectionSystem(dayScoped: boolean): string {
 function compactSeedForSelect(seed: ConcreteSeed) {
   const occurred = String((seed as any).occurred_at || (seed as any).published_at || "");
   const recency = isLivedSelfSeed(seed as any) ? livedAsOf(occurred || undefined) : null;
+  const scene = s(seed.concrete_subject, 80);
+  const tension = s(seed.point_or_tension, 80);
   return {
     seed_id: seed.seed_id,
-    cluster: seed.cluster,
-    concrete_subject: seed.concrete_subject,
-    point_or_tension: seed.point_or_tension || null,
+    scene,
+    tension: tension || null,
+    source: String((seed as any).source_kind || (seed as any).source || seed.cluster || "").slice(0, 32) || null,
     owner: (seed as any).owner || "OTHER",
+    freshness: recency ? { as_of: recency.as_of, days_ago: recency.days_ago } : null,
+    cluster: seed.cluster,
     viral: !!(seed as any).viral,
-    occurred_at: (seed as any).occurred_at || null,
-    as_of: recency?.as_of || null,
-    days_ago: recency?.days_ago ?? null,
-    creator_evidence_available: !!seed.creator_evidence_available,
   };
 }
 
@@ -876,6 +887,55 @@ export async function selectSeedsForSevenDayPlan(args: {
   });
 }
 
+/** Live job: bounded unassigned slots per tick. Weekly context stays. */
+export async function selectSeedsForChunk(args: {
+  xaiKey: string;
+  strategy: SevenDayStrategy;
+  seedPool: ConcreteSeed[];
+  chunkSlots: PlannerSlotIntent[];
+  alreadyAssigned?: PlannerSeedAssignment[];
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSelection>> {
+  const assigned = args.alreadyAssigned || [];
+  const assignedSlotIds = new Set(assigned.map((item) => String(item.slot_id || "")));
+  const reservedSeedIds = new Set(assigned.map((item) => String(item.seed_id || "")).filter(Boolean));
+  const slots = (args.chunkSlots || []).filter((slot) => !assignedSlotIds.has(slot.slot_id));
+  const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || "")));
+  const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
+  const seedById = new Map(pool.map((seed) => [String(seed.seed_id), seed]));
+  const week = (args.strategy.slots || []).map((slot) => {
+    const hit = assigned.find((item) => item.slot_id === slot.slot_id);
+    return {
+      slot_id: slot.slot_id,
+      day_offset: slot.day_offset,
+      strategic_role: slot.strategic_role,
+      editorial_mode: slot.editorial_mode,
+      planner_intent: slot.planner_intent,
+      seed_state: hit ? "ASSIGNED" : (slots.some((s) => s.slot_id === slot.slot_id) ? "ASSIGNING" : "UNASSIGNED"),
+      seed_id: hit?.seed_id || "",
+    };
+  });
+  const usedClusters = assigned
+    .map((item) => seedById.get(item.seed_id)?.cluster || "")
+    .filter(Boolean);
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 1600,
+    timeoutMs: args.timeoutMs ?? 28000,
+    system: selectionSystem(true),
+    user: {
+      strategy_summary: args.strategy.strategy_summary,
+      week_slots: week,
+      chunk_slot_ids: slots.map((s) => s.slot_id),
+      assigned_seed_ids: [...reservedSeedIds],
+      unassigned_slot_ids: week.filter((s) => s.seed_state !== "ASSIGNED").map((s) => s.slot_id),
+      used_clusters: usedClusters,
+      seed_pool: pool.map(compactSeedForSelect),
+    },
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool),
+  });
+}
+
 /** Live job: two days per tick. Compact payload. Does not close the week. */
 export async function selectSeedsForDays(args: {
   xaiKey: string;
@@ -888,23 +948,14 @@ export async function selectSeedsForDays(args: {
   const daySet = new Set((args.days || []).map((d) => Math.max(0, Math.min(PLANNING_HORIZON_DAYS - 1, Math.round(Number(d) || 0)))));
   const assigned = args.alreadyAssigned || [];
   const assignedSlotIds = new Set(assigned.map((item) => String(item.slot_id || "")));
-  const reservedSeedIds = new Set(assigned.map((item) => String(item.seed_id || "")).filter(Boolean));
   const slots = args.strategy.slots.filter((slot) => daySet.has(slot.day_offset) && !assignedSlotIds.has(slot.slot_id));
-  const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || ""))).slice(0, 96);
-  const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
-  return callPlanner({
+  return selectSeedsForChunk({
     xaiKey: args.xaiKey,
-    maxTokens: 2000,
-    timeoutMs: args.timeoutMs ?? 28000,
-    system: selectionSystem(true),
-    user: {
-      day_offsets: [...daySet].sort((a, b) => a - b),
-      strategy_summary: args.strategy.strategy_summary,
-      slots: slots.map(compactSlotForSelect),
-      reserved_seed_ids: [...reservedSeedIds],
-      seed_pool: pool.map(compactSeedForSelect),
-    },
-    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool),
+    strategy: args.strategy,
+    seedPool: args.seedPool,
+    chunkSlots: slots,
+    alreadyAssigned: assigned,
+    timeoutMs: args.timeoutMs,
   });
 }
 

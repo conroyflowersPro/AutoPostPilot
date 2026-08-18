@@ -61,8 +61,8 @@ import { fetchOfficialPublicPosts, loadEdgeXAccessToken, OPERATOR_HANDLE } from 
 import {
   loadRecentXAnalyticsPublished,
   nextStrategyDayOffsets,
-  nextUnassignedDayOffsets,
-  selectSeedsForDays,
+  nextUnassignedSlotChunk,
+  selectSeedsForChunk,
   strategyCoversSevenDays,
   type PlannerSeedAssignment,
   type PlannerSlotIntent,
@@ -832,6 +832,7 @@ export async function startWeeklyJob(args: {
     planner_slots_pending: [] as PlannerSlotIntent[],
     planner_timing_attempts: 0,
     planner_assignments: [] as PlannerSeedAssignment[],
+    planner_assigning_slot_ids: [] as string[],
     planner_strategy_attempts: 0,
     planner_volume_attempts: 0,
     planner_day_batch_attempts: 0,
@@ -1790,106 +1791,108 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     return;
   }
   const assigned: PlannerSeedAssignment[] = Array.isArray(st.planner_assignments) ? st.planner_assignments : [];
-  const days = nextUnassignedDayOffsets(strategy.slots, assigned.map((item) => item.slot_id));
+  const assignedIds = assigned.map((item) => item.slot_id);
+  const assigningIds: string[] = Array.isArray(st.planner_assigning_slot_ids) ? st.planner_assigning_slot_ids : [];
   const pool = await plannerSelectablePool(supabase, st);
-  if (days.length) {
-    const daySlots = strategy.slots.filter((slot) => days.includes(slot.day_offset));
-    const result = await selectSeedsForDays({
+  const chunk = assigningIds.length
+    ? strategy.slots.filter((slot) => assigningIds.includes(slot.slot_id) && !assignedIds.includes(slot.slot_id))
+    : nextUnassignedSlotChunk(strategy.slots, assignedIds);
+  if (chunk.length) {
+    st.planner_assigning_slot_ids = chunk.map((slot) => slot.slot_id);
+    const result = await selectSeedsForChunk({
       xaiKey,
       strategy,
       seedPool: pool,
-      days,
+      chunkSlots: chunk,
       alreadyAssigned: assigned,
       timeoutMs: 28000,
     });
     if (!result.ok || !result.value) {
-      st.select_timeouts = Number(st.select_timeouts || 0) + 1;
-      if (isTransientXaiError(result.error) && st.select_timeouts <= 1) {
-        holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 Seed 선택 이어감…`, `Planner select: ${result.error}`);
+      if (isTransientXaiError(result.error)) {
+        holdForXai(
+          row,
+          `Seed 배치 일시 중단 ${assigned.length}/${strategy.slots.length} · 이어서 처리`,
+          `Planner select: ${result.error}`,
+        );
         return;
       }
+      st.select_timeouts = Number(st.select_timeouts || 0) + 1;
       if (st.select_timeouts < 3) {
-        row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 Seed 재추론 ${st.select_timeouts}/3…`;
+        row.label_ko = `Seed 배치 재추론 ${assigned.length}/${strategy.slots.length} · ${st.select_timeouts}/3`;
         row.summary = [row.summary, `Planner select: ${result.error || "unusable"} · 코드가 Seed를 배정하지 않음`].filter(Boolean).join("\n");
         return;
       }
-      row.status = "error";
-      row.error = `7일 Agent승 Seed 배차 실패 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "unusable"}`;
-      row.label_ko = "Agent승 Seed 배차 실패";
+      holdForXai(
+        row,
+        `Seed 배치 일시 중단 ${assigned.length}/${strategy.slots.length} · 이어서 처리`,
+        `Planner select: ${result.error || "unusable"}`,
+      );
       return;
-    } else {
-      st.select_timeouts = 0;
-      const have = new Set(assigned.map((item) => item.slot_id));
-      for (const item of result.value.assignments) {
-        if (!have.has(item.slot_id)) {
-          assigned.push(item);
-          have.add(item.slot_id);
-        }
+    }
+    st.select_timeouts = 0;
+    const have = new Set(assigned.map((item) => item.slot_id));
+    for (const item of result.value.assignments) {
+      if (!have.has(item.slot_id)) {
+        assigned.push(item);
+        have.add(item.slot_id);
       }
-      const dayAssigned = assigned.filter((item) => {
-        const slot = strategy.slots.find((s) => s.slot_id === item.slot_id);
-        return slot && days.includes(slot.day_offset);
-      });
-      const stale = staleLivedExperiencePicks({
-        slots: daySlots,
-        assignments: dayAssigned,
-        pool: pool as any[],
-      });
-      if (stale.length) {
-        st.select_timeouts = Number(st.select_timeouts || 0) + 1;
-        const keep = assigned.filter((item) => !stale.includes(item.slot_id));
-        st.planner_assignments = keep;
-        if (st.select_timeouts < 3) {
-          row.label_ko = `Agent승 EXPERIENCE Seed 재추론 ${st.select_timeouts}/3…`;
-          row.summary = [
-            row.summary,
-            `같은 상황의 더 새 lived가 남았는데 옛 Seed를 고름 · 코드가 바꾸지 않음 · 칸 ${stale.join(",")}`,
-          ].filter(Boolean).join("\n");
-          return;
-        }
-        row.status = "error";
-        row.error = `EXPERIENCE Seed 재추론 한도: ${stale.join(",")}`;
-        row.label_ko = "Agent승 Seed 배차 실패";
-        return;
-      }
-      st.planner_assignments = assigned;
-      const missing = result.value.missing || [];
-      if (missing.length > 0) {
-        const direction = missing[0]?.exploration_direction || "";
-        const fingerprint = missingSlotFingerprint(missing);
-        st.explored_missing = st.explored_missing && typeof st.explored_missing === "object" ? st.explored_missing : {};
-        const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction);
-        if (!alreadyExplored) {
-          st.explored_missing[fingerprint] = true;
-          st.planner_missing_count = missing.length;
-          st.planner_exploration_direction = missing
-            .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
-            .join(" | ")
-            .slice(0, 1200);
-          recordFieldRefill(st, direction);
-          st.max_expand = Number(st.max_expand || 0) + Math.min(6, missing.length + 1);
-          row.step = "expand";
-          row.label_ko = `Planner 지정 분야 Seed 탐색 ${missing.length}개 슬롯…`;
-          row.summary = [
-            row.summary,
-            `Planner가 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${missing.length}개 분야 추가 탐색 요청`,
-          ].filter(Boolean).join("\n");
-          return;
-        }
-        st.planner_exploration_direction = "";
+    }
+    const chunkAssigned = assigned.filter((item) => chunk.some((slot) => slot.slot_id === item.slot_id));
+    const stale = staleLivedExperiencePicks({
+      slots: chunk,
+      assignments: chunkAssigned,
+      pool: pool as any[],
+    });
+    if (stale.length) {
+      st.select_timeouts = Number(st.select_timeouts || 0) + 1;
+      const keep = assigned.filter((item) => !stale.includes(item.slot_id));
+      st.planner_assignments = keep;
+      if (st.select_timeouts < 3) {
+        row.label_ko = `Agent승 EXPERIENCE Seed 재추론 ${st.select_timeouts}/3…`;
         row.summary = [
           row.summary,
-          `추가 탐색 한도 · Agent승이 빈 칸 Seed를 채우지 않아 재추론 ${st.planner_assignments.length}/${strategy.slots.length}`,
+          `같은 상황의 더 새 lived가 남았는데 옛 Seed를 고름 · 코드가 바꾸지 않음 · 칸 ${stale.join(",")}`,
         ].filter(Boolean).join("\n");
         return;
       }
+      holdForXai(row, `Seed 배치 일시 중단 ${keep.length}/${strategy.slots.length} · 이어서 처리`, `EXPERIENCE stale: ${stale.join(",")}`);
+      return;
     }
-    const remain = nextUnassignedDayOffsets(
-      strategy.slots,
-      (st.planner_assignments || []).map((item: PlannerSeedAssignment) => item.slot_id),
-    );
+    st.planner_assignments = assigned;
+    st.planner_assigning_slot_ids = [];
+    const missing = result.value.missing || [];
+    if (missing.length > 0) {
+      const direction = missing[0]?.exploration_direction || "";
+      const fingerprint = missingSlotFingerprint(missing);
+      st.explored_missing = st.explored_missing && typeof st.explored_missing === "object" ? st.explored_missing : {};
+      const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction);
+      if (!alreadyExplored) {
+        st.explored_missing[fingerprint] = true;
+        st.planner_missing_count = missing.length;
+        st.planner_exploration_direction = missing
+          .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
+          .join(" | ")
+          .slice(0, 1200);
+        recordFieldRefill(st, direction);
+        st.max_expand = Number(st.max_expand || 0) + Math.min(6, missing.length + 1);
+        row.step = "expand";
+        row.label_ko = `Planner 지정 분야 Seed 탐색 ${missing.length}개 슬롯…`;
+        row.summary = [
+          row.summary,
+          `Planner가 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${missing.length}개 분야 추가 탐색 요청`,
+        ].filter(Boolean).join("\n");
+        return;
+      }
+      st.planner_exploration_direction = "";
+      row.summary = [
+        row.summary,
+        `추가 탐색 한도 · Agent승이 빈 칸 Seed를 채우지 않아 재추론 ${st.planner_assignments.length}/${strategy.slots.length}`,
+      ].filter(Boolean).join("\n");
+      return;
+    }
+    const remain = nextUnassignedSlotChunk(strategy.slots, (st.planner_assignments || []).map((item: PlannerSeedAssignment) => item.slot_id));
     if (remain.length) {
-      row.label_ko = `Planner Seed 선택 ${(st.planner_assignments || []).length}/${strategy.slots.length} · ${remain.map((d) => d + 1).join(",")}일차…`;
+      row.label_ko = `Seed 배치 ${(st.planner_assignments || []).length}/${strategy.slots.length} · 다음 ${remain.length}칸`;
       return;
     }
   }

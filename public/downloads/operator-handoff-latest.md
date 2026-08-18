@@ -4,8 +4,8 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** v12.12.13 on **main**. PLAN Timing is its own Agent승 subtask.
-- **main:** v12.12.13. Volume → Slot strategy → Timing. Retry timing only.
+- **this branch:** v12.12.14 on **main**. Seed assign is a resumable 5-slot chunk.
+- **main:** v12.12.14. Seed chunks + Timing split. Timeout resumes the same chunk.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행.
