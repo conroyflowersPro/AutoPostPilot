@@ -21,6 +21,9 @@ assert.doesNotMatch(creator, /n % 3/);
 assert.doesNotMatch(creator, /enforceReachDailyCap/);
 assert.match(creator, /inferCreatorSlotReplan/);
 assert.match(creator, /Code will not invent Role, Mode, REACH, or time/);
+assert.match(creator, /before the next day/);
+assert.match(creator, /minimum, not a 2-hour step/);
+assert.match(creator, /Every slot must include planned_at/);
 
 const spread = readFileSync("supabase/functions/weekly-plan/for-you-spread.ts", "utf8");
 assert.match(spread, /Does not invent a replacement time/);
