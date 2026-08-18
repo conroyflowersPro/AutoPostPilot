@@ -9,7 +9,7 @@ import {
   enforceMinGapOnPlannedTimes,
   MIN_PLANNED_GAP_MS,
 } from "../supabase/functions/weekly-plan/for-you-spread.ts";
-import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/schedule.ts";
+import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/fedica-strategy-contract.ts";
 import { parseCreatorDaySlots } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
 
 const page = readFileSync("app/generate/page.tsx", "utf8");
