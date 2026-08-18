@@ -17,7 +17,7 @@ import {
   describeSlotTimeCheck,
 } from "../supabase/functions/weekly-plan/for-you-spread.ts";
 import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/fedica-strategy-contract.ts";
-import { parseCreatorDaySlots } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
+import { parseCreatorDaySlots, parseCreatorSlotTiming, minSpanHoursForSlotCount } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
 
 const page = readFileSync("app/generate/page.tsx", "utf8");
 assert.match(page, /GENERATION_DAYS = 7/);
@@ -219,8 +219,8 @@ const parsed = parseCreatorDaySlots({
   postsPerDay: [4, 4, 4, 4, 4, 4, 4],
 });
 assert.ok(parsed);
-assert.equal(parsed![0].planned_at, "2026-08-19T22:15:00.000Z");
-assert.match(String(parsed![1].planned_pt), /17:40/);
+assert.equal(parsed![0].strategic_role, "RETURN");
+assert.equal(parsed![0].planned_at, undefined);
 
 const incomplete = parseCreatorDaySlots({
   raw: {
@@ -246,5 +246,16 @@ assert.doesNotMatch(fedicaBatch, /allSlots\[i\]/);
 assert.doesNotMatch(fedicaBatch, /buildDaySpreadSlots\(/);
 const weekly = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.doesNotMatch(weekly, /searchAgentSeungTheories\(/);
+assert.match(weekly, /inferCreatorSlotTiming/);
+assert.match(weekly, /planner_slots_pending/);
+assert.match(weekly, /시각만 재추론/);
+assert.equal(minSpanHoursForSlotCount(6), 10);
+const timed = parseCreatorSlotTiming({
+  raw: { slots: [{ slot_id: "D1P1", planned_at: "2026-08-18T22:00:00.000Z", planned_pt: "2026-08-18 15:00 PT" }] },
+  slots: [{ slot_id: "D1P1", day_offset: 0, strategic_role: "RETURN", editorial_mode: "INFORMATIVE", planner_intent: "keep" }],
+});
+assert.ok(timed);
+assert.equal(timed![0].planned_at, "2026-08-18T22:00:00.000Z");
+assert.equal(timed![0].strategic_role, "RETURN");
 
 console.log("order1-plan-evidence-timing ok");

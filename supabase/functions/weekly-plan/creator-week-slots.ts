@@ -77,11 +77,9 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     "You are Agent승 filling AP slot intents for the listed day_offset values only.",
     creatorDnaBlock(),
     `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
-    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent, planned_at (ISO UTC), planned_pt (America/Los_Angeles wall time).",
-    "Every slot must include planned_at and planned_pt. Infer the clock from evidence. Do not omit a time. Code will not invent one.",
-    "Adjacent originals at least 2 hours apart — that is a minimum, not a 2-hour step. Stay on that calendar day, before the next day. 14:00–22:00 PT is audience evidence, not a box.",
-    "day_offset 0 is start_date. Put that day's clock on that date. If last_time_check is present, fix those gaps or unparsed clocks. Do not copy the previous failed times.",
-    "Do not leave Role, Editorial Mode, or timestamp blank. If a field is missing the runtime re-asks you; it does not fill it.",
+    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
+    "Do not emit planned_at or planned_pt. Timing is a later Agent승 PLAN subtask.",
+    "Do not leave Role or Editorial Mode blank. If a field is missing the runtime re-asks you; it does not fill it.",
     "USER_DIRECT and AP_PIPELINE are separate populations. Do not average them. Do not learn Creator Voice from AP_PIPELINE.",
     "Complexity/Emergence is a judgment, not a ratio or slot recipe. Keep Creator Identity and long-term account growth together.",
     "REACH: 1 per day_offset, never more than 2. Prefer CASUAL_OBSERVATION or easy INFORMATIVE. PRESENCE is not a role and is not REACH. Do not freeze RETURN/BRIDGE share.",
@@ -148,9 +146,7 @@ export function parseCreatorDaySlots(args: {
     if (n >= cap) continue;
     const role = growthRole(item?.growth_role || item?.strategic_role);
     const editorial_mode = parseSlotMode(item?.editorial_mode);
-    const planned_at = s(item?.planned_at, 48);
-    const planned_pt = s(item?.planned_pt || item?.planned_time, 48);
-    if (!role || !editorial_mode || (!planned_at && !planned_pt)) continue;
+    if (!role || !editorial_mode) continue;
     const intent = s(item?.planner_intent || item?.intent || item?.purpose, 240);
     if (!intent) continue;
     let slotId = s(item?.slot_id, 40) || `D${day + 1}P${n + 1}`;
@@ -163,8 +159,6 @@ export function parseCreatorDaySlots(args: {
       strategic_role: role,
       editorial_mode,
       planner_intent: intent,
-      planned_at: planned_at || undefined,
-      planned_pt: planned_pt || undefined,
     });
   }
   if (slots.length !== want) return null;
@@ -277,7 +271,6 @@ export async function inferCreatorSlotsForDays(args: {
       audience_counts: compactAudienceCounts(args.audience),
       plan_evidence: plannerEvidencePayload(args.planEvidence, args.digest),
       slot_calendar: slotCalendarDays(String(args.startDate || args.planEvidence?.start_date || ""), args.days),
-      last_time_check: args.lastTimeCheck || null,
       posts_per_day: args.postsPerDay,
       day_offsets: args.days,
       required_slot_count_this_call: wanted,
@@ -296,6 +289,110 @@ export async function inferCreatorSlotsForDays(args: {
       days: args.days,
       postsPerDay: args.postsPerDay,
     }),
+  });
+}
+
+export function minSpanHoursForSlotCount(n: number): number {
+  const count = Math.max(1, Math.round(Number(n) || 1));
+  return (count - 1) * 2;
+}
+
+export function parseCreatorSlotTiming(args: {
+  raw: any;
+  slots: PlannerSlotIntent[];
+}): PlannerSlotIntent[] | null {
+  const want = new Map((args.slots || []).map((s) => [String(s.slot_id), s]));
+  if (!want.size) return null;
+  const items = slotItems(args.raw);
+  const times = new Map<string, { planned_at?: string; planned_pt?: string }>();
+  for (const item of items) {
+    const id = s(item?.slot_id, 40);
+    if (!id || !want.has(id)) continue;
+    const planned_at = s(item?.planned_at, 48);
+    const planned_pt = s(item?.planned_pt || item?.planned_time, 48);
+    if (!planned_at && !planned_pt) continue;
+    times.set(id, { planned_at: planned_at || undefined, planned_pt: planned_pt || undefined });
+  }
+  if (times.size !== want.size) return null;
+  return (args.slots || []).map((slot) => ({
+    ...slot,
+    planned_at: times.get(slot.slot_id)?.planned_at,
+    planned_pt: times.get(slot.slot_id)?.planned_pt,
+  }));
+}
+
+export function buildTimingEvidencePacket(args: {
+  startDate: string;
+  slots: PlannerSlotIntent[];
+  postsPerDay: number[];
+  hardOccupied: string[];
+  todayPublished: string[];
+  historical: Array<{ at: string; imp?: number; likes?: number }>;
+  userDirectTiming: string[];
+  apPipelineTiming: string[];
+  fedicaBestPostingTime: unknown;
+  lastTimeCheck?: { ok?: boolean; missing?: string[]; collisions?: string[]; note?: string } | null;
+}): Record<string, unknown> {
+  const days = [...new Set((args.slots || []).map((s) => s.day_offset))].sort((a, b) => a - b);
+  const calendar = slotCalendarDays(args.startDate, days);
+  const dateOf = new Map(calendar.map((d) => [d.day_offset, d.date]));
+  return {
+    timezone: "America/Los_Angeles",
+    start_date: args.startDate,
+    days: calendar.map((d) => {
+      const n = args.postsPerDay[d.day_offset] || args.slots.filter((s) => s.day_offset === d.day_offset).length;
+      return {
+        day_offset: d.day_offset,
+        date: d.date,
+        slot_count: n,
+        min_span_hours: minSpanHoursForSlotCount(n),
+      };
+    }),
+    slots: (args.slots || []).map((s) => ({
+      slot_id: s.slot_id,
+      day_offset: s.day_offset,
+      date: dateOf.get(s.day_offset) || "",
+      growth_role: s.strategic_role,
+      editorial_mode: s.editorial_mode,
+      planner_intent: s.planner_intent,
+      planned_at: s.planned_at || "",
+      planned_pt: s.planned_pt || "",
+    })),
+    hard_occupied: (args.hardOccupied || []).slice(0, 80),
+    today_published: (args.todayPublished || []).slice(0, 40),
+    historical_published_timing: (args.historical || []).slice(0, 60),
+    user_direct_timing: (args.userDirectTiming || []).slice(0, 24),
+    ap_pipeline_timing: (args.apPipelineTiming || []).slice(0, 24),
+    fedica_best_posting_time: args.fedicaBestPostingTime || { status: "missing", windows: null, note: "" },
+    min_gap_hours: 2,
+    last_time_check: args.lastTimeCheck || null,
+    note:
+      "Fedica/audience hours are evidence, not a box. If min_span_hours does not fit an 8-hour band, infer outside it. Hard occupied and today_published are collision constraints. Historical times are evidence only.",
+  };
+}
+
+export async function inferCreatorSlotTiming(args: {
+  xaiKey: string;
+  startDate: string;
+  slots: PlannerSlotIntent[];
+  packet: Record<string, unknown>;
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlannerSlotIntent[]>> {
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 2500,
+    timeoutMs: args.timeoutMs,
+    system: [
+      "You are Agent승 PLAN Timing. Same intelligence. This subtask only infers clocks.",
+      "Do not change slot_id, day_offset, Role, Editorial Mode, or planner_intent.",
+      "Every listed slot needs planned_at (ISO UTC) and planned_pt (America/Los_Angeles wall time).",
+      "Stay on that slot's calendar date, before the next day. Adjacent originals at least 2 hours — a minimum, not a 2-hour step.",
+      "hard_occupied and today_published are collisions. Historical published timing and Fedica are evidence only.",
+      "If a day needs more span than any audience hour band, infer earlier or later that same day. Code will not invent a time.",
+      "Return strict JSON: { \"slots\": [ { slot_id, planned_at, planned_pt } ] }. No prose.",
+    ].join("\n"),
+    user: args.packet,
+    parse: (raw) => parseCreatorSlotTiming({ raw, slots: args.slots }),
   });
 }
 

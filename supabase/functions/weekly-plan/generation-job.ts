@@ -77,8 +77,10 @@ import { buildAudienceXStatus, type AudienceXStatus } from "./audience-x-status.
 import {
   inferCreatorSlotReplan,
   inferCreatorSlotsForDays,
+  inferCreatorSlotTiming,
   inferCreatorWeekVolume,
   inferPlanEvidenceDigest,
+  buildTimingEvidencePacket,
   reachDailyConstraintOk,
 } from "./creator-week-slots.ts";
 
@@ -498,6 +500,34 @@ function shouldSkipPublicXSearch(
   return windowExhausted === true;
 }
 
+function ptYmd(iso: string, now = new Date()): string {
+  const d = iso ? new Date(iso) : now;
+  if (!Number.isFinite(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function spacingOccupancy(planEvidence: AgentSeungPlanEvidence, analyticsRows: Array<{ published_at?: string; metrics?: Record<string, number | null | undefined> }>) {
+  const today = ptYmd("");
+  const historical = (analyticsRows || [])
+    .map((row) => ({
+      at: String(row.published_at || ""),
+      imp: Number(row.metrics?.impressions) || 0,
+      likes: Number(row.metrics?.likes) || 0,
+    }))
+    .filter((row) => row.at);
+  const todayPublished = historical.filter((row) => ptYmd(row.at) === today).map((row) => row.at);
+  const hard = (planEvidence.occupied_times || []).filter((iso) => {
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) && ms >= Date.now() - 2 * 3600 * 1000;
+  });
+  return { hard, todayPublished, historical, spacing: [...hard, ...todayPublished] };
+}
+
 function plannerStepAfterExpand(st: any): JobStep {
   if (st.pending_recovery || (Array.isArray(st.recover_batch) && st.recover_batch.length)) return "recover";
   if (st.planner_strategy) return "select";
@@ -688,6 +718,7 @@ export function jobHasProgress(row: any): boolean {
     (Array.isArray(st.gated) && st.gated.length > 0)
     || !!st.planner_digest
     || !!st.planner_volume
+    || (Array.isArray(st.planner_slots_pending) && st.planner_slots_pending.length > 0)
     || (Array.isArray(st.planner_slots_partial) && st.planner_slots_partial.length > 0)
     || Number(st.planner_digest_cursor || 0) > 0
     || !!st.planner_strategy
@@ -714,6 +745,7 @@ function resumeIncompleteJob(row: any, appVersion: string): any {
   const st = { ...(row.state || {}) };
   st.app_version = appVersion;
   st.planner_day_batch_attempts = 0;
+  st.planner_timing_attempts = 0;
   st.planner_xai_holds = 0;
   st.planner_digest_attempts = 0;
   st.empty_streak = 0;
@@ -797,6 +829,8 @@ export async function startWeeklyJob(args: {
     planner_strategy: null as SevenDayStrategy | null,
     planner_volume: null as SevenDayVolume | null,
     planner_slots_partial: [] as PlannerSlotIntent[],
+    planner_slots_pending: [] as PlannerSlotIntent[],
+    planner_timing_attempts: 0,
     planner_assignments: [] as PlannerSeedAssignment[],
     planner_strategy_attempts: 0,
     planner_volume_attempts: 0,
@@ -1092,10 +1126,6 @@ async function loadAgentSeungPlanEvidence(
     if (id) originByPostId[id] = classifyPlanOrigin(row.system_origin_class || row.origin);
   }
   const occupied = await loadOccupiedTimes(supabase, userId);
-  for (const row of syncRows || []) {
-    const at = String(row.published_at || "").trim();
-    if (at) occupied.push(at);
-  }
   const { data: snapRows } = await supabase
     .from("audience_snapshots")
     .select("data, imported_at")
@@ -1534,8 +1564,79 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
 
   const volume = st.planner_volume as SevenDayVolume;
   const partial: PlannerSlotIntent[] = Array.isArray(st.planner_slots_partial) ? st.planner_slots_partial : [];
-  const days = nextStrategyDayOffsets(partial, volume.posts_per_day);
-  if (days.length) {
+  const pending: PlannerSlotIntent[] = Array.isArray(st.planner_slots_pending) ? st.planner_slots_pending : [];
+  const occ = spacingOccupancy(planEvidence, analytics.rows || []);
+  const days = pending.length
+    ? [...new Set(pending.map((s) => s.day_offset))].sort((a, b) => a - b)
+    : nextStrategyDayOffsets(partial, volume.posts_per_day);
+  if (days.length && pending.length) {
+    const packet = buildTimingEvidencePacket({
+      startDate: String(st.startDate || ""),
+      slots: pending,
+      postsPerDay: volume.posts_per_day,
+      hardOccupied: occ.hard,
+      todayPublished: occ.todayPublished,
+      historical: occ.historical,
+      userDirectTiming: (planEvidence.user_direct?.posts || []).map((p: any) => String(p.d || "")).filter(Boolean),
+      apPipelineTiming: (planEvidence.ap_pipeline?.posts || []).map((p: any) => String(p.d || "")).filter(Boolean),
+      fedicaBestPostingTime: planEvidence.fedica_best_posting_time,
+      lastTimeCheck: st.last_time_check || null,
+    });
+    const result = await inferCreatorSlotTiming({
+      xaiKey,
+      startDate: String(st.startDate || ""),
+      slots: pending,
+      packet,
+      timeoutMs: PLANNER_DAY_SLOT_TIMEOUT_MS,
+    });
+    if (!result.ok || !result.value) {
+      if (isTransientXaiError(result.error)) {
+        if (takePlannerHold(st) < PLANNER_XAI_HOLD_MAX) {
+          holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 시각 이어감…`, `Creator timing: ${result.error}`);
+          return;
+        }
+        row.status = "error";
+        row.error = `7일 Agent승 시각 시간 초과 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "xai_timeout"}`;
+        row.label_ko = "Creator 시각 실패";
+        return;
+      }
+      st.planner_timing_attempts = Number(st.planner_timing_attempts || 0) + 1;
+      if (st.planner_timing_attempts < 3) {
+        row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 시각만 재추론 ${st.planner_timing_attempts}/3…`;
+        row.summary = [row.summary, `Timing: ${result.error || "unusable"}`].filter(Boolean).join("\n");
+        return;
+      }
+      row.status = "error";
+      row.error = `7일 Agent승 시각 실패 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "unusable"}`;
+      row.label_ko = "Creator 시각 실패";
+      return;
+    }
+    const normalized = stampPlannerSlotTimes(String(st.startDate || ""), result.value, []);
+    const timeCheck = describeSlotTimeCheck([...partial, ...normalized], occ.spacing);
+    if (!timeCheck.ok) {
+      st.last_time_check = timeCheck;
+      st.planner_timing_attempts = Number(st.planner_timing_attempts || 0) + 1;
+      if (st.planner_timing_attempts < 3) {
+        row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 시각만 재추론 ${st.planner_timing_attempts}/3…`;
+        row.summary = [row.summary, `시각만 재추론 · ${timeCheck.note}`].filter(Boolean).join("\n");
+        return;
+      }
+      row.status = "error";
+      row.error = `7일 Agent승 시각 실패 (${days.map((d) => d + 1).join(",")}일차): ${timeCheck.note}`;
+      row.label_ko = "Creator 시각 실패";
+      return;
+    }
+    st.planner_slots_partial = [...partial, ...normalized];
+    st.planner_slots_pending = [];
+    st.planner_timing_attempts = 0;
+    st.last_time_check = null;
+    st.planner_xai_holds = 0;
+    const remain = nextStrategyDayOffsets(st.planner_slots_partial, volume.posts_per_day);
+    if (remain.length) {
+      row.label_ko = `Agent승 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;
+      return;
+    }
+  } else if (days.length) {
     const result = await inferCreatorSlotsForDays({
       xaiKey,
       audience,
@@ -1544,7 +1645,6 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       already: partial,
       planEvidence,
       digest,
-      lastTimeCheck: st.last_time_check || null,
       startDate: String(st.startDate || ""),
       operatorNote: intentText || undefined,
       timeoutMs: PLANNER_DAY_SLOT_TIMEOUT_MS,
@@ -1571,37 +1671,21 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       row.label_ko = "Creator 슬롯 실패";
       return;
     }
-    const normalized = stampPlannerSlotTimes(String(st.startDate || ""), result.value, []);
-    const timeCheck = describeSlotTimeCheck([...partial, ...normalized], planEvidence.occupied_times);
-    if (!timeCheck.ok) {
-      st.last_time_check = timeCheck;
-      st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
-      if (st.planner_day_batch_attempts < 3) {
-        row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 시각 재추론 ${st.planner_day_batch_attempts}/3…`;
-        row.summary = [row.summary, `시각 재추론 · ${timeCheck.note}`].filter(Boolean).join("\n");
-        return;
-      }
-      row.status = "error";
-      row.error = `7일 Agent승 시각 실패 (${days.map((d) => d + 1).join(",")}일차): ${timeCheck.note}`;
-      row.label_ko = "Creator 시각 실패";
-      return;
-    }
-    st.planner_slots_partial = [...partial, ...normalized];
+    st.planner_slots_pending = result.value;
     st.planner_day_batch_attempts = 0;
-    st.planner_xai_holds = 0;
-    const remain = nextStrategyDayOffsets(st.planner_slots_partial, volume.posts_per_day);
-    if (remain.length) {
-      row.label_ko = `Agent승 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;
-      return;
-    }
+    st.planner_timing_attempts = 0;
+    st.last_time_check = null;
+    row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 Timing…`;
+    row.summary = [row.summary, `슬롯 전략 잠금 ${result.value.length}칸 · Role/Mode 유지 · 시각만 추론`].filter(Boolean).join("\n");
+    return;
   }
 
   const stamped = stampPlannerSlotTimes(
     String(st.startDate || ""),
     st.planner_slots_partial as PlannerSlotIntent[],
-    planEvidence.occupied_times,
+    occ.spacing,
   );
-  if (!strategyCoversSevenDays(stamped) || !spacingConstraintHolds(stamped, planEvidence.occupied_times)) {
+  if (!strategyCoversSevenDays(stamped) || !spacingConstraintHolds(stamped, occ.spacing)) {
     row.status = "error";
     row.error = `7일 달력 무결성 실패: ${stamped.length}칸`;
     row.label_ko = "달력 실패";

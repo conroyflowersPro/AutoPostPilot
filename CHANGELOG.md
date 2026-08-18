@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.13 — 2026-08-18
+
+- Agent승 PLAN: Volume → Slot 전략 → Timing 추론 → timestamp lock
+- Timing은 별도 evidence packet. 14:00–22:00은 증거가 아니면 창이 아닙니다
+- 시각 실패 시 Role/Mode/Intent는 유지하고 시각만 재추론합니다
+- Hard occupied와 오늘 게시만 충돌 검사. 지난 30일 게시는 타이밍 증거입니다
+
 ## 12.12.12 — 2026-08-18
 
 - 이미 있는 occupied 시각끼리 2시간이 안 되어도 새 칸을 탈락시키지 않습니다
