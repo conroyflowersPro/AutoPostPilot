@@ -31,6 +31,9 @@ assert.match(q, /케이블/);
 assert.doesNotMatch(q, /FSD/);
 assert.doesNotMatch(q, /Cybertruck/);
 
+assert.equal(buildTheorySearchQuery({ subject: "FSD Tesla Optimus" }), "");
+assert.equal(buildTheorySearchQuery({ scene: "FSD", subject: "Tesla" }), "");
+
 assert.equal(classifyTheoryKind("시드에 이 힘이 있을 때", "x"), "unknown");
 assert.equal(classifyTheoryKind("x", "vid-1", { viralIds: ["vid-1"], writingIds: ["wid-1"] }), "viral");
 

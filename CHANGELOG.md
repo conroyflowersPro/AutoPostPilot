@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.8.1 — 2026-08-18
+
+- WEEKLY 출력에 Editorial Mode를 명시합니다. 기존 값을 그대로 넘깁니다
+- POST는 슬롯마다 사고가 독립입니다. Batch transport는 되고, 글 사이 생각 전염은 안 됩니다
+- Collection 검색은 의미 쿼리가 있을 때만입니다. subject만으로 FSD·Tesla를 찾지 않습니다
+
 ## 12.8.0 — 2026-08-18
 
 - 적합한 시드에서만 Deep Thesis를 켭니다. 길이를 위해 켜지 않습니다. 깊이와 길이는 다릅니다

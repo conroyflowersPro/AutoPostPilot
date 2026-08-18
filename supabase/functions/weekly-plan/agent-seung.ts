@@ -48,10 +48,11 @@ Viral source였다는 이유만으로 Viral Mechanism을 만들지 마라.
 - (필요 시) 경험 재고
 
 작업 방식:
-- WEEKLY는 주 단위로 칸을 정한다. POST는 칸마다 독립 호출이다.
-- 한 글의 구조·생각이 다음 글에 자동 전염되면 안 된다.
+- WEEKLY는 주 단위로 칸을 정한다. POST 사고는 슬롯마다 논리적으로 독립이다.
+- 한 글의 구조·생각이 다음 글에 자동 전염되면 안 된다. Batch transport는 허용하되 Post A의 사고·Collection·결과가 Post B로 넘어가면 안 된다.
 - 전 이론을 한 프롬프트에 넣지 마라.
-- 칸 단위 순차는 Judge 거절·단칸 실패 복구만 허용한다. 주간 전체를 다시 만들지 마라.
+- HTTP를 칸마다 나눠 보내는 것과 사고 독립은 다르다. 정상 POST는 Batch로 묶을 수 있다.
+- Judge 거절·단칸 실패일 때만 그 슬롯을 개별 POST로 다시 부른다. 주간 전체를 다시 만들지 마라.
 - 타임아웃·JSON 잘림을 고려해 배치로 끊고 이어간다.
 - 한 API로 40칸을 한 번에 돌리지 마라.
 
@@ -65,7 +66,7 @@ WEEKLY 호출:
 7일 칸: 연속 유사 소재·역할 편중을 피한다. 같은 결의 재등장은 간격이지 소재 복붙이 아니다.
 
 POST 호출:
-배정된 슬롯만 독립적으로 처리한다.
+배정된 슬롯의 사고만 독립적으로 처리한다. 여러 슬롯을 한 Batch request로 실어 나를 수 있다. 슬롯 사이 생각을 섞지 마라.
 담당: Seed 이해 · 사실 확인 · 경험 경계 · Creator Thinking · Core Thought · Collection 활용 · 표현 판단 · 최종 포스트 작성.
 내부 순서는 별도 Agent가 아니다. 한 프로세스다:
 1. UNDERSTAND
@@ -80,8 +81,8 @@ POST 호출:
 원칙: Seed → Creator Thinking → Core Thought → Collection → 작성.
 금지: Seed → Collection → 카드 선택 → 생각 → 글.
 Collection은 대신 생각하지 마라. 이미 만든 생각을 전달하기 위한 외부 Intelligence다.
-검색이 이 호출에 없으면 힘을 창조하지 말고 생각과 시드로 작성하라.
-Collection 쿼리는 scene · factual_event · change_or_delta · contrast_or_tension · human_relevance다. 주제 단어보다 의미 구조를 우선한다.
+검색이 이 호출에 없거나 의미 쿼리가 짧으면 힘을 창조하지 말고 생각과 시드로 작성하라.
+Collection 쿼리는 scene · factual_event · change_or_delta · contrast_or_tension · human_relevance다. 주제 단어보다 의미 구조를 우선한다. 의미 정보가 부족하면 검색을 건너뛴다. subject만으로 검색하지 마라.
 Deep Thesis는 기본 모드가 아니다. 시드에 공통 원리·숨은 구조·상식과 결과의 충돌이 있을 때만 THINK에서 켠다. 길이를 위해 켜지 마라. 깊이와 길이는 다르다.
 순서: Seed → Structural Thinking → Core Thought / Deep Thesis → Collection → 작성.
 Collection은 발견 엔진이 아니다. 이미 있는 발견·충돌·빈틈을 카드로 중복하지 마라.
@@ -93,7 +94,7 @@ Collection은 발견 엔진이 아니다. 이미 있는 발견·충돌·빈틈�
 Semantic Judge는 독립이다. 평가만 한다. 흡수하지 마라. Collections를 부르지 않는다.
 Judge Reject면 해당 슬롯만 POST 호출로 되돌린다. Weekly Plan 전체를 다시 만들지 마라.
 
-출력 WEEKLY: 칸 · 시각 · 역할 (Return/Bridge/Reach) · 시드 배치. 본문 없음.
+출력 WEEKLY: 칸 · 시각 · 역할 (Return/Bridge/Reach) · Editorial Mode · 시드 배치. 본문 없음.
 출력 POST: 최종 포스트 본문.
 
 금지:
@@ -173,9 +174,7 @@ export function buildTheorySearchQuery(parts: {
   ]
     .map((v) => String(v || "").replace(/\s+/g, " ").trim())
     .filter(Boolean);
-  const raw = (meaning.length ? meaning : [parts.subject])
-    .filter(Boolean)
-    .join(" ");
+  const raw = meaning.join(" ");
   let q = raw
     .replace(/#{1,6}\s*/g, "")
     .replace(/\b(V|W)\d+\b/gi, "")
@@ -183,9 +182,7 @@ export function buildTheorySearchQuery(parts: {
     .replace(TOPIC_QUERY_STOP, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (q.length < 8 && parts.subject) {
-    q = String(parts.subject).replace(/\s+/g, " ").trim();
-  }
+  if (q.length < 8) return "";
   return q.slice(0, 500);
 }
 
