@@ -1,6 +1,13 @@
-# Operator thread handoff — 2026-08-17
+# Operator thread handoff — 2026-08-18
 
 새 채팅/에이전트는 **이 파일을 먼저** 읽고 이어서 작업한다. Writer·Planner·Judge 프롬프트에 넣지 않는다.
+
+## Current (do not treat older sections as live version)
+
+- **main:** v12.8.0. Do not deploy until Seung says **배포해**.
+- **ORDER 1 (v12.9.0):** PR #82 `cursor/order1-evidence-timing-c02a` — 7일 Evidence · Slot 날짜/시각. Preserve timestamp/calendar/Fedica identification.
+- **ORDER 2 (v12.10.0):** this thread — Agent승 Thinking Intelligence · Core Thought · 직접 WRITE. Collection API 호출 0. Hook만 준비.
+- **ORDER 3 next:** Independent Judge. Fedica가 Agent승 `planned_at`을 덮어쓰는 지점은 ORDER 1에서 표시만 함.
 
 ## Who / how
 

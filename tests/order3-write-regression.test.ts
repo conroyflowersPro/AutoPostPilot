@@ -118,12 +118,10 @@ for (const seed of seeds) {
   });
   const packet = buildSemanticSeedPacket(seed as any, interp as any);
   const exp = buildExperiencePacket(seed as any, interp as any);
-  const thought = buildPostThought(interp as any, {
-    creator_judgment: String((interp as any).why_it_might_matter_to_creator || ""),
-  });
-  thoughts.push(thought.core_thought);
+  const thought = buildPostThought(interp as any, {});
+  thoughts.push(thought.observation || packet.scene || seed.concrete_subject);
   assert.doesNotMatch(packet.subject || "", /실사용 후속/);
-  assert.ok(thought.core_thought.length >= 8, seed.name + " thought");
+  assert.equal(thought.core_thought, "", seed.name + " core thought stays open for Agent승");
   assert.doesNotMatch(thought.core_thought, /judgment_axis:/);
   if (seed.owner === "SELF" && (seed.experience_facts || []).length) {
     assert.equal(exp.creator_experienced, true, seed.name + " must keep lived facts");
@@ -154,7 +152,8 @@ for (const seed of seeds) {
     experience_packet: exp,
   });
   const prompt = buildConstraintOnlyWriterInstructions(deep);
-  assert.match(prompt, /DECIDED THOUGHT/);
+  assert.match(prompt, /CORE THOUGHT/);
+  assert.match(prompt, /YOU decide Core Thought/);
   assert.match(prompt, /STABLE CREATOR DNA/);
   assert.match(prompt, /RECENT VOICE REGISTER/);
   assert.doesNotMatch(prompt, /THINKING RAIL \(internal only/);
@@ -198,7 +197,8 @@ assert.match(kept, /쓰지 말 때/);
 assert.doesNotMatch(kept, /V4/);
 
 const ow = readFileSync("supabase/functions/weekly-plan/order-write-pipeline.ts", "utf8");
-assert.ok(ow.indexOf("buildPostThought") < ow.indexOf("searchAgentSeungTheories"));
+assert.ok(ow.indexOf("buildPostThought") < ow.indexOf("runCollectionReadyHook"));
+assert.doesNotMatch(ow, /searchAgentSeungTheories/);
 assert.doesNotMatch(ow, /from "\.\/generate-post/);
 assert.match(ow, /voiceRegisterConstraintLine/);
 const dna = readFileSync("supabase/functions/weekly-plan/engine-dna.ts", "utf8");

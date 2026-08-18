@@ -127,7 +127,7 @@ export function deepThesisWriteLines(fit: DeepThesisFit): string[] {
         ? "Named-entity check: without the names the thought thins. Keep the names. Do not hide them as a trick."
         : "Named-entity check: no famous-name center.";
   return [
-    "DEEP THESIS (THINK already chose this because the seed supports it — not to make a long post):",
+    "DEEP THESIS (optional inside THINK — only if you actually find hidden structure, shared dependency, constraint, expect-vs-result clash, causal link, or meaningful scale shift):",
     "Depth is not length. Short is correct if the discovery is already on the page. Do not cut the logic for a character quota. Do not add after it lands.",
     "Do not open by summarizing the whole conclusion. Leave room for the reader to connect. Discovery must happen as the thought moves, not as a hidden punchline.",
     "If the seed already has a concrete world (action, scene, use, money, time, people), you may pass through it. Do not invent an analogy.",

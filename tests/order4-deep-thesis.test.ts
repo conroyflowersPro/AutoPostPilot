@@ -78,10 +78,8 @@ const expFit = assessDeepThesisFit(
 );
 assert.equal(expFit.use, false, "EXPERIENCE mode does not force Deep Thesis");
 
-const thought = buildPostThought(richInterp as any, {
-  creator_judgment: String((richInterp as any).why_it_might_matter_to_creator || ""),
-});
-assert.ok(thought.core_thought.length >= 8);
+const thought = buildPostThought(richInterp as any, {});
+assert.equal(thought.core_thought, "");
 assert.doesNotMatch(thought.core_thought, /Deep Thesis/);
 
 const coll = theoryChunksForModel(
@@ -92,12 +90,15 @@ assert.match(coll, /Do not re-apply a card that only duplicates/);
 assert.match(coll, /Zero cards is allowed/);
 
 const ow = readFileSync("supabase/functions/weekly-plan/order-write-pipeline.ts", "utf8");
-assert.ok(ow.indexOf("assessDeepThesisFit") < ow.indexOf("searchAgentSeungTheories"));
-assert.match(ow, /deepThesisCollectionNote/);
+assert.match(ow, /assessDeepThesisFit/);
+assert.match(ow, /runCollectionReadyHook/);
+assert.doesNotMatch(ow, /searchAgentSeungTheories/);
+assert.doesNotMatch(ow, /deepThesisCollectionNote/);
 const wr = readFileSync("supabase/functions/weekly-plan/independent-post-generation.ts", "utf8");
 assert.match(wr, /deepThesisWriteLines/);
 assert.match(wr, /length follows the thought/);
 const order = readFileSync("lib/intelligence/agent-seung.ts", "utf8");
 assert.match(order, /Deep Thesis는 기본 모드가 아니다/);
-assert.match(order, /Seed → Structural Thinking → Core Thought \/ Deep Thesis → Collection/);
+assert.match(order, /COLLECTION_READY_HOOK/);
+assert.match(order, /Core Thought → COLLECTION_READY_HOOK → WRITE/);
 console.log("order4-deep-thesis ok");

@@ -2358,10 +2358,33 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     .select("text_body, post_type, action_type, published_at, system_origin_class, meta")
     .gte("published_at", voiceSince)
     .limit(400);
+  let thinkingCandidates: any[] = [];
+  let recent14dWeight: number | null = 2;
+  try {
+    const { data: rails, error: railErr } = await supabase
+      .from("thinking_rail_candidates")
+      .select("id, rail_key, topic, editorial_modes, trigger_summary, expansion_steps, support_count, recent_14d_support, recent_usage, historical_strength, confidence, status, notes")
+      .in("status", ["CANDIDATE", "APPROVED_PENDING_DNA", "PROMOTED"])
+      .order("confidence", { ascending: false })
+      .limit(40);
+    if (!railErr && Array.isArray(rails)) thinkingCandidates = rails;
+    const { data: jobMeta } = await supabase
+      .from("thinking_extract_jobs")
+      .select("recent_14d_weight")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const w = Number(jobMeta?.recent_14d_weight);
+    if (Number.isFinite(w) && w > 0) recent14dWeight = w;
+  } catch {
+    thinkingCandidates = [];
+  }
   const posts = await writeSlotBatch({
     slots: chunk,
     xaiKey: xaiKey || null,
     voiceRows: (voiceActs || []) as any,
+    thinkingCandidates,
+    recent_14d_weight: recent14dWeight,
     audienceSignals: audienceBarrierSignalsFromActivityMeta((voiceActs || []) as any),
     weekSignatures: st.weekly_signatures || [],
     skipSelectiveRegen: true,

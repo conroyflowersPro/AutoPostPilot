@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.10.0 — 2026-08-18
+
+- Agent승이 슬롯에서 UNDERSTAND → VERIFY → THINK 한 뒤 Core Thought를 직접 정하고 같은 자신이 글을 씁니다. 별도 Writer가 생각을 다시 만들지 않습니다
+- Core Thought는 `tension_around` / `judgment_axis` 조립문이 아닙니다. Thinking Rail은 참고 Intelligence이고 No Rail이 정상입니다
+- 정적 Rail과 Topic→Rail은 Creator Thinking DNA로 쓰지 않습니다. Collection API는 이 경로에서 호출하지 않습니다. Hook만 준비되어 있습니다
+
 ## 12.9.0 — 2026-08-18
 
 - 기존 7일 생성 버튼에서 Agent승이 30일 Analytics · Sync gap · USER_DIRECT/AP_PIPELINE을 따로 보고 7일 칸의 날짜·시각을 정합니다

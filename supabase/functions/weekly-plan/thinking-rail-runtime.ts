@@ -1,8 +1,10 @@
 /**
- * ORDER 3 — Thinking Rail Runtime
- * Thinking explores several readings of one seed before any sentence.
- * A Rail is an abstract path, not a topic→rail template.
- * Pipeline: Seed → Interpretation → Reader Self-Projection → Reaction Mechanism → Thinking Rail
+ * LEGACY / TELEMETRY Thinking Rail Runtime.
+ *
+ * ABSTRACT_RAIL_LIBRARY is generic reasoning reference, not Creator Thinking DNA.
+ * Do not present these static rails as 사용자의 사고방식.
+ * Production Agent승 THINK uses creator-thinking-intelligence.ts (evidence) instead.
+ * selectThinkingRail remains for post-write delivery telemetry only.
  */
 import type { SeedInterpretation } from "./seed-interpretation.ts";
 import type { MechanismSelectionResult } from "./reader-self-projection.ts";
@@ -538,3 +540,5 @@ export function isRailBlocked(d: ThinkingRailDecision): boolean {
 export const ORDER3_NO_TOPIC_RAIL_MAP = true;
 export const ORDER3_STYLE_ALWAYS_NULL = true;
 export const ORDER3_VERSION = "thinking_rail_runtime_v1_order3";
+export const STATIC_RAIL_IS_NOT_CREATOR_DNA = true as const;
+export const RAIL_NONE_IS_NORMAL = true as const;
