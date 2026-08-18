@@ -58,12 +58,18 @@ Viral source였다는 이유만으로 Viral Mechanism을 만들지 마라.
 
 WEEKLY 호출:
 주 전체를 본다.
-담당: 요청 기간의 전체 포스트 수 · Return / Bridge / Reach · Editorial Mode · 관심사 분산 · Seed 배치 · 포스트 간 간격 · 연속 유사 소재 방지 · 동일 역할 편중 방지 · 최근 발행 흐름.
+담당: 요청 기간의 전체 포스트 수 · Return / Bridge / Reach · Editorial Mode · 관심사 분산 · Seed 배치 · 날짜 · 시각 · 포스트 간 간격 · 연속 유사 소재 방지 · 동일 역할 편중 방지 · 최근 발행 흐름.
 최종 포스트 본문을 쓰지 마라.
 목적: 이번 주 어떤 글들을 어떤 위치에 놓을 것인가.
 시드 평가는 날조된 경험 선제 차단이다. 이 단계에서 힘 이름·카드 번호를 확정하지 마라. Collection을 부르지 마라.
 역할 근거는 30일 Analytics(+14일 메움)다. Collections를 부르지 않는다.
 7일 칸: 연속 유사 소재·역할 편중을 피한다. 같은 결의 재등장은 간격이지 소재 복붙이 아니다.
+입력 WEEKLY: 30일 Analytics(지표를 한 점수로 합치지 마라) · Analytics에 없는 Sync gap · USER_DIRECT와 AP_PIPELINE을 따로 · 기존 예약/게시 밀도.
+USER_DIRECT는 현재 Identity · 창발 · 직접 의견 · Current Voice다. AP_PIPELINE은 계획된 Portfolio · 간격 · 성과다. 둘을 한 평균 성공 집단으로 합치지 마라. AP_PIPELINE으로 Creator Voice를 배우지 마라.
+Complexity/Emergence: 계획된 AP가 기계적으로 굳는지, USER_DIRECT가 어디로 움직이는지, Identity를 지키며 Growth 기회를 열 수 있는지를 같이 판단하라. 고정 비율·고정 Slot 패턴으로 구현하지 마라. Creator Identity와 장기 Account Growth를 동시에 추구하라.
+날짜·시각은 7일 전략의 일부다. freshness, 같은 작성자 원글 밀도, 각 글이 engagement를 얻을 시간을 고려하라.
+인접 계획 원글은 최소 2시간. 14:00부터 2시간 격자, 120분 반복, 임의 jitter, 고정 하루 시간표로 만들지 마라. 14:00–22:00 PT는 청중이 있는 시간대이지 AP For You 창이 아니다.
+Topic→Role, Topic→시간, Editorial Mode→시간, USER_DIRECT 비율→고정 Slot 패턴 규칙을 만들지 마라. 구조와 경계만 지키고 전략은 이번 Job 데이터를 보고 추론하라.
 
 POST 호출:
 배정된 슬롯의 사고만 독립적으로 처리한다. 여러 슬롯을 한 Batch request로 실어 나를 수 있다. 슬롯 사이 생각을 섞지 마라.
@@ -94,7 +100,7 @@ Collection은 발견 엔진이 아니다. 이미 있는 발견·충돌·빈틈�
 Semantic Judge는 독립이다. 평가만 한다. 흡수하지 마라. Collections를 부르지 않는다.
 Judge Reject면 해당 슬롯만 POST 호출로 되돌린다. Weekly Plan 전체를 다시 만들지 마라.
 
-출력 WEEKLY: 칸 · 시각 · 역할 (Return/Bridge/Reach) · Editorial Mode · 시드 배치. 본문 없음.
+출력 WEEKLY: 칸 · 날짜 · 시각 · 역할 (Return/Bridge/Reach) · Editorial Mode · 시드 배치. 본문 없음.
 출력 POST: 최종 포스트 본문.
 
 금지:

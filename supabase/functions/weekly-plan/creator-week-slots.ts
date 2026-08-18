@@ -16,6 +16,7 @@ import {
   audienceStatusBlock,
   type AudienceXStatus,
 } from "./audience-x-status.ts";
+import { planEvidenceForModel, type AgentSeungPlanEvidence } from "./plan-evidence.ts";
 
 function s(v: unknown, max = 240): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -75,9 +76,12 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     "You are Agent승 filling AP slot intents for the listed day_offset values only.",
     creatorDnaBlock(),
     `day_offset is 0-based. Fill ${spec}. Do not emit any other day_offset.`,
-    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent.",
+    "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent, planned_at (ISO UTC), planned_pt (America/Los_Angeles wall time).",
+    "Date and time are strategy. Infer each timestamp from the evidence this job. Adjacent planned originals at least 2 hours. Do not emit a repeating 14:00/16:00/18:00/20:00/22:00 grid. Do not add random jitter. 14:00–22:00 PT are audience hours to consider, not a template.",
+    "USER_DIRECT and AP_PIPELINE are separate populations. Do not average them. Do not learn Creator Voice from AP_PIPELINE.",
+    "Complexity/Emergence is a judgment, not a ratio or slot recipe. Keep Creator Identity and long-term account growth together.",
     "REACH: 1 per day_offset, never more than 2. Prefer CASUAL_OBSERVATION or easy INFORMATIVE. PRESENCE is not a role and is not REACH. Do not freeze RETURN/BRIDGE share.",
-    "SCENE: consecutive slots must not share the same situation cluster (FSD, driving, parking, intersection). Those driving-family scenes are at most 2 per day_offset. Do not repeat the previous slot's verdict angle (better than before / still ambiguous).",
+    "SCENE: consecutive slots must not share the same situation cluster. Driving-family scenes are at most 2 per day_offset. Do not repeat the previous slot's verdict angle.",
     "EXPERIENCE only within lived_scene_count. Do not force EXPERIENCE share when lived originals are missing or thin. BRIDGE+EXPERIENCE almost never. REACH+EXPERIENCE only if universalized.",
     "planner_intent says why the slot exists, not how to write it.",
     "Return strict JSON: { \"slots\": [ ... ] }. Fill every required slot. No prose outside JSON.",
@@ -153,6 +157,8 @@ export function parseCreatorDaySlots(args: {
       strategic_role: role,
       editorial_mode: mode(item?.editorial_mode),
       planner_intent: intent,
+      planned_at: s(item?.planned_at, 48) || undefined,
+      planned_pt: s(item?.planned_pt || item?.planned_time, 48) || undefined,
     });
   }
   if (!slots.length) return null;
@@ -186,22 +192,25 @@ export function parseCreatorDaySlots(args: {
 export async function inferCreatorWeekVolume(args: {
   xaiKey: string;
   audience: AudienceXStatus;
+  planEvidence?: AgentSeungPlanEvidence | null;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<{ posts_per_day: number[]; summary: string }>> {
   return callPlanner({
     xaiKey: args.xaiKey,
-    maxTokens: 1200,
+    maxTokens: 1400,
     timeoutMs: args.timeoutMs,
     system: [
       "You are Agent승 locking seven-day AP volume only. Do not emit slots.",
       creatorDnaBlock(),
       audienceStatusBlock(args.audience),
+      "Use plan_evidence: 30-day Analytics metrics stay separate. Sync is gap-fill only. USER_DIRECT and AP_PIPELINE stay separate. Do not average them. Complexity/Emergence is a judgment, not a ratio.",
       "volume_gates: each day 4-8 originals, week 28-56, no empty day. Handmade does not change volume.",
       "Return strict JSON: posts_per_day (7 integers), strategy_summary.",
     ].join("\n"),
     user: {
       audience_x_status: args.audience,
+      plan_evidence: args.planEvidence ? planEvidenceForModel(args.planEvidence) : null,
       operator_note: args.operatorNote || "",
     },
     parse: (raw) => {
@@ -218,21 +227,30 @@ export async function inferCreatorSlotsForDays(args: {
   days: number[];
   postsPerDay: number[];
   already: PlannerSlotIntent[];
+  planEvidence?: AgentSeungPlanEvidence | null;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSlotIntent[]>> {
   const wanted = args.days.reduce((n, d) => n + (args.postsPerDay[d] || QUOTA_PER_DAY_MIN), 0);
   return callPlanner({
     xaiKey: args.xaiKey,
-    maxTokens: 3500,
+    maxTokens: 4000,
     timeoutMs: args.timeoutMs,
     system: creatorDaySlotsSystem(args.days, args.postsPerDay),
     user: {
       audience_counts: compactAudienceCounts(args.audience),
+      plan_evidence: args.planEvidence ? planEvidenceForModel(args.planEvidence) : null,
       posts_per_day: args.postsPerDay,
       day_offsets: args.days,
       required_slot_count_this_call: wanted,
-      already_slot_count: args.already.length,
+      already_planned: (args.already || []).map((slot) => ({
+        slot_id: slot.slot_id,
+        day_offset: slot.day_offset,
+        strategic_role: slot.strategic_role,
+        editorial_mode: slot.editorial_mode,
+        planned_at: slot.planned_at || "",
+        planned_pt: slot.planned_pt || "",
+      })),
       operator_note: args.operatorNote || "",
     },
     parse: (raw) => parseCreatorDaySlots({

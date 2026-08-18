@@ -67,9 +67,11 @@ function mapPlanned(row: {
   status: string | null;
   pipeline_id: string | null;
   fedica_post_id: string | null;
+  strategy_json?: { planned_at?: string | null } | null;
 }): CalendarActivity | null {
-  if (!row.scheduled_at) return null;
-  const date = ptDateKey(row.scheduled_at);
+  const when = row.scheduled_at || row.strategy_json?.planned_at || null;
+  if (!when) return null;
+  const date = ptDateKey(when);
   let origin: ActivityOrigin = "WEEKLY_PLANNER";
   const pid = String(row.pipeline_id || "");
   if (pid === "42338") origin = "WILD_GROWTH";
@@ -84,8 +86,8 @@ function mapPlanned(row: {
   return {
     activity_id: `plan-${row.id}`,
     date,
-    scheduled_at: row.scheduled_at,
-    published_at: status === "PUBLISHED" ? row.scheduled_at : null,
+    scheduled_at: when,
+    published_at: status === "PUBLISHED" ? when : null,
     origin,
     action_type: "ORIGINAL",
     status,
@@ -134,10 +136,9 @@ export async function getOperationalActivities(
 
     const { data: planned } = await supabase
       .from("SeungContent")
-      .select("id, content, scheduled_at, status, pipeline_id, fedica_post_id")
+      .select("id, content, scheduled_at, status, pipeline_id, fedica_post_id, strategy_json")
       .eq("user_id", user.id)
-      .eq("status", "scheduled")
-      .not("scheduled_at", "is", null);
+      .in("status", ["scheduled", "scheduling", "reviewed", "draft"]);
 
     for (const row of planned || []) {
       const m = mapPlanned(row);
@@ -323,7 +324,7 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData> {
   };
 }
 
-/** Planner-inscribed month counts from last X sync. No Grok. No leftover drafts. */
+/** Planner-inscribed month counts from last X sync plus canonical planned/scheduled times. */
 export async function getQueueMonthInscription(year: number, month1to12: number) {
   try {
     const supabase = await createClient();
@@ -339,10 +340,14 @@ export async function getQueueMonthInscription(year: number, month1to12: number)
       .maybeSingle();
     const { data: booked } = await supabase
       .from("SeungContent")
-      .select("scheduled_at")
+      .select("scheduled_at, status, strategy_json")
       .eq("user_id", user.id)
-      .eq("status", "scheduled")
-      .not("scheduled_at", "is", null);
+      .in("status", ["scheduled", "scheduling", "reviewed", "draft"]);
+    const bookedTimes = (booked || [])
+      .map((row: { scheduled_at?: string | null; strategy_json?: { planned_at?: string | null } | null }) => ({
+        scheduled_at: row.scheduled_at || row.strategy_json?.planned_at || null,
+      }))
+      .filter((row: { scheduled_at: string | null }) => Boolean(row.scheduled_at));
     let synced: ActivityForInscribe[] = [];
     if (conn?.id) {
       const fromDate = new Date(Date.UTC(year, month1to12 - 1, 0));
@@ -361,7 +366,7 @@ export async function getQueueMonthInscription(year: number, month1to12: number)
     }
     const days = mergeBookedScheduleDays(
       inscribeMonthFromActivities(synced, year, month1to12),
-      booked || [],
+      bookedTimes,
       year,
       month1to12,
     );

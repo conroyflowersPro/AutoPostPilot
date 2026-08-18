@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
       ? computeStartISOForDate(startDate)
       : computeKRBatchStartISO();
 
+    // ORDER 1 identified: this route recomputes a 2h spread and does not read
+    // Agent승 strategy_json.planned_at. ORDER 3 owns the Fedica timestamp handoff.
     const { data: occupiedRows } = await supabase
       .from("SeungContent")
       .select("scheduled_at")

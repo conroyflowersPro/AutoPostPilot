@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
     const occupied = (occupiedRows || [])
       .map((r: { scheduled_at?: string | null }) => String(r.scheduled_at || ""))
       .filter(Boolean);
+    // ORDER 1 identified: fallback recomputes the next 2h slot. It does not
+    // read Agent승 strategy_json.planned_at. ORDER 3 owns that handoff.
     const scheduledAt =
       typeof body.scheduledAt === "string" && body.scheduledAt.trim()
         ? body.scheduledAt.trim()

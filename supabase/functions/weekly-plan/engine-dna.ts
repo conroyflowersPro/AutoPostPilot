@@ -54,7 +54,7 @@ export function performanceDnaBlock(): string {
     "LENGTH: Writer decides from the assigned thought. Post Agent승 decides length from that thought. No mode quota, weekly length prescription, or fixed seven-day length mix.",
     "X WEIGHTS: they multiply predicted action probabilities for this Home-timeline viewer, not raw like/reply counts. Do not treat a report-vs-like weight ratio as 'N likes cancelled'. Do not put weight numbers into post prose.",
     "COPY-LINK/DM: those weights are P(this viewer copies or DMs after seeing the post in Home). Author copying an original and DMing an account does not add rank. Direct navigation (DM/groupchat link) has no ranking impact. Same recipient is irrelevant because that send is not in the ranking sum. Do not write for that action.",
-    "SPACING (strategy only): X For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Gap originals by about 2 hours. Do not stack originals. First original 14:00 America/Los_Angeles. Pacific 14:00–22:00 PT are audience posting hours, not an AP For You window — do not compress gaps to fill that window. Do not write the last sentence for the algorithm.",
+    "SPACING (strategy only): X For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Adjacent planned originals need at least 2 hours — a constraint, not a repeating clock. Do not stamp 14:00 + 2h. Do not add jitter. Pacific 14:00–22:00 PT are audience posting hours to consider, not an AP For You window. Agent승 infers timestamps from this job's evidence. Do not write the last sentence for the algorithm.",
     "CANDIDATE: practical investigation → bookmarks/profile this window not follows; lived incident + clip → mixed conversion; ultra-short originals did not convert follows",
     "FORBIDDEN: impressions-only optimization · invent success from drafts · override Creator DNA authenticity · clone a winning post",
     "Likes = X algorithm layer for mix/spacing, not a sentence recipe",
@@ -210,7 +210,7 @@ export function engineRulesAsWill(): string {
     "USER_DIRECT informs Creator Intelligence. AP_PIPELINE trains performance only and must not rewrite Agent승. Weekly Agent승 does not prescribe writing form; Post Agent승 does not redesign strategy.",
     "Do not invent lived experience or opinions. Authenticity first. Place and experience bounds live in Creator DNA + these engine rules.",
     "Semantic Judge validates only final publishability. Judge does not select Seeds, redesign strategy, or write. Reject returns that slot to Post Agent승. Do not rebuild the weekly plan.",
-    "After review + original media, AI publishes. Spacing follows X For You: ~2 hours between same-author originals so they are not stacked in one refresh. OON candidates drop after about 48 hours. 14:00–22:00 PT are audience posting hours, not a window to pack.",
+    "After review + original media, AI publishes. Adjacent planned originals need at least 2 hours. Agent승 infers timestamps from evidence; do not pack a 14:00 grid. 14:00–22:00 PT are audience posting hours to consider. OON candidates drop after about 48 hours.",
     "X ranking weights scale predicted viewer actions on Home-served posts, not counted events and not author DMs of own links. They do not pick the last sentence.",
     "Do not wait for a typed restatement of will. DNA + these rules are the will.",
   ].join("\n");

@@ -2,7 +2,7 @@
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
  * Seed supply: Planner locks seven-day slots, then Seed Generator fills requested_seed_count (slots + 10).
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
- * Target volume: Planner locks the 7-day plan. Judge owns week count (PASS saved >= planned slots). Floor 4/day × 7 = 28; 5 fills 14:00–22:00 PT; bounds 4–8.
+ * Target volume: Planner locks the 7-day plan. Judge owns week count (PASS saved >= planned slots). Floor 4/day × 7 = 28; bounds 4–8. Agent승 infers timestamps (min 2h constraint).
  * CORS: Access-Control-Allow-Methods included.
  * ORDER 0B: seed_eligible via isSeedEligibleRole; manual posts are learning only.
  */
@@ -58,7 +58,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "12.8.1";
+const APP_VERSION = "12.9.0";
 const WEEKLY_ENGINE_VERSION = "v11_judge_owns_count";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;

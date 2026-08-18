@@ -71,6 +71,7 @@ import {
   type SevenDayVolume,
 } from "./seven-day-planner.ts";
 import { stampPlannerSlotTimes } from "./for-you-spread.ts";
+import { buildAgentSeungPlanEvidence, classifyPlanOrigin, type AgentSeungPlanEvidence } from "./plan-evidence.ts";
 import { judgeWeekCount } from "./semantic-judge.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { buildAudienceXStatus, type AudienceXStatus } from "./audience-x-status.ts";
@@ -875,14 +876,14 @@ export async function tickWeeklyJob(args: {
     if (row.status !== "running") {
       // Compatibility transition above completed this tick without another call.
     }
-    else if (row.step === "quota") await stepStrategy(args.supabase, args.xaiKey, row);
+    else if (row.step === "quota") await stepStrategy(args.supabase, args.xaiKey, args.userId, row);
     else if (row.step === "expand") await stepExpand(args.supabase, args.xaiKey, row);
     else if (row.step === "judge") {
       // Resume compatibility for jobs created before Planner owned selection.
       row.step = row.state?.planner_strategy ? "select" : "strategy";
       row.label_ko = row.state?.planner_strategy ? "Planner Seed 선택…" : "7일 Planner 전략…";
     }
-    else if (row.step === "strategy") await stepStrategy(args.supabase, args.xaiKey, row);
+    else if (row.step === "strategy") await stepStrategy(args.supabase, args.xaiKey, args.userId, row);
     else if (row.step === "select") await stepPlannerSelect(args.supabase, args.xaiKey, row);
     else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey || "", args.userId, row);
     else if (row.step === "recover") await stepRecover(args.supabase, args.xaiKey || "", row);
@@ -960,7 +961,7 @@ async function loadAudienceXStatus(supabase: any, analytics?: {
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
   const { data: syncRows } = await supabase
     .from("account_activities")
-    .select("text_body, post_type, action_type, published_at, x_post_id")
+    .select("text_body, post_type, action_type, published_at, x_post_id, system_origin_class, origin")
     .gte("published_at", since)
     .limit(500);
   const dates = published.rows.map((row) => String(row.published_at || "").slice(0, 10)).filter(Boolean).sort();
@@ -969,6 +970,69 @@ async function loadAudienceXStatus(supabase: any, analytics?: {
     analyticsTo: dates[dates.length - 1],
     analyticsPosts: published.rows,
     syncPosts: syncRows || [],
+  });
+}
+
+async function loadOccupiedTimes(supabase: any, userId: string): Promise<string[]> {
+  const times: string[] = [];
+  try {
+    const { data: booked } = await supabase
+      .from("SeungContent")
+      .select("scheduled_at, status, strategy_json")
+      .eq("user_id", userId)
+      .in("status", ["scheduled", "scheduling", "reviewed", "draft"])
+      .limit(400);
+    for (const row of booked || []) {
+      const scheduled = String(row.scheduled_at || "").trim();
+      const planned = String(row.strategy_json?.planned_at || "").trim();
+      if (scheduled) times.push(scheduled);
+      else if (planned) times.push(planned);
+    }
+  } catch {
+    /* occupancy is evidence, not a hard fail */
+  }
+  return times;
+}
+
+async function loadAgentSeungPlanEvidence(
+  supabase: any,
+  userId: string,
+  startDate: string,
+  analytics: {
+    rows: Array<{
+      post_id?: string | null;
+      published_at?: string;
+      content?: string;
+      metrics?: Record<string, number | null | undefined>;
+    }>;
+    coverage_days?: number;
+    account_daily?: Array<Record<string, unknown>>;
+  },
+): Promise<AgentSeungPlanEvidence> {
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+  const { data: syncRows } = await supabase
+    .from("account_activities")
+    .select("text_body, post_type, action_type, published_at, x_post_id, system_origin_class, origin")
+    .gte("published_at", since)
+    .limit(500);
+  const originByPostId: Record<string, string> = {};
+  for (const row of syncRows || []) {
+    const id = String(row.x_post_id || "").trim();
+    if (id) originByPostId[id] = classifyPlanOrigin(row.system_origin_class || row.origin);
+  }
+  const occupied = await loadOccupiedTimes(supabase, userId);
+  for (const row of syncRows || []) {
+    const at = String(row.published_at || "").trim();
+    if (at) occupied.push(at);
+  }
+  return buildAgentSeungPlanEvidence({
+    startDate,
+    analyticsPosts: analytics.rows || [],
+    analyticsCoverageDays: analytics.coverage_days,
+    accountDaily: analytics.account_daily,
+    syncPosts: syncRows || [],
+    occupiedTimes: occupied,
+    originByPostId,
   });
 }
 
@@ -1269,7 +1333,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   }
 }
 
-async function stepStrategy(supabase: any, xaiKey: string, row: any) {
+async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: any) {
   const st = row.state;
   if (!xaiKey) {
     row.status = "error";
@@ -1294,10 +1358,18 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   }
   const analytics = await loadRecentXAnalyticsPublished(supabase, 30);
   const audience = await loadAudienceXStatus(supabase, analytics);
+  const planEvidence = await loadAgentSeungPlanEvidence(
+    supabase,
+    userId,
+    String(st.startDate || ""),
+    analytics,
+  );
   st.audience_x_status = audience;
+  st.plan_evidence_version = planEvidence.version;
   const analyticsLine = [
     `X Analytics 실제 게시 ${analytics.rows.length}행 · 실제 날짜 ${analytics.coverage_days}일`,
     `동기화 공백 원글 ${audience.sync_gap_originals} · 경험 장면 ${audience.lived_scene_count}`,
+    `USER_DIRECT ${planEvidence.user_direct.originals} · AP_PIPELINE ${planEvidence.ap_pipeline.originals}`,
     `bundled ${analytics.bundled_source || "none"}${analytics.bundled_error ? ` · ${analytics.bundled_error}` : ""}`,
   ].join(" · ");
 
@@ -1305,6 +1377,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     const result = await inferCreatorWeekVolume({
       xaiKey,
       audience,
+      planEvidence,
       operatorNote: intentText || undefined,
       timeoutMs: 20000,
     });
@@ -1354,6 +1427,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
       days,
       postsPerDay: volume.posts_per_day,
       already: partial,
+      planEvidence,
       operatorNote: intentText || undefined,
       timeoutMs: 28000,
     });
@@ -1382,7 +1456,11 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     }
   }
 
-  const stamped = stampPlannerSlotTimes(String(st.startDate || ""), st.planner_slots_partial as PlannerSlotIntent[]);
+  const stamped = stampPlannerSlotTimes(
+    String(st.startDate || ""),
+    st.planner_slots_partial as PlannerSlotIntent[],
+    planEvidence.occupied_times,
+  );
   if (!strategyCoversSevenDays(stamped)) {
     row.status = "error";
     row.error = `7일 달력 무결성 실패: ${stamped.length}칸`;
@@ -1406,10 +1484,10 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   const seedTarget = candidatePoolTarget(row.required_slots);
   row.summary = [
     row.summary,
-    `Agent승 잠금 ${row.required_slots}칸 · Planner가 시각 배정 · Seed Generator에 ${seedTarget}개 요청 (칸 + ${SEED_POOL_BUFFER})`,
+    `Agent승 잠금 ${row.required_slots}칸 · Agent승이 날짜·시각 결정 · Seed Generator에 ${seedTarget}개 요청 (칸 + ${SEED_POOL_BUFFER})`,
     `Creator 7일 판단: ${volume.summary}`,
     analyticsLine,
-    `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "14:00 PT"}`,
+    `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "Agent승 시각"}`,
   ].filter(Boolean).join("\n");
   if ((st.gated || []).length < seedTarget && canKeepExpanding(st)) {
     row.step = "expand";
