@@ -12,7 +12,6 @@ const siPath = path.join(root, "supabase/functions/weekly-plan/seed-interpretati
 const indexPath = path.join(root, "supabase/functions/weekly-plan/index.ts");
 const guardPath = path.join(root, "supabase/functions/weekly-plan/manual-leakage-guard.ts");
 const rolesPath = path.join(root, "supabase/functions/weekly-plan/source-roles.ts");
-const statusPath = path.join(root, "supabase/functions/weekly-plan/ORDER1_STATUS.md");
 
 let fail = 0;
 function check(name, ok, detail = "") {
@@ -90,8 +89,7 @@ check("H1 no Terafab hardcode", !/Terafab|테라팹/.test(siSrc));
 check("H2 no Cybertruck fixed template", !siSrc.includes("사이버트럭은 볼수록"));
 check("H3 no fixed reaction template list assignment", !siSrc.includes("mechanism = 1") && !siSrc.includes('mechanism: "놀람'));
 
-// I status
-check("I1 ORDER1_STATUS.md exists", existsSync(statusPath));
+// I version / leftover order tests
 check("I2 version strings consistent in index", indexSrc.includes("10.0.0-order1") && indexSrc.includes("order1_seed_interpretation"));
 
 // ORDER 0B test file still present for regression suite

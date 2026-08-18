@@ -13,6 +13,7 @@
 - 출처를 확인할 수 없으면 USER_DIRECT가 아니라 UNKNOWN입니다. UNKNOWN은 Voice·창발 증거로 쓰지 않고, 실제 성과 지표는 남깁니다
 - 일반 Judge 거절은 같은 칸 전략으로 REPAIR하고, 전략 붕괴는 그 칸만 Agent승 PLAN이 재판단합니다
 - Thinking 추출은 제외 row가 많아도 소스의 다음 범위를 계속 스캔합니다. Collection API는 호출하지 않습니다
+- 과거 클라우드 에이전트가 남긴 base64 조각 · materialize Actions · 엔진 폴더 ORDER STATUS 문서를 지워 엔진이 읽히게 했습니다
 
 ## 12.11.0 — 2026-08-18
 
