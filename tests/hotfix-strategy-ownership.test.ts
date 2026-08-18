@@ -40,7 +40,7 @@ assert.match(job, /STRATEGY_REPLAN_ABANDON/);
 assert.match(job, /CONTENT_REPAIR_ABANDON/);
 assert.match(job, /extractFedicaBestPostingTime/);
 assert.match(job, /public_window_exhausted/);
-assert.match(job, /14일 공개 창/);
+assert.match(job, /7일 공개 창/);
 assert.doesNotMatch(job, /기존 Seed Pool로 Planner 이어감/);
 assert.match(job, /inferPlanEvidenceDigest/);
 assert.match(job, /planner_digest_complete/);

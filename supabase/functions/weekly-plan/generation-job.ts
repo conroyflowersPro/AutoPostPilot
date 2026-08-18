@@ -1182,8 +1182,8 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const candidates: any[] = [...(st.gated || []), ...(gated.passed || [])];
   const compact = !!st.compact_next || !!targetedExploration;
   const windows = publicSearchWindows();
-  const searchWindow = windows.last14;
-  st.public_search_half = "last14";
+  const searchWindow = windows.last7;
+  st.public_search_half = "last7";
   const token = await loadEdgeXAccessToken(supabase);
   const officialPublicPosts = await fetchOfficialPublicPosts({ accessToken: token, maxResults: 100 });
   const xaiRes = await expandSeedSupplyWithXai({
@@ -1196,7 +1196,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     plannerRequestedCount: candidatePoolTarget(required),
     compactRetry: compact,
     model: V11_SEED_MODEL,
-    timeoutMs: compact ? 20000 : PLANNER_DIGEST_TIMEOUT_MS,
+    timeoutMs: PLANNER_DIGEST_TIMEOUT_MS,
     searchWindow,
     officialPublicPosts,
     excludeHandle: OPERATOR_HANDLE,
@@ -1289,7 +1289,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.label_ko = labelForPlannerStep(nextPlannerStep);
       row.summary = [
         row.summary,
-        `14일 공개 창 탐색 끝 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`,
+        `7일 공개 창 탐색 끝 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`,
       ].filter(Boolean).join("\n");
       return;
     }
@@ -1309,7 +1309,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     }
     st.compact_next = false;
     if (canKeepExpanding(st)) {
-      row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
+      row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 7일 창 계속…`;
       return;
     }
     st.public_window_exhausted = true;
@@ -1320,7 +1320,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     st.empty_streak = 0;
     st.compact_next = false;
   }
-  row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
+  row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 7일 창 계속…`;
   if (targetedExploration && grokAdded.length > 0) {
     st.planner_exploration_direction = "";
     row.step = nextPlannerStep;
@@ -1584,7 +1584,7 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     row.step = "expand";
     row.label_ko = st.public_window_exhausted
       ? `Planner 칸용 Seed ${(st.gated || []).length}/${seedTarget}…`
-      : `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
+      : `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 7일 창 계속…`;
     return;
   }
   row.step = "select";

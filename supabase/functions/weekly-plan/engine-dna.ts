@@ -170,7 +170,7 @@ export function creatorDnaWriterSlice(growthRole?: string): string {
 /** Public X collector only. No RETURN/BRIDGE/REACH, no types, no Tesla interest menu. */
 export const PUBLIC_SEED_MIN_REPLIES = 20;
 export const PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS = 50_000;
-export const PUBLIC_SEED_WINDOW_DAYS = 14;
+export const PUBLIC_SEED_WINDOW_DAYS = 7;
 
 export function seedCollectorBounds(): string {
   return [
@@ -203,7 +203,7 @@ export function engineRulesAsWill(): string {
     "ARCHITECTURE: No engine replaces the Creator. Roles do not mix. Pipeline: Audience DNA (Analytics+sync status) → Weekly Agent승 (RETURN/BRIDGE/REACH + type + place/time/Seeds) → Seed Generator explores for open cells → Post Agent승 thinks and writes every locked slot → Semantic Judge → reject returns that slot to Post Agent승 → Judge. DNA layers remain for other jobs.",
     "Weekly Agent승 does not write bodies. Post Agent승 does not rebuild the week.",
     "Lived EXPERIENCE material is Analytics originals plus sync-gap originals. Overlap prefers Analytics. Public X is not lived inventory.",
-    "Seed Generator collects public X posts from the last 14 days (replies >= 20; impressions >= 50k only if that pool is short) as one scene + one observation. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
+    "Seed Generator collects public X posts from the last 7 days (replies >= 20; impressions >= 50k only if that pool is short) as one scene + one observation. It does not judge RETURN/BRIDGE/REACH, types, or attitude. Never emit a prompt example, canned phrase, or few-shot subject as concrete_subject.",
     "Planning Horizon is seven days. Weekly Agent승 judges RETURN/BRIDGE/REACH and types. REACH is 1 per day, max 2. Other roles have no fixed ratio. Consecutive slots must not share the same situation cluster. FSD/driving scenes are at most 2 per day.",
     "Language is Korean. Setting is California/US. Do not invent Korea-only situations the creator does not live.",
     "Agent승 is how this person sees, thinks, and expresses — a judgment criterion, not a content template. Ask what he would notice first; do not freeze always-short / always-twist / topic→말투.",

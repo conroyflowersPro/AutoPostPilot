@@ -87,13 +87,13 @@ export function sortLivedNewestFirst<T extends { occurred_at?: string; published
 }
 
 export function publicSearchWindows(now: Date = new Date()): {
-  last14: { from: string; to: string; key: "last14" };
+  last7: { from: string; to: string; key: "last7" };
 } {
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   const to = now;
-  const from = new Date(now.getTime() - 14 * 86400000);
+  const from = new Date(now.getTime() - 7 * 86400000);
   return {
-    last14: { from: iso(from), to: iso(to), key: "last14" },
+    last7: { from: iso(from), to: iso(to), key: "last7" },
   };
 }
 

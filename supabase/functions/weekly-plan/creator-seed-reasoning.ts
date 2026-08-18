@@ -252,7 +252,7 @@ export async function reasonCreatorSeeds(
 
   const compact = !!args.compactRetry;
   const collectRule =
-    `Collect from public Korean X in the last 14 days. Default keep: replies >= ${PUBLIC_SEED_MIN_REPLIES}. Do not use likes, reposts, or bookmarks as a keep gate. If that pool is short, supplement impressions >= ${PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS} only. Extract one scene + one observation_or_feeling + optional source_hint + source_id. Do not judge RETURN/BRIDGE/REACH or editorial type.`;
+    `Collect from public Korean X in the last 7 days. Default keep: replies >= ${PUBLIC_SEED_MIN_REPLIES}. Do not use likes, reposts, or bookmarks as a keep gate. If that pool is short, supplement impressions >= ${PUBLIC_SEED_SUPPLEMENT_IMPRESSIONS} only. Extract one scene + one observation_or_feeling + optional source_hint + source_id. Do not judge RETURN/BRIDGE/REACH or editorial type.`;
   const system = compact
     ? [
       "You collect public X seed material for @Seung4680. Not a strategist. Not a writer.",
@@ -280,7 +280,7 @@ export async function reasonCreatorSeeds(
     "If a found post is written as lived experience, set found_form EXPERIENTIAL and situation as a third-person circulating scene, not 내가/어제 내.",
     "Do not search or emit the operator's own posts.",
     "Lived evidence seeds are not your job in this call.",
-    "Return only scenes actually found in the 14-day window. Zero new seeds is allowed when nothing new remains. Do not invent to hit a count.",
+    "Return only scenes actually found in the 7-day window. Zero new seeds is allowed when nothing new remains. Do not invent to hit a count.",
     "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id, found_form. owner is always OTHER. No scores, rankings, strategy, selection, allocation, growth_role, editorial_mode, or prose outside JSON.",
   ].join("\n");
 
@@ -319,14 +319,14 @@ export async function reasonCreatorSeeds(
       impressions: Number((p as any).impressions) || 0,
     })),
     weekly_goal_note:
-      "Extract every distinct public scene found in this 14-day window slice. Do not invent to fill a count. Zero is allowed.",
+      "Extract every distinct public scene found in this 7-day window slice. Do not invent to fill a count. Zero is allowed.",
     requirement:
       "No finished posts. No invented experience. No Return/Bridge/Reach labels. No interest-list fill.",
   });
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 40000);
+    const timer = setTimeout(() => controller.abort(), args.timeoutMs ?? 52000);
     const window = args.searchWindow;
     const exclude = clean(args.excludeHandle, 40) || "Seung4680";
     const xSearchTool = {
