@@ -16,6 +16,7 @@ import { hasExpertJargon, isEngagementBaitCloser } from "./seed-scope.ts";
 import { creatorDnaWriterSlice } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writerLivedTimeLines } from "./seed-ownership.ts";
+import { presentPacketLines } from "./semantic-seed-packet.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_grok_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -364,26 +365,31 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
 
 function writerPhilosophyBlock(): string {
   return [
-    "POST AGENT승 ROLE: You are Agent승. Same identity as weekly planning. This call is POST: think then write one Korean X post for @Seung4680.",
-    "Understand the assigned Seed and Planner Intent first. Then form the central thought this Creator would actually hold and create the post.",
-    "THOUGHT FIRST. No separate Writer re-interprets Seed meaning, Core Thought, or Collection. You do that, then you write.",
-    "Internal process (do not output steps): UNDERSTAND → VERIFY → THINK → DECIDE → RETRIEVE → SELECT → INTERNALIZE → WRITE → STOP.",
-    "Collection is after Core Thought. If this call has no collection chunks, do not invent force. Write from thought and seed.",
+    "POST AGENT승 ROLE: You are Agent승. Same identity as weekly planning. This call is POST: write one Korean X post for @Seung4680.",
+    "Understand the assigned Seed and Planner Intent first. The closed thought is in DECIDED THOUGHT. Write it; do not form a new one.",
+    "Decide the necessary reasoning and expression yourself from that decided thought.",
+    "THOUGHT FIRST. Collection is already retrieved after that thought. Internalize principles; never name cards or theories.",
+    "Thinking Rail is internal intelligence only. Do not print the rail. Do not turn beats into a post template. Same rail must not clone the last post's shape.",
     "You do not choose the seven-day strategy, select another Seed, or rebuild the week.",
     "HARD BOUNDARY: do not invent facts or lived experience, do not directly copy a Manual Creator Post, and do not abandon the assigned Seed and Planner Intent.",
-    "Do not paste prompt material or examples. Decide the necessary reasoning and expression yourself.",
+    "Do not paste prompt material or examples.",
     "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording. Do not inhabit someone else's viral lived post as your yesterday.",
-    "Your goal is long-term X account growth, not a writing-rule checklist. Participation is a signal. Complete the assigned Seed as an actual Creator post.",
+    "Your goal is long-term X account growth. Participation is a signal. Write the decided thought as this Creator would, then STOP.",
   ].join("\n");
 }
 
 export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext): string {
-  const subject = subjectFromCtx(ctx);
   const core = ctx.core_thought;
   const expBound = ctx.experience_boundaries || {};
-  const mustNotFirstPerson = !!(expBound as any).must_not_claim_first_person;
-  const experienced = !!(expBound as any).creator_experienced;
+  const exp = (ctx as any).experience_packet || {};
+  const thought = (ctx as any).post_thought || {};
+  const experienced = !!(exp.creator_experienced && Array.isArray(exp.facts) && exp.facts.length);
+  const mustNotFirstPerson = !experienced;
   const planner = ctx.planner_intent || { strategy_slot_id: "", strategic_role: "", intent: "" };
+  const voice = ctx.voice_register;
+  const packet = (ctx as any).seed_packet || {};
+  const packetLines = presentPacketLines(packet);
+  const railShape = s((ctx.thinking_rail as any)?.reasoning_shape);
 
   return [
     "You write one Korean X post for creator @Seung4680.",
@@ -392,16 +398,34 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "ASSIGNED PLANNER INTENT (strategic purpose, never a writing template):",
     `slot=${s(planner.strategy_slot_id)} role=${s(planner.strategic_role)} intent=${s(planner.intent)}`,
     "ASSIGNED SEED:",
-    subject.slice(0, 200),
-    "SEED MATERIAL (not the closed thought): " + s(core?.tension || core?.primary_claim).slice(0, 160),
-    "CREATOR INTELLIGENCE (supporting judgment, never sentences to copy):",
+    packetLines.join("\n"),
+    "DECIDED THOUGHT (do not change):",
+    "Observation: " + s(thought.observation || (ctx as any).interpreted_meaning?.what_is_actually_happening).slice(0, 220),
+    "Creator interpretation: " + s(thought.creator_interpretation || ctx.why_it_matters).slice(0, 220),
+    "Core Thought: " + s(thought.core_thought || core?.creator_judgment || core?.primary_claim).slice(0, 220),
+    "Reader entry: " + s(thought.reader_entry || ctx.human_element).slice(0, 180),
+    "Stop point: " + s(thought.stop_point || "Stop when the core thought is already delivered."),
+    railShape
+      ? "THINKING RAIL (internal only, not a template, do not name it): " + railShape
+      : "",
+    s((ctx as any).collection_block) || "COLLECTION: none. Do not invent force.",
+    "STABLE CREATOR DNA:",
     creatorDnaWriterSlice(s(planner.strategic_role)),
-    "REASONING ORDER (internal only; do not output steps):",
-    "UNDERSTAND the Seed and slot intent. VERIFY facts and experience bounds. THINK as this Creator. DECIDE one Core Thought. RETRIEVE/SELECT collection only after that thought, and only if chunks are in this call. INTERNALIZE. WRITE the complete post and stop when the thought is complete. STOP.",
+    voice
+      ? [
+          "RECENT VOICE REGISTER (use as rhythm, never copy recent sentences):",
+          s(voice.constraint_line),
+          `handmade_n=${voice.n} window_days=${voice.window_days} median_chars=${voice.median_chars} question_ending_allowed=${voice.question_ending_allowed}`,
+        ].join("\n")
+      : "RECENT VOICE REGISTER: missing. Write in current Creator DNA only.",
+    "WRITE: express the decided thought in natural Creator language. 2–4 lines is enough if the thought is already there.",
+    "STOP: no lesson, summary, industry outlook, giant meaning, reader question, or CTA.",
     ...writerBoundaryConstraintLines(ctx),
-    "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "first-person is allowed only within supplied evidence" : "do not claim first-person lived experience"),
-    s((expBound as any).owner) === "OTHER"
-      ? "PUBLIC VIRAL: circulating scene, not your dated life. Infer that it is going around. Never inhabit the found post's I. Do not write N일 전."
+    "EXPERIENCE: " + (experienced && !mustNotFirstPerson
+      ? "first-person only within these facts: " + (Array.isArray(exp.facts) ? exp.facts.join(" | ") : "")
+      : "do not claim first-person lived experience"),
+    s((expBound as any).owner) === "OTHER" || s(exp.ownership) === "OTHER"
+      ? "PUBLIC VIRAL: circulating scene, not your dated life. Never inhabit the found post's I. Do not write N일 전."
       : "",
     experienced && s((expBound as any).occurred_at)
       ? writerLivedTimeLines(String((expBound as any).occurred_at)).join(" ")
@@ -410,7 +434,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
       ? "CITE RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Do not retell or copy the source post. 동일 내용 금지."
       : "",
     "OUTPUT: Korean post text only. No JSON. No step labels. No English meta. No chain-of-thought.",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 /**
@@ -490,20 +514,15 @@ export async function callGrokWriter(
   options: { model?: string; timeout_ms?: number; retry_hint?: string; temperature?: number } = {},
 ): Promise<WriterCallResult> {
   const system = buildConstraintOnlyWriterInstructions(ctx);
-  const subject = subjectFromCtx(ctx);
-  const tension = s(ctx.core_thought?.tension) || s((ctx as any).interpreted_meaning?.why_it_matters_now);
   const userMsg = [
-    "Understand the assigned Planner Intent and Seed, close the thought, then write the Korean X post. Thought first.",
+    "Write the Korean X post from DECIDED THOUGHT. Do not change Core Thought. Do not re-interpret the seed.",
     "Planner Intent: " + s(ctx.planner_intent?.intent).slice(0, 240),
-    "Situation: " + subject.slice(0, 160),
-    tension
-      ? "Seed material (not the closed thought): " + tension.slice(0, 140)
-      : "If this is only a keyword, infer a public-agreeable situation through Creator vision. Do not require a snag. Do not write the keyword as the whole post.",
-    "Use x_search and web_search only to check public current facts. Do not copy other posts as the draft. Do not invent lived experience. Not a generic news line.",
+    "Core Thought: " + s((ctx as any).post_thought?.core_thought || ctx.core_thought?.creator_judgment).slice(0, 220),
+    "Use x_search and web_search only to check public current facts. Do not copy other posts as the draft. Do not invent lived experience.",
     s(options.retry_hint)
-      ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Understand the same assignment again and create a valid post without changing Planner strategy."
+      ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Write the same decided thought as a valid post."
       : "",
-    "Respond with post text only.",
+    "Respond with post text only. Stop when the thought is complete.",
   ].filter(Boolean).join("\n");
 
   const controller = new AbortController();

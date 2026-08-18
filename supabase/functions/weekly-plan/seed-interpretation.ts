@@ -120,8 +120,9 @@ function buildClaimBoundaries(seed: InterpretSeedInput, factual: FactualBoundary
 }
 function buildExperienceBoundaries(seed: InterpretSeedInput): ExperienceBoundary {
   const owner = String(seed.owner || seed.seed_source || "").toUpperCase();
+  const facts = (seed.experience_facts || []).map(clean).filter((x) => x.length >= 4);
   const self = owner === "SELF" || owner === "ANALYTICS_LIVED";
-  const hasExp = self && !!(seed.creator_evidence_available || seed.experience_required || seed.occurred_at);
+  const hasExp = self && facts.length > 0;
   return {
     creator_experienced: hasExp,
     evidence_supported: hasExp,

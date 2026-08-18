@@ -9,6 +9,15 @@
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
 import { selectReactionMechanism } from "./reader-self-projection.ts";
 import { selectThinkingRail } from "./thinking-rail-runtime.ts";
+import {
+  buildExperiencePacket,
+  buildPostThought,
+  buildSemanticSeedPacket,
+} from "./semantic-seed-packet.ts";
+import {
+  searchAgentSeungTheories,
+  theoryChunksForModel,
+} from "./agent-seung.ts";
 import { decideEverydayLanguage } from "./everyday-language-reasoning.ts";
 import { decideCreatorStyle } from "./creator-style-decision.ts";
 import { decideNaturalHumor } from "./natural-humor-decision.ts";
@@ -246,14 +255,40 @@ export async function writeOneSlot(args: {
     recent_generated_signatures: weekSignatures,
   };
 
-  // 2. Writer context is interpretation + seed + DNA identity only.
-  // Delivery engines do not run yet and must not pick the thought.
+  // 2. Think from the seed first (rail is internal intelligence, not a post template).
+  const thinkRail = selectThinkingRail({
+    interpretation: seed_interpretation,
+    mechanism: null,
+    editorial_mode: mode,
+  });
+  const seed_packet = buildSemanticSeedPacket(seed as any, seed_interpretation as any);
+  const experience_packet = buildExperiencePacket(seed as any, seed_interpretation as any);
+  const prelimCore = {
+    creator_judgment: String((seed_interpretation as any).why_it_might_matter_to_creator || ""),
+    tension: String((seed_interpretation as any).what_is_actually_happening || ""),
+    reader_relevant_meaning: String((seed_interpretation as any).possible_reader_connection || ""),
+  };
+  const post_thought = buildPostThought(seed_interpretation as any, prelimCore);
+
+  // 3. Collection after Core Thought. One query per seed. Meaning fields, not topic words.
+  let collection_block = "";
+  if (args.xaiKey) {
+    const log = await searchAgentSeungTheories(String(seed.concrete_subject || ""), {
+      xaiKey: args.xaiKey,
+      packet: seed_packet,
+    });
+    collection_block = theoryChunksForModel(log.chunks || []);
+  } else {
+    collection_block = theoryChunksForModel([]);
+  }
+
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
     day_offset: dayOffset,
     slot_index: slot,
     seed: seed as any,
     interpretation: seed_interpretation as any,
+    thinking_rail: thinkRail as any,
     editorial_mode: mode,
     planner_intent: {
       strategy_slot_id: String(seed.strategy_slot_id || ""),
@@ -262,9 +297,13 @@ export async function writeOneSlot(args: {
     },
     voice_register: voicePayload,
     week_structural_signatures: weekSignatures,
+    seed_packet,
+    post_thought,
+    collection_block,
+    experience_packet,
   });
 
-  // 3. Post Agent승 closes one thought for this Seed, then writes it.
+  // 4. Post Agent승 writes the decided thought in the same call.
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
     xai_key: args.xaiKey,

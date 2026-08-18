@@ -82,6 +82,8 @@ POST 호출:
 금지: Seed → Collection → 카드 선택 → 생각 → 글.
 Collection은 대신 생각하지 마라. 이미 만든 생각을 전달하기 위한 외부 Intelligence다.
 검색이 이 호출에 없으면 힘을 창조하지 말고 생각과 시드로 작성하라.
+Collection 쿼리는 scene · factual_event · change_or_delta · contrast_or_tension · human_relevance다. 주제 단어보다 의미 구조를 우선한다.
+한 포스트 기본 사용은 힘 1 · 형식 1이다. 없어도 작성할 수 있다. 카드 이름·이론 이름을 포스트에 넣지 마라.
 이론 이름·V/W 번호는 포스트에 넣지 마라.
 남의 경험이면 1인칭 완료로 쓰지 마라.
 단계를 출력하지 마라. 최종 본문만 낸다.
@@ -108,8 +110,8 @@ export const AGENT_SEUNG_RAG = {
   searchUrl: "https://api.x.ai/v1/documents/search",
   retrievalMode: "hybrid" as const,
   maxChunks: 6,
-  maxForceCards: 2,
-  maxFormCards: 2,
+  maxForceCards: 1,
+  maxFormCards: 1,
   maxCardsToMix: 2,
   skipIfNoCollectionId: true,
   skipOnJudge: true,
@@ -148,39 +150,62 @@ export function agentSeungIdentityLine(): string {
   return `너는 ${AGENT_SEUNG_NAME}이다. 규칙을 복사하지 말고 시드와 데이터를 보고 추론하라.`;
 }
 
+const TOPIC_QUERY_STOP =
+  /\b(FSD|HW3|HW4|Cybertruck|XMoney|Tesla|Optimus|Elon)\b/gi;
+
 export function buildTheorySearchQuery(parts: {
   scene?: string;
   fact?: string;
+  factual_event?: string;
+  change_or_delta?: string;
+  contrast_or_tension?: string;
+  human_relevance?: string;
   subject?: string;
 }): string {
-  const raw = [parts.scene, parts.fact, parts.subject]
+  const meaning = [
+    parts.scene,
+    parts.factual_event || parts.fact,
+    parts.change_or_delta,
+    parts.contrast_or_tension,
+    parts.human_relevance,
+  ]
     .map((v) => String(v || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const raw = (meaning.length ? meaning : [parts.subject])
     .filter(Boolean)
     .join(" ");
-  return raw
+  let q = raw
     .replace(/#{1,6}\s*/g, "")
     .replace(/\b(V|W)\d+\b/gi, "")
     .replace(theoryLabelRe(), "")
+    .replace(TOPIC_QUERY_STOP, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 500);
+    .trim();
+  if (q.length < 8 && parts.subject) {
+    q = String(parts.subject).replace(/\s+/g, " ").trim();
+  }
+  return q.slice(0, 500);
 }
 
-export function classifyTheoryKind(raw: string, hint?: string): TheoryKind {
-  const h = String(hint || "").toLowerCase();
-  if (h.includes("viral") || h.includes("writing")) {
-    if (h.includes("viral") && !h.includes("writing")) return "viral";
-    if (h.includes("writing") && !h.includes("viral")) return "writing";
-  }
-  const text = String(raw || "");
-  if (/##\s*V\d+/i.test(text) || /시드에 이 힘이/.test(text)) return "viral";
-  if (/##\s*W\d+/i.test(text) || /맞는 형식/.test(text) || /닫는 형식/.test(text)) return "writing";
+export function classifyTheoryKind(
+  raw: string,
+  hint?: string,
+  source?: { viralIds?: string[]; writingIds?: string[] },
+): TheoryKind {
+  const id = String(hint || "").trim();
+  const viralIds = (source?.viralIds || []).map((x) => String(x || "").trim()).filter(Boolean);
+  const writingIds = (source?.writingIds || []).map((x) => String(x || "").trim()).filter(Boolean);
+  if (id && viralIds.includes(id)) return "viral";
+  if (id && writingIds.includes(id)) return "writing";
+  const h = id.toLowerCase();
+  if (h.includes("viral") && !h.includes("writing")) return "viral";
+  if (h.includes("writing") && !h.includes("viral")) return "writing";
   return "unknown";
 }
 
 export function stripTheoryLabels(text: string): string {
   return String(text || "")
-    .replace(/^#{1,6}\s*.*$/gm, "")
+    .replace(/^#{1,6}\s*(V|W)\d+[^\n]*/gim, "")
     .replace(/^출처:.*$/gm, "")
     .replace(theoryLabelRe(), "")
     .replace(/\s+\n/g, "\n")
@@ -205,9 +230,14 @@ export function capTheoryChunks(chunks: TheoryChunk[]): TheoryChunk[] {
 export function theoryChunksForModel(chunks: TheoryChunk[]): string {
   const kept = capTheoryChunks(chunks).filter((c) => c.chunk_content);
   if (!kept.length) {
-    return "Collection 검색 없음. 시드에 없는 힘을 만들지 마라. 이론 이름을 쓰지 마라.";
+    return "COLLECTION: none. Write from the decided thought and seed. Do not invent force. Do not name theories.";
   }
-  return kept
-    .map((c, i) => `카드 ${i + 1} (${c.kind === "writing" ? "형식" : c.kind === "viral" ? "힘" : "참고"}):\n${c.chunk_content}`)
-    .join("\n\n");
+  return [
+    "COLLECTION (internalize; do not name cards or theories; do not change Core Thought):",
+    "Default use at most one force and one form. Skip a chunk unless it is already in this seed/thought. A second card only if it does a different job. Zero cards is allowed.",
+    ...kept.map((c) => {
+      const role = c.kind === "writing" ? "form" : c.kind === "viral" ? "force" : "note";
+      return `(${role})\n${c.chunk_content}`;
+    }),
+  ].join("\n\n");
 }

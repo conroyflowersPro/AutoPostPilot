@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.7.0 — 2026-08-18
+
+- Post Agent승은 시드 의미 패킷으로 생각을 끝낸 뒤 Collection을 검색합니다. 쿼리는 장면·사실·대비·인간 관련성입니다
+- 경험은 내용이 있을 때만 1인칭입니다. Core Thought는 라벨이 아니라 판단 문장입니다
+- Collection은 출처로 viral/writing을 가릅니다. 기본 힘 1·형식 1. 카드 제목은 지우되 적용/비적용 문맥은 남깁니다
+- WRITE는 결정된 생각과 최근 말투를 쓰고 Core Thought를 바꾸지 않습니다. 생각이 전달되면 멈춥니다
+
 ## 12.6.0 — 2026-08-18
 
 - Agent승 Identity는 하나입니다. WEEKLY는 칸·역할·시드 배치만 하고 본문을 쓰지 않습니다. POST는 슬롯마다 독립적으로 생각해서 최종 포스트를 씁니다

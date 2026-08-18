@@ -152,7 +152,7 @@ const iWrite = writeFn.indexOf("integrateSlotGeneration");
 const iDelivery = writeFn.indexOf("selectDeliveryAfterThought");
 ok("W78. runtime interprets before write", iInterp >= 0 && iInterp < iWrite);
 ok("W79. runtime delivery is after write", iDelivery > iWrite && /DELIVERY_AFTER_THOUGHT/.test(ow));
-ok("W80. writeOneSlot does not select mechanism/rail/style before the writer", !/selectReactionMechanism/.test(writeFn) && !/selectThinkingRail/.test(writeFn) && !/decideCreatorStyle/.test(writeFn) && !/decideNaturalHumor/.test(writeFn) && !/decideEverydayLanguage/.test(writeFn));
+ok("W80. writeOneSlot uses rail as thought intelligence, not mechanism/style templates", /selectThinkingRail/.test(writeFn) && /searchAgentSeungTheories/.test(writeFn) && !/selectReactionMechanism/.test(writeFn) && !/decideCreatorStyle/.test(writeFn) && !/decideNaturalHumor/.test(writeFn) && !/decideEverydayLanguage/.test(writeFn));
 ok("W81. live Grok user message does not inject mechanism lines", /callGrokWriter/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 ok("W82. mechanism does not force Writer personality", !/READER ENTRY MOVE/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 

@@ -23,14 +23,20 @@ const sampleWriting = `## W3. 구체성 / 장면 우선
 ### 맞는 형식
 - 시드에 있는 장면·사실로 운반한다`;
 
-assert.equal(classifyTheoryKind(sampleViral), "viral");
-assert.equal(classifyTheoryKind(sampleWriting), "writing");
+assert.equal(classifyTheoryKind(sampleViral, "viral-col-1"), "viral");
+assert.equal(classifyTheoryKind(sampleWriting, "writing-col-1"), "writing");
+assert.equal(classifyTheoryKind(sampleViral), "unknown");
+assert.equal(
+  classifyTheoryKind(sampleViral, "abc", { viralIds: ["abc"], writingIds: ["def"] }),
+  "viral",
+);
 
 const stripped = stripTheoryLabels(sampleViral);
 assert.doesNotMatch(stripped, /V4/);
 assert.doesNotMatch(stripped, /Information Gap/i);
 assert.doesNotMatch(stripped, /Loewenstein/);
 assert.match(stripped, /빈틈/);
+assert.match(stripped, /시드에 이 힘이/);
 
 const q = buildTheorySearchQuery({
   scene: "충전 커넥터가 빗물에 젖어 있다",
@@ -49,11 +55,11 @@ const many: TheoryChunk[] = [
   { chunk_id: "f", chunk_content: "형식C", score: 4, kind: "writing" },
 ];
 const capped = capTheoryChunks(many);
-assert.equal(capped.filter((c) => c.kind === "viral").length, 2);
-assert.equal(capped.filter((c) => c.kind === "writing").length, 2);
+assert.equal(capped.filter((c) => c.kind === "viral").length, 1);
+assert.equal(capped.filter((c) => c.kind === "writing").length, 1);
 
 const skipBlock = theoryChunksForModel([]);
-assert.match(skipBlock, /힘을 만들지 마라/);
+assert.match(skipBlock, /COLLECTION: none/);
 
 const libOrder = readFileSync("lib/intelligence/agent-seung.ts", "utf8");
 const edgeOrder = readFileSync("supabase/functions/weekly-plan/agent-seung.ts", "utf8");
