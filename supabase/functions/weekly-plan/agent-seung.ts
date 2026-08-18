@@ -82,6 +82,9 @@ POST 호출:
 Collection은 대신 생각하지 마라. 이미 만든 생각을 전달하기 위한 외부 Intelligence다.
 검색이 이 호출에 없으면 힘을 창조하지 말고 생각과 시드로 작성하라.
 Collection 쿼리는 scene · factual_event · change_or_delta · contrast_or_tension · human_relevance다. 주제 단어보다 의미 구조를 우선한다.
+Deep Thesis는 기본 모드가 아니다. 시드에 공통 원리·숨은 구조·상식과 결과의 충돌이 있을 때만 THINK에서 켠다. 길이를 위해 켜지 마라. 깊이와 길이는 다르다.
+순서: Seed → Structural Thinking → Core Thought / Deep Thesis → Collection → 작성.
+Collection은 발견 엔진이 아니다. 이미 있는 발견·충돌·빈틈을 카드로 중복하지 마라.
 한 포스트 기본 사용은 힘 1 · 형식 1이다. 없어도 작성할 수 있다. 카드 이름·이론 이름을 포스트에 넣지 마라.
 이론 이름·V/W 번호는 포스트에 넣지 마라.
 남의 경험이면 1인칭 완료로 쓰지 마라.
@@ -228,19 +231,25 @@ export function capTheoryChunks(chunks: TheoryChunk[]): TheoryChunk[] {
   return [...viral, ...writing].slice(0, mix);
 }
 
-export function theoryChunksForModel(chunks: TheoryChunk[]): string {
+export function theoryChunksForModel(chunks: TheoryChunk[], extraNote?: string): string {
   const kept = capTheoryChunks(chunks).filter((c) => c.chunk_content);
+  const note = String(extraNote || "").trim();
   if (!kept.length) {
-    return "COLLECTION: none. Write from the decided thought and seed. Do not invent force. Do not name theories.";
+    return ["COLLECTION: none. Write from the decided thought and seed. Do not invent force. Do not name theories.", note]
+      .filter(Boolean)
+      .join("\n");
   }
   return [
     "COLLECTION (internalize; do not name cards or theories; do not change Core Thought):",
     "Default use at most one force and one form. Skip a chunk unless it is already in this seed/thought. A second card only if it does a different job. Zero cards is allowed.",
+    note,
     ...kept.map((c) => {
       const role = c.kind === "writing" ? "form" : c.kind === "viral" ? "force" : "note";
       return `(${role})\n${c.chunk_content}`;
     }),
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function envCollectionSplit(): { ids: string[]; viralIds: string[]; writingIds: string[] } {

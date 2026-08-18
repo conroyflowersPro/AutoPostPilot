@@ -41,6 +41,7 @@ export type PostThought = {
   core_thought: string;
   reader_entry: string;
   stop_point: string;
+  thinking_mode?: "short" | "deep_thesis";
 };
 
 export function buildSemanticSeedPacket(
@@ -64,7 +65,7 @@ export function buildSemanticSeedPacket(
   const noveltyRaw = s(ip.what_is_new_or_interesting, 180);
   const delta =
     noveltyRaw.length >= 4 &&
-    !/^(none|limited novelty)/i.test(noveltyRaw) &&
+    !/^(none|limited novelty|no clear novelty)/i.test(noveltyRaw) &&
     !/forced/.test(noveltyRaw)
       ? keep(noveltyRaw)
       : keep(sd.change_or_delta || ip.change_or_delta);

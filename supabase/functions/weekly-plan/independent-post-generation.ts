@@ -17,6 +17,7 @@ import { creatorDnaWriterSlice } from "./engine-dna.ts";
 import { writerArchitectureLock } from "./engine-architecture.ts";
 import { writerLivedTimeLines } from "./seed-ownership.ts";
 import { presentPacketLines } from "./semantic-seed-packet.ts";
+import { deepThesisWriteLines, type DeepThesisFit } from "./deep-thesis.ts";
 
 export const ORDER7B_VERSION = "independent_post_generation_v1_grok_writer";
 export const ORDER7B_PER_POST_ISOLATION = true as const;
@@ -389,6 +390,11 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const voice = ctx.voice_register;
   const packet = (ctx as any).seed_packet || {};
   const packetLines = presentPacketLines(packet);
+  const thesisFit = ((thought as any).deep_thesis || null) as DeepThesisFit | null;
+  const deepLines = thesisFit ? deepThesisWriteLines(thesisFit) : [];
+  const writeLength = thesisFit?.use
+    ? "WRITE: length follows the thought. Short if the discovery is already there. Do not cut the logic for a quota. Do not add after it lands."
+    : "WRITE: express the decided thought in natural Creator language. 2–4 lines is enough if the thought is already there.";
 
   return [
     "You write one Korean X post for creator @Seung4680.",
@@ -404,6 +410,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "Core Thought: " + s(thought.core_thought || core?.creator_judgment || core?.primary_claim).slice(0, 220),
     "Reader entry: " + s(thought.reader_entry || ctx.human_element).slice(0, 180),
     "Stop point: " + s(thought.stop_point || "Stop when the core thought is already delivered."),
+    ...deepLines,
     s((ctx as any).collection_block) || "COLLECTION: none. Do not invent force.",
     "STABLE CREATOR DNA:",
     creatorDnaWriterSlice(s(planner.strategic_role)),
@@ -414,7 +421,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
           `handmade_n=${voice.n} window_days=${voice.window_days} median_chars=${voice.median_chars} question_ending_allowed=${voice.question_ending_allowed}`,
         ].join("\n")
       : "RECENT VOICE REGISTER: missing. Write in current Creator DNA only.",
-    "WRITE: express the decided thought in natural Creator language. 2–4 lines is enough if the thought is already there.",
+    writeLength,
     "STOP: no lesson, summary, industry outlook, giant meaning, reader question, or CTA.",
     ...writerBoundaryConstraintLines(ctx),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson

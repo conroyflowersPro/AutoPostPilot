@@ -15,6 +15,10 @@ import {
   buildSemanticSeedPacket,
 } from "./semantic-seed-packet.ts";
 import {
+  assessDeepThesisFit,
+  deepThesisCollectionNote,
+} from "./deep-thesis.ts";
+import {
   searchAgentSeungTheories,
   theoryChunksForModel,
 } from "./agent-seung.ts";
@@ -267,18 +271,26 @@ export async function writeOneSlot(args: {
     tension: String((seed_interpretation as any).what_is_actually_happening || ""),
     reader_relevant_meaning: String((seed_interpretation as any).possible_reader_connection || ""),
   };
-  const post_thought = buildPostThought(seed_interpretation as any, prelimCore);
+  const thesisFit = assessDeepThesisFit(seed_packet, seed_interpretation as any);
+  const post_thought = {
+    ...buildPostThought(seed_interpretation as any, prelimCore),
+    thinking_mode: thesisFit.use ? "deep_thesis" : "short",
+    stop_point: thesisFit.use
+      ? "Stop when the reader can finish the discovery. Depth is not length. No lesson, industry bow, or extra question."
+      : "Stop when this core thought is already on the page. No lesson, summary, outlook, CTA, or extra question.",
+    deep_thesis: thesisFit,
+  };
 
-  // 3. Collection after Core Thought. One query per seed. Meaning fields, not topic words.
+  // 3. Collection after Core Thought / Deep Thesis. One query per seed.
   let collection_block = "";
   if (args.xaiKey) {
     const log = await searchAgentSeungTheories("", {
       xaiKey: args.xaiKey,
       packet: seed_packet,
     });
-    collection_block = theoryChunksForModel(log.chunks || []);
+    collection_block = theoryChunksForModel(log.chunks || [], deepThesisCollectionNote(thesisFit));
   } else {
-    collection_block = theoryChunksForModel([]);
+    collection_block = theoryChunksForModel([], deepThesisCollectionNote(thesisFit));
   }
 
   const deep = buildDeepGenerationContext({
