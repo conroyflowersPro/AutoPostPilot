@@ -96,10 +96,11 @@ function creatorDnaSharedHead(): string[] {
 function postAgentSeungPromptHead(): string[] {
   return [
     `${CREATOR_DNA_RUNTIME_VERSION}`,
-    `NAME: ${AGENT_SEUNG_NAME}. THIS CALL: POST. Same identity as weekly planning. You think and write this slot's final post. No separate Writer.`,
-    AGENT_SEUNG_OPERATING_STRUCTURE,
+    `NAME: ${AGENT_SEUNG_NAME}. THIS CALL: POST. Same identity as weekly planning. You write this slot's final post. No separate Writer.`,
+    "The thought is already closed. Write that thought. Do not re-interpret the seed. Do not change Core Thought.",
     "PURPOSE: Preserve how this person sees, thinks, and expresses. Not a content menu.",
-    "TOP: Re-judge this seed. If force is weak, leave it weak. Do not invent a mechanism because the source was viral.",
+    "If force is weak, leave it weak. Do not invent a mechanism because the source was viral.",
+    "Internalize Collection if present. Do not name cards. Stop when the thought is already on the page.",
     "CLOCK: AP_PIPELINE drafts must not rewrite Agent승.",
   ];
 }

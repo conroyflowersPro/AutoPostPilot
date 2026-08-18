@@ -223,8 +223,9 @@ export function capTheoryChunks(chunks: TheoryChunk[]): TheoryChunk[] {
     else if (c.kind === "writing" && writing.length < AGENT_SEUNG_RAG.maxFormCards) writing.push(c);
     else if (c.kind === "unknown") rest.push(c);
   }
-  const unknownRoom = AGENT_SEUNG_RAG.maxForceCards + AGENT_SEUNG_RAG.maxFormCards - viral.length - writing.length;
-  return [...viral, ...writing, ...rest.slice(0, Math.max(0, unknownRoom))];
+  void rest;
+  const mix = AGENT_SEUNG_RAG.maxCardsToMix;
+  return [...viral, ...writing].slice(0, mix);
 }
 
 export function theoryChunksForModel(chunks: TheoryChunk[]): string {

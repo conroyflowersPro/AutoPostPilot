@@ -3,6 +3,7 @@
  * Lived originals may become abstract cite-seeds (related follow-up).
  * Never body.slice as seed subject. Same-content clone is forbidden.
  */
+import { livedExperienceFacts, livedMeaningGist } from "./seed-ownership.ts";
 
 export type ExperienceProvenance =
   | "RECENT_MANUAL_14D"
@@ -16,6 +17,7 @@ export type ExperienceCandidate = {
   dimension: string;
   concrete_subject: string;
   point_or_tension?: string;
+  experience_facts?: string[];
   experience_class: ExperienceClass;
   provenance: ExperienceProvenance;
   creator_evidence_available: true;
@@ -83,93 +85,15 @@ export function clusterFromText(text: string): string {
 const CITE_NOT_CLONE =
   "Cite the lived episode by situation only. Write a RELATED follow-up. 동일 내용 금지 — do not retell the same events, punchline, or wording.";
 
-/** Abstract related-follow-up subject. Never body.slice. */
+/** Meaning gist only. Never body.slice. Never a frozen example-post subject. */
 export function relatedExperienceSubject(body: string, cluster: string, historical: boolean): {
   subject: string;
   cite_episode_hint: string;
 } {
-  if (/보행/.test(body) && /정차|기다리|야간/.test(body)) {
-    return {
-      subject: "야간 FSD 보행자 대기 장면 인용 — 보행자 신뢰 vs 다음 교차 판단",
-      cite_episode_hint: "cite the night FSD pedestrian-wait episode; related follow-up, 동일 내용 금지",
-    };
-  }
-  if (/사거리|끼어|다시\s*들어가|식겁/.test(body) && /fsd/i.test(body)) {
-    return {
-      subject: "사거리 FSD 멈춤·재진입 장면 인용 — 판단 공백 관련 후속",
-      cite_episode_hint: "cite the intersection FSD hesitation episode; new tension, 동일 내용 금지",
-    };
-  }
-  if (/출근길|혼잡/.test(body) && /fsd/i.test(body)) {
-    return {
-      subject: "출근길 FSD 혼잡 구간 인용 — 감독 부하 관련 후속",
-      cite_episode_hint: "cite the morning commute FSD episode; related observation, 동일 내용 금지",
-    };
-  }
-  if (/드라이브스루/.test(body) && /fsd/i.test(body)) {
-    return {
-      subject: "FSD 드라이브스루 시도 인용 — 될 때까지 관련 후속",
-      cite_episode_hint: "cite the FSD drive-through attempt; related follow-up, 동일 내용 금지",
-    };
-  }
-  if (/와이퍼/.test(body) && /보행|인사/.test(body)) {
-    return {
-      subject: "FSD 와이퍼 답인사 장면 인용 — 보행자 인식 관련 후속",
-      cite_episode_hint: "cite the wiper-greeting episode; related follow-up, 동일 내용 금지",
-    };
-  }
-  if (/차량에서/.test(body) && /grok|그록/i.test(body)) {
-    return {
-      subject: "차 안 Grok 한도 체감 인용 — 차량 로그인 vs 개인 쿼터 관련 후속",
-      cite_episode_hint: "cite the in-car Grok quota episode; related product tension, 동일 내용 금지",
-    };
-  }
-  if (/꽃집/.test(body) && /grok|voice|결제|pci/i.test(body)) {
-    return {
-      subject: "꽃집 음성주문 결제 벽 인용 — 말하기 vs 돈 받기 관련 후속",
-      cite_episode_hint: "cite the flower-shop voice-agent PCI wall; related follow-up, 동일 내용 금지",
-    };
-  }
-  if (/마님|나리/.test(body) && /저녁|메뉴/.test(body)) {
-    return {
-      subject: "퇴근 후 저녁 메뉴 장면 인용 — 일상 긴장 관련 후속",
-      cite_episode_hint: "cite the dinner-menu household episode; related casual, 동일 내용 금지",
-    };
-  }
-  if (cluster === "FSD") {
-    if (/합류|merge/i.test(body)) {
-      return {
-        subject: historical ? "과거 FSD 합류 장면 인용 (시점 프레임 필수)" : "FSD 합류 장면 인용 — 관련 후속 관찰",
-        cite_episode_hint: CITE_NOT_CLONE,
-      };
-    }
-    if (/감시|감독|supervision/i.test(body)) {
-      return {
-        subject: "FSD 감시 부하 인용 — 개입 타이밍 관련 후속",
-        cite_episode_hint: CITE_NOT_CLONE,
-      };
-    }
-    return {
-      subject: historical ? "과거 FSD 실사용 인용 — 지금과 비교 (당시 프레임)" : "FSD 실사용 장면 인용 — 관련 후속 관찰 (동일 내용 금지)",
-      cite_episode_hint: CITE_NOT_CLONE,
-    };
-  }
-  if (cluster === "CYBERTRUCK") {
-    return {
-      subject: /충전/.test(body)
-        ? "실제 충전 세션 인용 — 대기·속도 관련 후속"
-        : "Cybertruck 실사용 인용 — 관련 후속 관찰 (동일 내용 금지)",
-      cite_episode_hint: CITE_NOT_CLONE,
-    };
-  }
-  if (cluster === "LAFC") {
-    return { subject: "LAFC 직관 현장 인용 — 동선 관련 후속 (동일 내용 금지)", cite_episode_hint: CITE_NOT_CLONE };
-  }
-  if (cluster === "ROBOTAXI") {
-    return { subject: "Robotaxi 현장 인용 — 승하차 관련 후속 (동일 내용 금지)", cite_episode_hint: CITE_NOT_CLONE };
-  }
+  const gist = livedMeaningGist(body);
+  const prefix = historical ? "과거 장면: " : "";
   return {
-    subject: `${cluster} 실사용 장면 인용 — 관련 후속 관찰 (동일 내용 금지)`,
+    subject: (gist ? prefix + gist : "").slice(0, 90) || `${cluster} 장면`.slice(0, 40),
     cite_episode_hint: CITE_NOT_CLONE,
   };
 }
@@ -193,6 +117,7 @@ export function extractExperienceMaterial(
     cluster,
     dimension: historical ? "HISTORICAL_EXPERIENCE" : "RECENT_EXPERIENCE",
     concrete_subject: related.subject.slice(0, 90),
+    experience_facts: livedExperienceFacts(body),
     point_or_tension: historical
       ? "과거 시점 프레임 필수 — 현재 사실처럼 쓰지 말 것; 원문 재게시 금지; 동일 내용 금지"
       : CITE_NOT_CLONE,
