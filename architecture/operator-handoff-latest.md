@@ -74,7 +74,7 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 **RETURN/BRIDGE/REACH:** 30-day Analytics + 14-day sync fill. Collections is not called here.
 
 **Collections source (upload these two files):**
-- `architecture/collections/viral-theories.md` — 힘 알아보기. V1 Cialdini Social Proof + Scarcity. V2 Berger STEPPS 자름(안목 디테일·경이/놀람·짧은 장면; Triggers 제외). V3 Identity Signaling(위치 vs 편; Recognition 제외). V4–V9 empty. Do not mix with writing cards until all theories are in.
+- `architecture/collections/viral-theories.md` — 힘 알아보기. V1 Cialdini. V2 Berger STEPPS 자름. V3 Identity Signaling. V4 Loewenstein Information Gap. V5–V9 empty. Do not mix with writing cards until all theories are in.
 - `architecture/collections/writing-theories.md` — 닫는 형식. W1–W9 empty until agreed.
 - Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID` (fallback `XAI_THEORY_COLLECTION_ID`).
 - Search: one server hybrid search per slot, limit 3. Do not give Grok `collections_search`.
