@@ -64,9 +64,29 @@ function grabOrder(src) {
 }
 assert.equal(grabOrder(libOrder), grabOrder(edgeOrder));
 assert.match(libOrder, /힘 이름·카드 번호를 확정하지 마라/);
+assert.match(libOrder, /THIS CALL: POST|POST 호출/);
+assert.match(libOrder, /장기적인 X 계정 성장/);
+assert.match(libOrder, /별도 Writer 사고 주체는 없다/);
+assert.doesNotMatch(libOrder, /평범한 시드가 아니다\. 이미 힘이 있다/);
+assert.doesNotMatch(libOrder, /Writer는 지시대로 본문만 쓴다/);
+assert.match(libOrder, /UNDERSTAND/);
+assert.match(libOrder, /Seed → Creator Thinking → Core Thought → Collection → 작성/);
 assert.match(edgeOrder, /searchAgentSeungTheories/);
+assert.match(libOrder, /AGENT_SEUNG_WRITES_FINAL_POST/);
+assert.match(edgeOrder, /AGENT_SEUNG_WRITES_FINAL_POST/);
 
 const writer = readFileSync("supabase/functions/weekly-plan/engine-dna.ts", "utf8");
 assert.match(writer, /function writerPromptHead/);
 assert.match(writer, /writerPromptHead\(\)/);
+assert.match(writer, /function postAgentSeungPromptHead/);
+assert.match(writer, /THIS CALL: POST/);
+assert.match(writer, /Post Agent승 thinks and writes/);
+
+const postGen = readFileSync("supabase/functions/weekly-plan/independent-post-generation.ts", "utf8");
+assert.match(postGen, /POST AGENT승 ROLE/);
+assert.doesNotMatch(postGen, /WRITER ROLE: You are Grok 4.6 writing/);
+
+const pipe = readFileSync("lib/intelligence/engine-architecture.ts", "utf8");
+assert.match(pipe, /Post Agent승 thinks then writes/);
+assert.match(pipe, /reject returns that slot to Post Agent승/);
 console.log("agent-seung-theory-search ok");

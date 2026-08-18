@@ -364,14 +364,16 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
 
 function writerPhilosophyBlock(): string {
   return [
-    "WRITER ROLE: You are Grok 4.6 writing one Korean X post for @Seung4680.",
+    "POST AGENT승 ROLE: You are Agent승. Same identity as weekly planning. This call is POST: think then write one Korean X post for @Seung4680.",
     "Understand the assigned Seed and Planner Intent first. Then form the central thought this Creator would actually hold and create the post.",
-    "THOUGHT FIRST. Creator Intelligence and connected engines are supporting information. Use only what helps this thought; they do not decide it for you.",
-    "You do not choose the seven-day strategy, select another Seed, or redesign slot allocation.",
+    "THOUGHT FIRST. No separate Writer re-interprets Seed meaning, Core Thought, or Collection. You do that, then you write.",
+    "Internal process (do not output steps): UNDERSTAND → VERIFY → THINK → DECIDE → RETRIEVE → SELECT → INTERNALIZE → WRITE → STOP.",
+    "Collection is after Core Thought. If this call has no collection chunks, do not invent force. Write from thought and seed.",
+    "You do not choose the seven-day strategy, select another Seed, or rebuild the week.",
     "HARD BOUNDARY: do not invent facts or lived experience, do not directly copy a Manual Creator Post, and do not abandon the assigned Seed and Planner Intent.",
     "Do not paste prompt material or examples. Decide the necessary reasoning and expression yourself.",
     "If live X/web facts are needed to know what was actually announced, use them as facts only. Do not copy tweet wording. Do not inhabit someone else's viral lived post as your yesterday.",
-    "Your goal is not to pass a writing-rule checklist. Complete the assigned Seed as an actual Creator post.",
+    "Your goal is long-term X account growth, not a writing-rule checklist. Participation is a signal. Complete the assigned Seed as an actual Creator post.",
   ].join("\n");
 }
 
@@ -395,10 +397,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "CREATOR INTELLIGENCE (supporting judgment, never sentences to copy):",
     creatorDnaWriterSlice(s(planner.strategic_role)),
     "REASONING ORDER (internal only; do not output steps):",
-    "1) Understand the Seed and Planner Intent together.",
-    "2) Close one central thought this Creator would hold. Code labels are material, not the thought.",
-    "3) Decide the reasoning and expression that this post needs, using Creator Intelligence as support.",
-    "4) Write the complete post and stop when the thought is complete.",
+    "UNDERSTAND the Seed and slot intent. VERIFY facts and experience bounds. THINK as this Creator. DECIDE one Core Thought. RETRIEVE/SELECT collection only after that thought, and only if chunks are in this call. INTERNALIZE. WRITE the complete post and stop when the thought is complete. STOP.",
     ...writerBoundaryConstraintLines(ctx),
     "EXPERIENCE: " + (experienced && !mustNotFirstPerson ? "first-person is allowed only within supplied evidence" : "do not claim first-person lived experience"),
     s((expBound as any).owner) === "OTHER"

@@ -1,9 +1,9 @@
 /**
- * v11 write path: Planner/Seeds → Interpretation(boundaries) → Grok 4.6 closes thought then writes → Semantic Judge.
+ * v11 write path: Weekly Agent승 slots → Interpretation(boundaries) → Post Agent승 thinks then writes → Semantic Judge.
  * Thought first, style follows — in execution, not only in documents.
- * Mechanism / Rail / 말투 / humor / compression do not run before the writer and do not pick the thought.
+ * Mechanism / Rail / 말투 / humor / compression do not run before the post call and do not pick the thought.
  * After the post exists they may be recorded as delivery telemetry. They do not rewrite.
- * Writer does not become Planner. Judge does not rewrite.
+ * Post Agent승 is not Weekly Agent승. Judge does not rewrite.
  * Paid xAI: quota, seed expand, and original post body. No OpenAI.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
@@ -264,7 +264,7 @@ export async function writeOneSlot(args: {
     week_structural_signatures: weekSignatures,
   });
 
-  // 3. Grok closes one thought for this Seed, then writes it.
+  // 3. Post Agent승 closes one thought for this Seed, then writes it.
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
     xai_key: args.xaiKey,
