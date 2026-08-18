@@ -11,4 +11,4 @@ Agent승이 이론 선택 때만 검색한다. Writer에게 주지 않는다.
 
 업로드: xAI Console Collections, 또는 Management API. 검색은 `POST https://api.x.ai/v1/documents/search` (hybrid, limit 3). Grok `collections_search` 도구는 쓰지 않는다.
 
-상의가 끝난 이론만 파일에 붙인다.
+상의가 끝난 이론만 파일에 붙인다. 작성 이론은 아직 학습 전이다. 바이럴·작성 카드를 모두 모은 뒤에 최종 조합한다. 카드 하나 넣을 때마다 작성 형식과 섞지 마라.
