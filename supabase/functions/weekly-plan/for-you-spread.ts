@@ -67,6 +67,19 @@ function formatPt(iso: string): string {
 }
 
 const PT_WALL = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})/;
+const YMD_SPACE = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})/;
+const AMPM = /(\d{1,2}):(\d{2})\s*([AaPp][Mm])/;
+const HOUR_KO = /(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/;
+
+export function pinTimeToSlotDay(
+  iso: string,
+  cal: { year: number; month: number; day: number },
+): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const p = laParts(d);
+  return laWallTimeToISO(cal.year, cal.month, cal.day, p.hour, p.minute);
+}
 
 export function parsePlannerTimestamp(
   raw: unknown,
@@ -102,6 +115,22 @@ export function parsePlannerTimestamp(
   if (hourOnly && day) {
     return laWallTimeToISO(day.year, day.month, day.day, Number(hourOnly[1]), Number(hourOnly[2] || 0));
   }
+  const ymd = YMD_SPACE.exec(text);
+  if (ymd) {
+    return laWallTimeToISO(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]), Number(ymd[4]), Number(ymd[5]));
+  }
+  const ampm = AMPM.exec(text);
+  if (ampm && day) {
+    let hour = Number(ampm[1]) % 12;
+    if (/p/i.test(ampm[3])) hour += 12;
+    return laWallTimeToISO(day.year, day.month, day.day, hour, Number(ampm[2]));
+  }
+  const ko = HOUR_KO.exec(text);
+  if (ko && day) {
+    let hour = Number(ko[1]);
+    if (/오후|저녁|밤/.test(text) && hour < 12) hour += 12;
+    return laWallTimeToISO(day.year, day.month, day.day, hour, Number(ko[2] || 0));
+  }
   return "";
 }
 
@@ -125,11 +154,45 @@ export function enforceMinGapOnPlannedTimes<T extends {
       || parsePlannerTimestamp(slot.planned_pt, cal)
       || parsePlannerTimestamp(slot.planned_hour, cal);
     if (iso) {
-      slot.planned_at = iso;
-      slot.planned_pt = formatPt(iso);
+      const pinned = pinTimeToSlotDay(iso, cal);
+      slot.planned_at = pinned;
+      slot.planned_pt = formatPt(pinned);
     }
   }
   return slots;
+}
+
+export function describeSlotTimeCheck<T extends { slot_id?: string; day_offset: number; planned_at?: string }>(
+  slots: T[],
+  occupiedISOs: string[] = [],
+  gapMs = MIN_PLANNED_GAP_MS,
+): { ok: boolean; missing: string[]; collisions: string[]; note: string } {
+  const missing = (slots || [])
+    .filter((s) => !Number.isFinite(Date.parse(String(s.planned_at || ""))))
+    .map((s) => String(s.slot_id || `day_${s.day_offset}`));
+  const stamped = (slots || [])
+    .map((s) => ({ id: String(s.slot_id || `day_${s.day_offset}`), ms: Date.parse(String(s.planned_at || "")) }))
+    .filter((s) => Number.isFinite(s.ms));
+  const occupied = occupiedISOs.map((x) => Date.parse(x)).filter((ms) => Number.isFinite(ms));
+  const all = [
+    ...occupied.map((ms) => ({ id: "occupied", ms })),
+    ...stamped,
+  ].sort((a, b) => a.ms - b.ms);
+  const collisions: string[] = [];
+  for (let i = 1; i < all.length; i += 1) {
+    const gap = all[i].ms - all[i - 1].ms;
+    if (gap < gapMs) {
+      collisions.push(`${all[i - 1].id} ↔ ${all[i].id} (${Math.round(gap / 60000)}m)`);
+    }
+  }
+  const ok = missing.length === 0 && collisions.length === 0 && stamped.length === (slots || []).length;
+  const note = ok
+    ? "times hold"
+    : [
+      missing.length ? `unparsed ${missing.join(",")}` : "",
+      collisions.length ? `gap<2h ${collisions.slice(0, 8).join("; ")}` : "",
+    ].filter(Boolean).join(" · ");
+  return { ok, missing, collisions, note };
 }
 
 export function spacingConstraintHolds<T extends { planned_at?: string }>(
@@ -145,6 +208,18 @@ export function spacingConstraintHolds<T extends { planned_at?: string }>(
     if (times[i] - times[i - 1] < gapMs) return false;
   }
   return slots.every((s) => Number.isFinite(Date.parse(String(s.planned_at || ""))));
+}
+
+/** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */
+export function slotCalendarDays(startDate: string, days: number[]): Array<{ day_offset: number; date: string }> {
+  const origin = parseStartDate(startDate);
+  return (days || []).map((d) => {
+    const cal = addDays(origin.year, origin.month, origin.day, d);
+    return {
+      day_offset: d,
+      date: `${cal.year}-${String(cal.month).padStart(2, "0")}-${String(cal.day).padStart(2, "0")}`,
+    };
+  });
 }
 
 /** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */

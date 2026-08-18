@@ -69,7 +69,7 @@ import {
   type SevenDayStrategy,
   type SevenDayVolume,
 } from "./seven-day-planner.ts";
-import { stampPlannerSlotTimes, spacingConstraintHolds } from "./for-you-spread.ts";
+import { stampPlannerSlotTimes, spacingConstraintHolds, describeSlotTimeCheck } from "./for-you-spread.ts";
 import { buildAgentSeungPlanEvidence, classifyPlanOrigin, extractFedicaBestPostingTime, emptyPlanEvidenceDigest, pagePlanEvidenceRows, PLAN_EVIDENCE_PAGE_SIZE, type AgentSeungPlanEvidence, type PlanEvidenceDigest } from "./plan-evidence.ts";
 import { judgeWeekCount, isSlotStrategyInvalidation } from "./semantic-judge.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
@@ -1544,6 +1544,8 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       already: partial,
       planEvidence,
       digest,
+      lastTimeCheck: st.last_time_check || null,
+      startDate: String(st.startDate || ""),
       operatorNote: intentText || undefined,
       timeoutMs: PLANNER_DAY_SLOT_TIMEOUT_MS,
     });
@@ -1570,18 +1572,17 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       return;
     }
     const normalized = stampPlannerSlotTimes(String(st.startDate || ""), result.value, []);
-    if (
-      normalized.some((slot) => !String(slot.planned_at || "").trim())
-      || !spacingConstraintHolds([...partial, ...normalized], planEvidence.occupied_times)
-    ) {
+    const timeCheck = describeSlotTimeCheck([...partial, ...normalized], planEvidence.occupied_times);
+    if (!timeCheck.ok) {
+      st.last_time_check = timeCheck;
       st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
       if (st.planner_day_batch_attempts < 3) {
         row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 시각 재추론 ${st.planner_day_batch_attempts}/3…`;
-        row.summary = [row.summary, "시각 누락 또는 최소 간격 위반 · 코드가 새 시각을 만들지 않음"].filter(Boolean).join("\n");
+        row.summary = [row.summary, `시각 재추론 · ${timeCheck.note}`].filter(Boolean).join("\n");
         return;
       }
       row.status = "error";
-      row.error = `7일 Agent승 시각 실패 (${days.map((d) => d + 1).join(",")}일차)`;
+      row.error = `7일 Agent승 시각 실패 (${days.map((d) => d + 1).join(",")}일차): ${timeCheck.note}`;
       row.label_ko = "Creator 시각 실패";
       return;
     }

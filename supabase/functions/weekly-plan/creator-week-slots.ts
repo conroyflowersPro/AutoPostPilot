@@ -24,6 +24,7 @@ import {
   type AgentSeungPlanEvidence,
   type PlanEvidenceDigest,
 } from "./plan-evidence.ts";
+import { slotCalendarDays } from "./for-you-spread.ts";
 
 function s(v: unknown, max = 240): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -79,6 +80,7 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     "Each slot: slot_id, day_offset, growth_role (RETURN|BRIDGE|REACH), editorial_mode (INFORMATIVE|COMPARE|OPINION|EXPERIENCE|CASUAL_OBSERVATION), planner_intent, planned_at (ISO UTC), planned_pt (America/Los_Angeles wall time).",
     "Every slot must include planned_at and planned_pt. Infer the clock from evidence. Do not omit a time. Code will not invent one.",
     "Adjacent originals at least 2 hours apart — that is a minimum, not a 2-hour step. Stay on that calendar day, before the next day. 14:00–22:00 PT is audience evidence, not a box.",
+    "day_offset 0 is start_date. Put that day's clock on that date. If last_time_check is present, fix those gaps or unparsed clocks. Do not copy the previous failed times.",
     "Do not leave Role, Editorial Mode, or timestamp blank. If a field is missing the runtime re-asks you; it does not fill it.",
     "USER_DIRECT and AP_PIPELINE are separate populations. Do not average them. Do not learn Creator Voice from AP_PIPELINE.",
     "Complexity/Emergence is a judgment, not a ratio or slot recipe. Keep Creator Identity and long-term account growth together.",
@@ -260,6 +262,8 @@ export async function inferCreatorSlotsForDays(args: {
   already: PlannerSlotIntent[];
   planEvidence?: AgentSeungPlanEvidence | null;
   digest?: PlanEvidenceDigest | null;
+  lastTimeCheck?: { ok?: boolean; missing?: string[]; collisions?: string[]; note?: string } | null;
+  startDate?: string;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSlotIntent[]>> {
@@ -272,6 +276,8 @@ export async function inferCreatorSlotsForDays(args: {
     user: {
       audience_counts: compactAudienceCounts(args.audience),
       plan_evidence: plannerEvidencePayload(args.planEvidence, args.digest),
+      slot_calendar: slotCalendarDays(String(args.startDate || args.planEvidence?.start_date || ""), args.days),
+      last_time_check: args.lastTimeCheck || null,
       posts_per_day: args.postsPerDay,
       day_offsets: args.days,
       required_slot_count_this_call: wanted,

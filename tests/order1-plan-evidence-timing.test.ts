@@ -13,6 +13,8 @@ import {
   enforceMinGapOnPlannedTimes,
   MIN_PLANNED_GAP_MS,
   spacingConstraintHolds,
+  pinTimeToSlotDay,
+  describeSlotTimeCheck,
 } from "../supabase/functions/weekly-plan/for-you-spread.ts";
 import { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "../lib/fedica-strategy-contract.ts";
 import { parseCreatorDaySlots } from "../supabase/functions/weekly-plan/creator-week-slots.ts";
@@ -153,6 +155,14 @@ assert.equal(slots[1].planned_at, "2026-08-19T22:40:00.000Z");
 assert.equal(slots[2].planned_at, "2026-08-20T03:11:00.000Z");
 assert.equal(spacingConstraintHolds(slots), false);
 assert.ok(MIN_PLANNED_GAP_MS >= 2 * 60 * 60 * 1000);
+const pinned = pinTimeToSlotDay("2026-08-19T22:07:00.000Z", { year: 2026, month: 8, day: 18 });
+assert.match(pinned, /2026-08-1[89]/);
+const check = describeSlotTimeCheck([
+  { slot_id: "a", day_offset: 0, planned_at: "2026-08-18T21:00:00.000Z" },
+  { slot_id: "b", day_offset: 0, planned_at: "2026-08-18T21:30:00.000Z" },
+]);
+assert.equal(check.ok, false);
+assert.ok(check.collisions.length > 0);
 
 const parsed = parseCreatorDaySlots({
   raw: {
