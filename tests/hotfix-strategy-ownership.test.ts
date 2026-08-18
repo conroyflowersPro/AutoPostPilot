@@ -28,6 +28,9 @@ assert.doesNotMatch(spread, /lastMs \+ gapMs/);
 
 const job = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.match(job, /코드가 새 시각을 만들지 않음/);
+assert.match(job, /PLANNER_XAI_HOLD_MAX/);
+assert.match(job, /PLANNER_DAY_SLOT_TIMEOUT_MS/);
+assert.match(job, /takePlannerHold/);
 assert.match(job, /코드가 Seed를 배정하지 않음/);
 assert.match(job, /STRATEGY_REPLAN/);
 assert.match(job, /CONTENT_REPAIR/);

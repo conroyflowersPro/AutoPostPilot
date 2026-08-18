@@ -134,6 +134,9 @@ function isWriterFailure(reasons: unknown[], judgeStatus?: string): boolean {
 }
 
 /** Slow/unavailable xAI must not end the weekly job. Invalid JSON still uses the 3-try cap. */
+export const PLANNER_XAI_HOLD_MAX = 4 as const;
+export const PLANNER_DAY_SLOT_TIMEOUT_MS = 40000 as const;
+
 export function isTransientXaiError(err: unknown): boolean {
   const name = err && typeof err === "object" && "name" in err ? String((err as { name?: unknown }).name) : "";
   const msg = err instanceof Error ? err.message : String(err ?? "");
@@ -147,6 +150,11 @@ function holdForXai(row: any, label: string, detail: string) {
   row.label_ko = label;
   const line = String(detail || "").trim();
   if (line) row.summary = [row.summary, line].filter(Boolean).join("\n");
+}
+
+function takePlannerHold(st: any): number {
+  st.planner_xai_holds = Number(st.planner_xai_holds || 0) + 1;
+  return st.planner_xai_holds;
 }
 
 function formatPipelineReject(subject: string, reasons: unknown[], judgeStatus?: string): string {
@@ -752,6 +760,7 @@ export async function startWeeklyJob(args: {
     planner_strategy_attempts: 0,
     planner_volume_attempts: 0,
     planner_day_batch_attempts: 0,
+    planner_xai_holds: 0,
     planner_selection_attempts: 0,
     planner_selection_failures: 0,
     planner_exploration_direction: "",
@@ -1400,7 +1409,13 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     });
     if (!result.ok || !result.value) {
       if (isTransientXaiError(result.error)) {
-        holdForXai(row, "xAI 응답 대기 · 칸 수 이어감…", `Creator volume: ${result.error}`);
+        if (takePlannerHold(st) < PLANNER_XAI_HOLD_MAX) {
+          holdForXai(row, "xAI 응답 대기 · 칸 수 이어감…", `Creator volume: ${result.error}`);
+          return;
+        }
+        row.status = "error";
+        row.error = `7일 Agent승 칸 수 시간 초과: ${result.error || "xai_timeout"}`;
+        row.label_ko = "Creator 칸 수 실패";
         return;
       }
       st.planner_volume_attempts = Number(st.planner_volume_attempts || 0) + 1;
@@ -1423,6 +1438,7 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     } as SevenDayVolume;
     st.planner_slots_partial = [];
     st.planner_day_batch_attempts = 0;
+    st.planner_xai_holds = 0;
     const locked = result.value.posts_per_day.reduce((a, b) => a + b, 0);
     row.label_ko = `7일 칸 수 잠금 ${locked}칸 · Agent승 슬롯…`;
     row.summary = [
@@ -1446,11 +1462,17 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       already: partial,
       planEvidence,
       operatorNote: intentText || undefined,
-      timeoutMs: 28000,
+      timeoutMs: PLANNER_DAY_SLOT_TIMEOUT_MS,
     });
     if (!result.ok || !result.value) {
       if (isTransientXaiError(result.error)) {
-        holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 이어감…`, `Creator day slots: ${result.error}`);
+        if (takePlannerHold(st) < PLANNER_XAI_HOLD_MAX) {
+          holdForXai(row, `xAI 응답 대기 · ${days.map((d) => d + 1).join(",")}일차 이어감…`, `Creator day slots: ${result.error}`);
+          return;
+        }
+        row.status = "error";
+        row.error = `7일 Agent승 슬롯 시간 초과 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "xai_timeout"}`;
+        row.label_ko = "Creator 슬롯 실패";
         return;
       }
       st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
@@ -1482,6 +1504,7 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     }
     st.planner_slots_partial = [...partial, ...normalized];
     st.planner_day_batch_attempts = 0;
+    st.planner_xai_holds = 0;
     const remain = nextStrategyDayOffsets(st.planner_slots_partial, volume.posts_per_day);
     if (remain.length) {
       row.label_ko = `Agent승 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;

@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.1 — 2026-08-18
+
+- 7일 칸 시각 추론이 xAI timeout이면 같은 날을 끝없이 다시 부르지 않습니다. 최대 4번 대기 후 멈춥니다
+- 칸 시각 호출 제한을 40초로 올립니다. 코드가 빈 시각을 채우지 않습니다
+
 ## 12.12.0 — 2026-08-18
 
 - POST는 THINK로 Core Thought를 확정한 뒤 Collection을 칸당 1회 검색하고, 그다음 WRITE합니다
