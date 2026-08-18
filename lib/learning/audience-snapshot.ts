@@ -307,3 +307,39 @@ export function formatAudienceIntelligenceForPlanner(
   ];
   return lines.join("\n");
 }
+
+/** Timing evidence only. Do not fold these fields back into Audience DNA scoring. */
+export function extractFedicaBestPostingTime(raw: unknown): {
+  status: "present" | "missing";
+  windows: unknown;
+  note: string;
+} {
+  const hits: Record<string, unknown> = {};
+  const walk = (value: unknown, path: string) => {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const keyPath = path ? `${path}.${k}` : k;
+      if (TIME_NOISE.test(k) || (typeof v === "string" && TIME_NOISE.test(v))) {
+        hits[keyPath] = v;
+      }
+      if (v && typeof v === "object") walk(v, keyPath);
+    }
+  };
+  walk(raw, "");
+  if (!Object.keys(hits).length) {
+    return {
+      status: "missing",
+      windows: null,
+      note: "No Fedica Best Posting Time in stored snapshots.",
+    };
+  }
+  return {
+    status: "present",
+    windows: hits,
+    note: "Fedica Best Posting Time pulled as timing evidence only. Not Audience DNA.",
+  };
+}

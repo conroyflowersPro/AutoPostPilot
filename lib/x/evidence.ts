@@ -7,6 +7,7 @@
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MetricBag, XTimelinePost, XMentionPost } from "@/lib/x/client";
+import { mergeStoredOriginClass } from "@/lib/origin-class";
 
 export type SystemOriginClass = "USER_DIRECT" | "AP_PIPELINE" | "SYSTEM_ASSISTED" | "MANUAL" | "UNKNOWN";
 
@@ -98,6 +99,13 @@ export async function persistXPostEvidence(
     .eq("account_id", input.accountId)
     .eq("x_post_id", p.id)
     .maybeSingle();
+
+  if (existing?.id) {
+    baseRow.system_origin_class = mergeStoredOriginClass(
+      existing.system_origin_class,
+      input.systemOriginClass || "UNKNOWN",
+    );
+  }
 
   let activityId: string;
   let postStatus: "NEW" | "EXISTING" | "UPDATED";

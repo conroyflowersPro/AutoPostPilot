@@ -4,12 +4,12 @@
 
 ## Current (do not treat older sections as live version)
 
-- **main:** v12.11.0. ORDER 1–3 merged and pushed for production (Netlify + Edge on `main`).
+- **this branch:** v12.11.2 on **main**. USER_DIRECT path · EXPERIENCE ownership · counters · cursor · BPT.
+- **main:** v12.11.2. Hotfix shipped.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE. Collection API 호출 0. Hook만 준비.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행. Collection API 호출 0.
-
-PR: https://github.com/conroyflowersPro/AutoPostPilot/pull/84
+- **HOTFIX (v12.11.2, on main):** USER_DIRECT 확정 경로 · EXPERIENCE는 Agent승 선택 · repair/replan 카운터 분리 · Thinking 합성 cursor · Fedica BPT timing 입력.
 
 ## Who / how
 

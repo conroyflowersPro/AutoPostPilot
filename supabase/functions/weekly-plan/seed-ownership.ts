@@ -127,6 +127,50 @@ export function abstractLivedSubject(text: string, _cluster: string): string {
   return livedMeaningGist(text);
 }
 
+export function livedAsOf(
+  occurredAt: string | undefined,
+  now: Date = new Date(),
+): { as_of: string; days_ago: number | null } {
+  const occurred = occurredAt ? ymdInLosAngeles(occurredAt) : "";
+  const today = ymdInLosAngeles(now);
+  const diff = dayDiffYmd(today, occurred);
+  if (!occurred || diff >= 900) return { as_of: "unknown", days_ago: null };
+  if (diff <= 0) return { as_of: "today", days_ago: 0 };
+  if (diff === 1) return { as_of: "yesterday", days_ago: 1 };
+  return { as_of: `${diff}_days_ago`, days_ago: diff };
+}
+
+/** Same-cluster newer lived unused while an older lived was picked. Code does not swap — caller re-asks Agent승. */
+export function staleLivedExperiencePicks(args: {
+  slots: Array<{ slot_id: string; editorial_mode?: string }>;
+  assignments: Array<{ slot_id: string; seed_id: string }>;
+  pool: Array<Record<string, unknown>>;
+}): string[] {
+  const used = new Set(args.assignments.map((a) => String(a.seed_id || "")).filter(Boolean));
+  const lived = sortLivedNewestFirst(args.pool.filter((s) => isLivedSelfSeed(s) && String(s.seed_id || "")));
+  const fails: string[] = [];
+  for (const slot of args.slots) {
+    if (String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE") continue;
+    const pick = args.assignments.find((a) => a.slot_id === slot.slot_id);
+    if (!pick) continue;
+    const chosen = args.pool.find((s) => String(s.seed_id || "") === pick.seed_id);
+    if (!chosen || !isLivedSelfSeed(chosen)) continue;
+    const cluster = String(chosen.cluster || "");
+    if (!cluster) continue;
+    const chosenT = Date.parse(String(chosen.occurred_at || chosen.published_at || 0)) || 0;
+    const newer = lived.find((s) => {
+      const id = String(s.seed_id || "");
+      if (!id || id === pick.seed_id) return false;
+      if (used.has(id)) return false;
+      if (String(s.cluster || "") !== cluster) return false;
+      const t = Date.parse(String(s.occurred_at || s.published_at || 0)) || 0;
+      return t > chosenT;
+    });
+    if (newer) fails.push(slot.slot_id);
+  }
+  return fails;
+}
+
 export type ExperienceAssignment = {
   slot_id: string;
   seed_id: string;

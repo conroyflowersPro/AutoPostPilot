@@ -7,6 +7,21 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.11.2 — 2026-08-18
+
+- 내 계정 원글·인용은 AP/Fedica 매칭이 없으면 USER_DIRECT입니다. 재동기화가 기존 USER_DIRECT를 UNKNOWN으로 내리지 않습니다
+- EXPERIENCE 칸 Seed는 Agent승이 고릅니다. 코드가 최신 경험으로 덮지 않습니다. 같은 상황의 더 새 lived가 남았으면 그 칸만 다시 고릅니다
+- Judge 전략 거절과 글 거절 횟수를 따로 셉니다
+- Thinking 추출 cursor는 시각과 안정 id를 같이 씁니다
+- Agent승 시간 추론 입력에 Fedica Best Posting Time을 넣습니다. 없으면 missing입니다
+
+## 12.11.1 — 2026-08-18
+
+- 코드는 Role · Editorial Mode · REACH · 시각을 만들지 않습니다. 필수값이 빠지거나 간격이 깨지면 해당 범위만 Agent승 PLAN이 다시 추론합니다
+- 출처를 확인할 수 없으면 USER_DIRECT가 아니라 UNKNOWN입니다. UNKNOWN은 Voice·창발 증거로 쓰지 않고, 실제 성과 지표는 남깁니다
+- 일반 Judge 거절은 같은 칸 전략으로 REPAIR하고, 전략 붕괴는 그 칸만 Agent승 PLAN이 재판단합니다
+- Thinking 추출은 제외 row가 많아도 소스의 다음 범위를 계속 스캔합니다. Collection API는 호출하지 않습니다
+
 ## 12.11.0 — 2026-08-18
 
 - 독립 Judge는 게시 가능 여부만 봅니다. 7일 전략·칸·시드·역할·Mode·시각을 다시 정하지 않습니다

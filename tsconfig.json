@@ -38,7 +38,6 @@
     "node_modules",
     "supabase",
     "supabase/functions",
-    "tests",
-    "tools"
+    "tests"
   ]
 }

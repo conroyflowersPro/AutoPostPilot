@@ -1,9 +1,0 @@
-name: materialize-order8b-hotfix-sel
-on:
-  workflow_dispatch:
-jobs:
-  materialize:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo 'see full workflow in next commit'

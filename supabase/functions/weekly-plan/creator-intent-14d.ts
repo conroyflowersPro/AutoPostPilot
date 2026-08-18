@@ -89,9 +89,10 @@ export function normalizePostType(row: CreatorActivityRow): ActivityPostType {
 }
 
 export function isHandmadeCandidate(row: CreatorActivityRow): boolean {
-  const soc = String(row.system_origin_class || "").toUpperCase();
-  if (soc && /APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED/.test(soc)) return false;
-  return true;
+  const v = String(row.system_origin_class || row.origin || "").toUpperCase().trim();
+  if (!v) return false;
+  if (/USER_DIRECT|MANUAL|HANDMADE|CREATOR_DIRECT/.test(v)) return true;
+  return false;
 }
 
 function strengthFromPublishing(score: number, originals: number): IntentStrength {

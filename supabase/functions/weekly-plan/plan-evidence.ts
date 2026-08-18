@@ -7,7 +7,7 @@ import { isSyncOriginal } from "./audience-x-status.ts";
 
 export const AGENT_SEUNG_PLAN_EVIDENCE_VERSION = "agent-seung-plan-evidence-v1";
 
-export type PlanOrigin = "USER_DIRECT" | "AP_PIPELINE";
+export type PlanOrigin = "USER_DIRECT" | "AP_PIPELINE" | "UNKNOWN";
 
 export type CompactPlanMetrics = {
   id: string;
@@ -49,20 +49,32 @@ export type AgentSeungPlanEvidence = {
   }>;
   user_direct: OriginPopulation;
   ap_pipeline: OriginPopulation;
+  unknown: OriginPopulation;
   sync_gap: {
     user_direct: CompactPlanMetrics[];
     ap_pipeline: CompactPlanMetrics[];
+    unknown: CompactPlanMetrics[];
   };
   occupied_times: string[];
   start_date: string;
   notes: string[];
+  fedica_best_posting_time: {
+    status: "present" | "missing" | "stale";
+    windows: unknown;
+    note: string;
+  };
 };
 
 const AP_ORIGIN =
   /AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED|SYSTEM_ASSISTED/;
+const DIRECT_ORIGIN = /USER_DIRECT|MANUAL|HANDMADE|CREATOR_DIRECT/;
 
 export function classifyPlanOrigin(value: string | null | undefined): PlanOrigin {
-  return AP_ORIGIN.test(String(value || "").toUpperCase()) ? "AP_PIPELINE" : "USER_DIRECT";
+  const v = String(value || "").toUpperCase().trim();
+  if (!v) return "UNKNOWN";
+  if (DIRECT_ORIGIN.test(v)) return "USER_DIRECT";
+  if (AP_ORIGIN.test(v)) return "AP_PIPELINE";
+  return "UNKNOWN";
 }
 
 function s(v: unknown, max = 72): string {
@@ -100,8 +112,8 @@ export function compactPlanMetrics(row: {
   detail_expands?: number;
 }): CompactPlanMetrics {
   const m = row.metrics || {};
-  const origin = row.origin || "USER_DIRECT";
-  const text = origin === "AP_PIPELINE" ? "" : s(row.content || row.text_body, 72);
+  const origin = row.origin || "UNKNOWN";
+  const text = origin === "USER_DIRECT" ? s(row.content || row.text_body, 72) : "";
   return {
     id: s(row.post_id || row.x_post_id, 40),
     d: s(row.published_at, 40),
@@ -137,14 +149,49 @@ function bagPosts(rows: CompactPlanMetrics[], origin: PlanOrigin, cap = 120): Or
 export const PLAN_EVIDENCE_NOTES = [
   "Analytics is primary performance evidence. Keep metric columns separate. Do not collapse into one engagement score.",
   "Sync fills Analytics holes only. A post already in Analytics is not a second evidence row.",
-  "USER_DIRECT is identity, spontaneous interest, current intent, direct opinion, current voice, emergence. AP_PIPELINE is planned portfolio, spacing, performance, planned complexity.",
+  "UNKNOWN origin is not USER_DIRECT. Keep its performance metrics. Do not use it as voice, emergence, or handmade thinking evidence.",
   "Do not average USER_DIRECT and AP_PIPELINE into one success population. Do not learn Creator Voice from AP_PIPELINE.",
   "Complexity/Emergence is a judgment, not a mix recipe: is planned AP going rigid, where is USER_DIRECT moving, can Identity stay while Growth opens. No fixed USER_DIRECT ratio. No fixed slot pattern.",
   "Date and time are part of the seven-day strategy. Consider freshness, same-author density, and time for each original to earn engagement.",
   "Adjacent planned originals need at least 2 hours. That is a constraint. Do not emit a repeating clock grid. Do not add jitter to look irregular.",
   "14:00–22:00 PT are audience hours to consider, not an AP For You window and not a template.",
+  "Fedica Best Posting Time is timing evidence when present. If missing, say so. Do not replace it with a 14:00–22:00 grid.",
   "Do not invent Topic→Role, Topic→time, Editorial Mode→time, or USER_DIRECT-ratio slot mappings. Infer this job from the evidence.",
 ] as const;
+
+export function emptyFedicaBestPostingTime(): AgentSeungPlanEvidence["fedica_best_posting_time"] {
+  return {
+    status: "missing",
+    windows: null,
+    note: "Fedica Best Posting Time not loaded. Missing evidence. Do not substitute a 14:00–22:00 clock.",
+  };
+}
+
+const BPT_KEY =
+  /best.?posting.?time|best\s*time|posting[_\s-]*time|reach by time|followers by time|최적.*시간|게시\s*시간|타임존|timezone/i;
+
+export function extractFedicaBestPostingTime(raw: unknown): AgentSeungPlanEvidence["fedica_best_posting_time"] {
+  const hits: Record<string, unknown> = {};
+  const walk = (value: unknown, path: string) => {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const keyPath = path ? `${path}.${k}` : k;
+      if (BPT_KEY.test(k) || (typeof v === "string" && BPT_KEY.test(v))) hits[keyPath] = v;
+      if (v && typeof v === "object") walk(v, keyPath);
+    }
+  };
+  walk(raw, "");
+  if (!Object.keys(hits).length) return emptyFedicaBestPostingTime();
+  return {
+    status: "present",
+    windows: hits,
+    note: "Fedica Best Posting Time is timing evidence. Not Audience DNA. Not a clock template.",
+  };
+}
 
 export function buildAgentSeungPlanEvidence(args: {
   startDate: string;
@@ -167,6 +214,7 @@ export function buildAgentSeungPlanEvidence(args: {
   }>;
   occupiedTimes?: string[];
   originByPostId?: Record<string, PlanOrigin | string>;
+  fedicaBestPostingTime?: AgentSeungPlanEvidence["fedica_best_posting_time"] | null;
 }): AgentSeungPlanEvidence {
   const originById = args.originByPostId || {};
   const analyticsRows: CompactPlanMetrics[] = [];
@@ -183,6 +231,7 @@ export function buildAgentSeungPlanEvidence(args: {
   }
   const syncGapDirect: CompactPlanMetrics[] = [];
   const syncGapAp: CompactPlanMetrics[] = [];
+  const syncGapUnknown: CompactPlanMetrics[] = [];
   const syncOriginTimes: Array<{ origin: PlanOrigin; at: string }> = [];
   for (const row of args.syncPosts || []) {
     if (!isSyncOriginal(row)) continue;
@@ -198,18 +247,22 @@ export function buildAgentSeungPlanEvidence(args: {
       origin,
     });
     if (origin === "AP_PIPELINE") syncGapAp.push(compact);
-    else syncGapDirect.push(compact);
+    else if (origin === "USER_DIRECT") syncGapDirect.push(compact);
+    else syncGapUnknown.push(compact);
   }
   const userDirect = bagPosts(analyticsRows, "USER_DIRECT");
   const apPipeline = bagPosts(analyticsRows, "AP_PIPELINE");
+  const unknown = bagPosts(analyticsRows, "UNKNOWN");
   for (const hit of syncOriginTimes) {
-    const target = hit.origin === "AP_PIPELINE" ? apPipeline : userDirect;
+    const target =
+      hit.origin === "AP_PIPELINE" ? apPipeline : hit.origin === "USER_DIRECT" ? userDirect : unknown;
     if (hit.at && !target.recent_times.includes(hit.at)) {
       target.recent_times.push(hit.at);
     }
   }
   userDirect.originals = Math.max(userDirect.originals, userDirect.recent_times.length);
   apPipeline.originals = Math.max(apPipeline.originals, apPipeline.recent_times.length);
+  unknown.originals = Math.max(unknown.originals, unknown.recent_times.length);
 
   const dates = new Set(analyticsRows.map((r) => isoDay(r.d)).filter(Boolean));
   return {
@@ -228,13 +281,16 @@ export function buildAgentSeungPlanEvidence(args: {
     })),
     user_direct: userDirect,
     ap_pipeline: apPipeline,
+    unknown,
     sync_gap: {
       user_direct: syncGapDirect.slice(0, 40),
       ap_pipeline: syncGapAp.slice(0, 40),
+      unknown: syncGapUnknown.slice(0, 40),
     },
     occupied_times: [...new Set((args.occupiedTimes || []).filter(Boolean))].slice(0, 80),
     start_date: String(args.startDate || "").slice(0, 10),
     notes: [...PLAN_EVIDENCE_NOTES],
+    fedica_best_posting_time: args.fedicaBestPostingTime || emptyFedicaBestPostingTime(),
   };
 }
 
@@ -254,8 +310,23 @@ export function planEvidenceForModel(evidence: AgentSeungPlanEvidence): Record<s
       recent_times: evidence.ap_pipeline.recent_times.slice(0, 24),
       posts: evidence.ap_pipeline.posts.slice(0, 80),
     },
+    unknown_origin_performance: {
+      originals: evidence.unknown.originals,
+      recent_times: evidence.unknown.recent_times.slice(0, 24),
+      posts: evidence.unknown.posts.slice(0, 80),
+      note: "Performance metrics only. Not voice, emergence, or handmade thinking evidence.",
+    },
     sync_gap: evidence.sync_gap,
     occupied_times: evidence.occupied_times,
+    timing: {
+      fedica_best_posting_time: evidence.fedica_best_posting_time,
+      audience_hours_pt: {
+        start: "14:00",
+        end: "22:00",
+        role: "audience_evidence_not_fixed_window",
+      },
+      min_gap_hours: 2,
+    },
     notes: evidence.notes,
   };
 }

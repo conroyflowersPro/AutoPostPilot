@@ -24,7 +24,8 @@ assert.doesNotMatch(page, /8일 전략 만들기/);
 const job = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 const recoverFn = job.slice(job.indexOf("async function stepRecover"), job.indexOf("async function legacySeedJudgeUnused"));
 assert.match(recoverFn, /CONTENT_REPAIR/);
-assert.match(recoverFn, /SLOT_STRATEGY_SIGNAL/);
+assert.match(recoverFn, /STRATEGY_REPLAN/);
+assert.match(recoverFn, /inferCreatorSlotReplan/);
 assert.match(recoverFn, /planned_at: original\.planned_at/);
 assert.match(recoverFn, /editorial_mode: original\.editorial_mode/);
 assert.doesNotMatch(recoverFn, /creatorRelabelRejectBatch\(/);
@@ -36,6 +37,7 @@ assert.doesNotMatch(job, /searchAgentSeungTheories\(/);
 
 const write = readFileSync("supabase/functions/weekly-plan/independent-post-generation.ts", "utf8");
 assert.match(write, /THIS CALL IS REPAIR/);
+assert.match(write, /THIS CALL IS CREATE after slot-level PLAN replan/);
 assert.match(write, /not a rewrite template/);
 assert.doesNotMatch(write, /Topic→Retry/);
 

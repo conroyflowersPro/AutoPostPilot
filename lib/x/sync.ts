@@ -128,7 +128,10 @@ export async function runXAccountSync(opts?: {
           status: "PUBLISHED",
           collectionSource: source === "scheduled" ? "x_sync_scheduled" : "x_sync_manual",
           collectionRunId: runId || null,
-          systemOriginClass: classifyXPostOrigin(p.id, p.text || "", apHints),
+          systemOriginClass: classifyXPostOrigin(p.id, p.text || "", apHints, {
+            actionType: action,
+            ownAccount: true,
+          }),
         });
         if (persisted.postStatus === "NEW") created += 1;
         else updated += 1;
