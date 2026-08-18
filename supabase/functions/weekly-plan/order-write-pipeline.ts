@@ -14,18 +14,19 @@ import {
   buildPostThought,
   buildSemanticSeedPacket,
 } from "./semantic-seed-packet.ts";
-import {
-  assessDeepThesisFit,
-  deepThesisCollectionNote,
-} from "./deep-thesis.ts";
-import {
-  searchAgentSeungTheories,
-  theoryChunksForModel,
-} from "./agent-seung.ts";
+import { assessDeepThesisFit } from "./deep-thesis.ts";
 import { decideEverydayLanguage } from "./everyday-language-reasoning.ts";
 import { decideCreatorStyle } from "./creator-style-decision.ts";
 import { decideNaturalHumor } from "./natural-humor-decision.ts";
-import { buildDeepGenerationContext } from "./deep-generation-context.ts";
+import {
+  applyAgentSeungCoreThought,
+  buildDeepGenerationContext,
+} from "./deep-generation-context.ts";
+import { runCollectionReadyHook } from "./collection-ready-hook.ts";
+import {
+  retrieveCreatorThinkingIntelligence,
+  type ThinkingCandidateRow,
+} from "./creator-thinking-intelligence.ts";
 import {
   integrateSlotGeneration,
   type IntegratedSlotResult,
@@ -198,6 +199,8 @@ export async function writeOneSlot(args: {
   xaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
+  thinkingCandidates?: ThinkingCandidateRow[];
+  recent_14d_weight?: number | null;
   recentMechanismUsage?: Array<{ mechanism_id?: string }>;
   audienceSignals?: AudienceBarrierSignals | null;
   recentStyleCounts?: Record<string, number> | null;
@@ -259,21 +262,18 @@ export async function writeOneSlot(args: {
     recent_generated_signatures: weekSignatures,
   };
 
-  // 2. Think from the seed first (rail is internal intelligence, not a post template).
-  const thinkRail = selectThinkingRail({
-    interpretation: seed_interpretation,
-    mechanism: null,
-  });
+  // UNDERSTAND / VERIFY evidence. Do not assemble Core Thought here.
   const seed_packet = buildSemanticSeedPacket(seed as any, seed_interpretation as any);
   const experience_packet = buildExperiencePacket(seed as any, seed_interpretation as any);
-  const prelimCore = {
-    creator_judgment: String((seed_interpretation as any).why_it_might_matter_to_creator || ""),
-    tension: String((seed_interpretation as any).what_is_actually_happening || ""),
-    reader_relevant_meaning: String((seed_interpretation as any).possible_reader_connection || ""),
-  };
+  const thinking_intelligence = retrieveCreatorThinkingIntelligence({
+    candidates: args.thinkingCandidates || [],
+    seed_packet,
+    interpretation: seed_interpretation as any,
+    recent_14d_weight: args.recent_14d_weight,
+  });
   const thesisFit = assessDeepThesisFit(seed_packet, seed_interpretation as any);
   const post_thought = {
-    ...buildPostThought(seed_interpretation as any, prelimCore),
+    ...buildPostThought(seed_interpretation as any, {}),
     thinking_mode: thesisFit.use ? "deep_thesis" : "short",
     stop_point: thesisFit.use
       ? "Stop when the reader can finish the discovery. Depth is not length. No lesson, industry bow, or extra question."
@@ -281,17 +281,16 @@ export async function writeOneSlot(args: {
     deep_thesis: thesisFit,
   };
 
-  // 3. Collection after Core Thought / Deep Thesis. One query per seed.
-  let collection_block = "";
-  if (args.xaiKey) {
-    const log = await searchAgentSeungTheories("", {
-      xaiKey: args.xaiKey,
-      packet: seed_packet,
-    });
-    collection_block = theoryChunksForModel(log.chunks || [], deepThesisCollectionNote(thesisFit));
-  } else {
-    collection_block = theoryChunksForModel([], deepThesisCollectionNote(thesisFit));
-  }
+  /**
+   * COLLECTION_READY_HOOK — required insertion after Core Thought, before WRITE.
+   * This order: no Collection API (api_calls = 0). WRITE proceeds without cards.
+   * Same POST call still does THINK → Core Thought → WRITE to stay under Edge timeout.
+   * Future Collection order splits at runCollectionReadyHook after a real Core Thought exists.
+   */
+  const collection_hook = runCollectionReadyHook({
+    seed_packet,
+    core_thought: post_thought.core_thought || null,
+  });
 
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
@@ -299,7 +298,11 @@ export async function writeOneSlot(args: {
     slot_index: slot,
     seed: seed as any,
     interpretation: seed_interpretation as any,
-    thinking_rail: thinkRail as any,
+    thinking_rail: {
+      status: "RAIL_NONE",
+      selected_rail_id: null,
+      static_library_is_not_creator_dna: true,
+    } as any,
     editorial_mode: mode,
     planner_intent: {
       strategy_slot_id: String(seed.strategy_slot_id || ""),
@@ -310,7 +313,9 @@ export async function writeOneSlot(args: {
     week_structural_signatures: weekSignatures,
     seed_packet,
     post_thought,
-    collection_block,
+    thinking_intelligence: thinking_intelligence as any,
+    collection_block: collection_hook.collection_block,
+    collection_hook: collection_hook as any,
     experience_packet,
   });
 
@@ -333,6 +338,17 @@ export async function writeOneSlot(args: {
   let slotFinal = "BLOCKED";
   let signature: Record<string, unknown> | null = null;
   let writerAttempted = !!integrated.writer_call_attempted;
+
+  const agentThought = {
+    core_thought: String((integrated.independent as any)?.agent_core_thought || "").trim(),
+    from_current_seed: (integrated.independent as any)?.from_current_seed !== false,
+    boundary_ok: (integrated.independent as any)?.boundary_ok !== false,
+  };
+  if (agentThought.core_thought) {
+    deep.core_thought = applyAgentSeungCoreThought(deep.core_thought, agentThought);
+    if (deep.post_thought) deep.post_thought = { ...deep.post_thought, core_thought: agentThought.core_thought };
+    runCollectionReadyHook({ seed_packet, core_thought: agentThought.core_thought });
+  }
 
   // 4. Delivery after the thought exists. Telemetry only — does not rewrite the post.
   const delivery = selectDeliveryAfterThought({
@@ -454,6 +470,8 @@ export async function writeSlotBatch(args: {
   xaiKey: string | null;
   dryRun?: boolean;
   voiceRows?: VoiceActivityRow[];
+  thinkingCandidates?: ThinkingCandidateRow[];
+  recent_14d_weight?: number | null;
   audienceSignals?: AudienceBarrierSignals | null;
   weekSignatures?: Array<Record<string, unknown>>;
   skipSelectiveRegen?: boolean;
@@ -471,6 +489,8 @@ export async function writeSlotBatch(args: {
       xaiKey: args.xaiKey,
       dryRun: args.dryRun,
       voiceRows: args.voiceRows,
+      thinkingCandidates: args.thinkingCandidates,
+      recent_14d_weight: args.recent_14d_weight,
       recentMechanismUsage: recent.slice(-12),
       audienceSignals: args.audienceSignals || null,
       recentStyleCounts: { ...styleCounts },

@@ -241,9 +241,11 @@ export function nextForYouSlotAfterOccupied(
 
 /**
  * Spread posts across Pacific days from startISO.
- * Step ~2h for X For You author diversity. Hours 14:00–22:00 PT are
- * audience posting hours. Extra posts roll to the next day at 14:00.
+ * Legacy helper for posts that have no Agent승 planned_at.
+ * Generation Job and Fedica must not use this to overwrite Agent승 planned_at.
  */
+export { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "./fedica-strategy-contract.ts";
+
 export function buildDaySpreadSlots(
   startISO: string,
   count: number,

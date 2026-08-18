@@ -38,11 +38,18 @@ export type ExperiencePacket = {
 export type PostThought = {
   observation: string;
   creator_interpretation: string;
+  /** Empty until Agent승 decides. Never a tension_around/judgment_axis/reader_bridge label. */
   core_thought: string;
+  from_current_seed?: boolean;
+  boundary_ok?: boolean;
   reader_entry: string;
   stop_point: string;
   thinking_mode?: "short" | "deep_thesis";
 };
+
+export function isAssembledThoughtLabel(v: unknown): boolean {
+  return /^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(String(v || "").trim());
+}
 
 export function buildSemanticSeedPacket(
   seed: Record<string, unknown> | null | undefined,
@@ -123,6 +130,9 @@ export function buildPostThought(
     tension?: string;
     reader_relevant_meaning?: string;
     primary_claim?: string;
+    core_thought?: string;
+    from_current_seed?: boolean;
+    boundary_ok?: boolean;
   } | null | undefined,
 ): PostThought {
   const ip = interp || {};
@@ -131,13 +141,8 @@ export function buildPostThought(
     ip.why_it_might_matter_to_creator || ip.why_it_matters_now || ip.what_is_new_or_interesting,
     220,
   );
-  const labeled = /^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(
-    String(core?.creator_judgment || ""),
-  );
-  const core_thought = s(
-    (labeled ? "" : core?.creator_judgment) || creator_interpretation || observation,
-    220,
-  );
+  const candidate = s(core?.core_thought || core?.creator_judgment || core?.primary_claim, 220);
+  const core_thought = isAssembledThoughtLabel(candidate) ? "" : candidate;
   const reader_entry = s(
     ip.possible_reader_connection || ip.concrete_human_element || core?.reader_relevant_meaning,
     180,
@@ -146,6 +151,8 @@ export function buildPostThought(
     observation,
     creator_interpretation,
     core_thought,
+    from_current_seed: core?.from_current_seed !== false,
+    boundary_ok: core?.boundary_ok !== false,
     reader_entry,
     stop_point: "Stop when this core thought is already on the page. No lesson, summary, outlook, CTA, or extra question.",
   };

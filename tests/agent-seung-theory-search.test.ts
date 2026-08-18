@@ -76,8 +76,16 @@ assert.match(libOrder, /별도 Writer 사고 주체는 없다/);
 assert.doesNotMatch(libOrder, /평범한 시드가 아니다\. 이미 힘이 있다/);
 assert.doesNotMatch(libOrder, /Writer는 지시대로 본문만 쓴다/);
 assert.match(libOrder, /UNDERSTAND/);
-assert.match(libOrder, /Seed → Creator Thinking → Core Thought → Collection → 작성/);
+assert.match(libOrder, /Creator Thinking → THINK → Core Thought → COLLECTION_READY_HOOK → WRITE/);
 assert.match(edgeOrder, /searchAgentSeungTheories/);
+assert.match(libOrder, /Editorial Mode · 시드 배치/);
+assert.match(libOrder, /Batch transport는 허용/);
+assert.match(libOrder, /subject만으로 검색하지 마라/);
+assert.match(libOrder, /칸 · 날짜 · 시각/);
+assert.match(libOrder, /USER_DIRECT와 AP_PIPELINE을 따로/);
+assert.match(libOrder, /고정 하루 시간표로 만들지 마라/);
+assert.doesNotMatch(libOrder, /POST는 칸마다 독립 호출이다/);
+assert.doesNotMatch(libOrder, /칸 단위 순차는 Judge 거절/);
 assert.match(libOrder, /AGENT_SEUNG_WRITES_FINAL_POST/);
 assert.match(edgeOrder, /AGENT_SEUNG_WRITES_FINAL_POST/);
 

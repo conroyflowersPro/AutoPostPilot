@@ -48,6 +48,7 @@ export type CompressionTarget =
 
 export type CoreThoughtStatus =
   | "CORE_THOUGHT_READY"
+  | "CORE_THOUGHT_OPEN"
   | "CORE_THOUGHT_WEAK"
   | "CORE_THOUGHT_HOLD"
   | "CORE_THOUGHT_BLOCKED"
@@ -136,7 +137,9 @@ export type DeepGenerationContext = {
     reader_entry: string;
     stop_point: string;
   };
+  thinking_intelligence?: Record<string, unknown>;
   collection_block?: string;
+  collection_hook?: Record<string, unknown>;
   experience_packet?: Record<string, unknown>;
   generation_status: GenerationStatus;
   voice_register?: {
@@ -192,8 +195,15 @@ export type BuildDeepGenerationInput = {
     reader_entry: string;
     stop_point: string;
   } | null;
+  thinking_intelligence?: Record<string, unknown> | null;
   collection_block?: string | null;
+  collection_hook?: Record<string, unknown> | null;
   experience_packet?: Record<string, unknown> | null;
+  agent_core_thought?: {
+    core_thought?: string | null;
+    from_current_seed?: boolean;
+    boundary_ok?: boolean;
+  } | null;
 };
 
 function s(v: unknown, d = ""): string {
@@ -205,15 +215,19 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
+function isAssembledThoughtLabel(v: unknown): boolean {
+  return /^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(String(v || "").trim());
+}
+
 /**
- * Core Thought: the judgment this post actually wants to make — NOT a one-line summary,
- * NOT a hook, NOT a punchline, NOT picked for novelty or viral chance.
- * HOLD when the judgment is not worth publishing.
+ * Seed/evidence gate only. Does NOT assemble Core Thought from interpretation fields.
+ * Agent승 decides the thought after THINK. Labels like tension_around: are metadata, not the thought.
  */
 export function buildCoreThought(
   interp: Record<string, unknown> | null | undefined,
   seed: Record<string, unknown> | null | undefined,
   _mechanism: Record<string, unknown> | null | undefined,
+  agent?: { core_thought?: string | null; from_current_seed?: boolean; boundary_ok?: boolean } | null,
 ): CoreThought {
   const subject = s((interp as any)?.seed_subject || (seed as any)?.concrete_subject);
   const tension = s((interp as any)?.what_is_actually_happening);
@@ -253,35 +267,50 @@ export function buildCoreThought(
   else if (hasFacts) evidence_dependency = "factual";
   else if (experienced) evidence_dependency = "experience";
   const interpStatus = s((interp as any)?.status);
-  let status: CoreThoughtStatus = "CORE_THOUGHT_READY";
-  let confidence = 0.7;
   const block_reasons: string[] = [];
   const fact_confidence = hasFacts ? 0.7 : 0.2;
   const opinion_confidence = why ? 0.6 : 0.25;
+  let status: CoreThoughtStatus = "CORE_THOUGHT_OPEN";
+  let confidence = 0.5;
   if (interpStatus === "INTERPRETATION_BLOCKED") {
     status = "CORE_THOUGHT_BLOCKED";
     confidence = 0.1;
     block_reasons.push("interpretation_blocked");
   } else if (s((interp as any)?.not_worth_publishing) === "true" || s((interp as any)?.hold_reason) === "not_worth_publishing") {
-    // HOLD is a judgment after a thought exists. Empty labels are not a HOLD.
     status = "CORE_THOUGHT_HOLD";
     confidence = 0.2;
     block_reasons.push("not_worth_publishing");
-  } else if (!tension && !why && !hasFacts && !experienced) {
-    status = "CORE_THOUGHT_WEAK";
-    confidence = 0.35;
-    block_reasons.push("thin_seed_material");
-  } else if (interpStatus === "INTERPRETATION_WEAK" || !tension) {
-    status = "CORE_THOUGHT_WEAK";
-    confidence = 0.4;
   }
+
+  const agentText = s(agent?.core_thought).slice(0, 220);
+  const usable = agentText.length >= 4 && !isAssembledThoughtLabel(agentText);
+  if (usable && status !== "CORE_THOUGHT_BLOCKED") {
+    return {
+      status: "CORE_THOUGHT_READY",
+      primary_claim: agentText.slice(0, 160),
+      creator_judgment: agentText.slice(0, 160),
+      tension: tension.slice(0, 160),
+      useful_implication: "",
+      reader_relevant_meaning: human.slice(0, 160),
+      confidence: clamp01(0.75),
+      fact_confidence: clamp01(fact_confidence),
+      opinion_confidence: clamp01(opinion_confidence),
+      evidence_dependency,
+      experience_dependency: experienced && !expBound.must_not_claim_first_person,
+      source_meaning_separated: true,
+      from_current_seed: agent?.from_current_seed !== false,
+      block_reasons: agent?.boundary_ok === false ? ["agent_boundary_flag"] : [],
+      order7a_version: ORDER7A_VERSION,
+    };
+  }
+
   return {
     status,
-    primary_claim: (tension || why || subject).slice(0, 160),
-    creator_judgment: (why || tension || subject).slice(0, 160),
+    primary_claim: "",
+    creator_judgment: "",
     tension: tension.slice(0, 160),
-    useful_implication: (human || why).slice(0, 160),
-    reader_relevant_meaning: String(human || why || subject).slice(0, 160),
+    useful_implication: "",
+    reader_relevant_meaning: human.slice(0, 160),
     confidence: clamp01(confidence),
     fact_confidence: clamp01(fact_confidence),
     opinion_confidence: clamp01(opinion_confidence),
@@ -291,6 +320,32 @@ export function buildCoreThought(
     from_current_seed: true,
     block_reasons,
     order7a_version: ORDER7A_VERSION,
+  };
+}
+
+export function applyAgentSeungCoreThought(
+  core: CoreThought,
+  agent: { core_thought?: string | null; from_current_seed?: boolean; boundary_ok?: boolean } | null | undefined,
+): CoreThought {
+  const agentText = s(agent?.core_thought).slice(0, 220);
+  if (core.status === "CORE_THOUGHT_BLOCKED" || core.status === "CORE_THOUGHT_INSUFFICIENT_SEED") {
+    return core;
+  }
+  if (agentText.length < 4 || isAssembledThoughtLabel(agentText)) {
+    return core;
+  }
+  const reasons = [...(core.block_reasons || [])];
+  if (agent?.boundary_ok === false && !reasons.includes("agent_boundary_flag")) {
+    reasons.push("agent_boundary_flag");
+  }
+  return {
+    ...core,
+    status: "CORE_THOUGHT_READY",
+    primary_claim: agentText.slice(0, 160),
+    creator_judgment: agentText.slice(0, 160),
+    from_current_seed: agent?.from_current_seed !== false,
+    confidence: clamp01(Math.max(core.confidence, 0.75)),
+    block_reasons: reasons,
   };
 }
 
@@ -347,7 +402,10 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
   const seed_id = s(seed.seed_id, "unknown_seed");
   const context_id = `dgctx-${slot_id}-${seed_id}`;
 
-  const core = buildCoreThought(interp, seed, mech);
+  const core = applyAgentSeungCoreThought(
+    buildCoreThought(interp, seed, mech, input.agent_core_thought),
+    input.agent_core_thought,
+  );
   const compression_target = resolveCompressionTarget(style, rail, everyday, humor, mode);
   const inference = resolveInferenceSpace(mech, style, everyday);
   const punchlineStop = !!humor.stop_after_punchline_ok && !!humor.punchline_compatible;
@@ -446,11 +504,12 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
     core_thought: core,
     thinking_rail: {
       flexible: true,
-      status: s(rail.status),
+      status: s(rail.status, "RAIL_NONE"),
       selected_rail_id: s(rail.selected_rail_id || rail.rail_id),
       compression_preference: s(rail.compression_preference),
       reasoning_shape: s(rail.reasoning_shape),
       required_reasoning_beats: [],
+      static_library_is_not_creator_dna: true,
     },
     everyday_language: {
       prefer_broad_simple: true,
@@ -499,7 +558,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
     reader_inference_space: inference,
     stop_condition: {
       mechanism_completed_ok: true,
-      core_thought_delivered_ok: core.status === "CORE_THOUGHT_READY" || core.status === "CORE_THOUGHT_WEAK",
+      core_thought_delivered_ok: core.status === "CORE_THOUGHT_READY" || core.status === "CORE_THOUGHT_OPEN" || core.status === "CORE_THOUGHT_WEAK",
       punchline_stop_ok: punchlineStop,
       leave_inference_open: inference === "high" || inference === "medium",
       avoid_explanatory_tail: true,
@@ -513,7 +572,9 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       : [],
     seed_packet: input.seed_packet || undefined,
     post_thought: input.post_thought || undefined,
+    thinking_intelligence: input.thinking_intelligence || undefined,
     collection_block: input.collection_block || undefined,
+    collection_hook: input.collection_hook || undefined,
     experience_packet: input.experience_packet || undefined,
     generation_status,
     voice_register: input.voice_register || null,

@@ -7,6 +7,31 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.11.0 — 2026-08-18
+
+- 독립 Judge는 게시 가능 여부만 봅니다. 7일 전략·칸·시드·역할·Mode·시각을 다시 정하지 않습니다
+- PASS는 바로 저장되고 같은 칸을 다시 만들거나 다시 Judge하지 않습니다. REJECT는 그 칸만 같은 전략으로 Agent승 REPAIR합니다
+- 기존 Calendar가 planned_at과 draft/reviewed/scheduled/published/failed 상태를 그대로 보여 줍니다
+- 기존 Fedica 예약 경로가 Agent승 `planned_at`을 사용합니다. 간격이 깨져 있으면 새 시각을 숨겨 만들지 않습니다. Collection API는 호출하지 않습니다
+
+## 12.10.0 — 2026-08-18
+
+- Agent승이 슬롯에서 UNDERSTAND → VERIFY → THINK 한 뒤 Core Thought를 직접 정하고 같은 자신이 글을 씁니다. 별도 Writer가 생각을 다시 만들지 않습니다
+- Core Thought는 `tension_around` / `judgment_axis` 조립문이 아닙니다. Thinking Rail은 참고 Intelligence이고 No Rail이 정상입니다
+- 정적 Rail과 Topic→Rail은 Creator Thinking DNA로 쓰지 않습니다. Collection API는 이 경로에서 호출하지 않습니다. Hook만 준비되어 있습니다
+
+## 12.9.0 — 2026-08-18
+
+- 기존 7일 생성 버튼에서 Agent승이 30일 Analytics · Sync gap · USER_DIRECT/AP_PIPELINE을 따로 보고 7일 칸의 날짜·시각을 정합니다
+- 인접 원글 최소 2시간은 제약입니다. 14:00부터 2시간 격자로 찍지 않습니다
+- 기존 Calendar가 계획·예약 시각을 읽고, Fedica가 Agent승 시각을 덮어쓰는 지점은 표시만 합니다. Collection API는 연결하지 않습니다
+
+## 12.8.1 — 2026-08-18
+
+- WEEKLY 출력에 Editorial Mode를 명시합니다. 기존 값을 그대로 넘깁니다
+- POST는 슬롯마다 사고가 독립입니다. Batch transport는 되고, 글 사이 생각 전염은 안 됩니다
+- Collection 검색은 의미 쿼리가 있을 때만입니다. subject만으로 FSD·Tesla를 찾지 않습니다
+
 ## 12.8.0 — 2026-08-18
 
 - 적합한 시드에서만 Deep Thesis를 켭니다. 길이를 위해 켜지 않습니다. 깊이와 길이는 다릅니다

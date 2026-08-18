@@ -412,13 +412,18 @@ function mode(v: unknown): EditorialMode {
 
 function compactPublishedFlow(rows: XAnalyticsPublishedPost[]) {
   return rows.slice(0, 180).map((row) => ({
-    d: s(row.published_at, 10),
+    d: s(row.published_at, 40),
     t: s(row.content, 72),
     fol: Number(row.metrics?.followers_gained) || 0,
     pv: Number(row.metrics?.profile_visits) || 0,
     bm: Number(row.metrics?.bookmarks) || 0,
     rp: Number(row.metrics?.replies) || 0,
+    rps: Number(row.metrics?.reposts) || 0,
+    qt: Number(row.metrics?.quotes) || 0,
+    lk: Number(row.metrics?.likes) || 0,
     imp: Number(row.metrics?.impressions) || 0,
+    sh: Number(row.metrics?.shares) || 0,
+    de: Number(row.metrics?.detail_expands) || 0,
   }));
 }
 
@@ -429,6 +434,9 @@ function compactAccountDaily(rows: XAnalyticsDailyAccountPulse[] | undefined) {
     unf: Number(row.unfollows) || 0,
     pv: Number(row.profile_visits) || 0,
     bm: Number(row.bookmarks) || 0,
+    rp: Number(row.replies) || 0,
+    rps: Number(row.reposts) || 0,
+    lk: Number(row.likes) || 0,
     imp: Number(row.impressions) || 0,
   }));
 }
@@ -439,17 +447,17 @@ function strategySystem(): string {
     plannerArchitectureLock(),
     "Your only job in this call is to infer the seven-day account strategy and slot intents. Do not inspect or select Seeds. Do not write posts. Do not choose prose, thought order, tone, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Planning Horizon is seven days. Intelligence horizons remain whatever their evidence supports.",
-    "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days, compacted to date, short text, and outcome metrics. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
+    "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days, compacted to date, short text, and outcome metrics. Keep metric columns separate. Do not collapse into one engagement score. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
     "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
     "handmade_cadence is real published-account rhythm from USER_DIRECT originals. Empty recent_x_analytics does NOT mean the account posts once a day. Do not collapse the week to 7 slots because analytics rows are missing.",
     "You own weekly volume and placement. There is no separate Quota call. Lock seven calendar days with no empty day. At least 4 originals per day, at most 8. Week floor 28, week ceiling 56. Mode overlap is allowed. 30-day posts inform placement, not a uniqueness ban.",
-    "Start the first original at 14:00 America/Los_Angeles. Gap about 2 hours for X For You author diversity. 14:00–22:00 PT are audience posting hours — do not even-spread tighter to fill them. Anti-dump: stacked originals in one refresh become noise.",
+    "Date and time are part of seven-day strategy. Adjacent planned originals at least 2 hours. Do not start every day at 14:00. Do not emit a repeating 2-hour grid or add jitter. 14:00–22:00 PT are audience posting hours to consider, not an AP For You window.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
     "volume_gates are hard. Return exactly final_slot_count slot intents, one per locked cell, covering all seven days.",
     "If available analytics are thin, still lock a full seven-day volume from handmade_cadence and DNA. Do not estimate missing analytics dates. Set analytics_request_needed when additional real X Analytics would improve placement, not as an excuse to plan 1/day.",
-    "Each slot contains strategic_role, editorial_mode, and planner_intent only. planner_intent says why this slot exists and what it should accomplish—not how to write it.",
-    "Return strict JSON with top-level keys strategy_summary, profile_diversity_intent, final_slot_count, slots, analytics_request_needed, analytics_request_reason. Each slot has slot_id, day_offset, strategic_role, editorial_mode, planner_intent. No prose outside JSON.",
+    "Each slot contains strategic_role, editorial_mode, planner_intent, planned_at, and planned_pt. planner_intent says why this slot exists and what it should accomplish—not how to write it.",
+    "Return strict JSON with top-level keys strategy_summary, profile_diversity_intent, final_slot_count, slots, analytics_request_needed, analytics_request_reason. Each slot has slot_id, day_offset, strategic_role, editorial_mode, planner_intent, planned_at, planned_pt. No prose outside JSON.",
   ].join("\n");
 }
 
@@ -531,7 +539,7 @@ function volumeSystem(): string {
   return [
     "You are the seven-day Planner for @Seung4680.",
     plannerArchitectureLock(),
-    "This call locks weekly volume only. Do not emit slots. Do not inspect Seeds. Do not write posts. Times are stamped later at 14:00–22:00 America/Los_Angeles.",
+    "This call locks weekly volume only. Do not emit slots. Do not inspect Seeds. Do not write posts. Agent승 infers timestamps later from evidence; do not assume a 14:00–22:00 grid.",
     "Planning Horizon is seven days. Use only recent_x_analytics as the recent published-flow record. handmade_cadence is real published-account rhythm. Empty recent_x_analytics does NOT mean the account posts once a day.",
     "volume_gates are hard: each day 4-8 originals, week floor 28, week ceiling 56, no empty day.",
     "Return strict JSON with posts_per_day (7 integers), strategy_summary, profile_diversity_intent, analytics_request_needed, analytics_request_reason. No prose outside JSON.",
@@ -542,8 +550,8 @@ function daySlotsSystem(days: number[]): string {
   return [
     "You are the seven-day Planner for @Seung4680.",
     plannerArchitectureLock(),
-    `This call fills slot intents for day_offset values ${days.join(", ")} only. Do not emit other days. Do not emit planned times.`,
-    "Each slot contains slot_id, day_offset, strategic_role, editorial_mode, and planner_intent only. planner_intent says why this slot exists—not how to write it.",
+    `This call fills slot intents for day_offset values ${days.join(", ")} only. Do not emit other days.`,
+    "Each slot contains slot_id, day_offset, strategic_role, editorial_mode, planner_intent, planned_at, and planned_pt. planner_intent says why this slot exists—not how to write it. Infer timestamps from evidence. Min gap 2 hours. No clock grid.",
     "Fill exactly posts_per_day[d] slots for each requested day. Mode overlap is allowed. No fixed mode ratio.",
     "Return strict JSON with slots array. No prose outside JSON.",
   ].join("\n");

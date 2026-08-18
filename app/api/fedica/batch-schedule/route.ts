@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  computeKRBatchStartISO,
-  computeStartISOForDate,
-  buildDaySpreadSlots,
-  nextForYouSlotAfterOccupied,
-} from "@/lib/schedule";
+import { computeKRBatchStartISO, computeStartISOForDate, nextForYouSlotAfterOccupied } from "@/lib/schedule";
+import { resolveFedicaScheduleTime } from "@/lib/fedica-strategy-contract";
 import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
 import { scheduleOnePost } from "@/lib/services/schedule-service";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
@@ -82,10 +78,6 @@ export async function POST(req: NextRequest) {
       .is("last_attempt_at", null)
       .lt("created_at", staleIso);
 
-    const startISO = startDate
-      ? computeStartISOForDate(startDate)
-      : computeKRBatchStartISO();
-
     const { data: occupiedRows } = await supabase
       .from("SeungContent")
       .select("scheduled_at")
@@ -95,13 +87,11 @@ export async function POST(req: NextRequest) {
     const occupied = (occupiedRows || [])
       .map((r: { scheduled_at?: string | null }) => String(r.scheduled_at || ""))
       .filter(Boolean);
-    const resumeISO = nextForYouSlotAfterOccupied(startISO, occupied);
 
-    const allSlots = buildDaySpreadSlots(
-      resumeISO,
-      Math.max(totalPlanned, slotOffset + ordered.length),
-      maxPerDay
-    );
+    const startISO = startDate
+      ? computeStartISOForDate(startDate)
+      : computeKRBatchStartISO();
+    const resumeISO = nextForYouSlotAfterOccupied(startISO, occupied);
 
     const provider = createDefaultPublisher();
     const scheduled: any[] = [];
@@ -110,8 +100,26 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < ordered.length; i++) {
       const post = ordered[i];
-      const scheduledAt =
-        allSlots[slotOffset + i] || allSlots[allSlots.length - 1];
+      const decided = resolveFedicaScheduleTime({
+        post,
+        occupiedISOs: occupied,
+      });
+      let scheduledAt: string;
+      if (decided.ok) {
+        scheduledAt = decided.iso;
+      } else if (decided.code === "missing_planned_at") {
+        // Legacy drafts without Agent승 time: occupied-safe execution only. Not a new week plan.
+        scheduledAt = nextForYouSlotAfterOccupied(startISO, occupied);
+      } else {
+        failed.push({
+          id: post.id,
+          error: decided.error,
+          errorInternal: decided.code,
+          stage: "validate_post",
+          retryable: false,
+        });
+        continue;
+      }
       const result = await scheduleOnePost({
         supabase,
         provider,
@@ -122,6 +130,8 @@ export async function POST(req: NextRequest) {
       });
 
       if (result.ok) {
+        const used = String(result.scheduledAt || scheduledAt || "");
+        if (used && !occupied.includes(used)) occupied.push(used);
         if (result.skipped || result.status === "already_scheduled") {
           skipped.push({
             id: result.id,

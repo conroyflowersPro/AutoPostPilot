@@ -18,7 +18,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
-const EXTRACTOR_VERSION = "thinking_feature_v1_pilot";
+const EXTRACTOR_VERSION = "thinking_feature_v2_actions";
 const DEFAULT_BATCH = 8;
 const DEFAULT_BUDGET_MS = 14000;
 const DEFAULT_PILOT_MAX = 40;
@@ -71,10 +71,73 @@ function isRecent14d(iso: string | null): boolean {
   return Date.now() - t <= 14 * 24 * 60 * 60 * 1000;
 }
 
+function normalizeActionLabel(v: unknown): string {
+  return String(v || "")
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9가-힣_]/g, "")
+    .slice(0, 40);
+}
+
+function abstractBehaviorKey(f: any): string {
+  const actions = Array.isArray(f.reasoning_steps)
+    ? [...new Set(f.reasoning_steps.map((x: unknown) => normalizeActionLabel(x)).filter(Boolean))].sort()
+    : [];
+  const scale = normalizeActionLabel(f.scale_shift);
+  const judge = normalizeActionLabel(f.judgment_habit);
+  const key = [actions.join("+") || "unspecified", scale, judge].filter(Boolean).join("|");
+  return key.slice(0, 200);
+}
+
+function mostCommonPhrase(values: unknown[]): string | null {
+  const counts = new Map<string, number>();
+  for (const v of values) {
+    const t = String(v || "").replace(/\s+/g, " ").trim();
+    if (t.length < 2) continue;
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  let best: string | null = null;
+  let n = 0;
+  for (const [k, c] of counts) {
+    if (c > n) {
+      best = k;
+      n = c;
+    }
+  }
+  return best && n >= 1 ? best.slice(0, 160) : null;
+}
+
+function mostFrequentActions(items: any[]): string[] {
+  const counts = new Map<string, number>();
+  for (const it of items) {
+    const steps = Array.isArray(it.reasoning_steps) ? it.reasoning_steps : [];
+    const seen = new Set<string>();
+    for (const s of steps) {
+      const t = String(s || "").trim();
+      if (t.length < 2 || seen.has(t)) continue;
+      seen.add(t);
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .filter(([, c]) => c >= 2 || items.length === 2)
+    .map(([k]) => k)
+    .slice(0, 8);
+}
+
+function isCreatorThinkingEvidence(row: ActivityRow): boolean {
+  const soc = String(row.system_origin_class || "").toUpperCase();
+  if (/AP_PIPELINE|APP|SYSTEM|AUTOPOST|FEDICA_AUTO|GENERATED|SYSTEM_ASSISTED/.test(soc)) return false;
+  const origin = String(row.origin || "").toUpperCase();
+  if (origin && /AP_PIPELINE/.test(origin) && !/USER_DIRECT|MANUAL/.test(origin)) return false;
+  return true;
+}
+
 function buildExtractPrompt(
   posts: Array<{ x_post_id: string; text: string; post_type: string }>
 ): string {
-  return `You extract CREATOR THINKING STRUCTURE from posts.\nReturn JSON only: {"items":[{...}]}\n\nRules:\n- Extract STRUCTURE only, not polished rewrite of the post.\n- Do NOT invent facts that are not in the post.\n- Do NOT copy the full post text into any field.\n- reasoning_steps: short step labels only (e.g. "관찰","비교","의미","판단"), max 6.\n- trigger, first_interpretation, scale_shift, time_horizon, judgment_habit, ending_pattern: short phrases.\n- topic: coarse label (TESLA/FSD/CYBERTRUCK/ROBOTAXI/AI_TECH/LAFC/GAMING/DAILY/OTHER)\n- editorial_mode_guess: EXPERIENCE|OPINION|INFORMATIVE|COMPARE|CASUAL_OBSERVATION|OTHER\n- confidence: 0..1\n\nPosts:\n${JSON.stringify(posts)}`;
+  return `You extract CREATOR THINKING BEHAVIOR from posts. Structure only.\nReturn JSON only: {"items":[{...}]}\n\nRules:\n- Extract thinking actions, not writing style.\n- Do NOT invent facts that are not in the post.\n- Do NOT copy the full post text into any field.\n- Fill a field ONLY when evidence exists. Leave null otherwise. Do not force every field.\n- NEVER extract surface style as thinking: 존댓말, 반말, ㅋㅋ, 음슴체, sentence/paragraph length, hook form, ending word, punchline wording.\n- reasoning_actions: short labels of thinking moves actually present (observe, decompose, expect_vs_actual, check_constraint, split_incentives, causal, scale_move, time_horizon, separate_feeling_from_fact, look_for_shared_dependency, check_counterexample, leave_uncertain_open, ...). Max 8. Do not freeze a fixed order like 관찰→비교→의미→판단 unless that is what this post actually did.\n- Optional fields when evidenced: trigger, initial_observation, interpretation_shift, scale_movement, time_horizon_movement, evidence_or_rule_checking, incentive_analysis, causal_reasoning, constraint_or_bottleneck, contradiction_handling, judgment_formation, ending_tendency (how the thought stops — leave_open / stop_on_observation / cautious_judgment — NEVER an ending particle).\n- Compatibility aliases: reasoning_steps = reasoning_actions; first_interpretation = initial_observation; scale_shift = scale_movement; time_horizon = time_horizon_movement; judgment_habit = judgment_formation; ending_pattern = ending_tendency.\n- topic and editorial_mode_guess are optional metadata only. They are NOT the thinking identity.\n- confidence: 0..1\n\nPosts:\n${JSON.stringify(posts)}`;
 }
 
 async function callXaiExtract(
@@ -334,6 +397,7 @@ Deno.serve(async (req: Request) => {
         if (kind === "ORIGINAL" && !job.include_original) continue;
         if (kind === "QUOTE" && !job.include_quote) continue;
         if (kind !== "ORIGINAL" && kind !== "QUOTE") continue;
+        if (!isCreatorThinkingEvidence(r as ActivityRow)) continue;
         const text = String((r as ActivityRow).text_body || "").trim();
         if (text.length < 12) continue;
         allowed.push(r as ActivityRow);
@@ -394,6 +458,23 @@ Deno.serve(async (req: Request) => {
       let written = 0;
       for (const r of batch) {
         const it = byId.get(String(r.x_post_id)) || {};
+        const actions = Array.isArray(it.reasoning_actions)
+          ? it.reasoning_actions
+          : Array.isArray(it.reasoning_steps)
+            ? it.reasoning_steps
+            : [];
+        const extras = {
+          interpretation_shift: it.interpretation_shift || null,
+          evidence_or_rule_checking: it.evidence_or_rule_checking || null,
+          incentive_analysis: it.incentive_analysis || null,
+          causal_reasoning: it.causal_reasoning || null,
+          constraint_or_bottleneck: it.constraint_or_bottleneck || null,
+          contradiction_handling: it.contradiction_handling || null,
+          judgment_formation: it.judgment_formation || it.judgment_habit || null,
+          ending_tendency: it.ending_tendency || it.ending_pattern || null,
+          scale_movement: it.scale_movement || it.scale_shift || null,
+          time_horizon_movement: it.time_horizon_movement || it.time_horizon || null,
+        };
         const feature = {
           job_id: jobId,
           x_post_id: String(r.x_post_id),
@@ -404,14 +485,12 @@ Deno.serve(async (req: Request) => {
           topic: it.topic || null,
           editorial_mode_guess: it.editorial_mode_guess || null,
           trigger: it.trigger || null,
-          first_interpretation: it.first_interpretation || null,
-          reasoning_steps: Array.isArray(it.reasoning_steps)
-            ? it.reasoning_steps.slice(0, 6)
-            : [],
-          scale_shift: it.scale_shift || null,
-          time_horizon: it.time_horizon || null,
-          judgment_habit: it.judgment_habit || null,
-          ending_pattern: it.ending_pattern || null,
+          first_interpretation: it.initial_observation || it.first_interpretation || null,
+          reasoning_steps: actions.map((x: unknown) => String(x)).filter(Boolean).slice(0, 8),
+          scale_shift: extras.scale_movement,
+          time_horizon: extras.time_horizon_movement,
+          judgment_habit: extras.judgment_formation,
+          ending_pattern: extras.ending_tendency,
           source_pointer: `account_activities:${r.id}`,
           extractor_version: EXTRACTOR_VERSION,
           xai_used: !!extractResult.xai_used,
@@ -419,7 +498,7 @@ Deno.serve(async (req: Request) => {
             typeof it.confidence === "number" ? it.confidence : null,
           raw_model_notes: extractResult.error
             ? String(extractResult.error).slice(0, 200)
-            : null,
+            : JSON.stringify(extras).slice(0, 1500),
         };
         const { error: upErr } = await supabase
           .from("thinking_post_features")
@@ -489,16 +568,13 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId);
       if (error) return json({ error: error.message }, 400);
 
+      const recentWeight = Number(job.recent_14d_weight);
+      const w14 = Number.isFinite(recentWeight) && recentWeight > 0 ? recentWeight : 2;
+
       const groups = new Map<string, any[]>();
       for (const f of features || []) {
-        const steps = Array.isArray(f.reasoning_steps)
-          ? f.reasoning_steps.map((s: any) => String(s)).join(">")
-          : "";
-        const key = [
-          String(f.topic || "OTHER"),
-          String(f.editorial_mode_guess || "OTHER"),
-          steps || "UNKNOWN",
-        ].join("|");
+        const key = abstractBehaviorKey(f);
+        if (!key) continue;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(f);
       }
@@ -510,21 +586,21 @@ Deno.serve(async (req: Request) => {
         const support = items.length;
         const confidence = Math.min(
           0.95,
-          0.35 + support * 0.08 + recent * 0.05
+          0.35 + support * 0.08 + (recent / Math.max(1, support)) * w14 * 0.08
         );
         if (confidence < 0.5) continue;
-        const sample = items[0];
+        const actions = mostFrequentActions(items);
         const row = {
           job_id: jobId,
           rail_key: rail_key.slice(0, 200),
-          topic: sample.topic,
+          topic: null,
           editorial_modes: [
             ...new Set(
               items.map((x) => x.editorial_mode_guess).filter(Boolean)
             ),
           ],
-          trigger_summary: sample.trigger,
-          expansion_steps: sample.reasoning_steps || [],
+          trigger_summary: mostCommonPhrase(items.map((x) => x.trigger)),
+          expansion_steps: actions,
           support_count: support,
           recent_14d_support: recent,
           recent_usage: recent >= 2 ? "HIGH" : recent === 1 ? "MEDIUM" : "LOW",
@@ -532,7 +608,14 @@ Deno.serve(async (req: Request) => {
           confidence: Number(confidence.toFixed(2)),
           status: "CANDIDATE",
           evidence_post_ids: items.map((x) => x.x_post_id).slice(0, 20),
-          notes: "SAFE PILOT aggregate — not promoted to Creator Thinking DNA",
+          notes: JSON.stringify({
+            aggregation: "behavior_not_topic",
+            recent_14d_weight: w14,
+            judgment_tendency: mostCommonPhrase(items.map((x) => x.judgment_habit)),
+            scale_movement: mostCommonPhrase(items.map((x) => x.scale_shift)),
+            ending_tendency: mostCommonPhrase(items.map((x) => x.ending_pattern)),
+            incompatibility: null,
+          }).slice(0, 500),
         };
         const { data: ins } = await supabase
           .from("thinking_rail_candidates")

@@ -280,7 +280,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\n시작일: ${startDate} (LA) · 이미 예약된 시각 다음부터 · X For You 원글 간격 약 2시간 (14:00–22:00 PT는 발행 시간대)\n하루 최대 ${maxPerDay}개 · 배치 ${SCHEDULE_BATCH_SIZE}개씩`
+        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\nAgent승이 정한 계획 시각을 사용합니다. 시각이 없는 예전 초안만 기존 occupied-safe 경로입니다.\n최소 2시간은 간격 제약입니다. 스케줄러가 2시간 격자나 jitter로 새 주간 시각을 만들지 않습니다.\n배치 ${SCHEDULE_BATCH_SIZE}개씩`
       )
     )
       return;
@@ -377,10 +377,9 @@ export default function PostList({ posts }: { posts: Post[] }) {
         </summary>
         <div className="mt-3 space-y-3">
         <p className="text-xs text-zinc-400">
-          글에 지정된 Fedica 파이프라인으로 날짜·시각을 넣습니다. 같은 날 이미 예약된
-          글(예: 먼저 올린 3개)이 있으면 그날 14:00을 다시 쓰지 않고 약 2시간 뒤부터
-          이어갑니다. 이 간격은 X For You에서 같은 계정 원글이 한 새로고침에 안 겹치게
-          한 것이고, 14:00–22:00 PT는 태평양 발행 시간대입니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
+          글에 지정된 Fedica 파이프라인으로 Agent승이 정한 계획 시각을 넣습니다. 시각이 없는
+          예전 초안만 이미 예약된 시각 다음 occupied-safe 경로를 씁니다. 최소 2시간은 간격
+          제약이지 2시간 격자나 jitter가 아닙니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
         </p>
 
         <div

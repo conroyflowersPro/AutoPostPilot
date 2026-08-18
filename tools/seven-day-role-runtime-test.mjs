@@ -36,8 +36,8 @@ ok("R1. planning horizon is seven days", /QUOTA_DAYS = 7/.test(quota) && /GENERA
 ok("R2. persisted job has strategy, select, write, recover steps",
   /"strategy"/.test(job) && /"select"/.test(job) && /"write"/.test(job) && /"recover"/.test(job));
 ok("R3. live router uses Creator strategy then Planner select/recover",
-  /stepStrategy\(args\.supabase, args\.xaiKey, row\)/.test(job) &&
-  /stepPlannerSelect\(args\.supabase, args\.xaiKey, row\)/.test(job) &&
+  /stepStrategy\(args\.supabase, args\.xaiKey, args\.userId, row\)/.test(job) &&
+    /stepPlannerSelect\(args\.supabase, args\.xaiKey, row\)/.test(job) &&
   /stepRecover\(args\.supabase, args\.xaiKey \|\| "", row\)/.test(job));
 ok("R4. Seed Generator is explore-only", /Do not score Creator fit/.test(seed) && /No scores, rankings, strategy, selection, allocation/.test(seed));
 ok("R5. Seed output has no strategic judgment fields",
@@ -143,10 +143,11 @@ ok("R28. Creator DNA fills volume then 2 days per tick",
   /inferCreatorWeekVolume/.test(job) &&
   /inferCreatorSlotsForDays/.test(job) &&
   !/await inferSevenDayStrategy\(/.test(job));
-ok("R29. Planner stamps 14:00–22:00 PT after the week is locked",
+ok("R29. Agent승 planned times; min 2h constraint not a 14:00 grid",
   /stampPlannerSlotTimes/.test(job) &&
-  /FOR_YOU_START_HOUR = 14/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
-  /FOR_YOU_END_HOUR = 22/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
+  /planEvidence/.test(job) &&
+  /MIN_PLANNED_GAP_MS/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
+  !/stepTwoHoursIso/.test(read("supabase/functions/weekly-plan/for-you-spread.ts")) &&
   /planned_pt/.test(job));
 ok("R30. Writer timeout vs Judge reject labels",
   /V11_WRITER_TIMEOUT_MS = 45000/.test(pipe) &&
