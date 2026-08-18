@@ -75,7 +75,7 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 
 **Collections source (upload these two files):**
 - `architecture/collections/viral-theories.md` — 힘 알아보기. V1–V8 (Cialdini, STEPPS 자름, Identity, Information Gap, Recognition, Weak Ties, Relatedness, Emotional Contagion). V9 empty. Do not mix with writing cards until all theories are in.
-- `architecture/collections/writing-theories.md` — 닫는 형식. W1 Processing Fluency. W2–W9 empty. Do not mix with viral cards until all writing cards are in.
+- `architecture/collections/writing-theories.md` — 닫는 형식. W1 Processing Fluency. W2 의도적 불완전성. W3–W9 empty. Do not mix with viral cards until all writing cards are in.
 - Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID` (fallback `XAI_THEORY_COLLECTION_ID`).
 - Search: one server hybrid search per slot, limit 3. Do not give Grok `collections_search`.
 
