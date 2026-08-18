@@ -53,8 +53,8 @@ assert.doesNotMatch(judgeSrc, /collections_search/);
 assert.equal(isSlotStrategyInvalidation(["forced_cta", "ai_report_voice"]), false);
 assert.equal(isSlotStrategyInvalidation(["seed_no_longer_valid", "factual_basis"]), true);
 
-assert.equal(COLLECTION_API_CALLS_THIS_ORDER, 0);
-const hook = runCollectionReadyHook({ seed_packet: { scene: "충전 줄" }, core_thought: "앞 칸 규칙" });
+assert.equal(COLLECTION_API_CALLS_THIS_ORDER, 1);
+const hook = await runCollectionReadyHook({ seed_packet: { scene: "충전 줄" }, core_thought: "앞 칸 규칙" });
 assert.equal(hook.api_calls, 0);
 assert.equal(hook.skipped, true);
 

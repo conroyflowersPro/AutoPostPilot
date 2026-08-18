@@ -17,7 +17,7 @@ import {
   livedExperienceFacts,
 } from "../supabase/functions/weekly-plan/seed-ownership.ts";
 import { relatedExperienceSubject } from "../supabase/functions/weekly-plan/experience-evidence.ts";
-import { buildConstraintOnlyWriterInstructions } from "../supabase/functions/weekly-plan/independent-post-generation.ts";
+import { buildConstraintOnlyWriterInstructions, buildThinkOnlyInstructions } from "../supabase/functions/weekly-plan/independent-post-generation.ts";
 import { buildDeepGenerationContext } from "../supabase/functions/weekly-plan/deep-generation-context.ts";
 
 const night =
@@ -153,7 +153,10 @@ for (const seed of seeds) {
   });
   const prompt = buildConstraintOnlyWriterInstructions(deep);
   assert.match(prompt, /CORE THOUGHT/);
-  assert.match(prompt, /YOU decide Core Thought/);
+  assert.match(prompt, /Collection candidates may follow|COLLECTION:/);
+  const thinkPrompt = buildThinkOnlyInstructions(deep);
+  assert.match(thinkPrompt, /YOU decide Core Thought/);
+  assert.match(thinkPrompt, /THINK only/);
   assert.match(prompt, /STABLE CREATOR DNA/);
   assert.match(prompt, /RECENT VOICE REGISTER/);
   assert.doesNotMatch(prompt, /THINKING RAIL \(internal only/);
@@ -179,8 +182,8 @@ const unknownPad: TheoryChunk[] = [
   { chunk_id: "v2", chunk_content: "힘2", score: 5, kind: "viral" },
 ];
 const capped = capTheoryChunks(unknownPad);
-assert.equal(capped.length, 2);
-assert.equal(capped.filter((c) => c.kind === "viral").length, 1);
+assert.equal(capped.length, 3);
+assert.equal(capped.filter((c) => c.kind === "viral").length, 2);
 assert.equal(capped.filter((c) => c.kind === "writing").length, 1);
 assert.equal(capped.filter((c) => c.kind === "unknown").length, 0);
 assert.equal(classifyTheoryKind("시드에 이 힘이 있을 때 반전"), "unknown");

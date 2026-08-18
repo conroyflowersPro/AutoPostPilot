@@ -1,7 +1,7 @@
 /**
  * Edge lockstep of lib/intelligence/agent-seung.ts (Edge cannot import lib/).
  * ORDER 1: same identity; WEEKLY vs POST call; Post Agent승 writes the final post.
- * POST: UNDERSTAND → VERIFY → THINK → Core Thought → COLLECTION_READY_HOOK (no-op this order) → WRITE.
+ * POST: UNDERSTAND → VERIFY → THINK → Core Thought → COLLECTION_READY_HOOK → WRITE.
  */
 export const AGENT_SEUNG_NAME = "Agent승";
 export const AGENT_SEUNG_NAME_EN = "AgentSeung";
@@ -81,14 +81,14 @@ POST 호출:
 2. VERIFY
 3. THINK — Creator Thinking Intelligence는 참고다. No Rail은 정상이다. Topic 이름·Editorial Mode·Keyword로 Rail을 고르지 마라. 정적 Rail 라이브러리는 이 Creator의 Thinking DNA가 아니다.
 4. Core Thought 결정 — 네가 만든다. tension_around / judgment_axis / reader_bridge 조립문이 아니다. Hook·Punchline·완성 문단이 아니다.
-5. COLLECTION_READY_HOOK — 이 런타임에서는 no-op. Collection API를 부르지 마라. 카드 없이 작성한다.
+5. COLLECTION_READY_HOOK — Core Thought 확정 후 서버가 이론 후보를 1회 검색한다. 후보는 힘 ≤2 · 형식 ≤2. 코드가 카드를 고르거나 조합하지 않는다. 0후보는 정상이다. 네가 적합을 추론한다. 없으면 쓰지 마라. Core Thought를 바꾸지 마라.
 향후 Collection 쿼리는 scene · factual_event · change_or_delta · contrast_or_tension · human_relevance · Core Thought다. 주제 단어보다 의미 구조를 우선한다. 의미 정보가 부족하면 검색을 건너뛴다. subject만으로 검색하지 마라.
-6. WRITE — 같은 네가 최종 포스트를 쓴다. 별도 Writer가 Core Thought를 다시 만들지 않는다.
+6. WRITE — 같은 네가 최종 포스트를 쓴다. 별도 Writer가 Core Thought를 다시 만들지 않는다. 후보 카드는 필요할 때만. Topic 매핑으로 고르지 마라.
 7. STOP — 생각이 전달되면 끝. 교훈·전망·CTA·질문을 자동으로 붙이지 마라. 깊이가 필요하면 고정 길이로 자르지 마라.
 원칙: Seed / Evidence → UNDERSTAND → VERIFY → Creator Thinking → THINK → Core Thought → COLLECTION_READY_HOOK → WRITE → STOP
 금지: Seed → Collection → 카드 선택 → 생각 → 글.
 금지: Topic → Rail, Editorial Mode → Rail, Keyword → Rail, Reaction Mechanism → Rail 로 THINK를 결정하는 것.
-Collection은 대신 생각하지 마라. 이미 만든 생각을 전달하기 위한 외부 Intelligence다. 이 런타임에서는 검색하지 않는다.
+Collection은 대신 생각하지 마라. 이미 만든 생각을 전달하기 위한 외부 Intelligence다. 검색 실패·빈 후보는 카드 없이 작성한다. 없는 힘을 만들지 마라.
 Deep Thesis는 기본 모드가 아니다. 시드에 공통 원리·숨은 구조·제약·상식과 결과의 충돌·인과·의미 있는 scale shift가 실제로 보일 때만 THINK에서 확장한다. 주당 개수·길이를 위해 켜지 마라. 깊이와 길이는 다르다.
 카드 이름·이론 이름을 포스트에 넣지 마라.
 남의 경험이면 1인칭 완료로 쓰지 마라.
@@ -117,9 +117,9 @@ export const AGENT_SEUNG_RAG = {
   searchUrl: "https://api.x.ai/v1/documents/search",
   retrievalMode: "hybrid" as const,
   maxChunks: 6,
-  maxForceCards: 1,
-  maxFormCards: 1,
-  maxCardsToMix: 2,
+  maxForceCards: 2,
+  maxFormCards: 2,
+  maxCardsToMix: 4,
   skipIfNoCollectionId: true,
   skipOnJudge: true,
   oneSearchBothCollections: true,
@@ -167,9 +167,11 @@ export function buildTheorySearchQuery(parts: {
   change_or_delta?: string;
   contrast_or_tension?: string;
   human_relevance?: string;
+  core_thought?: string;
   subject?: string;
 }): string {
   const meaning = [
+    parts.core_thought,
     parts.scene,
     parts.factual_event || parts.fact,
     parts.change_or_delta,
@@ -241,8 +243,10 @@ export function theoryChunksForModel(chunks: TheoryChunk[], extraNote?: string):
       .join("\n");
   }
   return [
-    "COLLECTION (internalize; do not name cards or theories; do not change Core Thought):",
-    "Default use at most one force and one form. Skip a chunk unless it is already in this seed/thought. A second card only if it does a different job. Zero cards is allowed.",
+    "COLLECTION CANDIDATES (internalize; do not name cards or theories; do not change Core Thought):",
+    "These are retrieval candidates, not required cards. Infer fit against the locked Core Thought and this seed.",
+    "Use 0 if none already live in the seed/thought. Use only cards that do a different needed job.",
+    "Code does not pick or mix. Topic names do not pick cards. Zero cards is allowed and normal.",
     note,
     ...kept.map((c) => {
       const role = c.kind === "writing" ? "form" : c.kind === "viral" ? "force" : "note";
@@ -302,6 +306,7 @@ export async function searchAgentSeungTheories(
       change_or_delta?: string;
       contrast_or_tension?: string;
       human_relevance?: string;
+      core_thought?: string;
     };
   },
 ): Promise<TheorySearchLog> {
@@ -311,6 +316,7 @@ export async function searchAgentSeungTheories(
     change_or_delta: opts?.packet?.change_or_delta,
     contrast_or_tension: opts?.packet?.contrast_or_tension,
     human_relevance: opts?.packet?.human_relevance,
+    core_thought: opts?.packet?.core_thought,
     subject: query,
   });
   const key = String(opts?.xaiKey || "").trim();

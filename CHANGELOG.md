@@ -7,6 +7,12 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.0 — 2026-08-18
+
+- POST는 THINK로 Core Thought를 확정한 뒤 Collection을 칸당 1회 검색하고, 그다음 WRITE합니다
+- 검색 후보는 힘 ≤2 · 형식 ≤2입니다. 코드가 카드를 고르지 않습니다. 0장도 정상입니다
+- 시크릿 없음·검색 실패·생각 없음이면 카드 없이 작성합니다. Judge·PLAN·Fedica는 Collection을 부르지 않습니다
+
 ## 12.11.2 — 2026-08-18
 
 - 내 계정 원글·인용은 AP/Fedica 매칭이 없으면 USER_DIRECT입니다. 재동기화가 기존 USER_DIRECT를 UNKNOWN으로 내리지 않습니다

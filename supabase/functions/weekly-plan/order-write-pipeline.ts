@@ -24,6 +24,11 @@ import {
 } from "./deep-generation-context.ts";
 import { runCollectionReadyHook } from "./collection-ready-hook.ts";
 import {
+  callGrokThink,
+  V11_THINK_TIMEOUT_MS,
+  V11_WRITE_TIMEOUT_MS,
+} from "./independent-post-generation.ts";
+import {
   retrieveCreatorThinkingIntelligence,
   type ThinkingCandidateRow,
 } from "./creator-thinking-intelligence.ts";
@@ -282,16 +287,9 @@ export async function writeOneSlot(args: {
   };
 
   /**
-   * COLLECTION_READY_HOOK — required insertion after Core Thought, before WRITE.
-   * This order: no Collection API (api_calls = 0). WRITE proceeds without cards.
-   * Same POST call still does THINK → Core Thought → WRITE to stay under Edge timeout.
-   * Future Collection order splits at runCollectionReadyHook after a real Core Thought exists.
+   * B: THINK → Core Thought → Collection search → WRITE.
+   * Hook does not run before a real Agent승 thought exists.
    */
-  const collection_hook = runCollectionReadyHook({
-    seed_packet,
-    core_thought: post_thought.core_thought || null,
-  });
-
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
     day_offset: dayOffset,
@@ -314,17 +312,42 @@ export async function writeOneSlot(args: {
     seed_packet,
     post_thought,
     thinking_intelligence: thinking_intelligence as any,
-    collection_block: collection_hook.collection_block,
-    collection_hook: collection_hook as any,
+    collection_block: "COLLECTION: none this run. Write without cards. Zero cards is normal. Do not invent force.",
+    collection_hook: { insertion_point: "after_core_thought_before_write", skipped: true, api_calls: 0 } as any,
     experience_packet,
   });
 
-  // 4. Post Agent승 writes the decided thought in the same call.
+  if (args.dryRun !== true && args.xaiKey) {
+    const thought = await callGrokThink(deep, args.xaiKey, {
+      model: V11_WRITER_MODEL,
+      timeout_ms: V11_THINK_TIMEOUT_MS,
+    });
+    if (thought.ok && thought.core_thought) {
+      deep.core_thought = applyAgentSeungCoreThought(deep.core_thought, {
+        core_thought: thought.core_thought,
+        from_current_seed: thought.from_current_seed,
+        boundary_ok: thought.boundary_ok,
+      });
+      if (deep.post_thought) {
+        deep.post_thought = { ...deep.post_thought, core_thought: thought.core_thought };
+      }
+    }
+  }
+
+  const collection_hook = await runCollectionReadyHook({
+    seed_packet,
+    core_thought: String((deep.post_thought as any)?.core_thought || deep.core_thought?.creator_judgment || ""),
+    xaiKey: args.dryRun === true ? null : args.xaiKey,
+  });
+  (deep as any).collection_block = collection_hook.collection_block;
+  (deep as any).collection_hook = collection_hook;
+
+  // 4. Post Agent승 writes the locked thought. Collection candidates are already on ctx.
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
     xai_key: args.xaiKey,
     model: V11_WRITER_MODEL,
-    timeout_ms: V11_WRITER_TIMEOUT_MS,
+    timeout_ms: V11_WRITE_TIMEOUT_MS,
     seed_id: seed.seed_id,
     allow_one_retry: args.skipSelectiveRegen ? false : true,
   });
@@ -344,10 +367,10 @@ export async function writeOneSlot(args: {
     from_current_seed: (integrated.independent as any)?.from_current_seed !== false,
     boundary_ok: (integrated.independent as any)?.boundary_ok !== false,
   };
-  if (agentThought.core_thought) {
+  const locked = String((deep.post_thought as any)?.core_thought || "").trim();
+  if (!locked && agentThought.core_thought) {
     deep.core_thought = applyAgentSeungCoreThought(deep.core_thought, agentThought);
     if (deep.post_thought) deep.post_thought = { ...deep.post_thought, core_thought: agentThought.core_thought };
-    runCollectionReadyHook({ seed_packet, core_thought: agentThought.core_thought });
   }
 
   // 4. Delivery after the thought exists. Telemetry only — does not rewrite the post.

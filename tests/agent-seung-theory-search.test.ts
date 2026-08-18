@@ -55,8 +55,8 @@ const many: TheoryChunk[] = [
   { chunk_id: "f", chunk_content: "형식C", score: 4, kind: "writing" },
 ];
 const capped = capTheoryChunks(many);
-assert.equal(capped.filter((c) => c.kind === "viral").length, 1);
-assert.equal(capped.filter((c) => c.kind === "writing").length, 1);
+assert.equal(capped.filter((c) => c.kind === "viral").length, 2);
+assert.equal(capped.filter((c) => c.kind === "writing").length, 2);
 
 const skipBlock = theoryChunksForModel([]);
 assert.match(skipBlock, /COLLECTION: none/);

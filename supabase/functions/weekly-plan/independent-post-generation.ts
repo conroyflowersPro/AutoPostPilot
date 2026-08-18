@@ -388,14 +388,26 @@ function repairInstructionLines(ctx: DeepGenerationContext): string[] {
   ];
 }
 
-function writerPhilosophyBlock(): string {
+function writerPhilosophyBlock(phase: "think" | "write" = "write"): string {
+  const collectionLine =
+    phase === "think"
+      ? "Collection is not available on this THINK call. Do not invent force. Do not pick cards."
+      : "Collection candidates may follow. Infer fit against the locked Core Thought. Zero cards is allowed. Do not invent force. Do not name theories or card numbers. Do not change Core Thought.";
+  const thoughtLine =
+    phase === "think"
+      ? "YOU decide Core Thought after THINK. It is this post's center judgment or viewpoint — not a hook, punchline, finished paragraph, or assembled label (tension_around / judgment_axis / reader_bridge)."
+      : "Core Thought is already closed. WRITE it. Do not remake the judgment. Collection does not replace it.";
+  const writeLine =
+    phase === "think"
+      ? "Do not write the post on this call. Output Core Thought only."
+      : "WRITE the locked Core Thought in this Creator's natural language. Do not print thinking steps.";
   return [
     "POST AGENT승 ROLE: You are Agent승. Same identity as weekly planning. This call is POST: think, then write one Korean X post for @Seung4680. No separate Writer.",
     "UNDERSTAND the assigned Seed and Planner Intent. VERIFY facts and experience boundaries. THINK with Creator Thinking Intelligence as reference only.",
-    "YOU decide Core Thought after THINK. It is this post's center judgment or viewpoint — not a hook, punchline, finished paragraph, or assembled label (tension_around / judgment_axis / reader_bridge).",
+    thoughtLine,
     "No Rail is normal. You may use one thinking pattern, parts of several, mutate, invent a new path, or use none. Rails do not choose the conclusion. Topic names do not choose a rail.",
-    "Collection is not available this run. Write without cards. Do not invent force.",
-    "After Core Thought is closed, WRITE it in this Creator's natural language. Do not print thinking steps.",
+    collectionLine,
+    writeLine,
     "You do not choose the seven-day strategy, select another Seed, or rebuild the week.",
     "HARD BOUNDARY: do not invent facts or lived experience, do not directly copy a Manual Creator Post, and do not abandon the assigned Seed and Planner Intent.",
     "Do not paste prompt material or examples.",
@@ -425,7 +437,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
 
   return [
     "You think, then write one Korean X post for creator @Seung4680.",
-    writerPhilosophyBlock(),
+    writerPhilosophyBlock("write"),
     writerArchitectureLock(),
     ...repairInstructionLines(ctx),
     "ASSIGNED PLANNER INTENT (strategic purpose, never a writing template; do not re-plan the week):",
@@ -436,7 +448,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "Seed interpretation notes: " + s(thought.creator_interpretation || ctx.why_it_matters).slice(0, 220),
     "Reader situation (not a bridge slogan): " + s(thought.reader_entry || ctx.human_element).slice(0, 180),
     decided
-      ? "If a prior Core Thought exists, keep it only if it is still this seed's judgment: " + decided.slice(0, 220)
+      ? "LOCKED CORE THOUGHT after THINK. Collection must not replace it: " + decided.slice(0, 220)
       : "CORE THOUGHT: none yet. After THINK, you write it. One center judgment or viewpoint from this seed. Not a finished post.",
     "Stop point: " + s(thought.stop_point || "Stop when the core thought is already delivered."),
     ...intelLines,
@@ -468,6 +480,34 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
       : "",
     "OUTPUT JSON only: {\"core_thought\":\"one judgment sentence\",\"from_current_seed\":true,\"boundary_ok\":true,\"post\":\"korean x post\"}.",
     "core_thought is not the post. post is the post. No chain-of-thought. No English meta in post.",
+  ].filter(Boolean).join("\n");
+}
+
+export function buildThinkOnlyInstructions(ctx: DeepGenerationContext): string {
+  const thought = (ctx as any).post_thought || {};
+  const planner = ctx.planner_intent || { strategy_slot_id: "", strategic_role: "", intent: "" };
+  const packet = (ctx as any).seed_packet || {};
+  const packetLines = presentPacketLines(packet);
+  const intelLines = thinkingIntelligenceLines((ctx as any).thinking_intelligence);
+  const thesisFit = ((thought as any).deep_thesis || null) as DeepThesisFit | null;
+  const deepLines = thesisFit ? deepThesisWriteLines(thesisFit) : [];
+  return [
+    "THINK only. Do not write the Korean X post on this call.",
+    writerPhilosophyBlock("think"),
+    writerArchitectureLock(),
+    "ASSIGNED PLANNER INTENT (do not re-plan the week):",
+    `slot=${s(planner.strategy_slot_id)} role=${s(planner.strategic_role)} intent=${s(planner.intent)}`,
+    "ASSIGNED SEED (UNDERSTAND / VERIFY evidence — not Core Thought):",
+    packetLines.join("\n"),
+    "Observation: " + s(thought.observation || (ctx as any).interpreted_meaning?.what_is_actually_happening).slice(0, 220),
+    "Seed interpretation notes: " + s(thought.creator_interpretation || ctx.why_it_matters).slice(0, 220),
+    "Reader situation (not a bridge slogan): " + s(thought.reader_entry || ctx.human_element).slice(0, 180),
+    "CORE THOUGHT: none yet. After THINK, you write it. One center judgment or viewpoint from this seed. Not a finished post.",
+    ...intelLines,
+    ...deepLines,
+    ...writerBoundaryConstraintLines(ctx),
+    "OUTPUT JSON only: {\"core_thought\":\"one judgment sentence\",\"from_current_seed\":true,\"boundary_ok\":true}.",
+    "No post field. No chain-of-thought.",
   ].filter(Boolean).join("\n");
 }
 
@@ -555,6 +595,33 @@ export function parseAgentSeungPostOutput(raw: string): {
   return { core_thought: "", from_current_seed: true, boundary_ok: true, post: text };
 }
 
+export function parseAgentSeungThinkOutput(raw: string): {
+  core_thought: string;
+  from_current_seed: boolean;
+  boundary_ok: boolean;
+} {
+  const text = String(raw || "").trim();
+  const fenced = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const start = fenced.indexOf("{");
+  const end = fenced.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const obj = JSON.parse(fenced.slice(start, end + 1));
+      const thought = s(obj.core_thought || obj.coreThought).slice(0, 220);
+      if (thought && !/^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(thought)) {
+        return {
+          core_thought: thought,
+          from_current_seed: obj.from_current_seed !== false,
+          boundary_ok: obj.boundary_ok !== false,
+        };
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return { core_thought: "", from_current_seed: true, boundary_ok: true };
+}
+
 function extractXaiResponsesText(parsed: any): string {
   const direct = s(parsed?.output_text);
   if (direct.length >= 4) return direct;
@@ -582,12 +649,12 @@ export async function callGrokWriter(
 ): Promise<WriterCallResult> {
   const system = buildConstraintOnlyWriterInstructions(ctx);
   const userMsg = [
-    "THINK from this seed, decide Core Thought, then WRITE the Korean X post. Collection is none this run.",
+    "WRITE the locked Core Thought as one Korean X post. Infer Collection candidates only if they already live in this seed/thought. Zero cards is allowed.",
     "Planner Intent: " + s(ctx.planner_intent?.intent).slice(0, 240),
-    "Do not rebuild the week. Do not copy a rail as a post template.",
+    "Do not rebuild the week. Do not copy a rail as a post template. Do not remake Core Thought.",
     "Use x_search and web_search only to check public current facts. Do not copy other posts as the draft. Do not invent lived experience.",
     s(options.retry_hint)
-      ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Keep the same seed. Decide Core Thought again if needed, then write a valid post."
+      ? "BOUNDARY RETRY: previous draft failed a minimum boundary (" + s(options.retry_hint).slice(0, 180) + "). Keep the same seed and locked Core Thought, then write a valid post."
       : "",
     "Respond with JSON only: {\"core_thought\":\"...\",\"from_current_seed\":true,\"boundary_ok\":true,\"post\":\"...\"}. Stop when the thought is complete.",
   ].filter(Boolean).join("\n");
@@ -646,6 +713,93 @@ export async function callGrokWriter(
   } catch (e: any) {
     const msg = e?.name === "AbortError" ? "xai_timeout" : s(e?.message, "xai_fetch_error").slice(0, 160);
     return { ok: false, text: "", error: msg, attempted: true };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const V11_THINK_TIMEOUT_MS = 18000;
+export const V11_WRITE_TIMEOUT_MS = 22000;
+
+export type ThinkCallResult = {
+  ok: boolean;
+  core_thought: string;
+  from_current_seed: boolean;
+  boundary_ok: boolean;
+  error: string | null;
+  attempted: boolean;
+};
+
+/** THINK only. Does not write. Does not search Collections. */
+export async function callGrokThink(
+  ctx: DeepGenerationContext,
+  xaiKey: string,
+  options: { model?: string; timeout_ms?: number } = {},
+): Promise<ThinkCallResult> {
+  const system = buildThinkOnlyInstructions(ctx);
+  const userMsg = [
+    "THINK from this seed and decide Core Thought only. Do not write the post. Collection is not on this call.",
+    "Planner Intent: " + s(ctx.planner_intent?.intent).slice(0, 240),
+    "Do not rebuild the week. Do not invent lived experience.",
+    "Use x_search and web_search only to check public current facts.",
+    "Respond with JSON only: {\"core_thought\":\"...\",\"from_current_seed\":true,\"boundary_ok\":true}.",
+  ].join("\n");
+
+  const controller = new AbortController();
+  const timeoutMs = options.timeout_ms ?? V11_THINK_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch("https://api.x.ai/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${xaiKey}`,
+      },
+      body: JSON.stringify({
+        model: options.model || "grok-4.6",
+        instructions: system,
+        input: [{ role: "user", content: userMsg }],
+        tools: [{ type: "x_search" }, { type: "web_search" }],
+        temperature: 0.6,
+        max_output_tokens: 400,
+        reasoning_effort: "low",
+      }),
+      signal: controller.signal,
+    });
+    const rawText = await response.text();
+    if (!response.ok) {
+      return {
+        ok: false,
+        core_thought: "",
+        from_current_seed: true,
+        boundary_ok: true,
+        error: `xai_http_${response.status}:${rawText.slice(0, 180)}`,
+        attempted: true,
+      };
+    }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      return { ok: false, core_thought: "", from_current_seed: true, boundary_ok: true, error: "xai_json_parse_failed", attempted: true };
+    }
+    const content = extractXaiResponsesText(parsed);
+    const thought = parseAgentSeungThinkOutput(content);
+    if (!thought.core_thought) {
+      return { ok: false, core_thought: "", from_current_seed: true, boundary_ok: true, error: "empty_core_thought", attempted: true };
+    }
+    return {
+      ok: true,
+      core_thought: thought.core_thought,
+      from_current_seed: thought.from_current_seed,
+      boundary_ok: thought.boundary_ok,
+      error: null,
+      attempted: true,
+    };
+  } catch (e: any) {
+    const msg = e?.name === "AbortError" ? "xai_timeout" : s(e?.message, "xai_fetch_error").slice(0, 160);
+    return { ok: false, core_thought: "", from_current_seed: true, boundary_ok: true, error: msg, attempted: true };
   } finally {
     clearTimeout(timer);
   }

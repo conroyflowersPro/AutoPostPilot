@@ -141,7 +141,7 @@ const evidence = buildAgentSeungPlanEvidence({
 });
 assert.equal(evidence.fedica_best_posting_time.status, "missing");
 
-assert.equal(COLLECTION_API_CALLS_THIS_ORDER, 0);
+assert.equal(COLLECTION_API_CALLS_THIS_ORDER, 1);
 
 const calendar = readFileSync("app/components/QueueMonthCalendar.tsx", "utf8");
 assert.doesNotMatch(calendar, /recover_batch|STRATEGY_REPLAN|repair_attempts/);

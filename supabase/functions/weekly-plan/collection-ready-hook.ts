@@ -1,18 +1,25 @@
 /**
- * ORDER 2 — COLLECTION_READY_HOOK
+ * COLLECTION_READY_HOOK
  *
  * Insertion point (must stay here):
  *   Agent승 THINK → Core Thought 확정 → COLLECTION_READY_HOOK → Agent승 WRITE
  *
- * This order: no xAI Collection API, no fake cards, no Topic→card map.
- * Collection-less WRITE must succeed. Future Collection order plugs in here
- * without tearing down Generation Runtime.
+ * One hybrid search per slot after a real Core Thought exists.
+ * Candidates only (force ≤2, form ≤2). Code does not pick or mix cards.
+ * Zero candidates is normal. Judge / PLAN / Seed do not call this.
  */
 import type { SemanticSeedPacket } from "./semantic-seed-packet.ts";
+import {
+  searchAgentSeungTheories,
+  theoryChunksForModel,
+} from "./agent-seung.ts";
 
 export const COLLECTION_READY_HOOK_POINT = "after_core_thought_before_write" as const;
-export const COLLECTION_API_CALLS_THIS_ORDER = 0 as const;
-export const COLLECTION_READY_HOOK_NOOP = true as const;
+/** Max Collection searches the hook may make per slot. Not a requirement. */
+export const COLLECTION_API_CALLS_THIS_ORDER = 1 as const;
+export const COLLECTION_READY_HOOK_NOOP = false as const;
+export const COLLECTION_CANDIDATE_FORCE_CAP = 2 as const;
+export const COLLECTION_CANDIDATE_FORM_CAP = 2 as const;
 
 export type CollectionReadyMeaning = {
   scene?: string;
@@ -25,9 +32,9 @@ export type CollectionReadyMeaning = {
 
 export type CollectionReadyHookResult = {
   insertion_point: typeof COLLECTION_READY_HOOK_POINT;
-  skipped: true;
-  api_calls: 0;
-  reason: "order2_collection_noop";
+  skipped: boolean;
+  api_calls: 0 | 1;
+  reason: string;
   meaning: CollectionReadyMeaning;
   collection_block: string;
 };
@@ -37,7 +44,7 @@ function keep(v: unknown, max = 180): string | undefined {
   return t.length >= 2 ? t : undefined;
 }
 
-/** Accessible meaning for a later Collection order. Empty fields are omitted, not invented. */
+/** Accessible meaning for Collection search. Empty fields are omitted, not invented. */
 export function collectionReadyMeaning(
   packet: SemanticSeedPacket | null | undefined,
   coreThought?: string | null,
@@ -59,22 +66,56 @@ export function collectionReadyMeaning(
   return meaning;
 }
 
+const NONE_BLOCK =
+  "COLLECTION: none this run. Write without cards. Zero cards is normal. Do not invent force.";
+
 /**
- * No-op hook. Does not call searchAgentSeungTheories.
- * Future order may retrieve cards from `meaning` after a real Core Thought exists.
+ * Search after Core Thought. Does not choose cards. Does not change Core Thought.
+ * Missing thought / missing secret / empty query / HTTP fail → WRITE with no cards.
  */
-export function runCollectionReadyHook(input: {
+export async function runCollectionReadyHook(input: {
   seed_packet?: SemanticSeedPacket | null;
   core_thought?: string | null;
-}): CollectionReadyHookResult {
+  xaiKey?: string | null;
+}): Promise<CollectionReadyHookResult> {
   const meaning = collectionReadyMeaning(input.seed_packet, input.core_thought);
-  return {
+  const thought = String(input.core_thought || "").replace(/\s+/g, " ").trim();
+  const base = {
     insertion_point: COLLECTION_READY_HOOK_POINT,
-    skipped: true,
-    api_calls: 0,
-    reason: "order2_collection_noop",
     meaning,
-    collection_block:
-      "COLLECTION: none this run. Write without cards. Zero cards is normal. Do not invent force.",
+  };
+
+  if (thought.length < 8) {
+    return { ...base, skipped: true, api_calls: 0, reason: "missing_core_thought", collection_block: NONE_BLOCK };
+  }
+
+  const log = await searchAgentSeungTheories(thought, {
+    xaiKey: input.xaiKey || "",
+    packet: {
+      scene: meaning.scene,
+      factual_event: meaning.factual_event,
+      change_or_delta: meaning.change_or_delta,
+      contrast_or_tension: meaning.contrast_or_tension,
+      human_relevance: meaning.human_relevance,
+      core_thought: thought,
+    },
+  });
+
+  if (log.skipped) {
+    return {
+      ...base,
+      skipped: true,
+      api_calls: 0,
+      reason: log.skip_reason || "search_skipped",
+      collection_block: NONE_BLOCK,
+    };
+  }
+
+  return {
+    ...base,
+    skipped: false,
+    api_calls: 1,
+    reason: "candidates_ready",
+    collection_block: theoryChunksForModel(log.chunks),
   };
 }

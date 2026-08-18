@@ -54,8 +54,8 @@ const many: TheoryChunk[] = [
   { chunk_id: "d", chunk_content: "형식B", score: 5, kind: "writing" },
 ];
 const capped = capTheoryChunks(many);
-assert.equal(capped.filter((c) => c.kind === "viral").length, 1);
-assert.equal(capped.filter((c) => c.kind === "writing").length, 1);
+assert.equal(capped.filter((c) => c.kind === "viral").length, 2);
+assert.equal(capped.filter((c) => c.kind === "writing").length, 2);
 
 const packet = buildSemanticSeedPacket(
   { concrete_subject: "충전 줄", point_or_tension: "앞차가 안 움직임", owner: "OTHER" },
@@ -118,7 +118,7 @@ assert.match(decided.creator_judgment, /앞 칸/);
 assert.equal(decided.status, "CORE_THOUGHT_READY");
 assert.doesNotMatch(decided.creator_judgment, /judgment_axis/);
 
-const hook = runCollectionReadyHook({ seed_packet: packet, core_thought: decided.creator_judgment });
+const hook = await runCollectionReadyHook({ seed_packet: packet, core_thought: decided.creator_judgment });
 assert.equal(hook.api_calls, 0);
 assert.equal(hook.skipped, true);
 assert.equal(hook.insertion_point, "after_core_thought_before_write");
@@ -191,11 +191,13 @@ assert.doesNotMatch(wr, /DECIDED THOUGHT \(do not change\)/);
 const ow = readFileSync("supabase/functions/weekly-plan/order-write-pipeline.ts", "utf8");
 assert.doesNotMatch(ow, /searchAgentSeungTheories/);
 assert.match(ow, /runCollectionReadyHook/);
+assert.match(ow, /callGrokThink/);
 assert.match(ow, /retrieveCreatorThinkingIntelligence/);
 assert.match(ow, /selectDeliveryAfterThought/);
 assert.match(ow, /selectThinkingRail/);
 assert.ok(ow.indexOf("retrieveCreatorThinkingIntelligence") < ow.indexOf("integrateSlotGeneration"));
-assert.ok(ow.indexOf("runCollectionReadyHook") < ow.indexOf("integrateSlotGeneration"));
+assert.ok(ow.indexOf("await callGrokThink") < ow.indexOf("await runCollectionReadyHook"));
+assert.ok(ow.indexOf("await runCollectionReadyHook") < ow.indexOf("await integrateSlotGeneration"));
 assert.doesNotMatch(ow, /from "\.\/generate-post/);
 const weeklyJob = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.match(weeklyJob, /thinking_rail_candidates/);
