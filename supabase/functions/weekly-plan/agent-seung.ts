@@ -4,6 +4,7 @@
 export const AGENT_SEUNG_NAME = "Agent승";
 export const AGENT_SEUNG_NAME_EN = "AgentSeung";
 
+/** Full operating order. Always in Agent승. Not retrieved from Collections. Writer does not get this block. */
 export const AGENT_SEUNG_OPERATING_ORDER = `너는 ${AGENT_SEUNG_NAME}이다.
 인텔리전스다. 규칙을 복사하지 말고, 시드와 데이터를 보고 추론하라.
 
@@ -28,16 +29,16 @@ export const AGENT_SEUNG_OPERATING_ORDER = `너는 ${AGENT_SEUNG_NAME}이다.
   (X 실시간 검색, 좋아요 50+ · 댓글 20+ 등 알고리즘이 고른 글에서 추출. 평범한 시드가 아니다. 이미 힘이 있다.)
 - 30일 Analytics 데이터
 - 최근 14일 X 동기화 데이터 (Analytics 빈 구간 메움)
-- 이론 카드 (Collection) — 단계 3은 바이럴만, 단계 4는 작성만. 한 파일에 섞지 않는다
+- 이론 카드 (Collection) — 단계 3에서 viral+writing을 한 번에 검색. 한 카드로 힘·형식을 섞어 고르지 마라
 - (필요 시) 경험 재고
 
 작업 방식:
-- 기본은 일괄 처리다.
-- 설계를 배치 단위로 나누어 추론하고, Writer에게 배치 단위로 넘긴다.
-- 전 이론을 한 프롬프트에 넣지 마라. 단계마다 필요한 카드만 가져온다.
-- 바이럴 Collection과 작성 Collection을 각각 짧게 검색한다. 칸마다 하거나, 배치에 한 번 검색한 뒤 칸마다 적용한다.
-- 타임아웃·JSON 잘림을 고려해 몇 개씩 끊고 이어간다.
-- 한 칸 실패·Judge 거절 복구는 칸 단위 순차를 허용한다.
+- 기본은 일괄 처리다. 배치(예: 5~10칸) 단위로 추론하고 Writer에게 배치 단위로 넘긴다.
+- 전 이론을 한 프롬프트에 넣지 마라. 단계 3에서 검색한 청크만 참고한다.
+- 검색은 기본 1회다. collection_ids에 바이럴과 작성을 같이 넣는다. 가능하면 배치 단위로 묶는다.
+- 칸 단위 순차는 Judge 거절·단칸 실패 복구만 허용한다.
+- 타임아웃·JSON 잘림을 고려해 배치로 끊고 이어간다.
+- 한 API로 40칸을 한 번에 돌리지 마라.
 
 작업 순서:
 
@@ -47,37 +48,37 @@ export const AGENT_SEUNG_OPERATING_ORDER = `너는 ${AGENT_SEUNG_NAME}이다.
    - 사용자가 경험하지 않은 것을 경험한 것처럼 쓰지 못하게 막는다
    - 남의 경험은 사용 가능하나, 내 경험처럼 쓰지 않도록 지시에서 고정한다
    - 경험 재고가 비면 남의 경험 시드가 늘 수 있으므로 1인칭 경험 표기 금지를 빼먹지 않는다
-   - 시드의 힘을 알아본다. 아는 힘인지(바이럴 카드에 있는 힘인지) 판단한다. 아는 힘이면 설계에서 누락하지 않는다.
+   - 이 단계에서는 힘 이름·카드 번호를 확정하지 마라. Collection을 부르지 마라
 
 2. 역할 결정 (Return / Bridge / Reach)
    - 판단 근거는 30일 Analytics(+14일 메움)다
    - 결속/확장/유입은 뜻일 뿐, 근거는 데이터다
    - 이 단계에서는 Collections를 부르지 않는다
+   - 톤은 역할이 아니라 칸의 발화 대상으로 나중에 정한다
 
-3. 바이럴 Collection
-   - 시드에 이미 있는 힘만 선택한다
-   - 후보 시드는 이미 알고리즘이 고른 글이므로, 그 안에 있는 아는 힘은 누락하지 않는다
-   - 없는 힘을 만들어 넣지 않는다
-   - 작성 카드를 이 단계에서 부르지 않는다
-   - 기준: 시드에 힘이 있는가 / 참여에 도움이 되는가 / 알맹이를 해치지 않는가 / 군중 증명·FOMO·과장을 만들지 않는가
+3. Collection 검색
+   - 쿼리는 시드 장면·사실만. 카드 이름·V/W 번호를 넣지 마라
+   - 한 검색에 viral+writing Collection을 같이 넣는다
+   - 올라온 청크에서 제목·영문 이론명은 이미 제거된 상태로 본다
+   - 시드에 이미 있는 힘만 고른다. 없는 힘을 만들지 마라
+   - 형식은 그 힘을 닫는 방식만 고른다. 힘과 형식을 한 카드로 섞어 고르지 마라
+   - 칸당 힘 최대 2, 형식 최대 2
+   - 시크릿이 없어 검색을 건너뛰면 힘을 창조하지 말고 닫아라
 
-4. 작성 Collection
-   - 3에서 고른 힘을 이 계정 글로 닫을 형식만 선택한다
-   - 바이럴 힘을 이 단계에서 다시 찾지 않는다
-   - 이론 이름을 Writer에게 보내지 않는다
-
-5. 지시 생성
+4. 지시 생성
    - 힘 + 형식을 설계 항목으로만 합친다 (말투, 구조, 역할, 쓸 힘, 피해야 할 것)
-   - 이론 이름은 숨긴다. 포스트 문장에도 넣지 마라
+   - 이론 이름·V/W 번호는 숨긴다. 포스트 문장에도 넣지 마라
    - 남의 경험이면 1인칭 경험 표기 금지를 명시한다
-   - 본문은 쓰지 않는다. 설계만 낸다. Writer가 지시대로 본문만 쓴다
+   - 본문은 쓰지 않는다. 설계만 낸다
 
-6. 스케줄·칸 배정
+5. 스케줄·칸 배정
    - 7일 요청이면 동기화 데이터로 기존 유형을 파악한 뒤 복잡성/창발 관점으로 칸을 설계한다
    - Judge 리젝 오더도 동일하게 처리한다
    - 연속 유사 소재·역할 편중을 피한다
    - 시드에 이미 있는 힘(알아봄, 나눌 거리, 놀람, 관계 등)이 있는 칸을 하루에 너무 적지 않게 두되, 없으면 만들지 마라
-   - 같은 결이 친숙해질 만큼 간격을 두고 되돌아오게 하라. 같은 결의 재등장이지 같은 소재 복붙이 아니다. 한 글 안에서 반복하거나 중복 칸을 남발하지 마라. Collection에서 이 규칙을 검색하지 마라.
+   - 같은 결이 친숙해질 만큼 간격을 두고 되돌아오게 하라. 같은 결의 재등장이지 같은 소재 복붙이 아니다. 한 글 안에서 반복하거나 중복 칸을 남발하지 마라. Collection에서 이 규칙을 검색하지 마라
+
+6. Writer는 지시대로 본문만 쓴다. Semantic Judge는 Collections를 부르지 않는다.
 
 출력 (기계적으로 남길 것):
 - 칸
@@ -85,7 +86,6 @@ export const AGENT_SEUNG_OPERATING_ORDER = `너는 ${AGENT_SEUNG_NAME}이다.
 - 역할 (Return/Bridge/Reach)
 - Writer 지시문 (설계 항목)
 배치 단위로 넘긴다.
-검증은 Semantic Judge가 한다.
 
 금지:
 - 예시 문장 복사
@@ -101,40 +101,146 @@ export const AGENT_SEUNG_RAG = {
   provider: "xai_collections" as const,
   searchUrl: "https://api.x.ai/v1/documents/search",
   retrievalMode: "hybrid" as const,
-  maxChunks: 3,
+  maxChunks: 6,
+  maxForceCards: 2,
+  maxFormCards: 2,
   maxCardsToMix: 2,
   skipIfNoCollectionId: true,
   skipOnJudge: true,
+  oneSearchBothCollections: true,
   viralEnv: "XAI_VIRAL_THEORY_COLLECTION_ID",
   writingEnv: "XAI_WRITING_THEORY_COLLECTION_ID",
+};
+
+const THEORY_LABEL_SOURCE =
+  String.raw`\b(V|W)\d+\b|Processing Fluency|Dual Coding|Prospect Theory|Cognitive Dissonance|Mere Exposure|Emotional Contagion|Information Gap|Identity Signaling|Social Proof|Self-Determination|Psychological Reactance|STEPPS|Contagious|Cialdini|Granovetter|Loewenstein|Festinger|Zajonc|Paivio|Kahneman|Tversky|Brehm|Hatfield|Tajfel|Berger(?:\s*&\s*Heath)?`;
+
+function theoryLabelRe(): RegExp {
+  return new RegExp(THEORY_LABEL_SOURCE, "gi");
+}
+
+export type TheoryKind = "viral" | "writing" | "unknown";
+
+export type TheoryChunk = {
+  chunk_id: string;
+  chunk_content: string;
+  score: number;
+  kind: TheoryKind;
+  file_id?: string;
+};
+
+export type TheorySearchLog = {
+  query: string;
+  skipped: boolean;
+  skip_reason?: string;
+  force_count: number;
+  form_count: number;
+  chunks: TheoryChunk[];
 };
 
 export function agentSeungIdentityLine(): string {
   return `너는 ${AGENT_SEUNG_NAME}이다. 규칙을 복사하지 말고 시드와 데이터를 보고 추론하라.`;
 }
 
-export type TheoryChunk = {
-  chunk_id: string;
-  chunk_content: string;
-  score: number;
-  file_id?: string;
-};
-
-function envCollectionId(kind: "viral" | "writing"): string {
-  if (typeof Deno === "undefined") return "";
-  const key = kind === "viral" ? AGENT_SEUNG_RAG.viralEnv : AGENT_SEUNG_RAG.writingEnv;
-  return String(Deno.env.get(key) || Deno.env.get("XAI_THEORY_COLLECTION_ID") || "").trim();
+export function buildTheorySearchQuery(parts: {
+  scene?: string;
+  fact?: string;
+  subject?: string;
+}): string {
+  const raw = [parts.scene, parts.fact, parts.subject]
+    .map((v) => String(v || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ");
+  return raw
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/\b(V|W)\d+\b/gi, "")
+    .replace(theoryLabelRe(), "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
 }
 
-/** One hybrid search. No Grok tool loop. */
-export async function searchTheories(
+export function classifyTheoryKind(raw: string, hint?: string): TheoryKind {
+  const h = String(hint || "").toLowerCase();
+  if (h.includes("viral") || h.includes("writing")) {
+    if (h.includes("viral") && !h.includes("writing")) return "viral";
+    if (h.includes("writing") && !h.includes("viral")) return "writing";
+  }
+  const text = String(raw || "");
+  if (/##\s*V\d+/i.test(text) || /시드에 이 힘이/.test(text)) return "viral";
+  if (/##\s*W\d+/i.test(text) || /맞는 형식/.test(text) || /닫는 형식/.test(text)) return "writing";
+  return "unknown";
+}
+
+export function stripTheoryLabels(text: string): string {
+  return String(text || "")
+    .replace(/^#{1,6}\s*.*$/gm, "")
+    .replace(/^출처:.*$/gm, "")
+    .replace(theoryLabelRe(), "")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function capTheoryChunks(chunks: TheoryChunk[]): TheoryChunk[] {
+  const viral: TheoryChunk[] = [];
+  const writing: TheoryChunk[] = [];
+  const rest: TheoryChunk[] = [];
+  const sorted = [...chunks].sort((a, b) => (b.score || 0) - (a.score || 0));
+  for (const c of sorted) {
+    if (c.kind === "viral" && viral.length < AGENT_SEUNG_RAG.maxForceCards) viral.push(c);
+    else if (c.kind === "writing" && writing.length < AGENT_SEUNG_RAG.maxFormCards) writing.push(c);
+    else if (c.kind === "unknown") rest.push(c);
+  }
+  const unknownRoom = AGENT_SEUNG_RAG.maxForceCards + AGENT_SEUNG_RAG.maxFormCards - viral.length - writing.length;
+  return [...viral, ...writing, ...rest.slice(0, Math.max(0, unknownRoom))];
+}
+
+export function theoryChunksForModel(chunks: TheoryChunk[]): string {
+  const kept = capTheoryChunks(chunks).filter((c) => c.chunk_content);
+  if (!kept.length) {
+    return "Collection 검색 없음. 시드에 없는 힘을 만들지 마라. 이론 이름을 쓰지 마라.";
+  }
+  return kept
+    .map((c, i) => `카드 ${i + 1} (${c.kind === "writing" ? "형식" : c.kind === "viral" ? "힘" : "참고"}):\n${c.chunk_content}`)
+    .join("\n\n");
+}
+
+function envCollectionIds(): string[] {
+  if (typeof Deno === "undefined") return [];
+  const viral = String(Deno.env.get(AGENT_SEUNG_RAG.viralEnv) || "").trim();
+  const writing = String(Deno.env.get(AGENT_SEUNG_RAG.writingEnv) || "").trim();
+  const fallback = String(Deno.env.get("XAI_THEORY_COLLECTION_ID") || "").trim();
+  const ids = [viral, writing].filter(Boolean);
+  if (!ids.length && fallback) return [fallback];
+  return [...new Set(ids)];
+}
+
+function mapMatch(m: any, collectionHint?: string): TheoryChunk {
+  const raw = String(m?.chunk_content || m?.content || "");
+  const hint = String(collectionHint || m?.collection_id || m?.collectionId || m?.file_name || m?.file_id || "");
+  const kind = classifyTheoryKind(raw, hint);
+  return {
+    chunk_id: String(m?.chunk_id || m?.id || ""),
+    chunk_content: stripTheoryLabels(raw).slice(0, 1200),
+    score: Number(m?.score) || 0,
+    kind,
+    file_id: m?.file_id ? String(m.file_id) : undefined,
+  };
+}
+
+/** One hybrid search across viral+writing collections. No Grok tool loop. */
+export async function searchAgentSeungTheories(
   query: string,
-  kind: "viral" | "writing",
-  opts?: { xaiKey?: string; collectionId?: string; limit?: number },
-): Promise<TheoryChunk[]> {
+  opts?: { xaiKey?: string; collectionIds?: string[]; limit?: number },
+): Promise<TheorySearchLog> {
+  const q = buildTheorySearchQuery({ subject: query });
   const key = String(opts?.xaiKey || "").trim();
-  const collectionId = String(opts?.collectionId || envCollectionId(kind)).trim();
-  if (!key || !collectionId || !String(query || "").trim()) return [];
+  const ids = (opts?.collectionIds || envCollectionIds()).map((id) => String(id || "").trim()).filter(Boolean);
+  if (!q) return { query: "", skipped: true, skip_reason: "empty_query", force_count: 0, form_count: 0, chunks: [] };
+  if (!key || !ids.length) {
+    return { query: q, skipped: true, skip_reason: "no_secret_or_collection", force_count: 0, form_count: 0, chunks: [] };
+  }
   const limit = Math.min(AGENT_SEUNG_RAG.maxChunks, Math.max(1, opts?.limit || AGENT_SEUNG_RAG.maxChunks));
   const res = await fetch(AGENT_SEUNG_RAG.searchUrl, {
     method: "POST",
@@ -143,21 +249,38 @@ export async function searchTheories(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      query: String(query).slice(0, 500),
-      source: { collection_ids: [collectionId] },
+      query: q,
+      source: { collection_ids: ids },
       retrieval_mode: { type: AGENT_SEUNG_RAG.retrievalMode },
       limit,
     }),
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    return { query: q, skipped: true, skip_reason: "search_http_" + res.status, force_count: 0, form_count: 0, chunks: [] };
+  }
   const body = await res.json().catch(() => ({}));
-  const matches = Array.isArray(body?.matches) ? body.matches : [];
-  return matches.slice(0, limit).map((m: any) => ({
-    chunk_id: String(m.chunk_id || ""),
-    chunk_content: String(m.chunk_content || "").slice(0, 1200),
-    score: Number(m.score) || 0,
-    file_id: m.file_id ? String(m.file_id) : undefined,
-  }));
+  const matches = Array.isArray(body?.matches) ? body.matches : Array.isArray(body?.results) ? body.results : [];
+  const mapped = matches.slice(0, limit).map((m: any) => mapMatch(m));
+  const chunks = capTheoryChunks(mapped);
+  return {
+    query: q,
+    skipped: false,
+    force_count: chunks.filter((c) => c.kind === "viral").length,
+    form_count: chunks.filter((c) => c.kind === "writing").length,
+    chunks,
+  };
+}
+
+/** @deprecated use searchAgentSeungTheories — one call, both collections */
+export async function searchTheories(
+  query: string,
+  kind: "viral" | "writing",
+  opts?: { xaiKey?: string; collectionId?: string; limit?: number },
+): Promise<TheoryChunk[]> {
+  const ids = opts?.collectionId ? [opts.collectionId] : envCollectionIds();
+  const log = await searchAgentSeungTheories(query, { xaiKey: opts?.xaiKey, collectionIds: ids, limit: opts?.limit });
+  if (kind === "viral") return log.chunks.filter((c) => c.kind !== "writing");
+  return log.chunks.filter((c) => c.kind !== "viral");
 }
 
 export async function searchWritingTheories(

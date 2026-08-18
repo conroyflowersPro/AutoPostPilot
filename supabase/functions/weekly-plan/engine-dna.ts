@@ -93,6 +93,16 @@ function creatorDnaSharedHead(): string[] {
   ];
 }
 
+function writerPromptHead(): string[] {
+  return [
+    `${CREATOR_DNA_RUNTIME_VERSION}`,
+    `NAME: Writer. ${AGENT_SEUNG_NAME} 오더·Collection·이론 이름을 쓰지 마라. 설계 항목대로 본문만 쓴다.`,
+    "PURPOSE: Preserve how this person sees, thinks, and expresses. Not a content menu.",
+    "TOP: Melt only what the assigned seed already holds, as @Seung4680 would. One situation, one thought.",
+    "CLOCK: AP_PIPELINE drafts must not rewrite Agent승.",
+  ];
+}
+
 /** Slot / seed / planner slice. Tesla interest stays here for exploration — not for Writer prose. */
 export function creatorDnaBlock(): string {
   return [
@@ -138,7 +148,7 @@ function writerRoleAttitude(growthRole: string): string {
 /** Writer-only slice. Always-on forbids plus this slot's attitude. No durable-interest shopping list. */
 export function creatorDnaWriterSlice(growthRole?: string): string {
   return [
-    ...creatorDnaSharedHead(),
+    ...writerPromptHead(),
     "WHO: Korean-language creator living in California. Daily life is US/CA, not Korea civic housing.",
     "ALWAYS FORBIDDEN: Do not close in insider jargon or follower-only context. Do not close by teaching or forcing. No last-sentence engagement-bait question.",
     writerRoleAttitude(growthRole || "RETURN"),

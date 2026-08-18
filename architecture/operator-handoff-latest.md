@@ -74,13 +74,10 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 **RETURN/BRIDGE/REACH:** 30-day Analytics + 14-day sync fill. Collections is not called here.
 
 **Collections source (upload these two files):**
-**Collections source (two files, two searches — do not merge):**
-- `architecture/collections/viral-theories.md` — V1–V8. Called at Agent승 step 3.
-- `architecture/collections/writing-theories.md` — W1–W8. Called at step 4.
-- Mere exposure spacing is **not** a Collection card. It lives in operating-order step 6.
-- Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID`.
-- Search: one hybrid search per kind, limit 3. Do not give Grok `collections_search`.
-- Do not mix viral+writing into one file. Final per-seed combine is an experiment after upload.
+**Collections (approved 2026-08-17):**
+- Two files, one search: `collection_ids` = viral + writing. Query = seed scene/fact. Strip titles/theory names before the model. Cap 2 force + 2 form.
+- Step 1 seed eval = fake-experience only (no force names). Step 5 = slot spacing (mere exposure). Writer does not receive the operating order. Judge does not search Collections.
+- Upload chunk boundaries: `## Vn` / `## Wn`. Do not upload W9.
 - Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID` (fallback `XAI_THEORY_COLLECTION_ID`).
 - Search: one server hybrid search per slot, limit 3. Do not give Grok `collections_search`.
 
