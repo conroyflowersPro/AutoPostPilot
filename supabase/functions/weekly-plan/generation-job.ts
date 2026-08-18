@@ -494,7 +494,7 @@ function shouldSkipPublicXSearch(
   targetedExploration: string,
 ): boolean {
   if (String(targetedExploration || "").trim()) return false;
-  return expandPoolFilled(requiredSlots, gated);
+  return publicViralSeedCount(gated) >= EXPAND_BATCH;
 }
 
 function plannerStepAfterExpand(st: any): JobStep {
@@ -1194,7 +1194,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     plannerRequestedCount: candidatePoolTarget(required),
     compactRetry: compact,
     model: V11_SEED_MODEL,
-    timeoutMs: compact ? 20000 : 40000,
+    timeoutMs: compact ? 20000 : PLANNER_DIGEST_TIMEOUT_MS,
     searchWindow,
     officialPublicPosts,
     excludeHandle: OPERATOR_HANDLE,
@@ -1277,15 +1277,13 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         (xaiRes.error ? ` · xAI ${xaiRes.error}` : ""),
     ].filter(Boolean).join("\n");
     if (isTransientXaiError(st.last_expand_error || xaiRes.error)) {
-      const poolReady = (st.gated || []).length > 0;
-      if (targetedExploration || (required > 0 && poolReady) || (required <= 0 && poolReady)) {
+      if (publicViralSeedCount(st.gated || []) >= EXPAND_BATCH) {
         st.compact_next = false;
         row.step = nextPlannerStep;
         row.label_ko = labelForPlannerStep(nextPlannerStep);
-        row.summary = [row.summary, "공개 검색 시간 초과 · 기존 Seed Pool로 Planner 이어감"].filter(Boolean).join("\n");
         return;
       }
-      holdForXai(row, "xAI 응답 대기 · Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
+      holdForXai(row, "xAI 응답 대기 · 공개 Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
       return;
     }
     st.empty_streak = Number(st.empty_streak || 0) + 1;
@@ -1298,7 +1296,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       return;
     }
     const livedReady = Number(st.experience_n || 0) > 0 || (st.gated || []).some((s: any) => isLivedSelfSeed(s));
-    if (required <= 0 && livedReady && !targetedExploration) {
+    if (required <= 0 && livedReady && publicViralSeedCount(st.gated || []) >= EXPAND_BATCH && !targetedExploration) {
       st.compact_next = false;
       row.step = nextPlannerStep;
       row.label_ko = labelForPlannerStep(nextPlannerStep);
@@ -1607,9 +1605,12 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     analyticsLine,
     `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "Agent승 시각"}`,
   ].filter(Boolean).join("\n");
-  if ((st.gated || []).length < seedTarget && canKeepExpanding(st)) {
+  if (
+    publicViralSeedCount(st.gated || []) < EXPAND_BATCH
+    || ((st.gated || []).length < seedTarget && canKeepExpanding(st))
+  ) {
     row.step = "expand";
-    row.label_ko = `Planner 칸용 Seed ${(st.gated || []).length}/${seedTarget}…`;
+    row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}/${EXPAND_BATCH} · 풀 ${(st.gated || []).length}/${seedTarget}…`;
     return;
   }
   row.step = "select";
