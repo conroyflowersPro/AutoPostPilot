@@ -46,11 +46,16 @@ assert.equal(capped.filter((c) => c.kind === "writing").length, 1);
 
 const packet = buildSemanticSeedPacket(
   { concrete_subject: "충전 줄", point_or_tension: "앞차가 안 움직임", owner: "OTHER" },
-  { what_is_actually_happening: "슈퍼차저에서 앞차가 안 움직인다", possible_reader_connection: "대기" },
+  {
+    what_is_actually_happening: "슈퍼차저에서 앞차가 안 움직인다",
+    possible_reader_connection: "대기",
+    what_is_new_or_interesting: "줄이 한 칸도 안 줄어든다",
+  },
 );
 assert.equal(packet.ownership, "OTHER");
 assert.ok(packet.scene);
-assert.ok(!("change_or_delta" in packet));
+assert.equal(packet.change_or_delta, "줄이 한 칸도 안 줄어든다");
+assert.equal(packet.contrast_or_tension, "앞차가 안 움직임");
 
 const noExp = buildExperiencePacket(
   { owner: "SELF", creator_evidence_available: true, experience_facts: [] },
@@ -81,7 +86,9 @@ const wr = readFileSync("supabase/functions/weekly-plan/independent-post-generat
 assert.match(wr, /DECIDED THOUGHT/);
 assert.match(wr, /RECENT VOICE REGISTER/);
 assert.match(wr, /Do not change Core Thought/);
+assert.doesNotMatch(wr, /THINKING RAIL \(internal only/);
 const ow = readFileSync("supabase/functions/weekly-plan/order-write-pipeline.ts", "utf8");
+assert.match(ow, /searchAgentSeungTheories\(""/);
 assert.match(ow, /searchAgentSeungTheories/);
 assert.match(ow, /selectThinkingRail/);
 assert.match(ow, /buildPostThought/);

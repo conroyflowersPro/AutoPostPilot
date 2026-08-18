@@ -2,7 +2,7 @@
  * Agent승 — work loop (not a chat window).
  * Lockstep: supabase/functions/weekly-plan/agent-seung.ts
  * ORDER 1: same identity; WEEKLY vs POST call; Post Agent승 writes the final post.
- * Collection/Thinking internals are not implemented here.
+ * POST: think first, then search Collections, then write. Lockstep with weekly-plan/agent-seung.ts.
  */
 export const AGENT_SEUNG_NAME = "Agent승";
 export const AGENT_SEUNG_NAME_EN = "AgentSeung";
@@ -207,6 +207,7 @@ export function stripTheoryLabels(text: string): string {
   return String(text || "")
     .replace(/^#{1,6}\s*(V|W)\d+[^\n]*/gim, "")
     .replace(/^출처:.*$/gm, "")
+    .replace(/^저자:.*$/gm, "")
     .replace(theoryLabelRe(), "")
     .replace(/\s+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")

@@ -1,7 +1,7 @@
 /**
  * Edge lockstep of lib/intelligence/agent-seung.ts (Edge cannot import lib/).
  * ORDER 1: same identity; WEEKLY vs POST call; Post Agent승 writes the final post.
- * Collection/Thinking internals are not implemented here.
+ * POST: think first, then search Collections, then write. Lockstep with lib/intelligence/agent-seung.ts.
  */
 export const AGENT_SEUNG_NAME = "Agent승";
 export const AGENT_SEUNG_NAME_EN = "AgentSeung";
@@ -206,6 +206,7 @@ export function stripTheoryLabels(text: string): string {
   return String(text || "")
     .replace(/^#{1,6}\s*(V|W)\d+[^\n]*/gim, "")
     .replace(/^출처:.*$/gm, "")
+    .replace(/^저자:.*$/gm, "")
     .replace(theoryLabelRe(), "")
     .replace(/\s+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -262,7 +263,11 @@ function mapMatch(
   source: { viralIds: string[]; writingIds: string[] },
 ): TheoryChunk {
   const raw = String(m?.chunk_content || m?.content || "");
-  const hint = String(m?.collection_id || m?.collectionId || m?.file_name || m?.file_id || "");
+  const nestedId =
+    m?.metadata && typeof m.metadata === "object"
+      ? m.metadata.collection_id || m.metadata.collectionId
+      : "";
+  const hint = String(m?.collection_id || m?.collectionId || nestedId || m?.file_name || m?.file_id || "");
   const kind = classifyTheoryKind(raw, hint, source);
   return {
     chunk_id: String(m?.chunk_id || m?.id || ""),

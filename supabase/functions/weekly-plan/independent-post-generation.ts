@@ -389,7 +389,6 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
   const voice = ctx.voice_register;
   const packet = (ctx as any).seed_packet || {};
   const packetLines = presentPacketLines(packet);
-  const railShape = s((ctx.thinking_rail as any)?.reasoning_shape);
 
   return [
     "You write one Korean X post for creator @Seung4680.",
@@ -405,9 +404,6 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "Core Thought: " + s(thought.core_thought || core?.creator_judgment || core?.primary_claim).slice(0, 220),
     "Reader entry: " + s(thought.reader_entry || ctx.human_element).slice(0, 180),
     "Stop point: " + s(thought.stop_point || "Stop when the core thought is already delivered."),
-    railShape
-      ? "THINKING RAIL (internal only, not a template, do not name it): " + railShape
-      : "",
     s((ctx as any).collection_block) || "COLLECTION: none. Do not invent force.",
     "STABLE CREATOR DNA:",
     creatorDnaWriterSlice(s(planner.strategic_role)),

@@ -259,7 +259,6 @@ export async function writeOneSlot(args: {
   const thinkRail = selectThinkingRail({
     interpretation: seed_interpretation,
     mechanism: null,
-    editorial_mode: mode,
   });
   const seed_packet = buildSemanticSeedPacket(seed as any, seed_interpretation as any);
   const experience_packet = buildExperiencePacket(seed as any, seed_interpretation as any);
@@ -273,7 +272,7 @@ export async function writeOneSlot(args: {
   // 3. Collection after Core Thought. One query per seed. Meaning fields, not topic words.
   let collection_block = "";
   if (args.xaiKey) {
-    const log = await searchAgentSeungTheories(String(seed.concrete_subject || ""), {
+    const log = await searchAgentSeungTheories("", {
       xaiKey: args.xaiKey,
       packet: seed_packet,
     });

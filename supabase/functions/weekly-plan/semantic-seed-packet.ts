@@ -60,7 +60,14 @@ export function buildSemanticSeedPacket(
           .join("; ")
       : "",
   );
-  const tension = keep(sd.point_or_tension || ip.what_is_new_or_interesting);
+  const tension = keep(sd.point_or_tension);
+  const noveltyRaw = s(ip.what_is_new_or_interesting, 180);
+  const delta =
+    noveltyRaw.length >= 4 &&
+    !/^(none|limited novelty)/i.test(noveltyRaw) &&
+    !/forced/.test(noveltyRaw)
+      ? keep(noveltyRaw)
+      : keep(sd.change_or_delta || ip.change_or_delta);
   const human = keep(ip.possible_reader_connection || ip.concrete_human_element || ip.human_element);
   const owner = keep(sd.owner || ip.experience_boundaries && (ip.experience_boundaries as any).owner);
   const facts = Array.isArray(sd.experience_facts)
@@ -73,6 +80,7 @@ export function buildSemanticSeedPacket(
   if (subject) packet.subject = subject;
   if (scene) packet.scene = scene;
   if (factual) packet.factual_event = factual;
+  if (delta) packet.change_or_delta = delta;
   if (tension) packet.contrast_or_tension = tension;
   if (human) packet.human_relevance = human;
   if (owner) packet.ownership = String(owner).toUpperCase();
@@ -122,10 +130,11 @@ export function buildPostThought(
     ip.why_it_might_matter_to_creator || ip.why_it_matters_now || ip.what_is_new_or_interesting,
     220,
   );
+  const labeled = /^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(
+    String(core?.creator_judgment || ""),
+  );
   const core_thought = s(
-    (core?.creator_judgment && !/^judgment_axis:/.test(core.creator_judgment) ? core.creator_judgment : "") ||
-      creator_interpretation ||
-      observation,
+    (labeled ? "" : core?.creator_judgment) || creator_interpretation || observation,
     220,
   );
   const reader_entry = s(
