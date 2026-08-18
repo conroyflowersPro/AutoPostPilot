@@ -4,10 +4,12 @@
 
 ## Current (do not treat older sections as live version)
 
-- **main:** v12.8.0. Do not deploy until Seung says **배포해**.
-- **ORDER 1 (v12.9.0):** PR #82 `cursor/order1-evidence-timing-c02a` — 7일 Evidence · Slot 날짜/시각. Preserve timestamp/calendar/Fedica identification.
-- **ORDER 2 (v12.10.0):** this thread — Agent승 Thinking Intelligence · Core Thought · 직접 WRITE. Collection API 호출 0. Hook만 준비.
-- **ORDER 3 next:** Independent Judge. Fedica가 Agent승 `planned_at`을 덮어쓰는 지점은 ORDER 1에서 표시만 함.
+- **main:** v12.8.0 until this ORDER 3 stack is merged.
+- **ORDER 1 (v12.9.0):** PR #82 `cursor/order1-evidence-timing-c02a` — 7일 Evidence · Slot 날짜/시각.
+- **ORDER 2 (v12.10.0):** PR #83 `cursor/order2-thinking-intelligence-c02a` — Agent승 Thinking Intelligence · Core Thought · 직접 WRITE. Collection API 호출 0. Hook만 준비.
+- **ORDER 3 (v12.11.0):** this thread `cursor/order3-judge-fedica-c02a` — Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행. Collection API 호출 0.
+
+ORDER 3 연결이 확인되면 이 스택을 production에 올린다. 새 Planner/Scheduler/Calendar/Writer를 만들지 않았다.
 
 ## Who / how
 

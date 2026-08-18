@@ -157,10 +157,11 @@ assert.ok(parsed);
 assert.equal(parsed![0].planned_at, "2026-08-19T22:15:00.000Z");
 assert.match(String(parsed![1].planned_pt), /17:40/);
 
-assert.equal(FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT, true);
+assert.equal(FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT, false);
 const fedicaBatch = readFileSync("app/api/fedica/batch-schedule/route.ts", "utf8");
-assert.match(fedicaBatch, /buildDaySpreadSlots/);
-assert.match(fedicaBatch, /ORDER 3 owns the Fedica timestamp handoff/);
+assert.match(fedicaBatch, /resolveFedicaScheduleTime/);
+assert.doesNotMatch(fedicaBatch, /allSlots\[i\]/);
+assert.doesNotMatch(fedicaBatch, /buildDaySpreadSlots\(/);
 const weekly = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.doesNotMatch(weekly, /searchAgentSeungTheories\(/);
 

@@ -358,6 +358,27 @@ export function writerHumorConstraintLines(ctx: DeepGenerationContext): string[]
   ].filter(Boolean);
 }
 
+function repairInstructionLines(ctx: DeepGenerationContext): string[] {
+  const seed = ((ctx as any).seed || {}) as Record<string, unknown>;
+  if (!seed.repair && !Array.isArray(seed.judge_reasons)) return [];
+  const reasons = (Array.isArray(seed.judge_reasons) ? seed.judge_reasons : [])
+    .map((x) => String(x || "").trim())
+    .filter(Boolean);
+  const planned = String(seed.planned_at || "").trim();
+  return [
+    "THIS CALL IS REPAIR of one slot after independent Judge REJECT. Not a new WEEKLY plan.",
+    "Keep Slot identity, Seed, Role, Editorial Mode, and planned_at unless this slot's strategy actually collapsed.",
+    planned ? "planned_at to keep: " + planned : "Keep the assigned slot timestamp.",
+    reasons.length
+      ? "Judge evidence (not a rewrite template): " + reasons.join(" · ")
+      : "Judge evidence is present. Do not turn it into a fixed sentence recipe.",
+    seed.strategy_reconsider
+      ? "Judge signaled this slot's strategy may no longer hold. Re-judge this slot only. Do not rebuild the seven-day plan. Change timestamp only if this slot's strategy actually collapsed."
+      : "Content reject. Do not change timestamp, Role, Mode, or Seed as a default.",
+    "Do not copy Judge reasons into the post. Fix the problem, then think and write again.",
+  ];
+}
+
 function writerPhilosophyBlock(): string {
   return [
     "POST AGENT승 ROLE: You are Agent승. Same identity as weekly planning. This call is POST: think, then write one Korean X post for @Seung4680. No separate Writer.",
@@ -397,6 +418,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
     "You think, then write one Korean X post for creator @Seung4680.",
     writerPhilosophyBlock(),
     writerArchitectureLock(),
+    ...repairInstructionLines(ctx),
     "ASSIGNED PLANNER INTENT (strategic purpose, never a writing template; do not re-plan the week):",
     `slot=${s(planner.strategy_slot_id)} role=${s(planner.strategic_role)} intent=${s(planner.intent)}`,
     "ASSIGNED SEED (UNDERSTAND / VERIFY evidence — not Core Thought):",

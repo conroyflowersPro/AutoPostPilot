@@ -1,10 +1,13 @@
 /**
  * ORDER 8A — Semantic Judge Foundation
+ * ORDER 3 — Independent Judge. One question: is this final post publishable in this slot?
  * Evaluate only. Never rewrite final_text, never generate alternatives.
  * Hard fail vs soft concern. Per-post isolation. generation_status ≠ judge_status.
  * Architecture: Judge does not write. No engine replaces the Creator.
- * Final publishability only. Strategy, selection, allocation, profile diversity,
- * and creative preferences remain Planner/Writer responsibilities.
+ * Judge does not decide 7-day portfolio, slot/seed allocation, Return/Bridge/Reach,
+ * Editorial Mode, complexity/emergence, publish date/time, X timing, Thinking Rail,
+ * Core Thought, or Fedica scheduling. Judge is not a second Agent승.
+ * Collection API is not called here.
  * Creator-related judgment is Contradiction Check, not Creator Fit / topic similarity.
  */
 import type { DeepGenerationContext, CoreThought, CompressionTarget } from "./deep-generation-context.ts";
@@ -17,7 +20,7 @@ import { qualityPhilosophyBlock } from "./engine-stage-philosophy.ts";
 import { isKoreaOnlySituation, hasExpertJargon, isEngagementBaitCloser, deepJargonCount } from "./seed-scope.ts";
 import { hasForbiddenDayCountPhrase, inhabitsOtherLivedViral } from "./seed-ownership.ts";
 
-export {
+import {
   extractStructuralSignature,
   weekStructureHardReasons,
   writerWeekStructureConstraintLines,
@@ -25,6 +28,15 @@ export {
   inferHookType,
   DISCOURSE_TWIST_REINTERPRET,
 } from "./structural-signature.ts";
+
+export {
+  extractStructuralSignature,
+  weekStructureHardReasons,
+  writerWeekStructureConstraintLines,
+  inferDiscourseShape,
+  inferHookType,
+  DISCOURSE_TWIST_REINTERPRET,
+};
 
 export const ORDER8A_NO_ENGINE_REPLACES_CREATOR = ARCHITECTURE_NO_ENGINE_REPLACES_CREATOR;
 export const ORDER8A_ARCHITECTURE_JUDGE_DOES_NOT_WRITE = ARCHITECTURE_JUDGE_DOES_NOT_WRITE;
@@ -48,6 +60,10 @@ export const ORDER8A_NO_FINISHED_EXAMPLES_IN_PROMPT = true as const;
 export const ORDER8A_CREATOR_CHECK_IS_CONTRADICTION = true as const;
 export const ORDER8A_NO_CREATOR_FIT_SCORE_GATE = true as const;
 export const ORDER8A_NO_TOPIC_FAMILIARITY_GATE = true as const;
+export const JUDGE_QUESTION = "이 최종 Post는 현재 Slot에서 게시 가능한가?";
+export const JUDGE_DOES_NOT_PLAN = true as const;
+export const JUDGE_DOES_NOT_SCHEDULE = true as const;
+export const JUDGE_NO_COLLECTION_API = true as const;
 
 export type JudgeOverallStatus =
   | "PASS"
@@ -406,23 +422,21 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
   const coreBits = [
     s(core.primary_claim),
     s(core.creator_judgment),
-    s(core.tension),
-    s(core.useful_implication),
-    s(core.reader_relevant_meaning),
-  ].filter((x) => x.length > 3);
+  ].filter((x) => x.length > 3 && !/^(judgment_axis|tension_around|reader_bridge)\s*:/i.test(x));
   let coreScore = 0.55;
   if (coreBits.length === 0) {
-    coreScore = 0.4;
-    soft.push("core_thought_thin");
+    coreScore = 0.5;
+    soft.push("core_thought_open");
   } else {
     const hit = coreBits.some((b) => hasAnyToken(text, subjectTokens(b)) || text.includes(b.slice(0, Math.min(8, b.length))));
     if (hit) coreScore = 0.88;
     else if (text.length > 20) {
-      coreScore = 0.45;
-      soft.push("core_thought_weak_surface_match");
+      coreScore = 0.2;
+      hard.push("core_thought_departed");
+      soft.push("writer_core_thought_lost");
     } else {
       coreScore = 0.2;
-      soft.push("writer_core_thought_lost");
+      hard.push("core_thought_departed");
     }
   }
   scores.core_thought_preservation = clamp01(coreScore);
@@ -561,10 +575,22 @@ export function evaluateSemanticJudge(input: SemanticJudgeInput): SemanticJudgeR
     soft.push("relational_connotation_hostile_in_warm_scene");
   }
 
-  // Profile-level repetition is Planner strategy, using actual X Analytics.
-  // Judge does not reject or score the completed post against a virtual week.
-  flags.conceptual_repetition = "LOW";
-  scores.novelty_fit = 0.8;
+  // Same-job serious clone is publishability, not week-mix strategy.
+  const priorSigs =
+    input.weekly_context?.other_post_structural_signatures ||
+    input.weekly_context?.recent_generated_signatures ||
+    [];
+  if (priorSigs.length) {
+    const mine = extractStructuralSignature(text);
+    const clone = weekStructureHardReasons(mine, priorSigs);
+    if (clone.length) {
+      flags.conceptual_repetition = "HIGH";
+      hard.push("recent_meaning_repetition");
+    }
+  } else {
+    flags.conceptual_repetition = "LOW";
+  }
+  scores.novelty_fit = flags.conceptual_repetition === "HIGH" ? 0.15 : 0.8;
 
   return finalize(slot, cid, hard, soft, scores, flags, "rule_based", true, true, null);
 }
@@ -673,8 +699,15 @@ export function isJudgePass(r: SemanticJudgeResult): boolean {
   return r.overall_status === "PASS" || r.overall_status === "PASS_WITH_CONCERNS";
 }
 
-/** Judge owns week count. Planner locks the plan and does not close the week. */
-export const JUDGE_OWNS_WEEK_COUNT = true as const;
+/** Judge does not invent weekly strategy. This only classifies reject reasons. */
+export function isSlotStrategyInvalidation(reasons: unknown): boolean {
+  const blob = (Array.isArray(reasons) ? reasons : [reasons])
+    .map((x) => String(x || "").toLowerCase())
+    .join(" ");
+  return /insufficient_seed|interpretation_blocked|no_seed_subject|seed_no_longer|factual_basis|grounding_collapsed|slot_seed_incoherent/.test(
+    blob,
+  );
+}
 
 export function judgeWeekCount(args: { planned_slots: number; passed_saved: number }): {
   complete: boolean;

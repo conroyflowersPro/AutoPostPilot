@@ -59,7 +59,6 @@ import { analyticsLivedSeeds, syncGapLivedSeeds } from "./analytics-lived-seeds.
 import { applyNewestLivedExperienceAssignments, isLivedSelfSeed, publicSearchWindows } from "./seed-ownership.ts";
 import { fetchOfficialPublicPosts, loadEdgeXAccessToken, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
 import {
-  attachSeedsForSlots,
   loadRecentXAnalyticsPublished,
   nextStrategyDayOffsets,
   nextUnassignedDayOffsets,
@@ -72,18 +71,16 @@ import {
 } from "./seven-day-planner.ts";
 import { stampPlannerSlotTimes } from "./for-you-spread.ts";
 import { buildAgentSeungPlanEvidence, classifyPlanOrigin, type AgentSeungPlanEvidence } from "./plan-evidence.ts";
-import { judgeWeekCount } from "./semantic-judge.ts";
+import { judgeWeekCount, isSlotStrategyInvalidation } from "./semantic-judge.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { buildAudienceXStatus, type AudienceXStatus } from "./audience-x-status.ts";
 import {
-  creatorRelabelRejectBatch,
   inferCreatorSlotsForDays,
   inferCreatorWeekVolume,
 } from "./creator-week-slots.ts";
 
 const EXPAND_BATCH = 10;
 const WRITE_CHUNK = 1;
-const RECOVER_WRITE_CHUNK = 4;
 const COLLISION_DAYS = 30;
 /** Shorter than Edge ~60s wall so a killed invoke unlocks and the next tick retries. */
 const JOB_LOCK_MS = 55000;
@@ -440,7 +437,7 @@ function beginRecoverIfQueueReady(row: any, required: number): boolean {
   if (Number(st.write_index || 0) < (st.write_flat || []).length) return false;
   if (Array.isArray(st.recover_batch) && st.recover_batch.length) {
     row.step = "recover";
-    row.label_ko = `거절 ${st.recover_batch.length}칸 재배차 ${row.saved_count}/${required}…`;
+    row.label_ko = `거절 ${st.recover_batch.length}칸 재작성 ${row.saved_count}/${required}…`;
     return true;
   }
   const queued = Array.isArray(st.recovery_queue) ? st.recovery_queue.length : 0;
@@ -494,7 +491,7 @@ function plannerStepAfterExpand(st: any): JobStep {
 
 function labelForPlannerStep(step: JobStep): string {
   if (step === "strategy") return "탐색 완료 · 슬롯 수 정하는 중";
-  if (step === "recover") return "Planner 재배차…";
+  if (step === "recover") return "거절 칸 재작성…";
   return "Planner Seed 선택…";
 }
 
@@ -1307,7 +1304,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   if (targetedExploration && grokAdded.length > 0) {
     st.planner_exploration_direction = "";
     row.step = nextPlannerStep;
-    row.label_ko = nextPlannerStep === "recover" ? "Planner 재배차…" : "Planner Seed 선택…";
+    row.label_ko = nextPlannerStep === "recover" ? "거절 칸 재작성…" : "Planner Seed 선택…";
     return;
   }
   if (filled) {
@@ -1706,13 +1703,13 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   ].filter(Boolean).join("\n");
 }
 
-async function stepRecover(supabase: any, xaiKey: string, row: any) {
+async function stepRecover(_supabase: any, _xaiKey: string, row: any) {
   const st = row.state;
   const strategy = st.planner_strategy as SevenDayStrategy | null;
   if (!strategy) {
     row.status = "error";
-    row.error = "Planner recovery state missing";
-    row.label_ko = "Planner recovery 실패";
+    row.error = "Recovery state missing";
+    row.label_ko = "복구 상태 없음";
     return;
   }
   if (!Array.isArray(st.recover_batch) || !st.recover_batch.length) {
@@ -1720,161 +1717,82 @@ async function stepRecover(supabase: any, xaiKey: string, row: any) {
       st.recover_batch = [st.pending_recovery];
     } else {
       row.status = "error";
-      row.error = "Planner recovery state missing";
-      row.label_ko = "Planner recovery 실패";
+      row.error = "Recovery state missing";
+      row.label_ko = "복구 상태 없음";
       return;
     }
   }
   const batch: any[] = st.recover_batch;
-  const pending = st.pending_recovery || {
-    batch: true,
-    attempts: 0,
-    strategy_slot_id: batch[0]?.strategy_slot_id,
-    slot: batch[0]?.slot,
-    judge_reasons: batch.flatMap((item: any) => item.judge_reasons || []).slice(0, 12),
-  };
-  st.pending_recovery = pending;
-  pending.attempts = Number(pending.attempts || 0) + 1;
-  if (pending.attempts > 4) {
-    pending.attempts = 0;
-    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
-    st.recovery_history.push({
-      strategy_slot_id: pending.strategy_slot_id,
-      action: "TARGETED_EXPLORE",
-      from_seed_id: "",
-      to_seed_id: "",
-      exploration_direction: slotExplorationDirection(batch[0]?.slot || pending),
-      judge_reasons: pending.judge_reasons || [],
-    });
-    requestTargetedSeedRefill(row, pending, `거절 묶음 JSON 한도 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
-    return;
-  }
-
-  if (!st.recover_relabeled) {
-    const audience = (st.audience_x_status as AudienceXStatus | undefined) || await loadAudienceXStatus(supabase);
-    const result = await creatorRelabelRejectBatch({
-      xaiKey,
-      audience,
-      rejected: batch.map((item: any) => ({
-        strategy_slot_id: String(item.strategy_slot_id || item.slot?.strategy_slot_id || ""),
-        growth_role: String(item.slot?.strategic_role || ""),
-        editorial_mode: String(item.slot?.editorial_mode || ""),
-        planner_intent: String(item.slot?.planner_intent || ""),
-        judge_reasons: item.judge_reasons || [],
-      })),
-      timeoutMs: 28000,
-    });
-    if (!result.ok || !result.value) {
-      if (isTransientXaiError(result.error)) {
-        pending.attempts = Math.max(0, Number(pending.attempts || 1) - 1);
-        holdForXai(row, "xAI 응답 대기 · Agent승 거절 재판단 이어감…", `Creator relabel: ${result.error}`);
-        return;
-      }
-      row.label_ko = `Agent승 거절 재판단 재추론 ${pending.attempts}/4…`;
-      row.summary = [row.summary, `Creator relabel: ${result.error || "unusable"}`].filter(Boolean).join("\n");
-      return;
-    }
-    for (const labeled of result.value) {
-      const strategySlot = strategy.slots.find((slot) => slot.slot_id === labeled.strategy_slot_id);
-      if (!strategySlot) continue;
-      strategySlot.strategic_role = labeled.strategic_role || strategySlot.strategic_role;
-      strategySlot.editorial_mode = labeled.editorial_mode || strategySlot.editorial_mode;
-      strategySlot.planner_intent = labeled.planner_intent || strategySlot.planner_intent;
-    }
-    st.recover_relabeled = true;
-    row.label_ko = `거절 ${batch.length}칸 Planner Seed 배차…`;
-    return;
-  }
-
-  const slots: PlannerSlotIntent[] = [];
-  for (const item of batch) {
-    const id = String(item.strategy_slot_id || item.slot?.strategy_slot_id || "");
-    const strategySlot = strategy.slots.find((slot) => slot.slot_id === id);
-    if (strategySlot) slots.push(strategySlot);
-  }
-  const pool = recoverSeedPool(st);
-  if (!pool.length || !slots.length) {
-    st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
-    st.recovery_history.push({
-      strategy_slot_id: pending.strategy_slot_id,
-      action: "TARGETED_EXPLORE",
-      from_seed_id: seedIdOf(batch[0]?.slot || pending),
-      to_seed_id: "",
-      exploration_direction: slotExplorationDirection(batch[0]?.slot || pending),
-      judge_reasons: pending.judge_reasons || [],
-    });
-    requestTargetedSeedRefill(row, pending, `거절 묶음 Seed 후보 없음 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
-    return;
-  }
-  const result = await attachSeedsForSlots({
-    xaiKey,
-    strategy,
-    slots,
-    seedPool: pool,
-    reservedSeedIds: [...savedSeedIds(st)],
-    timeoutMs: 28000,
-  });
-  if (!result.ok || !result.value) {
-    if (isTransientXaiError(result.error)) {
-      pending.attempts = Math.max(0, Number(pending.attempts || 1) - 1);
-      holdForXai(row, "xAI 응답 대기 · Planner Seed 배차 이어감…", `Planner recover seeds: ${result.error}`);
-      return;
-    }
-    row.label_ko = `거절 묶음 Seed 배차 재추론 ${pending.attempts}/4…`;
-    row.summary = [row.summary, `Planner recover seeds: ${result.error || "unusable"}`].filter(Boolean).join("\n");
-    return;
-  }
-  if (result.value.missing.length) {
-    const direction = result.value.missing.map((item) => item.exploration_direction).filter(Boolean).join(" · ").slice(0, 240);
-    st.planner_exploration_direction = direction || st.planner_exploration_direction;
-    requestTargetedSeedRefill(row, pending, `거절 묶음 빈 칸 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
-    return;
-  }
   const replacements: any[] = [];
-  for (const assignment of result.value.assignments) {
-    const seed = pool.find((candidate: any) => String(candidate.seed_id || "") === assignment.seed_id);
-    const item = batch.find((entry: any) => String(entry.strategy_slot_id || entry.slot?.strategy_slot_id || "") === assignment.slot_id);
+  for (const item of batch) {
     const original = item?.slot || {};
-    const strategySlot = strategy.slots.find((slot) => slot.slot_id === assignment.slot_id);
-    if (!seed || !strategySlot) continue;
-    const day = Math.max(0, Math.min(QUOTA_DAYS - 1, Number(original.dayOffset ?? strategySlot.day_offset) || 0));
-    replacements.push(compactSlotLite(
-      seed,
-      day,
-      Number(String(original.slotId || "").replace(/^D\d+P/, "")) || 1,
-      strategySlot.editorial_mode,
-      {
-        strategic_role: strategySlot.strategic_role,
-        planner_intent: assignment.planner_intent || strategySlot.planner_intent,
-        strategy_slot_id: strategySlot.slot_id,
-        planned_at: original.planned_at || strategySlot.planned_at,
-        planned_pt: original.planned_pt || strategySlot.planned_pt,
-      },
-    ));
+    const id = String(item.strategy_slot_id || original.strategy_slot_id || original.slotId || "");
+    const strategySlot = strategy.slots.find((slot) => slot.slot_id === id);
+    const attempts = Number(item.attempts || original.repair_attempts || 0) + 1;
+    const reasons = Array.isArray(item.judge_reasons) ? item.judge_reasons : [];
+    if (attempts > SEED_REJECT_ABANDON) {
+      st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
+      st.recovery_history.push({
+        strategy_slot_id: id,
+        action: "REPAIR_ABANDON_SLOT",
+        from_seed_id: seedIdOf(original),
+        to_seed_id: seedIdOf(original),
+        judge_reasons: reasons,
+      });
+      row.summary = [row.summary, `칸 ${id} 재작성 한도 · 다른 PASS 칸은 유지`].filter(Boolean).join("\n");
+      continue;
+    }
+    const repaired = {
+      ...original,
+      strategy_slot_id: id || original.strategy_slot_id,
+      strategic_role: original.strategic_role || strategySlot?.strategic_role,
+      editorial_mode: original.editorial_mode || strategySlot?.editorial_mode,
+      planner_intent: original.planner_intent || strategySlot?.planner_intent,
+      planned_at: original.planned_at || strategySlot?.planned_at,
+      planned_pt: original.planned_pt || strategySlot?.planned_pt,
+      repair: true,
+      repair_attempts: attempts,
+      judge_reasons: reasons,
+      strategy_reconsider: isSlotStrategyInvalidation(reasons),
+      _saved: false,
+    };
+    replacements.push(repaired);
     st.recovery_history = Array.isArray(st.recovery_history) ? st.recovery_history : [];
     st.recovery_history.push({
-      strategy_slot_id: assignment.slot_id,
-      action: "RESELECT_EXISTING",
+      strategy_slot_id: id,
+      action: repaired.strategy_reconsider ? "SLOT_STRATEGY_SIGNAL" : "CONTENT_REPAIR",
       from_seed_id: seedIdOf(original),
-      to_seed_id: assignment.seed_id,
-      exploration_direction: "",
-      judge_reasons: item?.judge_reasons || [],
+      to_seed_id: seedIdOf(original),
+      judge_reasons: reasons,
     });
   }
-  if (replacements.length !== batch.length) {
-    requestTargetedSeedRefill(row, pending, `거절 묶음 Seed 미완 → Seed Generator ${TARGETED_EXPLORE_SEED_COUNT}개`);
+  st.pending_recovery = null;
+  st.recover_batch = [];
+  st.recover_relabeled = false;
+  st.recover_write = true;
+  if (!replacements.length) {
+    if (quotaFilled(row)) {
+      attachCountLedger(row);
+      row.status = "done";
+      row.step = "done";
+      row.error = null;
+      row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
+      return;
+    }
+    if (Number(st.write_index || 0) >= (st.write_flat || []).length) {
+      row.status = "error";
+      row.error = `7일 Judge 개수 미달: PASS 저장 ${row.saved_count}/${row.required_slots}`;
+      row.label_ko = "Judge 개수 미달";
+    } else {
+      row.step = "write";
+    }
     return;
   }
   const insertAt = Math.max(0, Math.min(Number(st.write_index || 0), (st.write_flat || []).length));
   st.write_flat.splice(insertAt, 0, ...replacements);
   st.write_index = insertAt;
-  st.pending_recovery = null;
-  st.recover_batch = [];
-  st.recover_relabeled = false;
-  st.recover_write = true;
-  st.planner_exploration_direction = "";
   row.step = "write";
-  row.label_ko = `거절 ${replacements.length}칸 Writer 묶음 재작성 ${row.saved_count}/${row.required_slots}…`;
+  row.label_ko = `거절 ${replacements.length}칸 같은 전략으로 재작성 ${row.saved_count}/${row.required_slots}…`;
 }
 
 /** @deprecated Not called by the live job. Seed Generator no longer has a semantic Judge. */
@@ -2312,10 +2230,29 @@ function attachCountLedger(row: any) {
   }
 }
 
+async function findExistingPassDraft(
+  supabase: any,
+  userId: string,
+  jobId: string,
+  strategySlotId: string,
+): Promise<string | null> {
+  const slotId = String(strategySlotId || "").trim();
+  const job = String(jobId || "").trim();
+  if (!slotId || !job) return null;
+  const { data } = await supabase
+    .from("SeungContent")
+    .select("id")
+    .eq("user_id", userId)
+    .filter("strategy_json->>job_id", "eq", job)
+    .filter("strategy_json->>strategy_slot_id", "eq", slotId)
+    .maybeSingle();
+  return data?.id ? String(data.id) : null;
+}
+
 async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any) {
   const st = row.state;
   const flat: any[] = st.write_flat || [];
-  const i = Number(st.write_index || 0);
+  let i = Number(st.write_index || 0);
   const required = Number(row.required_slots) || 0;
   if (quotaFilled(row)) {
     attachCountLedger(row);
@@ -2331,11 +2268,31 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     row.label_ko = "작성 키 없음";
     return;
   }
+  while (i < flat.length && flat[i]?._saved) i++;
+  st.write_index = i;
+  if (i < flat.length) {
+    const resumeSlotId = String(flat[i]?.strategy_slot_id || flat[i]?.slotId || "");
+    const existingPass = await findExistingPassDraft(supabase, userId, row.id, resumeSlotId);
+    if (existingPass) {
+      flat[i]._saved = true;
+      row.saved_count = Number(row.saved_count || 0) + 1;
+      st.write_index = i + 1;
+      row.label_ko = `초안 생성 ${row.saved_count}/${required || flat.length}…`;
+      if (quotaFilled(row)) {
+        attachCountLedger(row);
+        row.status = "done";
+        row.step = "done";
+        row.error = null;
+        row.label_ko = `완료: ${row.saved_count}개 draft 저장 · 리뷰하세요`;
+      }
+      return;
+    }
+  }
   if (i >= flat.length) {
     if (st.pending_recovery || (Array.isArray(st.recovery_queue) && st.recovery_queue.length)) {
       if (st.pending_recovery) {
         row.step = "recover";
-        row.label_ko = `거절 글 재배차 ${row.saved_count}/${required}…`;
+        row.label_ko = `거절 칸 같은 전략으로 재작성 ${row.saved_count}/${required}…`;
       } else {
         beginRecoverIfQueueReady(row, required);
       }
@@ -2346,7 +2303,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
     }
     return;
   }
-  const chunk = flat.slice(i, i + (st.recover_write ? RECOVER_WRITE_CHUNK : WRITE_CHUNK));
+  const chunk = flat.slice(i, i + WRITE_CHUNK);
   st.attempted_seed_subjects = Array.isArray(st.attempted_seed_subjects) ? st.attempted_seed_subjects : [];
   for (const slot of chunk) {
     const subject = String(slot?.concrete_subject || slot?.primaryTopic || "");
@@ -2434,7 +2391,7 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
       if (rejected) {
         const rejects = bumpSeedReject(st, seedId);
         if (rejects >= SEED_REJECT_ABANDON) {
-          row.summary = [row.summary, `Planner가 Seed 3회 거절 후 버림 ${seedId || strategySlotId} · 슬롯은 재배차`].filter(Boolean).join("\n");
+          row.summary = [row.summary, `칸 ${seedId || strategySlotId} 재작성 한도 · 다른 PASS 칸은 유지`].filter(Boolean).join("\n");
         }
       }
       enqueueRecovery(st, {
@@ -2459,26 +2416,23 @@ async function stepWrite(supabase: any, xaiKey: string, userId: string, row: any
         day_offset: chunk[k]?.dayOffset ?? null,
         seed_id: chunk[k]?.seed_id || null,
         strategic_role: chunk[k]?.strategic_role || null,
+        editorial_mode: chunk[k]?.editorial_mode || null,
         planner_intent: chunk[k]?.planner_intent || null,
         planned_at: chunk[k]?.planned_at || null,
         planned_pt: chunk[k]?.planned_pt || null,
         writer_model: "grok-4.6",
         engine: "v11_seven_day_planner_runtime",
         job_id: row.id,
+        judge_status: "pass",
       },
     });
     if (ins.error) {
-      ins = await supabase.from("SeungContent").insert({
-        content: text,
-        status: "draft",
-        pipeline_id: "42303",
-        user_id: userId,
-      });
+      row.summary = [row.summary, `칸 ${chunk[k]?.strategy_slot_id || p.slotId} 저장 실패: ${ins.error.message}`].filter(Boolean).join("\n");
+      st.write_index = i;
+      return;
     }
-    if (!ins.error) {
-      row.saved_count = Number(row.saved_count || 0) + 1;
-      if (chunk[k]) (chunk[k] as any)._saved = true;
-    }
+    row.saved_count = Number(row.saved_count || 0) + 1;
+    if (chunk[k]) (chunk[k] as any)._saved = true;
   }
   st.write_index = i + chunk.length;
   row.label_ko = `초안 생성 ${row.saved_count}/${required || (st.write_flat || []).length}…`;

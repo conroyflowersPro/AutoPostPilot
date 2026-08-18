@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createDefaultPublisher } from "@/lib/publishers/fedica-provider";
 import { scheduleOnePost } from "@/lib/services/schedule-service";
-import { computeKRBatchStartISO, nextForYouSlotAfterOccupied } from "@/lib/schedule";
+import { resolveFedicaScheduleTime } from "@/lib/fedica-strategy-contract";
 import { SCHEDULING_CONFIG } from "@/lib/config/scheduling";
 
 export const maxDuration = 60;
@@ -45,17 +45,11 @@ export async function POST(req: NextRequest) {
     const occupied = (occupiedRows || [])
       .map((r: { scheduled_at?: string | null }) => String(r.scheduled_at || ""))
       .filter(Boolean);
-    // ORDER 1 identified: fallback recomputes the next 2h slot. It does not
-    // read Agent승 strategy_json.planned_at. ORDER 3 owns that handoff.
-    const scheduledAt =
-      typeof body.scheduledAt === "string" && body.scheduledAt.trim()
-        ? body.scheduledAt.trim()
-        : nextForYouSlotAfterOccupied(computeKRBatchStartISO(), occupied);
 
     const { data: post, error } = await supabase
       .from("SeungContent")
       .select(
-        "id, content, status, pipeline_id, media_urls, scheduled_at, fedica_post_id, attempt_count"
+        "id, content, status, pipeline_id, media_urls, scheduled_at, fedica_post_id, attempt_count, strategy_json"
       )
       .eq("id", postId)
       .maybeSingle();
@@ -64,6 +58,30 @@ export async function POST(req: NextRequest) {
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
+
+    const decided = resolveFedicaScheduleTime({
+      post,
+      occupiedISOs: occupied,
+      operatorOverride:
+        typeof body.scheduledAt === "string" && body.scheduledAt.trim()
+          ? body.scheduledAt.trim()
+          : "",
+    });
+    if (!decided.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          id: postId,
+          status: "skipped",
+          error: decided.error,
+          errorInternal: decided.code,
+          stage: "validate_post",
+          retryable: false,
+        },
+        { status: 409 }
+      );
+    }
+    const scheduledAt = decided.iso;
 
     const provider = createDefaultPublisher();
     const result = await scheduleOnePost({

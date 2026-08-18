@@ -241,10 +241,10 @@ export function nextForYouSlotAfterOccupied(
 
 /**
  * Spread posts across Pacific days from startISO.
- * Used by Fedica scheduling (ORDER 3). Generation Job must not use this to
- * overwrite Agent승 planned_at. ORDER 1 identified the overwrite; ORDER 3 owns the handoff.
+ * Legacy helper for posts that have no Agent승 planned_at.
+ * Generation Job and Fedica must not use this to overwrite Agent승 planned_at.
  */
-export const FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT = true;
+export { FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT } from "./fedica-strategy-contract.ts";
 
 export function buildDaySpreadSlots(
   startISO: string,

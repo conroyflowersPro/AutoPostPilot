@@ -82,6 +82,7 @@ function mapPlanned(row: {
   else if (s === "reviewed") status = "APPROVED";
   else if (s === "published") status = "PUBLISHED";
   else if (s === "draft") status = "DRAFT";
+  else if (s === "failed" || s === "schedule_failed") status = "FAILED";
 
   return {
     activity_id: `plan-${row.id}`,

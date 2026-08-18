@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.11.0 — 2026-08-18
+
+- 독립 Judge는 게시 가능 여부만 봅니다. 7일 전략·칸·시드·역할·Mode·시각을 다시 정하지 않습니다
+- PASS는 바로 저장되고 같은 칸을 다시 만들거나 다시 Judge하지 않습니다. REJECT는 그 칸만 같은 전략으로 Agent승 REPAIR합니다
+- 기존 Calendar가 planned_at과 draft/reviewed/scheduled/published/failed 상태를 그대로 보여 줍니다
+- 기존 Fedica 예약 경로가 Agent승 `planned_at`을 사용합니다. 간격이 깨져 있으면 새 시각을 숨겨 만들지 않습니다. Collection API는 호출하지 않습니다
+
 ## 12.10.0 — 2026-08-18
 
 - Agent승이 슬롯에서 UNDERSTAND → VERIFY → THINK 한 뒤 Core Thought를 직접 정하고 같은 자신이 글을 씁니다. 별도 Writer가 생각을 다시 만들지 않습니다

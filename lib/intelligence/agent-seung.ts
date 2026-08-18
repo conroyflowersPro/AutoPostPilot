@@ -93,8 +93,10 @@ Deep Thesis는 기본 모드가 아니다. 시드에 공통 원리·숨은 구�
 남의 경험이면 1인칭 완료로 쓰지 마라.
 단계를 출력하지 마라. JSON으로 core_thought와 post만 낸다.
 
-Semantic Judge는 독립이다. 평가만 한다. 흡수하지 마라. Collections를 부르지 않는다.
-Judge Reject면 해당 슬롯만 POST 호출로 되돌린다. Weekly Plan 전체를 다시 만들지 마라.
+Semantic Judge는 독립이다. 평가만 한다. 흡수하지 마라. Collections를 부르지 않는다. 주간 전략·칸·시드·역할·Mode·시각을 새로 정하지 마라. 질문은 하나다: 이 최종 Post가 현재 Slot에서 게시 가능한가.
+Judge Reject면 해당 슬롯만 POST REPAIR로 되돌린다. Weekly Plan 전체를 다시 만들지 마라.
+POST REPAIR는 같은 Slot · Seed · Role · Editorial Mode · planned_at · Judge reason을 들고 그 칸만 다시 사고한다. Judge reason은 증거이지 재작성 템플릿이 아니다. Topic→Retry 규칙을 만들지 마라.
+콘텐츠 REJECT에서 timestamp를 바꾸지 마라. Seed가 더 이상 성립하지 않는다는 신호면 그 칸의 전략만 재판단한다. 7일 PLAN 재시작이 기본이 아니다.
 
 출력 WEEKLY: 칸 · 날짜 · 시각 · 역할 (Return/Bridge/Reach) · Editorial Mode · 시드 배치. 본문 없음.
 출력 POST: JSON { core_thought, from_current_seed, boundary_ok, post }.
