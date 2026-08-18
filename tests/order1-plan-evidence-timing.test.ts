@@ -163,6 +163,17 @@ const check = describeSlotTimeCheck([
 ]);
 assert.equal(check.ok, false);
 assert.ok(check.collisions.length > 0);
+assert.ok(spacingConstraintHolds(
+  [{ planned_at: "2026-08-18T21:00:00.000Z" }],
+  ["2026-08-18T14:00:00.000Z", "2026-08-18T14:01:00.000Z"],
+));
+assert.equal(
+  describeSlotTimeCheck(
+    [{ slot_id: "n1", day_offset: 0, planned_at: "2026-08-18T21:00:00.000Z" }],
+    ["2026-08-18T14:00:00.000Z", "2026-08-18T14:01:00.000Z"],
+  ).ok,
+  true,
+);
 
 const parsed = parseCreatorDaySlots({
   raw: {

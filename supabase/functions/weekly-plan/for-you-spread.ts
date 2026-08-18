@@ -172,17 +172,20 @@ export function describeSlotTimeCheck<T extends { slot_id?: string; day_offset: 
     .map((s) => String(s.slot_id || `day_${s.day_offset}`));
   const stamped = (slots || [])
     .map((s) => ({ id: String(s.slot_id || `day_${s.day_offset}`), ms: Date.parse(String(s.planned_at || "")) }))
-    .filter((s) => Number.isFinite(s.ms));
-  const occupied = occupiedISOs.map((x) => Date.parse(x)).filter((ms) => Number.isFinite(ms));
-  const all = [
-    ...occupied.map((ms) => ({ id: "occupied", ms })),
-    ...stamped,
-  ].sort((a, b) => a.ms - b.ms);
+    .filter((s) => Number.isFinite(s.ms))
+    .sort((a, b) => a.ms - b.ms);
+  const occupied = occupiedISOs
+    .map((x) => Date.parse(x))
+    .filter((ms) => Number.isFinite(ms));
   const collisions: string[] = [];
-  for (let i = 1; i < all.length; i += 1) {
-    const gap = all[i].ms - all[i - 1].ms;
-    if (gap < gapMs) {
-      collisions.push(`${all[i - 1].id} ↔ ${all[i].id} (${Math.round(gap / 60000)}m)`);
+  for (let i = 1; i < stamped.length; i += 1) {
+    const gap = stamped[i].ms - stamped[i - 1].ms;
+    if (gap < gapMs) collisions.push(`${stamped[i - 1].id} ↔ ${stamped[i].id} (${Math.round(gap / 60000)}m)`);
+  }
+  for (const slot of stamped) {
+    for (const occ of occupied) {
+      const gap = Math.abs(slot.ms - occ);
+      if (gap < gapMs) collisions.push(`${slot.id} ↔ existing (${Math.round(gap / 60000)}m)`);
     }
   }
   const ok = missing.length === 0 && collisions.length === 0 && stamped.length === (slots || []).length;
@@ -200,14 +203,21 @@ export function spacingConstraintHolds<T extends { planned_at?: string }>(
   occupiedISOs: string[] = [],
   gapMs = MIN_PLANNED_GAP_MS,
 ): boolean {
-  const times = [
-    ...occupiedISOs.map((x) => Date.parse(x)),
-    ...slots.map((s) => Date.parse(String(s.planned_at || ""))),
-  ].filter((ms) => Number.isFinite(ms)).sort((a, b) => a - b);
+  const times = (slots || [])
+    .map((s) => Date.parse(String(s.planned_at || "")))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => a - b);
+  if (times.length !== (slots || []).length) return false;
   for (let i = 1; i < times.length; i += 1) {
     if (times[i] - times[i - 1] < gapMs) return false;
   }
-  return slots.every((s) => Number.isFinite(Date.parse(String(s.planned_at || ""))));
+  const occupied = occupiedISOs.map((x) => Date.parse(x)).filter((ms) => Number.isFinite(ms));
+  for (const t of times) {
+    for (const o of occupied) {
+      if (Math.abs(t - o) < gapMs) return false;
+    }
+  }
+  return true;
 }
 
 /** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */
