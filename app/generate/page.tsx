@@ -21,9 +21,11 @@ async function readJson(res: Response) {
   }
   if (!res.ok) {
     throw new Error(
-      data.detail
-        ? `${data.error || "요청 실패"}: ${String(data.detail).slice(0, 200)}`
-        : data.error || `요청 실패 (${res.status})`
+      res.status === 401
+        ? "로그인이 만료됐습니다. 다시 로그인한 뒤 이어서 누르면 시드는 유지됩니다."
+        : data.detail
+          ? `${data.error || "요청 실패"}: ${String(data.detail).slice(0, 200)}`
+          : data.error || `요청 실패 (${res.status})`
     );
   }
   return data;
@@ -74,7 +76,22 @@ function GeneratePageInner() {
     setLafcHome("UNKNOWN");
   }
 
-  async function edgeCall(session: any, body: Record<string, unknown>) {
+  async function liveSession() {
+    let {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const expMs = session?.expires_at ? session.expires_at * 1000 : 0;
+    if (!session?.access_token || (expMs && expMs - Date.now() < 180000)) {
+      const refreshed = await supabase.auth.refreshSession();
+      session = refreshed.data.session || session;
+    }
+    if (!session?.access_token) {
+      throw new Error("로그인이 만료됐습니다. 다시 로그인한 뒤 이어서 누르면 시드는 유지됩니다.");
+    }
+    return session;
+  }
+
+  async function edgeCall(body: Record<string, unknown>) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) throw new Error("SUPABASE URL 없음");
     const phaseName = String(body.phase || "");
@@ -86,12 +103,13 @@ function GeneratePageInner() {
           : phaseName === "quota"
             ? 45000
             : 30000;
-    const attempts = phaseName === "job_status" ? 3 : 1;
+    const attempts = phaseName === "job_status" ? 3 : 2;
     let lastErr: unknown;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), ms);
       try {
+        const session = await liveSession();
         const res = await fetch(`${supabaseUrl}/functions/v1/weekly-plan`, {
           method: "POST",
           headers: {
@@ -102,6 +120,11 @@ function GeneratePageInner() {
           body: JSON.stringify(body),
           signal: ac.signal,
         });
+        if (res.status === 401 && attempt < attempts - 1) {
+          await supabase.auth.refreshSession();
+          await sleep(400);
+          continue;
+        }
         return await readJson(res);
       } catch (e: any) {
         if (e?.name === "AbortError") {
@@ -139,7 +162,7 @@ function GeneratePageInner() {
       if (stopRef.current) return;
       const started = Date.now();
       try {
-        const job = await edgeCall(session, { phase: "job_tick", job_id: jobId });
+        const job = await edgeCall({ phase: "job_tick", job_id: jobId });
         applyJob(job);
         if (job.status === "done") {
           setPhase(job.label_ko || `완료: ${job.saved_count || 0}개 draft 저장 · 리뷰하세요`);
@@ -152,7 +175,7 @@ function GeneratePageInner() {
         if (!isTransientEdgeError(e)) throw e;
         setPhase("사파리 연결이 잠깐 끊겼습니다. 서버 작업을 확인합니다…");
         try {
-          const st = await edgeCall(session, { phase: "job_status", job_id: jobId });
+          const st = await edgeCall({ phase: "job_status", job_id: jobId });
           applyJob(st);
           if (st.status === "done") {
             setPhase(st.label_ko || `완료: ${st.saved_count || 0}개 draft 저장 · 리뷰하세요`);
@@ -181,7 +204,7 @@ function GeneratePageInner() {
       } = await supabase.auth.getSession();
       if (!session?.access_token || cancelled) return;
       try {
-        const st = await edgeCall(session, { phase: "job_status" });
+        const st = await edgeCall({ phase: "job_status" });
         if (cancelled || !st?.success || !st.job_id) return;
         if (st.status === "error" && /배포로 이전|생성을 멈췄/.test(String(st.error || st.label_ko || ""))) {
           setError(String(st.error || st.label_ko));
@@ -213,7 +236,7 @@ function GeneratePageInner() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.access_token || !jobIdRef.current) return;
-      const stopped = await edgeCall(session, { phase: "job_stop", job_id: jobIdRef.current });
+      const stopped = await edgeCall({ phase: "job_stop", job_id: jobIdRef.current });
       applyJob(stopped);
       setPhase(stopped.label_ko || "생성 멈춤");
       setError(stopped.error || "생성을 멈췄습니다.");
@@ -281,7 +304,7 @@ function GeneratePageInner() {
       setPhase("주간 작업 시작…");
       let started: any;
       try {
-        started = await edgeCall(session, {
+        started = await edgeCall({
           generationDays: GENERATION_DAYS,
           startDate,
           topic: topic.trim() || undefined,
@@ -296,7 +319,7 @@ function GeneratePageInner() {
         if (!isTransientEdgeError(e)) throw e;
         setPhase("사파리 연결이 잠깐 끊겼습니다. 서버 작업을 확인합니다…");
         try {
-          started = await edgeCall(session, { phase: "job_status" });
+          started = await edgeCall({ phase: "job_status" });
         } catch {
           throw new Error("주간 작업을 시작하지 못했습니다. 다시 눌러 주세요.");
         }
