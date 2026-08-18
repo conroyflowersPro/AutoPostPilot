@@ -1,0 +1,18 @@
+Collection 카드 파일 — 올리는 법
+
+1. 힘 알아보기 Collection
+   - 예전에 올린 viral-theories.md 삭제
+   - 힘-알아보기/ 안 V1.md ~ V8.md 만 업로드
+   - V9 없음. 올리지 말 것
+
+2. 닫기 형식 Collection
+   - 예전에 올린 writing-theories.md 삭제
+   - 닫기-형식/ 안 W1.md ~ W8.md 만 업로드
+
+설정은 그대로:
+- Max chunk size 2048
+- Chunk overlap 0
+- Inject name into chunks 끔
+
+카드 하나 = 파일 하나. 합치지 말 것.
+임베딩 Done 될 때까지 기다리기.
