@@ -7,6 +7,10 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.11 — 2026-08-18
+
+- Netlify Edge 미들웨어가 auth 오류로 사이트 전체를 죽이지 않습니다
+
 ## 12.12.10 — 2026-08-18
 
 - 칸 시각을 그날 날짜에 붙입니다. 날짜가 어긋난 ISO여도 시·분은 Agent승 것을 유지합니다
