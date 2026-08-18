@@ -16,7 +16,14 @@ import {
   audienceStatusBlock,
   type AudienceXStatus,
 } from "./audience-x-status.ts";
-import { planEvidenceForModel, type AgentSeungPlanEvidence } from "./plan-evidence.ts";
+import {
+  planEvidenceForModel,
+  planEvidenceForVolumeAndSlots,
+  parsePlanEvidenceDigest,
+  emptyPlanEvidenceDigest,
+  type AgentSeungPlanEvidence,
+  type PlanEvidenceDigest,
+} from "./plan-evidence.ts";
 
 function s(v: unknown, max = 240): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -162,10 +169,59 @@ export function parseCreatorDaySlots(args: {
   return slots;
 }
 
+function plannerEvidencePayload(
+  evidence: AgentSeungPlanEvidence | null | undefined,
+  digest?: PlanEvidenceDigest | null,
+): Record<string, unknown> | null {
+  if (!evidence) return null;
+  if (digest) return planEvidenceForVolumeAndSlots(evidence, digest);
+  return planEvidenceForModel(evidence);
+}
+
+export async function inferPlanEvidenceDigest(args: {
+  xaiKey: string;
+  page: unknown[];
+  pageIndex: number;
+  pageCount: number;
+  previous: PlanEvidenceDigest | null;
+  accountDaily?: unknown;
+  counts: { user_direct: number; ap_pipeline: number; unknown: number };
+  occupiedTimes: string[];
+  fedicaBestPostingTime: unknown;
+  timeoutMs?: number;
+}): Promise<PlannerCallResult<PlanEvidenceDigest>> {
+  const consumed = Math.min(args.pageIndex + 1, Math.max(1, args.pageCount));
+  return callPlanner({
+    xaiKey: args.xaiKey,
+    maxTokens: 1200,
+    timeoutMs: args.timeoutMs ?? 25000,
+    system: [
+      "You are Agent승 reading AP weekly plan evidence in pages.",
+      "Update the running digest from this page plus the previous digest.",
+      "Do not emit slots, Role, Editorial Mode, REACH, timestamps, or posts_per_day.",
+      "Do not invent posts or missing metrics. Thin evidence stays thin.",
+      "UNKNOWN is performance only. Do not treat it as voice or handmade thinking.",
+      "Return strict JSON: cadence_note, user_direct_note, ap_pipeline_note, unknown_perf_note, recent_topics, occupied_hours_note, timing_note, complexity_emergence_note, thin.",
+    ].join("\n"),
+    user: {
+      previous_digest: args.previous || emptyPlanEvidenceDigest(),
+      page: args.page,
+      page_index: args.pageIndex,
+      page_count: args.pageCount,
+      account_daily: args.pageIndex === 0 ? args.accountDaily || [] : undefined,
+      counts: args.counts,
+      occupied_times: args.occupiedTimes,
+      fedica_best_posting_time: args.fedicaBestPostingTime,
+    },
+    parse: (raw) => parsePlanEvidenceDigest(raw, consumed),
+  });
+}
+
 export async function inferCreatorWeekVolume(args: {
   xaiKey: string;
   audience: AudienceXStatus;
   planEvidence?: AgentSeungPlanEvidence | null;
+  digest?: PlanEvidenceDigest | null;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<{ posts_per_day: number[]; summary: string }>> {
@@ -177,13 +233,14 @@ export async function inferCreatorWeekVolume(args: {
       "You are Agent승 locking seven-day AP volume only. Do not emit slots.",
       creatorDnaBlock(),
       audienceStatusBlock(args.audience),
-      "Use plan_evidence: 30-day Analytics metrics stay separate. Sync is gap-fill only. USER_DIRECT and AP_PIPELINE stay separate. Do not average them. Complexity/Emergence is a judgment, not a ratio.",
+      "Use the Agent승 evidence digest plus counts and occupied times. Raw post dumps are not on this call.",
+      "30-day Analytics metrics stay separate. Sync is gap-fill only. USER_DIRECT and AP_PIPELINE stay separate. Do not average them. Complexity/Emergence is a judgment, not a ratio.",
       "volume_gates: each day 4-8 originals, week 28-56, no empty day. Handmade does not change volume.",
       "Return strict JSON: posts_per_day (7 integers), strategy_summary.",
     ].join("\n"),
     user: {
       audience_x_status: args.audience,
-      plan_evidence: args.planEvidence ? planEvidenceForModel(args.planEvidence) : null,
+      plan_evidence: plannerEvidencePayload(args.planEvidence, args.digest),
       operator_note: args.operatorNote || "",
     },
     parse: (raw) => {
@@ -201,6 +258,7 @@ export async function inferCreatorSlotsForDays(args: {
   postsPerDay: number[];
   already: PlannerSlotIntent[];
   planEvidence?: AgentSeungPlanEvidence | null;
+  digest?: PlanEvidenceDigest | null;
   operatorNote?: string;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSlotIntent[]>> {
@@ -212,7 +270,7 @@ export async function inferCreatorSlotsForDays(args: {
     system: creatorDaySlotsSystem(args.days, args.postsPerDay),
     user: {
       audience_counts: compactAudienceCounts(args.audience),
-      plan_evidence: args.planEvidence ? planEvidenceForModel(args.planEvidence) : null,
+      plan_evidence: plannerEvidencePayload(args.planEvidence, args.digest),
       posts_per_day: args.postsPerDay,
       day_offsets: args.days,
       required_slot_count_this_call: wanted,

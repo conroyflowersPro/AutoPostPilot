@@ -39,6 +39,8 @@ assert.match(job, /staleLivedExperiencePicks/);
 assert.match(job, /STRATEGY_REPLAN_ABANDON/);
 assert.match(job, /CONTENT_REPAIR_ABANDON/);
 assert.match(job, /extractFedicaBestPostingTime/);
+assert.match(job, /inferPlanEvidenceDigest/);
+assert.match(job, /planner_digest_complete/);
 assert.doesNotMatch(job, /applyNewestLivedExperienceAssignments/);
 assert.doesNotMatch(job, /=\s*fillUnassignedPlannerSlotsFromPool/);
 

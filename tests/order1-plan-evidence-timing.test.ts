@@ -4,6 +4,10 @@ import {
   buildAgentSeungPlanEvidence,
   classifyPlanOrigin,
   compactPlanMetrics,
+  pagePlanEvidenceRows,
+  parsePlanEvidenceDigest,
+  planEvidenceForVolumeAndSlots,
+  emptyPlanEvidenceDigest,
 } from "../supabase/functions/weekly-plan/plan-evidence.ts";
 import {
   enforceMinGapOnPlannedTimes,
@@ -114,6 +118,30 @@ assert.match(evidence.user_direct.posts[0].t, /장면/);
 assert.equal(evidence.sync_gap.user_direct.length, 1);
 assert.equal(evidence.sync_gap.user_direct[0].id, "gap1");
 assert.ok(!evidence.notes.some((n) => /FSD →|Tesla →/.test(n)));
+
+const pages = pagePlanEvidenceRows(evidence);
+assert.ok(pages.length >= 3);
+assert.equal(parsePlanEvidenceDigest({ slots: [{ planned_at: "x" }] }, 1), null);
+assert.equal(parsePlanEvidenceDigest({ posts_per_day: [4, 4, 4, 4, 4, 4, 4] }, 1), null);
+const digest = parsePlanEvidenceDigest({
+  cadence_note: "active days clustered evenings",
+  user_direct_note: "lived scenes thin",
+  recent_topics: ["parking ticket"],
+  thin: false,
+}, 1);
+assert.ok(digest);
+assert.match(digest.cadence_note, /evenings/);
+assert.equal(digest.recent_topics[0], "parking ticket");
+const slim = planEvidenceForVolumeAndSlots(evidence, digest);
+assert.ok(!("user_direct" in slim));
+assert.ok(slim.digest);
+assert.ok(Array.isArray((slim as { occupied_times: string[] }).occupied_times));
+assert.equal(emptyPlanEvidenceDigest().thin, true);
+
+const jobSrc = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
+assert.match(jobSrc, /inferPlanEvidenceDigest/);
+assert.match(jobSrc, /planner_digest_complete/);
+assert.match(jobSrc, /planEvidenceForVolumeAndSlots|digest,/);
 
 const slots = enforceMinGapOnPlannedTimes("2026-08-19", [
   { day_offset: 0, planned_at: "2026-08-19T22:07:00.000Z" },

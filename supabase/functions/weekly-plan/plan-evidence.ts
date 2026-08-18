@@ -294,6 +294,108 @@ export function buildAgentSeungPlanEvidence(args: {
   };
 }
 
+export const PLAN_EVIDENCE_PAGE_SIZE = 28;
+
+export type PlanEvidenceDigest = {
+  cadence_note: string;
+  user_direct_note: string;
+  ap_pipeline_note: string;
+  unknown_perf_note: string;
+  recent_topics: string[];
+  occupied_hours_note: string;
+  timing_note: string;
+  complexity_emergence_note: string;
+  pages_consumed: number;
+  thin: boolean;
+};
+
+export function emptyPlanEvidenceDigest(pagesConsumed = 0, thin = true): PlanEvidenceDigest {
+  return {
+    cadence_note: "",
+    user_direct_note: "",
+    ap_pipeline_note: "",
+    unknown_perf_note: "",
+    recent_topics: [],
+    occupied_hours_note: "",
+    timing_note: "",
+    complexity_emergence_note: "",
+    pages_consumed: pagesConsumed,
+    thin,
+  };
+}
+
+export function parsePlanEvidenceDigest(raw: unknown, pagesConsumed: number): PlanEvidenceDigest | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  if (o.slots || o.posts_per_day || o.growth_role || o.planned_at) return null;
+  const topics = Array.isArray(o.recent_topics)
+    ? o.recent_topics.map((t) => s(t, 80)).filter(Boolean).slice(0, 12)
+    : [];
+  return {
+    cadence_note: s(o.cadence_note, 400),
+    user_direct_note: s(o.user_direct_note, 400),
+    ap_pipeline_note: s(o.ap_pipeline_note, 400),
+    unknown_perf_note: s(o.unknown_perf_note, 400),
+    recent_topics: topics,
+    occupied_hours_note: s(o.occupied_hours_note, 280),
+    timing_note: s(o.timing_note, 280),
+    complexity_emergence_note: s(o.complexity_emergence_note, 400),
+    pages_consumed: pagesConsumed,
+    thin: o.thin === true || (!s(o.cadence_note, 400) && !topics.length),
+  };
+}
+
+/** Date order only. Does not rank importance or drop origins. */
+export function pagePlanEvidenceRows(evidence: AgentSeungPlanEvidence): CompactPlanMetrics[] {
+  const rows = [
+    ...evidence.user_direct.posts,
+    ...evidence.sync_gap.user_direct,
+    ...evidence.ap_pipeline.posts,
+    ...evidence.sync_gap.ap_pipeline,
+    ...evidence.unknown.posts,
+    ...evidence.sync_gap.unknown,
+  ];
+  const seen = new Set<string>();
+  const unique: CompactPlanMetrics[] = [];
+  for (const row of rows) {
+    const key = `${row.origin}:${row.id || row.d}:${row.t}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+  }
+  unique.sort((a, b) => String(b.d).localeCompare(String(a.d)));
+  return unique;
+}
+
+/** Volume/slots payload after Agent승 digest. No raw post dump. */
+export function planEvidenceForVolumeAndSlots(
+  evidence: AgentSeungPlanEvidence,
+  digest: PlanEvidenceDigest,
+): Record<string, unknown> {
+  return {
+    evidence_version: evidence.version,
+    start_date: evidence.start_date,
+    analytics_coverage_days: evidence.analytics_coverage_days,
+    counts: {
+      user_direct: evidence.user_direct.originals,
+      ap_pipeline: evidence.ap_pipeline.originals,
+      unknown: evidence.unknown.originals,
+    },
+    occupied_times: evidence.occupied_times,
+    timing: {
+      fedica_best_posting_time: evidence.fedica_best_posting_time,
+      audience_hours_pt: {
+        start: "14:00",
+        end: "22:00",
+        role: "audience_evidence_not_fixed_window",
+      },
+      min_gap_hours: 2,
+    },
+    digest,
+    notes: evidence.notes,
+  };
+}
+
 export function planEvidenceForModel(evidence: AgentSeungPlanEvidence): Record<string, unknown> {
   return {
     evidence_version: evidence.version,

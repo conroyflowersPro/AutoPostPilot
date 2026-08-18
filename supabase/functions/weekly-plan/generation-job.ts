@@ -70,7 +70,7 @@ import {
   type SevenDayVolume,
 } from "./seven-day-planner.ts";
 import { stampPlannerSlotTimes, spacingConstraintHolds } from "./for-you-spread.ts";
-import { buildAgentSeungPlanEvidence, classifyPlanOrigin, extractFedicaBestPostingTime, type AgentSeungPlanEvidence } from "./plan-evidence.ts";
+import { buildAgentSeungPlanEvidence, classifyPlanOrigin, extractFedicaBestPostingTime, emptyPlanEvidenceDigest, pagePlanEvidenceRows, PLAN_EVIDENCE_PAGE_SIZE, type AgentSeungPlanEvidence, type PlanEvidenceDigest } from "./plan-evidence.ts";
 import { judgeWeekCount, isSlotStrategyInvalidation } from "./semantic-judge.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { buildAudienceXStatus, type AudienceXStatus } from "./audience-x-status.ts";
@@ -78,6 +78,7 @@ import {
   inferCreatorSlotReplan,
   inferCreatorSlotsForDays,
   inferCreatorWeekVolume,
+  inferPlanEvidenceDigest,
   reachDailyConstraintOk,
 } from "./creator-week-slots.ts";
 
@@ -761,6 +762,10 @@ export async function startWeeklyJob(args: {
     planner_volume_attempts: 0,
     planner_day_batch_attempts: 0,
     planner_xai_holds: 0,
+    planner_digest: null as PlanEvidenceDigest | null,
+    planner_digest_cursor: 0,
+    planner_digest_complete: false,
+    planner_digest_attempts: 0,
     planner_selection_attempts: 0,
     planner_selection_failures: 0,
     planner_exploration_direction: "",
@@ -1399,11 +1404,72 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     `bundled ${analytics.bundled_source || "none"}${analytics.bundled_error ? ` · ${analytics.bundled_error}` : ""}`,
   ].join(" · ");
 
+  if (!st.planner_digest_complete) {
+    const rows = pagePlanEvidenceRows(planEvidence);
+    const cursor = Number(st.planner_digest_cursor || 0);
+    if (cursor >= rows.length) {
+      st.planner_digest_complete = true;
+      if (!st.planner_digest) st.planner_digest = emptyPlanEvidenceDigest(0, true);
+    } else {
+      const page = rows.slice(cursor, cursor + PLAN_EVIDENCE_PAGE_SIZE);
+      const pageIndex = Math.floor(cursor / PLAN_EVIDENCE_PAGE_SIZE);
+      const pageCount = Math.max(1, Math.ceil(rows.length / PLAN_EVIDENCE_PAGE_SIZE));
+      const result = await inferPlanEvidenceDigest({
+        xaiKey,
+        page,
+        pageIndex,
+        pageCount,
+        previous: (st.planner_digest as PlanEvidenceDigest | null) || null,
+        accountDaily: pageIndex === 0 ? planEvidence.account_daily : undefined,
+        counts: {
+          user_direct: planEvidence.user_direct.originals,
+          ap_pipeline: planEvidence.ap_pipeline.originals,
+          unknown: planEvidence.unknown.originals,
+        },
+        occupiedTimes: planEvidence.occupied_times,
+        fedicaBestPostingTime: planEvidence.fedica_best_posting_time,
+        timeoutMs: 25000,
+      });
+      if (!result.ok || !result.value) {
+        if (isTransientXaiError(result.error)) {
+          if (takePlannerHold(st) < PLANNER_XAI_HOLD_MAX) {
+            holdForXai(row, `xAI 응답 대기 · 증거 읽기 ${cursor}/${rows.length}…`, `digest: ${result.error}`);
+            return;
+          }
+          row.status = "error";
+          row.error = `7일 Agent승 증거 읽기 시간 초과: ${result.error || "xai_timeout"}`;
+          row.label_ko = "증거 읽기 실패";
+          return;
+        }
+        st.planner_digest_attempts = Number(st.planner_digest_attempts || 0) + 1;
+        if (st.planner_digest_attempts < 3) {
+          row.label_ko = `Agent승 증거 다시 읽기 ${st.planner_digest_attempts}/3…`;
+          row.summary = [row.summary, analyticsLine, `digest: ${result.error || "unusable"}`].filter(Boolean).join("\n");
+          return;
+        }
+        row.status = "error";
+        row.error = `7일 Agent승 증거 읽기 실패: ${result.error || "unusable"}`;
+        row.label_ko = "증거 읽기 실패";
+        return;
+      }
+      st.planner_digest = result.value;
+      st.planner_digest_cursor = cursor + page.length;
+      st.planner_digest_attempts = 0;
+      st.planner_xai_holds = 0;
+      if (st.planner_digest_cursor >= rows.length) st.planner_digest_complete = true;
+      row.label_ko = `Agent승 증거 읽기 ${Math.min(st.planner_digest_cursor, rows.length)}/${rows.length}…`;
+      return;
+    }
+  }
+
+  const digest = (st.planner_digest as PlanEvidenceDigest | null) || emptyPlanEvidenceDigest(0, true);
+
   if (!st.planner_volume) {
     const result = await inferCreatorWeekVolume({
       xaiKey,
       audience,
       planEvidence,
+      digest,
       operatorNote: intentText || undefined,
       timeoutMs: 20000,
     });
@@ -1461,6 +1527,7 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
       postsPerDay: volume.posts_per_day,
       already: partial,
       planEvidence,
+      digest,
       operatorNote: intentText || undefined,
       timeoutMs: PLANNER_DAY_SLOT_TIMEOUT_MS,
     });

@@ -4,7 +4,7 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** v12.12.1 on **main**. PLAN timeout hold cap.
+- **this branch:** v12.12.2 local. Agent승 plan-evidence digest. **Not on main until 배포해.**
 - **main:** v12.12.1. PLAN timeout cap + Collection search after Core Thought.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
