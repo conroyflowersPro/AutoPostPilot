@@ -97,11 +97,34 @@ export function publicSearchWindows(now: Date = new Date()): {
   };
 }
 
-export function abstractLivedSubject(text: string, cluster: string): string {
+function livedClauses(text: string): string[] {
+  return String(text || "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?…다요함음죠네])\s+|\n+/)
+    .map((c) => c.replace(/^["'“”]+|["'“”]+$/g, "").trim())
+    .filter((c) => c.length >= 10 && !/동일 내용|cite the lived|어떻게 생각|팔로우/i.test(c));
+}
+
+/** Scene / change meaning only. Never the original post. Never cluster+"실사용 후속". */
+export function livedMeaningGist(text: string): string {
   const stripped = String(text || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
   if (stripped.length < 12) return "";
-  const clusterBit = String(cluster || "DAILY").replace(/_/g, " ");
-  return `${clusterBit} 실사용 후속`.slice(0, 80);
+  const clauses = livedClauses(stripped);
+  const picked = clauses.find((c) => c.length <= 72) || clauses[0] || stripped.slice(0, 72);
+  let gist = picked.replace(/^(결국|사실|진짜|솔직히)\s*/i, "").trim().slice(0, 72);
+  if (stripped.length > 90 && gist.length > stripped.length * 0.85) gist = gist.slice(0, 48);
+  if (/실사용 후속/.test(gist)) return "";
+  return gist.length >= 10 ? gist : "";
+}
+
+export function livedExperienceFacts(text: string): string[] {
+  return livedClauses(text).map((c) => c.slice(0, 140)).slice(0, 4);
+}
+
+export function abstractLivedSubject(text: string, _cluster: string): string {
+  return livedMeaningGist(text);
 }
 
 export type ExperienceAssignment = {

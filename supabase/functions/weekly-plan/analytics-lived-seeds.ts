@@ -4,7 +4,7 @@
  */
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { clusterFromText } from "./experience-evidence.ts";
-import { abstractLivedSubject, sortLivedNewestFirst } from "./seed-ownership.ts";
+import { abstractLivedSubject, livedExperienceFacts, sortLivedNewestFirst } from "./seed-ownership.ts";
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 
 type AnalyticsPost = {
@@ -37,6 +37,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
     const body = String(row.content || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
     if (body.length < 20) continue;
     const cluster = clusterFromText(body);
+    const facts = livedExperienceFacts(body);
     const subject = abstractLivedSubject(body, cluster);
     if (!subject) continue;
     const sig = subjectSignature(`${cluster}|${String(row.post_id || subject)}`);
@@ -49,7 +50,8 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: "Cite the lived episode by situation only. Related follow-up. 동일 내용 금지.",
+      point_or_tension: facts[1] || facts[0] || subject,
+      experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_ANALYTICS_30D"],
       status: "ELIGIBLE",
@@ -101,6 +103,7 @@ export function syncGapLivedSeeds(args: {
     const body = String(row.text_body || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
     if (body.length < 20) continue;
     const cluster = clusterFromText(body);
+    const facts = livedExperienceFacts(body);
     const subject = abstractLivedSubject(body, cluster);
     if (!subject) continue;
     const sig = subjectSignature(`${cluster}|${id || subject}`);
@@ -113,7 +116,8 @@ export function syncGapLivedSeeds(args: {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: "Cite the lived episode by situation only. Related follow-up. 동일 내용 금지.",
+      point_or_tension: facts[1] || facts[0] || subject,
+      experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_SYNC_GAP"],
       status: "ELIGIBLE",

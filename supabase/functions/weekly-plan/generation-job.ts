@@ -452,7 +452,7 @@ function beginRecoverIfQueueReady(row: any, required: number): boolean {
   st.recover_write = true;
   st.pending_recovery = { batch: true, attempts: 0, strategy_slot_id: batch[0]?.strategy_slot_id, slot: batch[0]?.slot, judge_reasons: batch.flatMap((item: any) => item.judge_reasons || []).slice(0, 12) };
   row.step = "recover";
-  row.label_ko = `거절 ${batch.length}칸 Creator DNA 재판단 ${row.saved_count}/${required}…`;
+  row.label_ko = `거절 ${batch.length}칸 Agent승 재판단 ${row.saved_count}/${required}…`;
   return true;
 }
 
@@ -1320,7 +1320,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
         return;
       }
       row.status = "error";
-      row.error = `7일 Creator DNA 칸 수 실패: ${result.error || "unusable"}`;
+      row.error = `7일 Agent승 칸 수 실패: ${result.error || "unusable"}`;
       row.label_ko = "Creator 칸 수 실패";
       return;
     }
@@ -1334,11 +1334,11 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     st.planner_slots_partial = [];
     st.planner_day_batch_attempts = 0;
     const locked = result.value.posts_per_day.reduce((a, b) => a + b, 0);
-    row.label_ko = `7일 칸 수 잠금 ${locked}칸 · Creator DNA 슬롯…`;
+    row.label_ko = `7일 칸 수 잠금 ${locked}칸 · Agent승 슬롯…`;
     row.summary = [
       row.summary,
       analyticsLine,
-      `Creator DNA 칸 수 ${locked} · 하루 ${result.value.posts_per_day.join("/")}`,
+      `Agent승 칸 수 ${locked} · 하루 ${result.value.posts_per_day.join("/")}`,
       `Creator 요약: ${result.value.summary}`,
     ].filter(Boolean).join("\n");
     return;
@@ -1364,12 +1364,12 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
       }
       st.planner_day_batch_attempts = Number(st.planner_day_batch_attempts || 0) + 1;
       if (st.planner_day_batch_attempts < 3) {
-        row.label_ko = `Creator DNA ${days.map((d) => d + 1).join(",")}일차 슬롯 재추론 ${st.planner_day_batch_attempts}/3…`;
+        row.label_ko = `Agent승 ${days.map((d) => d + 1).join(",")}일차 슬롯 재추론 ${st.planner_day_batch_attempts}/3…`;
         row.summary = [row.summary, `Creator day slots: ${result.error || "unusable"}`].filter(Boolean).join("\n");
         return;
       }
       row.status = "error";
-      row.error = `7일 Creator DNA 슬롯 실패 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "unusable"}`;
+      row.error = `7일 Agent승 슬롯 실패 (${days.map((d) => d + 1).join(",")}일차): ${result.error || "unusable"}`;
       row.label_ko = "Creator 슬롯 실패";
       return;
     }
@@ -1377,7 +1377,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
     st.planner_day_batch_attempts = 0;
     const remain = nextStrategyDayOffsets(st.planner_slots_partial, volume.posts_per_day);
     if (remain.length) {
-      row.label_ko = `Creator DNA 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;
+      row.label_ko = `Agent승 슬롯 ${st.planner_slots_partial.length}칸 · ${remain.map((d) => d + 1).join(",")}일차…`;
       return;
     }
   }
@@ -1406,7 +1406,7 @@ async function stepStrategy(supabase: any, xaiKey: string, row: any) {
   const seedTarget = candidatePoolTarget(row.required_slots);
   row.summary = [
     row.summary,
-    `Creator DNA 잠금 ${row.required_slots}칸 · Planner가 시각 배정 · Seed Generator에 ${seedTarget}개 요청 (칸 + ${SEED_POOL_BUFFER})`,
+    `Agent승 잠금 ${row.required_slots}칸 · Planner가 시각 배정 · Seed Generator에 ${seedTarget}개 요청 (칸 + ${SEED_POOL_BUFFER})`,
     `Creator 7일 판단: ${volume.summary}`,
     analyticsLine,
     `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "14:00 PT"}`,
@@ -1689,10 +1689,10 @@ async function stepRecover(supabase: any, xaiKey: string, row: any) {
     if (!result.ok || !result.value) {
       if (isTransientXaiError(result.error)) {
         pending.attempts = Math.max(0, Number(pending.attempts || 1) - 1);
-        holdForXai(row, "xAI 응답 대기 · Creator DNA 거절 재판단 이어감…", `Creator relabel: ${result.error}`);
+        holdForXai(row, "xAI 응답 대기 · Agent승 거절 재판단 이어감…", `Creator relabel: ${result.error}`);
         return;
       }
-      row.label_ko = `Creator DNA 거절 재판단 재추론 ${pending.attempts}/4…`;
+      row.label_ko = `Agent승 거절 재판단 재추론 ${pending.attempts}/4…`;
       row.summary = [row.summary, `Creator relabel: ${result.error || "unusable"}`].filter(Boolean).join("\n");
       return;
     }

@@ -128,6 +128,16 @@ export type DeepGenerationContext = {
   recent_repetition_risk: string;
   /** Abstract week signatures only — no prior post wording. */
   week_structural_signatures?: Array<Record<string, unknown>>;
+  seed_packet?: Record<string, unknown>;
+  post_thought?: {
+    observation: string;
+    creator_interpretation: string;
+    core_thought: string;
+    reader_entry: string;
+    stop_point: string;
+  };
+  collection_block?: string;
+  experience_packet?: Record<string, unknown>;
   generation_status: GenerationStatus;
   voice_register?: {
     n: number;
@@ -174,6 +184,16 @@ export type BuildDeepGenerationInput = {
     constraint_line: string;
   } | null;
   week_structural_signatures?: Array<Record<string, unknown>> | null;
+  seed_packet?: Record<string, unknown> | null;
+  post_thought?: {
+    observation: string;
+    creator_interpretation: string;
+    core_thought: string;
+    reader_entry: string;
+    stop_point: string;
+  } | null;
+  collection_block?: string | null;
+  experience_packet?: Record<string, unknown> | null;
 };
 
 function s(v: unknown, d = ""): string {
@@ -257,11 +277,11 @@ export function buildCoreThought(
   }
   return {
     status,
-    primary_claim: (tension ? `tension_around:${tension.slice(0, 80)}` : `observe:${subject.slice(0, 80)}`).slice(0, 120),
-    creator_judgment: why ? `judgment_axis:${why.slice(0, 100)}` : `judgment_axis:current_seed_relevance`,
-    tension: tension.slice(0, 120),
-    useful_implication: human ? `reader_bridge:${human.slice(0, 100)}` : `reader_bridge:open_inference`,
-    reader_relevant_meaning: String(human || why || subject).slice(0, 120),
+    primary_claim: (tension || why || subject).slice(0, 160),
+    creator_judgment: (why || tension || subject).slice(0, 160),
+    tension: tension.slice(0, 160),
+    useful_implication: (human || why).slice(0, 160),
+    reader_relevant_meaning: String(human || why || subject).slice(0, 160),
     confidence: clamp01(confidence),
     fact_confidence: clamp01(fact_confidence),
     opinion_confidence: clamp01(opinion_confidence),
@@ -430,11 +450,7 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
       selected_rail_id: s(rail.selected_rail_id || rail.rail_id),
       compression_preference: s(rail.compression_preference),
       reasoning_shape: s(rail.reasoning_shape),
-      required_reasoning_beats: Array.isArray(rail.required_reasoning_beats)
-        ? rail.required_reasoning_beats
-        : Array.isArray(rail.structure_beats)
-          ? rail.structure_beats
-          : [],
+      required_reasoning_beats: [],
     },
     everyday_language: {
       prefer_broad_simple: true,
@@ -495,6 +511,10 @@ export function buildDeepGenerationContext(input: BuildDeepGenerationInput): Dee
     week_structural_signatures: Array.isArray(input.week_structural_signatures)
       ? input.week_structural_signatures
       : [],
+    seed_packet: input.seed_packet || undefined,
+    post_thought: input.post_thought || undefined,
+    collection_block: input.collection_block || undefined,
+    experience_packet: input.experience_packet || undefined,
     generation_status,
     voice_register: input.voice_register || null,
     invariants: {

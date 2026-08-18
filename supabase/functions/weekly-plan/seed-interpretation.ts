@@ -120,8 +120,9 @@ function buildClaimBoundaries(seed: InterpretSeedInput, factual: FactualBoundary
 }
 function buildExperienceBoundaries(seed: InterpretSeedInput): ExperienceBoundary {
   const owner = String(seed.owner || seed.seed_source || "").toUpperCase();
+  const facts = (seed.experience_facts || []).map(clean).filter((x) => x.length >= 4);
   const self = owner === "SELF" || owner === "ANALYTICS_LIVED";
-  const hasExp = self && !!(seed.creator_evidence_available || seed.experience_required || seed.occurred_at);
+  const hasExp = self && facts.length > 0;
   return {
     creator_experienced: hasExp,
     evidence_supported: hasExp,
@@ -151,30 +152,32 @@ function assessRepetitionRisk(seed: InterpretSeedInput): "LOW" | "MEDIUM" | "HIG
   return "LOW";
 }
 function detectHumanElement(seed: InterpretSeedInput): string {
-  const text = `${clean(seed.concrete_subject)} ${clean(seed.point_or_tension)}`.toLowerCase();
-  if (!/시간|돈|습관|불편|선택|대기|줄|피곤|스트레스|체감|직접|해봤|타보|충전했|운전|직관|동선|대기시간|비용|가격체감|사람|관중|좌석|줄서|기다|짜증|편함|불편함|알림|화면|주차|구독|수수료|요금|날씨|외출|길찾기|와이퍼|업데이트|레이어|휴대폰|드라이브|연석/.test(text)) return "NONE";
-  if (/충전|대기|슈퍼차저/.test(text)) return "charging wait or session friction in daily use";
-  if (/직관|경기|bmo|동선/.test(text)) return "match-day movement and time cost";
-  if (/합류|감시|핸들|개입/.test(text)) return "driver attention / intervention load while driving";
-  if (/가격|비용|돈/.test(text)) return "money or cost trade-off in real choice";
-  return "daily time / effort / choice friction";
+  const text = `${clean(seed.concrete_subject)} ${clean(seed.point_or_tension)}`.trim();
+  if (text.length < 8) return "NONE";
+  const facts = (seed.experience_facts || []).map(clean).filter((x) => x.length >= 4);
+  if (facts[0]) return facts[0].slice(0, 80);
+  if (/시간|돈|습관|불편|선택|대기|줄|피곤|스트레스|체감|직접|해봤|타보|충전했|운전|직관|동선|비용|사람|기다|주차|구독|수수료|요금|날씨|외출|알림|화면|와이퍼/.test(text)) {
+    return text.slice(0, 80);
+  }
+  return "NONE";
 }
 function detectNovelty(seed: InterpretSeedInput): { signal: "NONE" | "LOW" | "MEDIUM" | "HIGH"; text: string } {
   const text = `${clean(seed.concrete_subject)} ${clean(seed.point_or_tension)}`;
   if (!text || text.length < 10) return { signal: "NONE", text: "none detectable" };
-  if (/vs\.?|대비|trade-?off|오히려|예상과|달라|변화|새|처음|아직/.test(text)) return { signal: "MEDIUM", text: "contrast, change, or unexpected tension present in seed" };
-  if (/패턴|기준|판단|차이|병목/.test(text)) return { signal: "LOW", text: "judgment criterion or pattern difference" };
+  if (/vs\.?|대비|trade-?off|오히려|예상과|달라|변화|새|처음|아직/.test(text)) {
+    return { signal: "MEDIUM", text: text.slice(0, 120) };
+  }
+  if (/패턴|기준|판단|차이|병목/.test(text)) return { signal: "LOW", text: text.slice(0, 120) };
   return { signal: "NONE", text: "no clear novelty beyond topic itself" };
 }
 function whyMightMatter(seed: InterpretSeedInput): string {
-  const cluster = clean(seed.cluster || seed.topic).toUpperCase();
-  const interests = (seed.creator_interest_signals || []).map((s) => s.toUpperCase());
-  const has = (k: string) => interests.some((i) => i.includes(k)) || cluster.includes(k);
-  if (has("FSD") || has("CYBER") || has("ROBOTAXI") || has("TESLA")) return "aligns with ongoing product-use and judgment interest (ownership / real-world behavior)";
-  if (has("LAFC")) return "aligns with match-day / stadium experience interest";
-  if (has("GAMING") || has("DOGE")) return "aligns with secondary leisure / culture interest";
-  if (seed.creator_evidence_available) return "supported by creator evidence availability signal";
-  return "may matter if it intersects creator high-level interest axes; otherwise low priority";
+  const facts = (seed.experience_facts || []).map(clean).filter((x) => x.length >= 4);
+  const tension = clean(seed.point_or_tension);
+  if (facts[0]) return facts[0].slice(0, 160);
+  if (tension && !/^cite the lived/i.test(tension) && !/동일 내용/.test(tension)) return tension.slice(0, 160);
+  const subject = clean(seed.concrete_subject);
+  if (subject && !/실사용 후속/.test(subject)) return subject.slice(0, 160);
+  return "judgment only from this seed's concrete situation; topic interest is not a thought";
 }
 function readerConnection(human: string, novelty: string): string {
   if (human === "NONE" && novelty.startsWith("no clear")) return "NONE";

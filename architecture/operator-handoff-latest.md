@@ -61,6 +61,34 @@ If 8:29 dumps still exist:
 - Do not merge to `main` without **배포해**.
 - Do not put this handoff into post engines.
 
+## Stated, not shipped — Agent승 absorbs Planner (2026-08-17)
+
+Do **not** treat the full absorb as live until Seung says **반영해** / **넣어** / **이대로**. Name + operating structure are planted in the DNA block; RAG search is coded but not yet on the write path.
+
+**Name:** Creator DNA → **Agent승**. 채팅창이 아니라 주를 운영하는 작업자.
+
+**Seed Generator:** candidates only. Intended: X live search of posts the algo already selected (likes ≥ 50, replies ≥ 20). Seeds already have force.
+
+**Agent승 operating order:** `lib/intelligence/agent-seung.ts` (`AGENT_SEUNG_OPERATING_ORDER`). Always in the model, not RAG. Evaluate seeds vs 30d Analytics + 14d sync fill · recognize force / known force · Return/Bridge/Reach from **data only** · retrieve theory cards only at theory-select · Writer design items only (no theory names, no body) · 7-day schedule + batches.
+
+**RETURN/BRIDGE/REACH:** 30-day Analytics + 14-day sync fill. Collections is not called here.
+
+**Collections source (upload these two files):**
+**Collections (approved 2026-08-17):**
+- Two files, one search: `collection_ids` = viral + writing. Query = seed scene/fact. Strip titles/theory names before the model. Cap 2 force + 2 form.
+- Step 1 seed eval = fake-experience only (no force names). Step 5 = slot spacing (mere exposure). Writer does not receive the operating order. Judge does not search Collections.
+- Upload chunk boundaries: `## Vn` / `## Wn`. Do not upload W9.
+- Secrets: `XAI_VIRAL_THEORY_COLLECTION_ID`, `XAI_WRITING_THEORY_COLLECTION_ID` (fallback `XAI_THEORY_COLLECTION_ID`).
+- Search: one server hybrid search per slot, limit 3. Do not give Grok `collections_search`.
+
+**Cost:** operating order is prompt. Collections only at theory-select. Skip: volume lock, Judge, clock-only ticks, unset collection ids.
+
+**Data:** 30-day Analytics + 14-day sync fills holes. Not a conversion ranking of theories. Diversity, seed-fit, anti-repeat; also the evidence for Return/Bridge/Reach.
+
+**Writer:** 창작이 아님. Agent승 결론대로 설계된 형식의 본문만 작성.
+
+**Planner:** absorbed (not fully wired yet).
+
 ## Open
 
-Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Next product request is unknown — wait for Seung.
+Confirm whether Fedica 8:29 posts and AP scheduled leftovers were cleaned, then whether remaining reviewed were rescheduled after 12.5.5. Agent승 order is planted; Planner absorb not fully wired. Next: agree remaining viral/writing cards one by one. Do not merge to `main` until **배포해**.

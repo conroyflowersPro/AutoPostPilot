@@ -142,7 +142,7 @@ ok("W70. mechanism write catalog is not injected into the live writer", /MECHANI
 ok("W71. humor fill has no numbered 레이어 seed", !/테슬라 앱 레이어/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/humor-fill.ts"), "utf8")));
 ok("W72. mechanism NONE is normal, not a forced observation personality", /none_is_normal/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")) && !/default_observation_personality/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/reader-self-projection.ts"), "utf8")));
 ok("W73. Writer surface is not pre-locked", !/planSlotSurface/.test(ow) && /Decide the necessary reasoning and expression yourself/.test(wr));
-ok("W74. Writer closes assigned Seed + Planner Intent thought", /WRITER ROLE/.test(wr) && /assigned Seed and Planner Intent/.test(wr) && /THOUGHT FIRST/.test(wr));
+ok("W74. Post Agent승 closes assigned Seed + Planner Intent thought", /POST AGENT승 ROLE/.test(wr) && /assigned Seed and Planner Intent/.test(wr) && /THOUGHT FIRST/.test(wr));
 ok("W75. writer is not Planner and does not ingest Performance DNA", /writerArchitectureLock/.test(wr) && /You do not become the Planner/.test(readFileSync(path.join(ROOT, "supabase/functions/weekly-plan/engine-architecture.ts"), "utf8")) && !/performanceDnaBlock\(\)/.test(wr));
 ok("W76. Writer does not receive enumerated creative-stage menu", !/writingStagePhilosophyBlock\(\)/.test(wr));
 ok("W77. Writer does not receive virtual-week structure commands", !/writerWeekStructureConstraintLines\(ctx/.test(wr));
@@ -152,7 +152,7 @@ const iWrite = writeFn.indexOf("integrateSlotGeneration");
 const iDelivery = writeFn.indexOf("selectDeliveryAfterThought");
 ok("W78. runtime interprets before write", iInterp >= 0 && iInterp < iWrite);
 ok("W79. runtime delivery is after write", iDelivery > iWrite && /DELIVERY_AFTER_THOUGHT/.test(ow));
-ok("W80. writeOneSlot does not select mechanism/rail/style before the writer", !/selectReactionMechanism/.test(writeFn) && !/selectThinkingRail/.test(writeFn) && !/decideCreatorStyle/.test(writeFn) && !/decideNaturalHumor/.test(writeFn) && !/decideEverydayLanguage/.test(writeFn));
+ok("W80. writeOneSlot uses rail as thought intelligence, not mechanism/style templates", /selectThinkingRail/.test(writeFn) && /searchAgentSeungTheories/.test(writeFn) && !/selectReactionMechanism/.test(writeFn) && !/decideCreatorStyle/.test(writeFn) && !/decideNaturalHumor/.test(writeFn) && !/decideEverydayLanguage/.test(writeFn));
 ok("W81. live Grok user message does not inject mechanism lines", /callGrokWriter/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 ok("W82. mechanism does not force Writer personality", !/READER ENTRY MOVE/.test(wr) && !/\.\.\.writerMechanismConstraintLines/.test(wr));
 

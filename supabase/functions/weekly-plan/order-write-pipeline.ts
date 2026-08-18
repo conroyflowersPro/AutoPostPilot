@@ -1,14 +1,27 @@
 /**
- * v11 write path: Planner/Seeds → Interpretation(boundaries) → Grok 4.6 closes thought then writes → Semantic Judge.
+ * v11 write path: Weekly Agent승 slots → Interpretation(boundaries) → Post Agent승 thinks then writes → Semantic Judge.
  * Thought first, style follows — in execution, not only in documents.
- * Mechanism / Rail / 말투 / humor / compression do not run before the writer and do not pick the thought.
+ * Mechanism / Rail / 말투 / humor / compression do not run before the post call and do not pick the thought.
  * After the post exists they may be recorded as delivery telemetry. They do not rewrite.
- * Writer does not become Planner. Judge does not rewrite.
+ * Post Agent승 is not Weekly Agent승. Judge does not rewrite.
  * Paid xAI: quota, seed expand, and original post body. No OpenAI.
  */
 import { interpretSeed, type SeedInterpretation } from "./seed-interpretation.ts";
 import { selectReactionMechanism } from "./reader-self-projection.ts";
 import { selectThinkingRail } from "./thinking-rail-runtime.ts";
+import {
+  buildExperiencePacket,
+  buildPostThought,
+  buildSemanticSeedPacket,
+} from "./semantic-seed-packet.ts";
+import {
+  assessDeepThesisFit,
+  deepThesisCollectionNote,
+} from "./deep-thesis.ts";
+import {
+  searchAgentSeungTheories,
+  theoryChunksForModel,
+} from "./agent-seung.ts";
 import { decideEverydayLanguage } from "./everyday-language-reasoning.ts";
 import { decideCreatorStyle } from "./creator-style-decision.ts";
 import { decideNaturalHumor } from "./natural-humor-decision.ts";
@@ -246,14 +259,47 @@ export async function writeOneSlot(args: {
     recent_generated_signatures: weekSignatures,
   };
 
-  // 2. Writer context is interpretation + seed + DNA identity only.
-  // Delivery engines do not run yet and must not pick the thought.
+  // 2. Think from the seed first (rail is internal intelligence, not a post template).
+  const thinkRail = selectThinkingRail({
+    interpretation: seed_interpretation,
+    mechanism: null,
+  });
+  const seed_packet = buildSemanticSeedPacket(seed as any, seed_interpretation as any);
+  const experience_packet = buildExperiencePacket(seed as any, seed_interpretation as any);
+  const prelimCore = {
+    creator_judgment: String((seed_interpretation as any).why_it_might_matter_to_creator || ""),
+    tension: String((seed_interpretation as any).what_is_actually_happening || ""),
+    reader_relevant_meaning: String((seed_interpretation as any).possible_reader_connection || ""),
+  };
+  const thesisFit = assessDeepThesisFit(seed_packet, seed_interpretation as any);
+  const post_thought = {
+    ...buildPostThought(seed_interpretation as any, prelimCore),
+    thinking_mode: thesisFit.use ? "deep_thesis" : "short",
+    stop_point: thesisFit.use
+      ? "Stop when the reader can finish the discovery. Depth is not length. No lesson, industry bow, or extra question."
+      : "Stop when this core thought is already on the page. No lesson, summary, outlook, CTA, or extra question.",
+    deep_thesis: thesisFit,
+  };
+
+  // 3. Collection after Core Thought / Deep Thesis. One query per seed.
+  let collection_block = "";
+  if (args.xaiKey) {
+    const log = await searchAgentSeungTheories("", {
+      xaiKey: args.xaiKey,
+      packet: seed_packet,
+    });
+    collection_block = theoryChunksForModel(log.chunks || [], deepThesisCollectionNote(thesisFit));
+  } else {
+    collection_block = theoryChunksForModel([], deepThesisCollectionNote(thesisFit));
+  }
+
   const deep = buildDeepGenerationContext({
     slot_id: slotId,
     day_offset: dayOffset,
     slot_index: slot,
     seed: seed as any,
     interpretation: seed_interpretation as any,
+    thinking_rail: thinkRail as any,
     editorial_mode: mode,
     planner_intent: {
       strategy_slot_id: String(seed.strategy_slot_id || ""),
@@ -262,9 +308,13 @@ export async function writeOneSlot(args: {
     },
     voice_register: voicePayload,
     week_structural_signatures: weekSignatures,
+    seed_packet,
+    post_thought,
+    collection_block,
+    experience_packet,
   });
 
-  // 3. Grok closes one thought for this Seed, then writes it.
+  // 4. Post Agent승 writes the decided thought in the same call.
   const integrated: IntegratedSlotResult = await integrateSlotGeneration(deep, {
     dry_run: args.dryRun === true,
     xai_key: args.xaiKey,
