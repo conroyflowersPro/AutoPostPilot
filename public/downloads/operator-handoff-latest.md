@@ -4,8 +4,8 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** v12.12.4 on **main**. Public X seeds required even when lived pool exists.
-- **main:** v12.12.4. Public search continues until ≥10 OTHER seeds.
+- **this branch:** v12.12.5 on **main**. Public seeds until the 14-day window is dry.
+- **main:** v12.12.5. Public X search follows the date window, not a count of 10.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행.

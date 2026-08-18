@@ -261,7 +261,7 @@ export async function reasonCreatorSeeds(
       "Return DIRECTION seeds only — never finished posts, never example prose.",
       "Do NOT invent lived experiences. Do NOT copy already_held or recent_published.",
       "Do not fill from an interest list. Tesla/FSD only if already in the found post. Do not bolt charging/Uber/generic driving onto another scene.",
-      "Thin evidence is expected. Still return requested_seed_count seeds. Empty seeds array is a failure.",
+      "Thin evidence is expected. Return only scenes actually found in the date window. Zero new seeds is allowed when nothing new remains. Do not invent to hit a count.",
       "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id. owner OTHER. No scores, rankings, strategy, selection, allocation, or prose outside JSON.",
     ].join("\n")
     : [
@@ -280,12 +280,15 @@ export async function reasonCreatorSeeds(
     "If a found post is written as lived experience, set found_form EXPERIENTIAL and situation as a third-person circulating scene, not 내가/어제 내.",
     "Do not search or emit the operator's own posts.",
     "Lived evidence seeds are not your job in this call.",
+    "Return only scenes actually found in the 14-day window. Zero new seeds is allowed when nothing new remains. Do not invent to hit a count.",
     "Output strict JSON with a seeds array. Each seed: situation, observation_or_feeling, source_hint, source_id, found_form. owner is always OTHER. No scores, rankings, strategy, selection, allocation, growth_role, editorial_mode, or prose outside JSON.",
   ].join("\n");
 
   const user = compact
     ? JSON.stringify({
       requested_seed_count: requested,
+      max_this_call: requested,
+      fill_count_is_not_a_quota: true,
       already_held_seeds: existingAbstract,
       recent_published_angles_avoid_repeat: recent,
       planner_exploration_direction: clean(args.explorationDirection, 240) || null,
@@ -294,7 +297,8 @@ export async function reasonCreatorSeeds(
     })
     : JSON.stringify({
     requested_seed_count: requested,
-    this_run_note_overlay_only: intent || null,
+    max_this_call: requested,
+    fill_count_is_not_a_quota: true,
     planner_exploration_direction: clean(args.explorationDirection, 240) || null,
     already_held_seeds: existingAbstract,
     recent_published_angles_avoid_repeat: recent,
@@ -315,7 +319,7 @@ export async function reasonCreatorSeeds(
       impressions: Number((p as any).impressions) || 0,
     })),
     weekly_goal_note:
-      "Return requested_seed_count distinct PUBLIC X scene/observation candidates. owner OTHER. No invented creator experience. No Tesla/FSD unless in the found post. No charging/Uber bolt-on.",
+      "Extract every distinct public scene found in this 14-day window slice. Do not invent to fill a count. Zero is allowed.",
     requirement:
       "No finished posts. No invented experience. No Return/Bridge/Reach labels. No interest-list fill.",
   });

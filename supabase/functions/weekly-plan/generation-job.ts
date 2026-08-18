@@ -489,12 +489,13 @@ function expandPoolFilled(requiredSlots: number, gated: any[]): boolean {
 }
 
 function shouldSkipPublicXSearch(
-  requiredSlots: number,
-  gated: any[],
+  _requiredSlots: number,
+  _gated: any[],
   targetedExploration: string,
+  windowExhausted?: boolean,
 ): boolean {
   if (String(targetedExploration || "").trim()) return false;
-  return publicViralSeedCount(gated) >= EXPAND_BATCH;
+  return windowExhausted === true;
 }
 
 function plannerStepAfterExpand(st: any): JobStep {
@@ -767,6 +768,7 @@ export async function startWeeklyJob(args: {
     planner_digest_cursor: 0,
     planner_digest_complete: false,
     planner_digest_attempts: 0,
+    public_window_exhausted: false,
     planner_selection_attempts: 0,
     planner_selection_failures: 0,
     planner_exploration_direction: "",
@@ -1153,7 +1155,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   if (experienceSeeds.length) {
     st.gated = [...(st.gated || []), ...experienceSeeds];
   }
-  if (shouldSkipPublicXSearch(required, st.gated || [], targetedExploration)) {
+  if (shouldSkipPublicXSearch(required, st.gated || [], targetedExploration, st.public_window_exhausted)) {
     st.compact_next = false;
     st.prior_subjects = priorSubjects.slice(-priorSubjectCap(required));
     row.step = nextPlannerStep;
@@ -1277,17 +1279,22 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         (xaiRes.error ? ` · xAI ${xaiRes.error}` : ""),
     ].filter(Boolean).join("\n");
     if (isTransientXaiError(st.last_expand_error || xaiRes.error)) {
-      if (publicViralSeedCount(st.gated || []) >= EXPAND_BATCH) {
-        st.compact_next = false;
-        row.step = nextPlannerStep;
-        row.label_ko = labelForPlannerStep(nextPlannerStep);
-        return;
-      }
       holdForXai(row, "xAI 응답 대기 · 공개 Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
       return;
     }
+    if (Number(xaiRes.raw_returned || 0) === 0) {
+      st.public_window_exhausted = true;
+      st.compact_next = false;
+      row.step = nextPlannerStep;
+      row.label_ko = labelForPlannerStep(nextPlannerStep);
+      row.summary = [
+        row.summary,
+        `14일 공개 창 탐색 끝 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`,
+      ].filter(Boolean).join("\n");
+      return;
+    }
     st.empty_streak = Number(st.empty_streak || 0) + 1;
-    if (st.empty_streak >= 4 && (st.gated || []).length < 1) {
+    if (st.empty_streak >= 4 && publicViralSeedCount(st.gated || []) < 1 && (st.gated || []).length < 1) {
       row.status = "error";
       row.error = `Grok 시드 추론이 반복 실패했습니다 (${st.gated.length}/${required}). 템플릿으로 채우지 않습니다.` +
         (st.last_expand_error ? ` 원인: ${st.last_expand_error}` : "");
@@ -1295,72 +1302,37 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       row.summary = [row.summary, st.last_expand_error ? `expand: ${st.last_expand_error}` : ""].filter(Boolean).join("\n");
       return;
     }
-    const livedReady = Number(st.experience_n || 0) > 0 || (st.gated || []).some((s: any) => isLivedSelfSeed(s));
-    if (required <= 0 && livedReady && publicViralSeedCount(st.gated || []) >= EXPAND_BATCH && !targetedExploration) {
-      st.compact_next = false;
-      row.step = nextPlannerStep;
-      row.label_ko = labelForPlannerStep(nextPlannerStep);
-      return;
-    }
     if (!compact) {
       st.compact_next = true;
-      row.label_ko = `Seed 짧게 재추론 ${candidateCount}/${poolTarget}…`;
-      if (st.last_expand_error) {
-        row.summary = [row.summary, `expand: ${st.last_expand_error}`].filter(Boolean).join("\n");
-      }
+      row.label_ko = `공개 Seed 짧게 재추론 · ${publicViralSeedCount(st.gated || [])}개`;
       return;
     }
     st.compact_next = false;
-    if (expandPoolFilled(required, st.gated || []) && (st.gated || []).length > 0) {
-      st.planner_exploration_direction = "";
-      row.step = nextPlannerStep;
-      row.label_ko = labelForPlannerStep(nextPlannerStep);
+    if (canKeepExpanding(st)) {
+      row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
       return;
     }
-    if (!expandPoolFilled(required, st.gated || []) && canKeepExpanding(st)) {
-      row.label_ko = targetedExploration
-        ? `Planner 지정 분야 Seed 추가 탐색 ${candidateCount}/${poolTarget}…`
-        : `Seed 후보 추가 탐색 ${candidateCount}/${poolTarget}…`;
-      if (st.last_expand_error) {
-        row.summary = [row.summary, `expand: ${st.last_expand_error}`].filter(Boolean).join("\n");
-      }
-      return;
-    }
+    st.public_window_exhausted = true;
+    row.step = nextPlannerStep;
+    row.label_ko = labelForPlannerStep(nextPlannerStep);
+    return;
   } else {
     st.empty_streak = 0;
     st.compact_next = false;
   }
-  row.label_ko = st.planner_exploration_direction
-    ? `Planner 지정 분야 후보 ${candidateCount}/${poolTarget}…`
-    : `Seed 후보 탐색 ${candidateCount}/${poolTarget}…`;
-  const filled = expandPoolFilled(required, st.gated || []);
+  row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
   if (targetedExploration && grokAdded.length > 0) {
     st.planner_exploration_direction = "";
     row.step = nextPlannerStep;
     row.label_ko = nextPlannerStep === "recover" ? "거절 칸 재작성…" : "Planner Seed 선택…";
     return;
   }
-  if (filled) {
-    if (st.gated.length < 1) {
-      row.status = "error";
-      row.error = `시드 ${st.gated.length}/${required}. 할당량을 채우지 못해 중단합니다.` +
-        (st.last_expand_error ? ` 원인: ${st.last_expand_error}` : "");
-      return;
-    }
-    row.step = nextPlannerStep;
-    row.label_ko = labelForPlannerStep(nextPlannerStep);
-  } else if (canKeepExpanding(st)) {
-    row.label_ko = targetedExploration
-      ? `Planner 지정 분야 Seed 추가 탐색 ${candidateCount}/${poolTarget}…`
-      : `Seed 후보 추가 탐색 ${candidateCount}/${poolTarget}…`;
-  } else if (st.gated.length < 1) {
-    row.status = "error";
-    row.error = `시드 ${st.gated.length}/${required}. 할당량을 채우지 못해 중단합니다.` +
-      (st.last_expand_error ? ` 원인: ${st.last_expand_error}` : "");
-  } else {
-    row.step = nextPlannerStep;
-    row.label_ko = labelForPlannerStep(nextPlannerStep);
+  if (!st.public_window_exhausted && canKeepExpanding(st)) {
+    return;
   }
+  st.public_window_exhausted = true;
+  row.step = nextPlannerStep;
+  row.label_ko = labelForPlannerStep(nextPlannerStep);
 }
 
 async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: any) {
@@ -1606,11 +1578,13 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
     `예정 시각 첫 원글 ${stamped.find((s) => s.planned_pt)?.planned_pt || "Agent승 시각"}`,
   ].filter(Boolean).join("\n");
   if (
-    publicViralSeedCount(st.gated || []) < EXPAND_BATCH
+    !st.public_window_exhausted
     || ((st.gated || []).length < seedTarget && canKeepExpanding(st))
   ) {
     row.step = "expand";
-    row.label_ko = `공개 Seed ${publicViralSeedCount(st.gated || [])}/${EXPAND_BATCH} · 풀 ${(st.gated || []).length}/${seedTarget}…`;
+    row.label_ko = st.public_window_exhausted
+      ? `Planner 칸용 Seed ${(st.gated || []).length}/${seedTarget}…`
+      : `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 14일 창 계속…`;
     return;
   }
   row.step = "select";
