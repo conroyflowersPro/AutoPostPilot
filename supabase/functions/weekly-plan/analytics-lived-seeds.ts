@@ -1,6 +1,6 @@
 /**
- * Experience seeds from Analytics originals plus sync-gap originals.
- * Generator material — Planner does not extract. No archive fallback mix.
+ * Lived grounding from Analytics originals plus sync-gap originals.
+ * Facts for EXPERIENCE slots only — not recyclable post Seeds. No archive fallback mix.
  */
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { clusterFromText } from "./experience-evidence.ts";
@@ -59,7 +59,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       creator_evidence_available: true,
       experience_required: true,
       source_type: "ANALYTICS_LIVED",
-      source_role: "SEED_SOURCE",
+      source_role: "GROUNDING_EVIDENCE",
       claim_types: ["PERSONAL_EXPERIENCE"],
       owner: "SELF",
       seed_source: "ANALYTICS_LIVED",
@@ -125,7 +125,7 @@ export function syncGapLivedSeeds(args: {
       creator_evidence_available: true,
       experience_required: true,
       source_type: "ANALYTICS_LIVED",
-      source_role: "SEED_SOURCE",
+      source_role: "GROUNDING_EVIDENCE",
       claim_types: ["PERSONAL_EXPERIENCE"],
       owner: "SELF",
       seed_source: "ANALYTICS_LIVED",

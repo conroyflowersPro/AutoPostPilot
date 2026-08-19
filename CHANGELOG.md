@@ -7,6 +7,14 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.20 — 2026-08-19
+
+- lived 개수는 EXPERIENCE 글 개수가 아닙니다. PLAN이 그 주 EXPERIENCE 칸만 추론합니다
+- Seed 선택은 expSupply로 EXPERIENCE 비율을 다시 만들지 않습니다
+- 수제글 원문은 Seed가 아닙니다. EXPERIENCE 칸에만 실제 경험 사실을 grounding으로 씁니다
+- 그 칸 lived가 부족하면 코드가 Mode를 바꾸지 않고 Agent승이 그 Slot만 재추론합니다
+- 공개 X 탐색 예산(v12.12.19)은 그대로 둡니다
+
 ## 12.12.19 — 2026-08-19
 
 - 공개 X 탐색량은 lived/USER_DIRECT evidence와 분리합니다. 경험 40개가 있어도 X를 10개만 찾지 않습니다
@@ -15,7 +23,7 @@
 ## 12.12.18 — 2026-08-18
 
 - 공개 창이 끝난 뒤 남은 칸은 must_fill입니다. 비워 두고 같은 줄을 반복하지 않습니다
-- EXPERIENCE에 쓸 unused lived가 없으면 Agent승이 그 칸 Mode만 바꿉니다
+- EXPERIENCE unused lived가 없으면 Mode를 바꾸라는 문구가 있었습니다. **12.12.20에서 닫았습니다**
 
 ## 12.12.17 — 2026-08-18
 
