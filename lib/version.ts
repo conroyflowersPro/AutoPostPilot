@@ -1,4 +1,4 @@
-export const APP_VERSION = "12.12.19";
+export const APP_VERSION = "12.12.18";
 export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 export const BUILD_STAMP = APP_VERSION;
 

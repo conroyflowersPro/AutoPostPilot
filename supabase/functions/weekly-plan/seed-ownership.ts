@@ -127,16 +127,6 @@ export function abstractLivedSubject(text: string, _cluster: string): string {
   return livedMeaningGist(text);
 }
 
-/** Seed select / PLAN: unused lived count is supply, not an EXPERIENCE quota. */
-export const LIVED_GROUNDING_INSUFFICIENT = "lived_grounding_insufficient";
-
-/** Situation label only. Never a handmade post sentence to rewrite. */
-export function livedGroundingLabel(cluster: string, occurredAt?: string): string {
-  const recency = livedAsOf(occurredAt).as_of;
-  const c = String(cluster || "scene").replace(/\s+/g, " ").trim().slice(0, 24) || "scene";
-  return `lived grounding · ${c} · ${recency}`;
-}
-
 export function livedAsOf(
   occurredAt: string | undefined,
   now: Date = new Date(),

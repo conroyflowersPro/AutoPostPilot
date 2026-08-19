@@ -101,7 +101,7 @@ export function canPlaceAfterPrevious(args: {
 export function diversifyAssignments<A extends { slot_id: string; seed_id: string }>(
   assignments: A[],
   slots: Array<{ slot_id: string; day_offset: number }>,
-  pool: Array<{ seed_id?: string; concrete_subject?: string; point_or_tension?: string; owner?: string; seed_source?: string }>,
+  pool: Array<{ seed_id?: string; concrete_subject?: string; point_or_tension?: string }>,
 ): A[] {
   const byId = new Map(pool.map((s) => [String(s.seed_id || ""), s]));
   const slotDay = new Map(slots.map((s) => [s.slot_id, s.day_offset]));
@@ -112,13 +112,7 @@ export function diversifyAssignments<A extends { slot_id: string; seed_id: strin
     return String(a.slot_id).localeCompare(String(b.slot_id));
   });
   const used = new Set(ordered.map((a) => a.seed_id));
-    const unused = pool.filter((s) => s.seed_id && !used.has(String(s.seed_id)));
-  const sameOwner = (a?: { owner?: string; seed_source?: string }, b?: { owner?: string; seed_source?: string }) => {
-    const self = (s?: { owner?: string; seed_source?: string }) =>
-      String(s?.owner || "").toUpperCase() === "SELF"
-      || String(s?.seed_source || "").toUpperCase() === "ANALYTICS_LIVED";
-    return self(a) === self(b);
-  };
+  const unused = pool.filter((s) => s.seed_id && !used.has(String(s.seed_id)));
   const dayCount = new Map<number, number>();
   let prev: { subject: string; obs: string } | undefined;
   for (const a of ordered) {
@@ -136,7 +130,6 @@ export function diversifyAssignments<A extends { slot_id: string; seed_id: strin
     });
     if (!ok) {
       const swapAt = unused.findIndex((u) =>
-        sameOwner(seed, u) &&
         canPlaceAfterPrevious({
           nextSubject: String(u.concrete_subject || ""),
           nextObservation: String(u.point_or_tension || ""),
