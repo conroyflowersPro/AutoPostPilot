@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.18 — 2026-08-18
+
+- 공개 창이 끝난 뒤 남은 칸은 must_fill입니다. 비워 두고 같은 줄을 반복하지 않습니다
+- EXPERIENCE에 쓸 unused lived가 없으면 Agent승이 그 칸 Mode만 바꿉니다
+
 ## 12.12.17 — 2026-08-18
 
 - EXPERIENCE 옛 Seed 반복 선택을 막습니다. 거절된 seed_id는 reserved이고 더 새 lived는 증거로만 넘깁니다

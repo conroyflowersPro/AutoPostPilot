@@ -790,6 +790,7 @@ function selectionSystem(dayScoped: boolean): string {
     "EXPERIENCE slots take ANALYTICS_LIVED owner SELF seeds only. Prefer newer as_of when the situation matches. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take public seeds; viral is already on those seeds.",
     "Do not place the same situation cluster on consecutive slots. FSD/driving/parking/intersection at most 2 per day. If the pool is overweight on one cluster, prefer another seed. If the seed is not FSD, do not pick a seed that bolts on charging, Uber, or generic driving.",
     "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request lived SELF scenes only, never public search to invent experience.",
+    "If must_fill is true, do not leave chunk slots in missing. Assign an unused seed_id from seed_pool. If an EXPERIENCE slot has no unused SELF lived, change that slot's editorial_mode to a mode the remaining pool can fill. Do not invent a Seed.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
 }
@@ -827,9 +828,12 @@ function parsePlannerSelection(
   validSeedIds: Set<string>,
   reservedSeedIds: Set<string>,
   pool: ConcreteSeed[] = [],
+  mustFill = false,
 ): PlannerSelection | null {
-  if (!raw || !Array.isArray(raw.assignments) || !Array.isArray(raw.missing)) return null;
+  if (!raw || !Array.isArray(raw.assignments)) return null;
+  if (!mustFill && !Array.isArray(raw.missing)) return null;
   const validSlotIds = new Set(slots.map((slot) => slot.slot_id));
+  const modes = new Set(["INFORMATIVE", "COMPARE", "OPINION", "EXPERIENCE", "CASUAL_OBSERVATION"]);
   const assignments: PlannerSeedAssignment[] = [];
   const missing: PlannerExplorationRequest[] = [];
   const usedSlots = new Set<string>();
@@ -841,14 +845,20 @@ function parsePlannerSelection(
     usedSlots.add(slotId);
     usedSeeds.add(seedId);
     const strategySlot = slots.find((slot) => slot.slot_id === slotId)!;
+    const mode = String(item?.editorial_mode || "").toUpperCase();
     assignments.push({
       slot_id: slotId,
       seed_id: seedId,
       planner_intent: s(item?.planner_intent, 240) || strategySlot.planner_intent,
-      editorial_mode: strategySlot.editorial_mode,
+      editorial_mode: mustFill && modes.has(mode) ? mode as PlannerSeedAssignment["editorial_mode"] : strategySlot.editorial_mode,
     });
   }
-  for (const item of raw.missing) {
+  if (mustFill) {
+    if (assignments.length !== slots.length) return null;
+    const diversified = pool.length ? diversifyAssignments(assignments, slots, pool) : assignments;
+    return { assignments: diversified, missing: [], version: SEVEN_DAY_PLANNER_VERSION };
+  }
+  for (const item of raw.missing || []) {
     const slotId = s(item?.slot_id, 40);
     const direction = s(item?.exploration_direction, 240);
     if (!validSlotIds.has(slotId) || usedSlots.has(slotId) || !direction) continue;
@@ -895,6 +905,7 @@ export async function selectSeedsForChunk(args: {
   chunkSlots: PlannerSlotIntent[];
   alreadyAssigned?: PlannerSeedAssignment[];
   lastLivedReject?: Array<{ slot_id: string; rejected_seed_id: string; cluster: string; newer: Array<{ seed_id: string }> }>;
+  mustFill?: boolean;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSelection>> {
   const assigned = args.alreadyAssigned || [];
@@ -933,11 +944,12 @@ export async function selectSeedsForChunk(args: {
       chunk_slot_ids: slots.map((s) => s.slot_id),
       assigned_seed_ids: [...reservedSeedIds],
       last_lived_reject: args.lastLivedReject || [],
+      must_fill: args.mustFill === true,
       unassigned_slot_ids: week.filter((s) => s.seed_state !== "ASSIGNED").map((s) => s.slot_id),
       used_clusters: usedClusters,
       seed_pool: pool.map(compactSeedForSelect),
     },
-    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool),
+    parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool, args.mustFill === true),
   });
 }
 

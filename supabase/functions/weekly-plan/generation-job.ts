@@ -1807,6 +1807,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       chunkSlots: chunk,
       alreadyAssigned: assigned,
       lastLivedReject: st.last_lived_reject || [],
+      mustFill: !!st.public_window_exhausted,
       timeoutMs: 28000,
     });
     if (!result.ok || !result.value) {
@@ -1837,6 +1838,10 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       if (!have.has(item.slot_id)) {
         assigned.push(item);
         have.add(item.slot_id);
+      }
+      const locked = strategy.slots.find((slot) => slot.slot_id === item.slot_id);
+      if (locked && item.editorial_mode && item.editorial_mode !== locked.editorial_mode) {
+        locked.editorial_mode = item.editorial_mode;
       }
     }
     const chunkAssigned = assigned.filter((item) => chunk.some((slot) => slot.slot_id === item.slot_id));
@@ -1893,10 +1898,10 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       }
       st.planner_exploration_direction = "";
       row.label_ko = `Seed 배치 ${st.planner_assignments.length}/${strategy.slots.length} · 공개 창 끝 · 남은 Pool로`;
-      row.summary = [
-        row.summary,
-        `공개 창이 끝나 추가 탐색 없음 · Agent승이 남은 Pool로 빈 칸을 채움 ${st.planner_assignments.length}/${strategy.slots.length}`,
-      ].filter(Boolean).join("\n");
+      const line = `공개 창이 끝나 추가 탐색 없음 · Agent승이 남은 Pool로 빈 칸을 채움 ${st.planner_assignments.length}/${strategy.slots.length}`;
+      if (!String(row.summary || "").endsWith(line)) {
+        row.summary = [row.summary, line].filter(Boolean).join("\n");
+      }
       return;
     }
     const remain = nextUnassignedSlotChunk(strategy.slots, (st.planner_assignments || []).map((item: PlannerSeedAssignment) => item.slot_id));
