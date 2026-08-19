@@ -431,7 +431,7 @@ function requestTargetedSeedRefill(row: any, pending: any, reason: string) {
   st.max_expand = Number(st.max_expand || 0) + 4;
   st.pending_recovery = pending;
   row.step = "expand";
-  row.label_ko = "Planner 지정 분야 Seed 추가 탐색…";
+  row.label_ko = "Agent승 지정 분야 Seed 추가 탐색…";
   row.summary = [row.summary, reason].filter(Boolean).join("\n");
 }
 
@@ -537,7 +537,8 @@ function plannerStepAfterExpand(st: any): JobStep {
 function labelForPlannerStep(step: JobStep): string {
   if (step === "strategy") return "탐색 완료 · 슬롯 수 정하는 중";
   if (step === "recover") return "거절 칸 재작성…";
-  return "Planner Seed 선택…";
+  if (step === "select") return "Agent승 Seed 배치…";
+  return "Agent승 Seed 배치…";
 }
 
 function refillRequestCount(deficit: number): number {
@@ -973,10 +974,10 @@ export async function tickWeeklyJob(args: {
       if (Number(row.saved_count || 0) > 0) {
         row.status = "error";
         row.error = "이전 3일 runtime job입니다. 저장 초안은 보존했습니다. 새 7일 job을 시작하세요.";
-        row.label_ko = "7일 Planner로 새로 시작 필요";
+        row.label_ko = "7일 Agent승으로 새로 시작 필요";
       } else {
         row.step = "strategy";
-        row.label_ko = "7일 Planner 전략…";
+        row.label_ko = "7일 Agent승 전략…";
       }
     }
     if (row.status !== "running") {
@@ -987,7 +988,7 @@ export async function tickWeeklyJob(args: {
     else if (row.step === "judge") {
       // Resume compatibility for jobs created before Planner owned selection.
       row.step = row.state?.planner_strategy ? "select" : "strategy";
-      row.label_ko = row.state?.planner_strategy ? "Planner Seed 선택…" : "7일 Planner 전략…";
+      row.label_ko = row.state?.planner_strategy ? "Agent승 Seed 배치…" : "7일 Agent승 전략…";
     }
     else if (row.step === "strategy") await stepStrategy(args.supabase, args.xaiKey, args.userId, row);
     else if (row.step === "select") await stepPlannerSelect(args.supabase, args.xaiKey, row);
@@ -1406,7 +1407,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   if (targetedExploration && grokAdded.length > 0) {
     st.planner_exploration_direction = "";
     row.step = nextPlannerStep;
-    row.label_ko = nextPlannerStep === "recover" ? "거절 칸 재작성…" : "Planner Seed 선택…";
+    row.label_ko = nextPlannerStep === "recover" ? "거절 칸 재작성…" : "Agent승 Seed 배치…";
     return;
   }
   if (!st.public_window_exhausted && canKeepExpanding(st)) {
@@ -1421,8 +1422,8 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
   const st = row.state;
   if (!xaiKey) {
     row.status = "error";
-    row.error = "7일 Planner는 XAI_API_KEY가 필요합니다.";
-    row.label_ko = "Planner 키 없음";
+    row.error = "7일 Agent승 PLAN은 XAI_API_KEY가 필요합니다.";
+    row.label_ko = "Agent승 키 없음";
     return;
   }
   const intentText = String(st.topic || "").trim();
@@ -1720,12 +1721,12 @@ async function stepStrategy(supabase: any, xaiKey: string, userId: string, row: 
   ) {
     row.step = "expand";
     row.label_ko = st.public_window_exhausted
-      ? `Planner 칸용 Seed ${(st.gated || []).length}/${seedTarget}…`
+      ? `Agent승 칸용 Seed ${(st.gated || []).length}/${seedTarget}…`
       : `공개 Seed ${publicViralSeedCount(st.gated || [])}개 · 7일 창 계속…`;
     return;
   }
   row.step = "select";
-  row.label_ko = "Planner Seed 선택·배차…";
+  row.label_ko = "Agent승 Seed 배치…";
 }
 
 async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSeed[]> {
@@ -1787,7 +1788,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   const strategy = st.planner_strategy as SevenDayStrategy | null;
   if (!strategy) {
     row.step = "strategy";
-    row.label_ko = "7일 Planner 전략…";
+    row.label_ko = "7일 Agent승 전략…";
     return;
   }
   const assigned: PlannerSeedAssignment[] = Array.isArray(st.planner_assignments) ? st.planner_assignments : [];
@@ -1812,20 +1813,20 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         holdForXai(
           row,
           `Seed 배치 일시 중단 ${assigned.length}/${strategy.slots.length} · 이어서 처리`,
-          `Planner select: ${result.error}`,
+          `Agent승 Seed: ${result.error}`,
         );
         return;
       }
       st.select_timeouts = Number(st.select_timeouts || 0) + 1;
       if (st.select_timeouts < 3) {
         row.label_ko = `Seed 배치 재추론 ${assigned.length}/${strategy.slots.length} · ${st.select_timeouts}/3`;
-        row.summary = [row.summary, `Planner select: ${result.error || "unusable"} · 코드가 Seed를 배정하지 않음`].filter(Boolean).join("\n");
+        row.summary = [row.summary, `Agent승 Seed: ${result.error || "unusable"} · 코드가 Seed를 배정하지 않음`].filter(Boolean).join("\n");
         return;
       }
       holdForXai(
         row,
         `Seed 배치 일시 중단 ${assigned.length}/${strategy.slots.length} · 이어서 처리`,
-        `Planner select: ${result.error || "unusable"}`,
+        `Agent승 Seed: ${result.error || "unusable"}`,
       );
       return;
     }
@@ -1876,10 +1877,10 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         recordFieldRefill(st, direction);
         st.max_expand = Number(st.max_expand || 0) + Math.min(6, missing.length + 1);
         row.step = "expand";
-        row.label_ko = `Planner 지정 분야 Seed 탐색 ${missing.length}개 슬롯…`;
+        row.label_ko = `Agent승 지정 분야 Seed 탐색 ${missing.length}개 슬롯…`;
         row.summary = [
           row.summary,
-          `Planner가 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${missing.length}개 분야 추가 탐색 요청`,
+          `Agent승이 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${missing.length}개 분야 추가 탐색 요청`,
         ].filter(Boolean).join("\n");
         return;
       }
@@ -1927,8 +1928,8 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   const flat = weekDays.flatMap((day) => day.posts || []);
   if (flat.length !== strategy.slots.length) {
     row.status = "error";
-    row.error = `Planner 배차 미완: ${flat.length}/${strategy.slots.length}`;
-    row.label_ko = "Planner 배차 실패";
+    row.error = `Agent승 Seed 배차 미완: ${flat.length}/${strategy.slots.length}`;
+    row.label_ko = "Agent승 Seed 배차 미완";
     return;
   }
   st.days = weekDays;
@@ -1944,7 +1945,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   row.label_ko = `7일 초안 생성 0/${flat.length}…`;
   row.summary = [
     row.summary,
-    `Planner 선택·배차 완료 ${flat.length}/${strategy.slots.length}`,
+    `Agent승 Seed 배치 완료 ${flat.length}/${strategy.slots.length}`,
   ].filter(Boolean).join("\n");
 }
 

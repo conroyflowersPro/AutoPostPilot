@@ -7,6 +7,10 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.15 — 2026-08-18
+
+- 화면의 Planner 라벨을 Agent승 Seed 배치로 바꿉니다. 새 Intelligence가 아닙니다
+
 ## 12.12.14 — 2026-08-18
 
 - Seed 배치는 날짜 고정이 아니라 5칸 bounded chunk입니다

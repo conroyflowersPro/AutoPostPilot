@@ -49,6 +49,7 @@ assert.match(job, /inferCreatorSlotTiming/);
 assert.match(job, /buildTimingEvidencePacket/);
 assert.match(job, /시각만 재추론/);
 assert.match(job, /selectSeedsForChunk/);
+assert.match(job, /Agent승 Seed 배치/);
 assert.match(job, /nextUnassignedSlotChunk/);
 assert.match(job, /Seed 배치 일시 중단/);
 assert.match(job, /planner_assigning_slot_ids/);
