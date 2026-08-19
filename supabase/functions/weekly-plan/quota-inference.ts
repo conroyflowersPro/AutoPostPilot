@@ -7,4 +7,5 @@ export const QUOTA_PER_DAY_MAX = 8;
 export const QUOTA_PER_DAY_MIN = 4;
 export const MIN_WEEKLY_SLOTS = QUOTA_PER_DAY_MIN * QUOTA_DAYS;
 export const MAX_WEEKLY_SLOTS = QUOTA_PER_DAY_MAX * QUOTA_DAYS;
+/** @deprecated Not the public X exploration target. Lived must not fill this. See publicExplorationBudget. */
 export const SEED_POOL_BUFFER = 10;

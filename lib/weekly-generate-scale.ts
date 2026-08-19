@@ -14,11 +14,13 @@ export const WRITE_CHUNK = 1;
 
 /** Grok may return fewer than EXPAND_BATCH. Budget as if ~3 usable seeds per round. */
 const PESSIMISTIC_SEEDS_PER_EXPAND = 3;
+const PUBLIC_EXPLORATION_MIN_MULTIPLIER = 1.75;
 
 export function expandRoundBudget(requiredSlots: number): number {
-  const slots = Math.max(1, Math.round(Number(requiredSlots) || 0) || 1);
-  const fill = Math.ceil((slots * 1.2) / PESSIMISTIC_SEEDS_PER_EXPAND);
-  return Math.min(36, Math.max(16, fill + 8));
+  const slots = Math.max(28, Math.round(Number(requiredSlots) || 0) || 28);
+  const target = Math.ceil(slots * PUBLIC_EXPLORATION_MIN_MULTIPLIER);
+  const fill = Math.ceil(target / PESSIMISTIC_SEEDS_PER_EXPAND);
+  return Math.min(36, Math.max(16, fill));
 }
 
 export function priorSubjectCap(requiredSlots: number): number {

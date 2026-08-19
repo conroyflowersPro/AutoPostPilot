@@ -1,6 +1,6 @@
 /**
  * Weekly Planner Edge — inferred seeds from learned data (not DIMENSION_REGISTRY bodies).
- * Seed supply: Planner locks seven-day slots, then Seed Generator fills requested_seed_count (slots + 10).
+ * Seed supply: Planner locks seven-day slots, then Seed Generator fills a public X exploration budget independent of lived evidence.
  * Will is DNA + engine, not a generate-box sentence. Registry templates are never a fallback.
  * Target volume: Planner locks the 7-day plan. Judge owns week count (PASS saved >= planned slots). Floor 4/day × 7 = 28; bounds 4–8. Agent승 infers timestamps (min 2h constraint).
  * CORS: Access-Control-Allow-Methods included.
@@ -51,6 +51,7 @@ import {
   QUOTA_PER_DAY_MIN,
   QUOTA_PER_DAY_MAX,
 } from "./quota-inference.ts";
+import { publicExplorationBudget } from "./public-exploration-budget.ts";
 import { startWeeklyJob, statusWeeklyJob, tickWeeklyJob, stopWeeklyJob } from "./generation-job.ts";
 import { overlayClusterWeightsWithIntent14d } from "./creator-intent-14d.ts";
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
@@ -58,7 +59,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "12.12.18";
+const APP_VERSION = "12.12.19";
 const WEEKLY_ENGINE_VERSION = "v11_judge_owns_count";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -240,7 +241,11 @@ Deno.serve(async (req) => {
       learned.cluster_weights = cluster_weights;
       const batchIndex = Math.max(0, Number(body.dim_batch_index) || 0);
       const priorSubjects = Array.isArray(body.prior_subjects) ? body.prior_subjects.map(String) : [];
-      const targetSupply = required_slots + 10;
+      const explore = publicExplorationBudget({
+        requiredSlots: required_slots,
+        gated: [],
+      });
+      const targetSupply = explore.target;
       const totalBatches = Math.max(1, Math.ceil(targetSupply / EXPAND_BATCH));
       const remaining = Math.max(0, targetSupply - priorSubjects.length);
 
