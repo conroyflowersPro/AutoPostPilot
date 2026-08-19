@@ -4,8 +4,8 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** **v12.12.21** public seed directions. 공개 추출은 한 번의 raw 0으로 닫지 않음. Seed는 방향이고 Agent승이 씀. 원문 문장·`실사용 후속` 라벨은 저장하지 않음. compact/targeted에도 x_search 유지. 공식 글이 있으면 Grok `[]`여도 코드가 방향 Seed를 만듦. v12.12.20 EXPERIENCE grounding은 유지.
-- **main / live:** **v12.12.20** (`19eb4d2`). EXPERIENCE grounding. 헤더 `v12.12.20`.
+- **this branch:** **v12.12.22** lived originals are not rewrite subjects. 경험 원문은 grounding만. `concrete_subject`는 방향이고 Agent승이 추론해서 쓴다. 번들 30일·account_activities 원문과 같은 제목은 거절. v12.12.21 공개 방향 추출은 유지.
+- **main / live:** **v12.12.21** (`4787f08`). 공개 Seed 방향. 헤더 `v12.12.21`.
 - **배포:** 하지 않음. 운영자가 **배포해**라고 할 때까지 `main`에 넣지 않는다. 이 브랜치는 draft PR만.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
@@ -26,7 +26,7 @@
 
 ## Shipped on main now
 
-**v12.12.20** (`19eb4d2`). Header should show `v12.12.20`.
+**v12.12.21** (`4787f08`). Header should show `v12.12.21`.
 
 | Version | What |
 | --- | --- |
@@ -35,27 +35,28 @@
 | 12.12.18 | must_fill. unused lived 없으면 Mode 변경 — **12.12.20이 닫음** |
 | 12.12.19 | 공개 X 탐색량에서 lived 제외. 동적 예산. `칸+10` 삭제 |
 | 12.12.20 | EXPERIENCE grounding. 수제글 원문은 Seed가 아님 |
+| 12.12.21 | 공개 추출은 한 번의 raw 0으로 닫지 않음. Seed는 방향 |
 
-## This branch (v12.12.21)
+## This branch (v12.12.22)
 
 의도:
 
-1. 공개 Seed 추출이 실제로 돌아가 쓸 수 있는 방향 Seed를 더 만든다
-2. Seed는 트윗 문장이 아니라 방향이다. Agent승이 추론하고 쓴다
-3. 공식/공개 글은 장면이 돌고 있다는 증거다. 원문을 `concrete_subject`에 넣지 않는다
-4. `실사용 후속` / 관찰 축 / 칸 타입 라벨은 거절한다
-5. raw 0 한 번으로 7일 공개 창을 닫지 않는다. 다른 검색어/구간으로 1–2번 더 찾는다
-6. Mode·Collection 1회/칸·lived GROUNDING_EVIDENCE는 바꾸지 않는다
+1. 운영자 원문은 다시 쓸 글이 아니다
+2. lived 텍스트는 grounding 사실만. 글은 Agent승이 방향에서 추론한다
+3. 원문 문장을 `concrete_subject`에 넣지 않는다
+4. 공개 추출에서 @Seung4680을 빼고, 최근 원문과 같은 제목은 거절한다
+5. Mode·Collection 1회/칸은 바꾸지 않는다
 
 핵심 파일:
 
+- `supabase/functions/weekly-plan/seed-ownership.ts`
+- `supabase/functions/weekly-plan/analytics-lived-seeds.ts`
+- `supabase/functions/weekly-plan/operator-original-guard.ts`
 - `supabase/functions/weekly-plan/creator-seed-reasoning.ts`
-- `supabase/functions/weekly-plan/public-x-seed-search.ts`
 - `supabase/functions/weekly-plan/generation-job.ts`
-- `supabase/functions/weekly-plan/seed-scope.ts`
-- `tests/public-seed-extraction-direction.test.ts`
+- `tests/lived-originals-are-not-subjects.test.ts`
 
-v12.12.20 EXPERIENCE grounding과 공개 예산 파일은 유지한다.
+v12.12.21 공개 방향 추출과 v12.12.20 EXPERIENCE grounding은 유지한다.
 
 ## Must not change without Seung
 

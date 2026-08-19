@@ -7,6 +7,13 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.22 — 2026-08-19
+
+- 내 원문은 다시 쓰지 않습니다. 경험은 grounding만, 글은 Agent승이 추론합니다
+- lived/public `concrete_subject`에 수제글 첫 절을 넣지 않습니다
+- 번들 30일·account_activities 원문과 같은 제목은 거절합니다
+- @Seung4680 공개 추출 제외는 그대로입니다
+
 ## 12.12.21 — 2026-08-19
 
 - 공개 추출을 한 번의 raw 0으로 끝내지 않습니다. 다른 검색어/구간으로 1–2번 더 찾습니다

@@ -58,7 +58,18 @@ import {
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 import { buildRecentExperienceCandidates } from "./experience-evidence.ts";
 import { analyticsLivedSeeds, syncGapLivedSeeds } from "./analytics-lived-seeds.ts";
-import { isLivedSelfSeed, staleLivedExperiencePicks, describeStaleLivedPicks, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
+import {
+  abstractLivedSubject,
+  isLivedSelfSeed,
+  staleLivedExperiencePicks,
+  describeStaleLivedPicks,
+  LIVED_GROUNDING_INSUFFICIENT,
+} from "./seed-ownership.ts";
+import {
+  bundledOperatorOriginals,
+  mergeOperatorOriginals,
+  subjectCopiesOperatorOriginal,
+} from "./operator-original-guard.ts";
 import { publicExplorationBudget, publicExplorationHave, publicExplorationRoundBudget, isPublicExplorationSeed } from "./public-exploration-budget.ts";
 import { fetchOfficialPublicPosts, loadEdgeXAccessToken, officialTokenStatusKo, publicDateSlice, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
 import {
@@ -616,7 +627,8 @@ function appendEligibleSeedsToWrite(
     const subj = String(seed.concrete_subject || "");
     if (!isUsableKeywordSubject(subj)) continue;
     if (isSlotTypeLabel(subj) || isKoreaOnlySituation(subj) || isFrozenHumorClone(subj)) continue;
-    const key = subjectKey(subj);
+    const lived = isLivedSelfSeed(seed as any);
+    const key = lived ? String(seed.seed_id || "") : subjectKey(subj);
     if (!key || seen.has(key)) continue;
     const personal = isPersonalInterestSubject(subj, String(seed.cluster || ""));
     let day = -1;
@@ -673,13 +685,20 @@ function compactSlotLite(
 ) {
   const strategySlotId = String(planner?.strategy_slot_id || planner?.slotId || "");
   const slotId = String(planner?.slotId || strategySlotId || `D${dayOffset + 1}P${slot}`);
+  const facts = Array.isArray((seed as any).experience_facts) ? (seed as any).experience_facts as string[] : [];
+  const rawSubject = String(seed.concrete_subject || "");
+  const originals = mergeOperatorOriginals(facts);
+  let subject = rawSubject;
+  if (isLivedSelfSeed(seed as any) && subjectCopiesOperatorOriginal(rawSubject, originals)) {
+    subject = abstractLivedSubject(facts.join(" ") || rawSubject, String(seed.cluster || ""));
+  }
   return {
     slotId,
     dayOffset,
-    primaryTopic: seed.concrete_subject,
+    primaryTopic: subject,
     topic_cluster: seed.cluster,
     cluster: seed.cluster,
-    concrete_subject: seed.concrete_subject,
+    concrete_subject: subject,
     editorial_mode: mode,
     strategic_role: planner?.strategic_role || "",
     planner_intent: planner?.planner_intent || "",
@@ -1245,6 +1264,9 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       .select("text_body, post_type, action_type, published_at, x_post_id")
       .gte("published_at", since)
       .limit(500);
+    st.operator_originals = mergeOperatorOriginals(
+      (syncRows || []).map((row: any) => String(row.text_body || "")),
+    );
     const gap = syncGapLivedSeeds({
       rows: syncRows || [],
       analyticsPostIds: analyticsIds,
@@ -1321,7 +1343,12 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     maxResults: 50,
     sliceIndex,
   });
-  const officialPublicPosts = officialRes.posts || [];
+  const operatorOriginals = mergeOperatorOriginals(
+    (Array.isArray(st.operator_originals) ? st.operator_originals : []).map(String),
+  );
+  const officialPublicPosts = (officialRes.posts || []).filter(
+    (p) => !subjectCopiesOperatorOriginal(String(p.text || ""), operatorOriginals),
+  );
   st.official_search_status = officialRes.status;
   const tokenLine = officialTokenStatusKo(tokenRes.status, officialRes.status);
   if (tokenLine && !String(row.summary || "").includes(tokenLine)) {
@@ -1342,6 +1369,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     officialPublicPosts,
     excludeHandle: OPERATOR_HANDLE,
     searchSliceIndex: sliceIndex,
+    recentPublishedAngles: operatorOriginals.slice(0, 40).map((t) => t.slice(0, 120)),
   });
   if (officialPublicPosts.length > 0) st.official_fallback_attempted = true;
   const metrics = st.seed_metrics || (st.seed_metrics = {
@@ -1371,6 +1399,7 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     if (/관찰·판단 축/.test(subject)) rejectReason = "ENGINE_LABEL_BODY";
     else if (isClusterLabelSubject(subject) || isSlotTypeLabel(subject)) rejectReason = "SLOT_LABEL_BODY";
     else if (isTweetProseSubject(subject)) rejectReason = "TWEET_PROSE_BODY";
+    else if (subjectCopiesOperatorOriginal(subject, operatorOriginals)) rejectReason = "OPERATOR_ORIGINAL_COPY";
     else if (isKoreaOnlySituation(subject)) rejectReason = "KOREA_ONLY";
     else if (isFrozenHumorClone(subject)) rejectReason = "FROZEN_CLONE";
     else if (!isUsableKeywordSubject(subject)) rejectReason = "WEAK_SUBJECT";
@@ -1852,6 +1881,11 @@ async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSe
       post_type: String(row.post_type || row.action_type || ""),
     }))
     .filter((row: RecentManualPost) => row.text.length >= 12);
+  const bundledManual: RecentManualPost[] = bundledOperatorOriginals().map((text, i) => ({
+    text,
+    source_id: `bundled-${i + 1}`,
+  }));
+  const leakageOriginals = [...bundledManual, ...recentManual];
 
   const pool: ConcreteSeed[] = [];
   const seen = new Set<string>();
@@ -1866,10 +1900,13 @@ async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSe
       source_role: role,
       concrete_subject: String(seed.concrete_subject),
       point_or_tension: seed.point_or_tension ? String(seed.point_or_tension) : undefined,
-      recent_manual: recentManual,
+      recent_manual: leakageOriginals,
       user_explicit: role === "USER_EXPLICIT_SEED",
     });
     if (!leakage.allow_as_seed) continue;
+    if (subjectCopiesOperatorOriginal(String(seed.concrete_subject || ""), mergeOperatorOriginals(
+      recentManual.map((r) => r.text),
+    ))) continue;
     seen.add(key);
     pool.push({ ...seed, status: "ELIGIBLE" });
   }

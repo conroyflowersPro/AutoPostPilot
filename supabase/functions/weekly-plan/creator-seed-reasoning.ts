@@ -30,6 +30,7 @@ import {
   massSectorFromText,
   type OpenSeedSlot,
 } from "./seed-scope.ts";
+import { bundledOperatorOriginals, subjectCopiesOperatorOriginal } from "./operator-original-guard.ts";
 
 export const CREATOR_SEED_REASONING_VERSION = "creator_seed_collector_v1";
 export const SAME_CLUSTER_DIRECTION_CAP = 4;
@@ -149,10 +150,14 @@ const SCENE_DIRECTIONS: Array<{ re: RegExp; direction: string }> = [
   { re: /교차로|신호등|횡단보도/, direction: "교차로 판단 장면이 돌고 있음" },
   { re: /차선|핸들|개입/, direction: "주행 개입 장면이 돌고 있음" },
   { re: /알림|업데이트|화면/, direction: "휴대폰 알림 장면이 돌고 있음" },
-  { re: /그록|챗gpt|chatgpt|번역/i, direction: "일상 AI 사용 장면이 돌고 있음" },
+  { re: /그록|grok|챗gpt|chatgpt|번역|language\s*detection/i, direction: "일상 AI 사용 장면이 돌고 있음" },
   { re: /직관|축구|lafc/i, direction: "경기 직관 장면이 돌고 있음" },
   { re: /fsd|오토파일럿|자율주행/i, direction: "FSD 판단 장면이 돌고 있음" },
   { re: /사이버트럭|cybertruck/i, direction: "사이버트럭 주행 장면이 돌고 있음" },
+  { re: /로켓|위성|발사|starlink|spacex/i, direction: "발사체·위성 장면이 돌고 있음" },
+  { re: /유성|별똥|하늘/, direction: "하늘 장면이 돌고 있음" },
+  { re: /선착순|현장\s*줄|핀\s*지급/, direction: "현장 줄 장면이 돌고 있음" },
+  { re: /퍼와서|퍼오|수익|크리에이터/, direction: "창작과 수익 장면이 돌고 있음" },
 ];
 
 export function abstractPublicDirection(text: string): string {
@@ -175,7 +180,9 @@ export function abstractPublicDirection(text: string): string {
   if (isClusterLabelSubject(clause) || isTweetProseSubject(clause)) return "";
   if (clause.length < 8) return "";
   if (clause.length >= stripped.length * 0.85) return "";
-  return `${clause} 장면이 돌고 있음`.slice(0, 48);
+  const direction = `${clause} 장면이 돌고 있음`.slice(0, 48);
+  if (subjectCopiesOperatorOriginal(direction, [stripped, ...bundledOperatorOriginals()])) return "";
+  return direction;
 }
 
 function directionSeedShell(i: number, situation: string, observation: string, sourceId: string, sourceHint: string): ConcreteSeed {
@@ -246,6 +253,9 @@ export function normalizeSeedDetailed(x: any, i: number): NormalizeSeedResult {
     return { seed: null, reason: "SLOT_LABEL_BODY" };
   }
   if (isTweetProseSubject(situation)) return { seed: null, reason: "TWEET_PROSE_BODY" };
+  if (subjectCopiesOperatorOriginal(situation, bundledOperatorOriginals())) {
+    return { seed: null, reason: "OPERATOR_ORIGINAL_COPY" };
+  }
   if (/^(RETURN|BRIDGE|REACH)$/i.test(situation)) {
     return { seed: null, reason: "ROLE_LABEL_BODY" };
   }
@@ -297,8 +307,10 @@ export function directionSeedsFromOfficialPosts(
   const seen = new Set(existing.map((s) => subjectSignature(String(s.concrete_subject || ""))));
   for (const p of posts || []) {
     if (isPublicSeedAdOrBait(p.text || "")) continue;
+    if (subjectCopiesOperatorOriginal(String(p.text || ""), bundledOperatorOriginals())) continue;
     const situation = abstractPublicDirection(p.text || "");
     if (!situation) continue;
+    if (subjectCopiesOperatorOriginal(situation, bundledOperatorOriginals())) continue;
     const normalized = normalizeSeedDetailed({
       situation,
       observation_or_feeling: "공개 장면이 돌고 있음",
@@ -499,6 +511,13 @@ export async function reasonCreatorSeeds(
       }
       if (/어제\s*내|내가\s*직접/.test(n.concrete_subject)) {
         reject("SELF_INHABIT_ON_PUBLIC");
+        continue;
+      }
+      if (subjectCopiesOperatorOriginal(n.concrete_subject, [
+        ...bundledOperatorOriginals(),
+        ...(args.recentPublishedAngles || []),
+      ])) {
+        reject("OPERATOR_ORIGINAL_COPY");
         continue;
       }
       if (isKoreaOnlySituation(n.concrete_subject)) {
