@@ -4,9 +4,9 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** **v12.12.20** EXPERIENCE grounding. lived 개수 ≠ EXPERIENCE 글 개수. 수제글 원문은 Seed가 아님. EXPERIENCE 칸만 실제 경험 사실 grounding. 부족하면 코드가 Mode를 안 바꾸고 Agent승이 그 Slot만 재추론.
-- **main / live:** **v12.12.19** (`6171ebe`). 공개 X 탐색 예산은 lived와 분리. `칸+10` 없음. 헤더 `v12.12.19`.
-- **배포:** 하지 않음. 운영자가 **배포해**라고 할 때까지 `main`에 넣지 않는다.
+- **this branch:** **v12.12.21** public seed directions. 공개 추출은 한 번의 raw 0으로 닫지 않음. Seed는 방향이고 Agent승이 씀. 원문 문장·`실사용 후속` 라벨은 저장하지 않음. compact/targeted에도 x_search 유지. 공식 글이 있으면 Grok `[]`여도 코드가 방향 Seed를 만듦. v12.12.20 EXPERIENCE grounding은 유지.
+- **main / live:** **v12.12.20** (`19eb4d2`). EXPERIENCE grounding. 헤더 `v12.12.20`.
+- **배포:** 하지 않음. 운영자가 **배포해**라고 할 때까지 `main`에 넣지 않는다. 이 브랜치는 draft PR만.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행.
@@ -26,7 +26,7 @@
 
 ## Shipped on main now
 
-**v12.12.19** (`6171ebe`). Header should show `v12.12.19`.
+**v12.12.20** (`19eb4d2`). Header should show `v12.12.20`.
 
 | Version | What |
 | --- | --- |
@@ -34,26 +34,28 @@
 | 12.12.17 | EXPERIENCE stale pick 거절 |
 | 12.12.18 | must_fill. unused lived 없으면 Mode 변경 — **12.12.20이 닫음** |
 | 12.12.19 | 공개 X 탐색량에서 lived 제외. 동적 예산. `칸+10` 삭제 |
+| 12.12.20 | EXPERIENCE grounding. 수제글 원문은 Seed가 아님 |
 
-## This branch (v12.12.20)
+## This branch (v12.12.21)
 
 의도:
 
-1. Agent승 PLAN이 주간 전체를 보고 EXPERIENCE가 몇 칸인지 추론
-2. `lived_scene_count` / expSupply는 공급량이지 EXPERIENCE 할당량이 아님
-3. 수제글 문장을 Seed로 재활용하지 않음. EXPERIENCE 칸에만 실제 경험 사실 grounding
-4. 그 칸 lived가 부족하면 코드가 Mode를 바꾸지 않고 Agent승이 그 Slot만 재추론
-
-**e8c596e와 다른 점 (가설을 버린 부분):** 사실 문장을 `lived grounding · cluster · yesterday` 더미 라벨로 바꾸지 않는다. Writer는 실제 `experience_facts`를 받아야 한다. 공개 탐색 예산(`public-exploration-budget.ts`)은 유지한다.
+1. 공개 Seed 추출이 실제로 돌아가 쓸 수 있는 방향 Seed를 더 만든다
+2. Seed는 트윗 문장이 아니라 방향이다. Agent승이 추론하고 쓴다
+3. 공식/공개 글은 장면이 돌고 있다는 증거다. 원문을 `concrete_subject`에 넣지 않는다
+4. `실사용 후속` / 관찰 축 / 칸 타입 라벨은 거절한다
+5. raw 0 한 번으로 7일 공개 창을 닫지 않는다. 다른 검색어/구간으로 1–2번 더 찾는다
+6. Mode·Collection 1회/칸·lived GROUNDING_EVIDENCE는 바꾸지 않는다
 
 핵심 파일:
 
-- `supabase/functions/weekly-plan/creator-week-slots.ts` · `engine-dna.ts` · `audience-x-status.ts`
-- `supabase/functions/weekly-plan/analytics-lived-seeds.ts` · `seed-ownership.ts` · `seed-engine.ts`
-- `supabase/functions/weekly-plan/seven-day-planner.ts` · `generation-job.ts`
-- `tests/experience-grounding-not-quota.test.ts`
+- `supabase/functions/weekly-plan/creator-seed-reasoning.ts`
+- `supabase/functions/weekly-plan/public-x-seed-search.ts`
+- `supabase/functions/weekly-plan/generation-job.ts`
+- `supabase/functions/weekly-plan/seed-scope.ts`
+- `tests/public-seed-extraction-direction.test.ts`
 
-공개 예산 파일은 유지: `public-exploration-budget.ts`
+v12.12.20 EXPERIENCE grounding과 공개 예산 파일은 유지한다.
 
 ## Must not change without Seung
 

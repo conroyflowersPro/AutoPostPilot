@@ -35,7 +35,9 @@ import {
   MASS_PER_DAY_MAX,
   isPersonalInterestSubject,
   isKoreaOnlySituation,
+  isClusterLabelSubject,
   isSlotTypeLabel,
+  isTweetProseSubject,
   pickDayForMass,
   enforceMassPerDay,
   demoteExperienceOnMassSlots,
@@ -56,9 +58,9 @@ import {
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 import { buildRecentExperienceCandidates } from "./experience-evidence.ts";
 import { analyticsLivedSeeds, syncGapLivedSeeds } from "./analytics-lived-seeds.ts";
-import { isLivedSelfSeed, publicSearchWindows, staleLivedExperiencePicks, describeStaleLivedPicks, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
+import { isLivedSelfSeed, staleLivedExperiencePicks, describeStaleLivedPicks, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
 import { publicExplorationBudget, publicExplorationHave, publicExplorationRoundBudget, isPublicExplorationSeed } from "./public-exploration-budget.ts";
-import { fetchOfficialPublicPosts, loadEdgeXAccessToken, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
+import { fetchOfficialPublicPosts, loadEdgeXAccessToken, officialTokenStatusKo, publicDateSlice, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
 import {
   loadRecentXAnalyticsPublished,
   nextStrategyDayOffsets,
@@ -501,6 +503,28 @@ function shouldSkipPublicXSearch(
   return windowExhausted === true;
 }
 
+export const PUBLIC_EMPTY_SEARCH_RETRY_MAX = 3 as const;
+
+/** One raw_returned === 0 must not close the 7-day public window. */
+export function decidePublicWindowAfterEmptyRound(args: {
+  rawReturned: number;
+  emptySearchAttempts: number;
+  officialMaterialLeft: boolean;
+  budgetRemaining: number;
+  transientXai: boolean;
+  maxEmptyAttempts?: number;
+}): "hold" | "retry_slice" | "close_budget" | "close_exhausted" {
+  if (args.transientXai) return "hold";
+  if (Number(args.budgetRemaining || 0) <= 0) return "close_budget";
+  const max = args.maxEmptyAttempts ?? PUBLIC_EMPTY_SEARCH_RETRY_MAX;
+  if (args.officialMaterialLeft) return "retry_slice";
+  if (Number(args.rawReturned || 0) === 0 && Number(args.emptySearchAttempts || 0) < max) {
+    return "retry_slice";
+  }
+  if (Number(args.emptySearchAttempts || 0) < max) return "retry_slice";
+  return "close_exhausted";
+}
+
 function ptYmd(iso: string, now = new Date()): string {
   const d = iso ? new Date(iso) : now;
   if (!Number.isFinite(d.getTime())) return "";
@@ -815,6 +839,9 @@ export async function startWeeklyJob(args: {
     },
     dim_batch: 0,
     empty_streak: 0,
+    search_empty_attempts: 0,
+    search_slice_index: 0,
+    official_fallback_attempted: false,
     last_expand_error: "",
     days: [] as any[],
     write_flat: [] as any[],
@@ -1283,11 +1310,23 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
   const publicGated = (st.gated || []).filter((s: any) => isPublicExplorationSeed(s));
   const candidates: any[] = [...publicGated, ...(gated.passed || [])];
   const compact = !!st.compact_next || !!targetedExploration;
-  const windows = publicSearchWindows();
-  const searchWindow = windows.last7;
-  st.public_search_half = "last7";
-  const token = await loadEdgeXAccessToken(supabase);
-  const officialPublicPosts = await fetchOfficialPublicPosts({ accessToken: token, maxResults: 100 });
+  const sliceIndex = Number(st.search_slice_index || 0);
+  const searchWindow = publicDateSlice(sliceIndex);
+  st.public_search_half = searchWindow.key;
+  const tokenRes = await loadEdgeXAccessToken(supabase);
+  const token = tokenRes.token;
+  st.official_token_status = tokenRes.status;
+  const officialRes = await fetchOfficialPublicPosts({
+    accessToken: token,
+    maxResults: 50,
+    sliceIndex,
+  });
+  const officialPublicPosts = officialRes.posts || [];
+  st.official_search_status = officialRes.status;
+  const tokenLine = officialTokenStatusKo(tokenRes.status, officialRes.status);
+  if (tokenLine && !String(row.summary || "").includes(tokenLine)) {
+    row.summary = [row.summary, tokenLine + (tokenRes.error ? ` · ${tokenRes.error}` : officialRes.error ? ` · ${officialRes.error}` : "")].filter(Boolean).join("\n");
+  }
   const xaiRes = await expandSeedSupplyWithXai({
     xaiKey,
     needed: requestedNow,
@@ -1302,7 +1341,9 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     searchWindow,
     officialPublicPosts,
     excludeHandle: OPERATOR_HANDLE,
+    searchSliceIndex: sliceIndex,
   });
+  if (officialPublicPosts.length > 0) st.official_fallback_attempted = true;
   const metrics = st.seed_metrics || (st.seed_metrics = {
     requested: 0,
     raw_returned: 0,
@@ -1328,7 +1369,8 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
     const subject = String(s.concrete_subject || "");
     let rejectReason = "";
     if (/관찰·판단 축/.test(subject)) rejectReason = "ENGINE_LABEL_BODY";
-    else if (isSlotTypeLabel(subject)) rejectReason = "SLOT_LABEL_BODY";
+    else if (isClusterLabelSubject(subject) || isSlotTypeLabel(subject)) rejectReason = "SLOT_LABEL_BODY";
+    else if (isTweetProseSubject(subject)) rejectReason = "TWEET_PROSE_BODY";
     else if (isKoreaOnlySituation(subject)) rejectReason = "KOREA_ONLY";
     else if (isFrozenHumorClone(subject)) rejectReason = "FROZEN_CLONE";
     else if (!isUsableKeywordSubject(subject)) rejectReason = "WEAK_SUBJECT";
@@ -1384,14 +1426,36 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       holdForXai(row, "xAI 응답 대기 · 공개 Seed 이어감…", `expand: ${st.last_expand_error || xaiRes.error}`);
       return;
     }
-    if (Number(xaiRes.raw_returned || 0) === 0) {
+    const rawReturned = Number(xaiRes.raw_returned || 0);
+    if (rawReturned === 0) {
+      st.search_empty_attempts = Number(st.search_empty_attempts || 0) + 1;
+      st.search_slice_index = Number(st.search_slice_index || 0) + 1;
+      const afterEmpty = jobPublicExplorationBudget(st, required);
+      const windowDecision = decidePublicWindowAfterEmptyRound({
+        rawReturned,
+        emptySearchAttempts: st.search_empty_attempts,
+        officialMaterialLeft: officialPublicPosts.length > 0 && !st.official_fallback_attempted,
+        budgetRemaining: afterEmpty.remaining,
+        transientXai: false,
+      });
+      if (windowDecision === "retry_slice") {
+        st.compact_next = false;
+        row.label_ko = `공개 Seed 다른 검색으로 재시도 · ${publicViralSeedCount(st.gated || [])}개`;
+        row.summary = [
+          row.summary,
+          `공개 검색 빈 결과 · 다른 검색어/구간으로 재시도 ${st.search_empty_attempts}/${PUBLIC_EMPTY_SEARCH_RETRY_MAX}`,
+        ].filter(Boolean).join("\n");
+        return;
+      }
       st.public_window_exhausted = true;
       st.compact_next = false;
       row.step = nextPlannerStep;
       row.label_ko = labelForPlannerStep(nextPlannerStep);
       row.summary = [
         row.summary,
-        `7일 공개 창 탐색 끝 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`,
+        windowDecision === "close_budget"
+          ? `공개 X 탐색 목표 충족 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`
+          : `7일 공개 창 탐색 끝 · 공개 Seed ${publicViralSeedCount(st.gated || [])}개`,
       ].filter(Boolean).join("\n");
       return;
     }
