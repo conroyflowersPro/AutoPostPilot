@@ -7,6 +7,14 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.21 — 2026-08-19
+
+- 공개 추출을 한 번의 raw 0으로 끝내지 않습니다. 다른 검색어/구간으로 1–2번 더 찾습니다
+- compact·targeted 호출에도 `x_search`를 유지합니다. targeted는 분야 힌트일 뿐입니다
+- Seed는 방향입니다. Agent승이 글을 쓰고, 공개 원문 문장은 저장하지 않습니다
+- Grok이 `[]`를 내도 공식 글이 있으면 코드가 방향 Seed를 만듭니다
+- `실사용 후속` 같은 라벨과 트윗 문장 복사는 거절합니다
+
 ## 12.12.20 — 2026-08-19
 
 - lived 개수는 EXPERIENCE 글 개수가 아닙니다. PLAN이 그 주 EXPERIENCE 칸만 추론합니다

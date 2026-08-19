@@ -51,8 +51,9 @@ export async function expandSeedSupplyWithXai(args: {
   model?: string;
   timeoutMs?: number;
   searchWindow?: { from: string; to: string; key?: string };
-  officialPublicPosts?: Array<{ text: string; created_at?: string }>;
+  officialPublicPosts?: Array<{ text: string; created_at?: string; id?: string }>;
   excludeHandle?: string;
+  searchSliceIndex?: number;
 }): Promise<XaiSeedExpansionResult> {
   const res = await reasonCreatorSeeds({
     xaiKey: args.xaiKey,
@@ -70,6 +71,7 @@ export async function expandSeedSupplyWithXai(args: {
     searchWindow: args.searchWindow,
     officialPublicPosts: args.officialPublicPosts,
     excludeHandle: args.excludeHandle,
+    searchSliceIndex: args.searchSliceIndex,
   });
   return {
     seeds: res.seeds,

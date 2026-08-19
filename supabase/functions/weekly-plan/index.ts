@@ -43,7 +43,7 @@ import {
   topicDistributionReport,
   softDailyCap,
 } from "./daily-topic-distribute.ts";
-import { enforceMassPerDay, demoteExperienceOnMassSlots, MASS_PER_DAY_MAX } from "./seed-scope.ts";
+import { enforceMassPerDay, demoteExperienceOnMassSlots, isClusterLabelSubject, isTweetProseSubject, MASS_PER_DAY_MAX } from "./seed-scope.ts";
 import { expandSeedSupplyWithXai } from "./seed-supply-expansion.ts";
 import { writeSlotBatch, V11_WRITER_MODEL, V11_SEED_MODEL } from "./order-write-pipeline.ts";
 import {
@@ -59,7 +59,7 @@ import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-inte
 const POSTS_MIN = QUOTA_PER_DAY_MIN;
 const POSTS_MAX = QUOTA_PER_DAY_MAX;
 const POSTS_TARGET = 4;
-const APP_VERSION = "12.12.20";
+const APP_VERSION = "12.12.21";
 const WEEKLY_ENGINE_VERSION = "v11_judge_owns_count";
 const GENERATOR_VERSION = "order7b_independent_writer_v11";
 const COLLISION_DAYS = 30;
@@ -359,7 +359,9 @@ Deno.serve(async (req) => {
           used_dimension_registry_as_seed_body: !!(xaiRes as any).used_dimension_registry_as_seed_body,
         };
         for (const s of xaiRes.seeds) {
-          if (/관찰·판단 축/.test(String(s.concrete_subject || ""))) continue;
+          const subject = String(s.concrete_subject || "");
+          if (/관찰·판단 축/.test(subject)) continue;
+          if (isClusterLabelSubject(subject) || isTweetProseSubject(subject)) continue;
           candidates.push({
             ...s,
             source_role: "SEED_SOURCE",

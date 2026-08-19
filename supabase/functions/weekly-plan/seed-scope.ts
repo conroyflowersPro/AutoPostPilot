@@ -42,6 +42,29 @@ export function isSlotTypeLabel(subject: string): boolean {
   return /관찰·판단\s*축|DIMENSION_REGISTRY|PERSONAL_DNA_INTEREST|MASS_PUBLIC_DAILY|slot_kind|cluster_bound/.test(raw);
 }
 
+const CLUSTER_OR_SECTOR =
+  "FSD|DAILY|TESLA|CYBERTRUCK|ROBOTAXI|LAFC|GAMING|OBSERVATION|DAILY_AI|PHONE_NOTIFY|ROAD_PARK|LIVING_COST|QUEUE_WAIT|WEATHER_OUT|HUMOR|CASUAL|INFORMATIVE";
+
+/** Empty cluster+label bodies. Not a situation direction. */
+export function isClusterLabelSubject(subject: string): boolean {
+  const raw = String(subject || "").trim();
+  if (isSlotTypeLabel(raw)) return true;
+  if (/실사용\s*후속/.test(raw)) return true;
+  if (/관찰(\s*|·)?(판단\s*)?축/.test(raw)) return true;
+  if (/차원 기반 신규 각도/.test(raw)) return true;
+  return new RegExp(`^(${CLUSTER_OR_SECTOR})\\s*(실사용|후속|관찰|축|칸|방향)?$`, "i").test(raw);
+}
+
+/** Original tweet prose stored as the seed subject. Directions stay short. */
+export function isTweetProseSubject(subject: string): boolean {
+  const t = String(subject || "").replace(/\s+/g, " ").trim();
+  if (t.length >= 80) return true;
+  if (/https?:\/\//i.test(t)) return true;
+  if (/^@\w+/.test(t)) return true;
+  if (/#\w+/.test(t) && t.length >= 40) return true;
+  return (t.match(/[.!?。]|다\.|요\.|음\./g) || []).length >= 2;
+}
+
 export type OpenSeedSlot = {
   slot_id: string;
   /**
