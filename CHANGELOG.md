@@ -7,6 +7,10 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.17 — 2026-08-18
+
+- EXPERIENCE 옛 Seed 반복 선택을 막습니다. 거절된 seed_id는 reserved이고 더 새 lived는 증거로만 넘깁니다
+
 ## 12.12.16 — 2026-08-18
 
 - 공개 창이 끝난 뒤 Agent승이 분야 추가 탐색을 요청해도 공개 검색으로 돌아가지 않습니다

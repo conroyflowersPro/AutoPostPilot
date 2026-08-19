@@ -894,11 +894,15 @@ export async function selectSeedsForChunk(args: {
   seedPool: ConcreteSeed[];
   chunkSlots: PlannerSlotIntent[];
   alreadyAssigned?: PlannerSeedAssignment[];
+  lastLivedReject?: Array<{ slot_id: string; rejected_seed_id: string; cluster: string; newer: Array<{ seed_id: string }> }>;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSelection>> {
   const assigned = args.alreadyAssigned || [];
   const assignedSlotIds = new Set(assigned.map((item) => String(item.slot_id || "")));
   const reservedSeedIds = new Set(assigned.map((item) => String(item.seed_id || "")).filter(Boolean));
+  for (const item of args.lastLivedReject || []) {
+    if (item.rejected_seed_id) reservedSeedIds.add(String(item.rejected_seed_id));
+  }
   const slots = (args.chunkSlots || []).filter((slot) => !assignedSlotIds.has(slot.slot_id));
   const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || "")));
   const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
@@ -928,6 +932,7 @@ export async function selectSeedsForChunk(args: {
       week_slots: week,
       chunk_slot_ids: slots.map((s) => s.slot_id),
       assigned_seed_ids: [...reservedSeedIds],
+      last_lived_reject: args.lastLivedReject || [],
       unassigned_slot_ids: week.filter((s) => s.seed_state !== "ASSIGNED").map((s) => s.slot_id),
       used_clusters: usedClusters,
       seed_pool: pool.map(compactSeedForSelect),

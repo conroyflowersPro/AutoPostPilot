@@ -56,7 +56,7 @@ import {
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 import { buildRecentExperienceCandidates } from "./experience-evidence.ts";
 import { analyticsLivedSeeds, syncGapLivedSeeds } from "./analytics-lived-seeds.ts";
-import { isLivedSelfSeed, publicSearchWindows, staleLivedExperiencePicks } from "./seed-ownership.ts";
+import { isLivedSelfSeed, publicSearchWindows, staleLivedExperiencePicks, describeStaleLivedPicks } from "./seed-ownership.ts";
 import { fetchOfficialPublicPosts, loadEdgeXAccessToken, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
 import {
   loadRecentXAnalyticsPublished,
@@ -1806,6 +1806,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       seedPool: pool,
       chunkSlots: chunk,
       alreadyAssigned: assigned,
+      lastLivedReject: st.last_lived_reject || [],
       timeoutMs: 28000,
     });
     if (!result.ok || !result.value) {
@@ -1845,6 +1846,11 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       pool: pool as any[],
     });
     if (stale.length) {
+      st.last_lived_reject = describeStaleLivedPicks({
+        slots: chunk,
+        assignments: chunkAssigned,
+        pool: pool as any[],
+      });
       st.select_timeouts = Number(st.select_timeouts || 0) + 1;
       const keep = assigned.filter((item) => !stale.includes(item.slot_id));
       st.planner_assignments = keep;
@@ -1852,13 +1858,14 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         row.label_ko = `Agent승 EXPERIENCE Seed 재추론 ${st.select_timeouts}/3…`;
         row.summary = [
           row.summary,
-          `같은 상황의 더 새 lived가 남았는데 옛 Seed를 고름 · 코드가 바꾸지 않음 · 칸 ${stale.join(",")}`,
+          `같은 상황의 더 새 lived가 남음 · 거절 Seed는 다시 안 씀 · 칸 ${stale.join(",")}`,
         ].filter(Boolean).join("\n");
         return;
       }
       holdForXai(row, `Seed 배치 일시 중단 ${keep.length}/${strategy.slots.length} · 이어서 처리`, `EXPERIENCE stale: ${stale.join(",")}`);
       return;
     }
+    st.last_lived_reject = [];
     st.planner_assignments = assigned;
     st.planner_assigning_slot_ids = [];
     const missing = result.value.missing || [];

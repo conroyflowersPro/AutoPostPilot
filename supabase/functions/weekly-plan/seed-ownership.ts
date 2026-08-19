@@ -171,6 +171,40 @@ export function staleLivedExperiencePicks(args: {
   return fails;
 }
 
+export function describeStaleLivedPicks(args: {
+  slots: Array<{ slot_id: string; editorial_mode?: string }>;
+  assignments: Array<{ slot_id: string; seed_id: string }>;
+  pool: Array<Record<string, unknown>>;
+}): Array<{ slot_id: string; rejected_seed_id: string; cluster: string; newer: Array<{ seed_id: string; as_of?: string | null }> }> {
+  const used = new Set(args.assignments.map((a) => String(a.seed_id || "")).filter(Boolean));
+  const lived = sortLivedNewestFirst(args.pool.filter((s) => isLivedSelfSeed(s) && String(s.seed_id || "")));
+  const out: Array<{ slot_id: string; rejected_seed_id: string; cluster: string; newer: Array<{ seed_id: string; as_of?: string | null }> }> = [];
+  for (const slot of args.slots) {
+    if (String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE") continue;
+    const pick = args.assignments.find((a) => a.slot_id === slot.slot_id);
+    if (!pick) continue;
+    const chosen = args.pool.find((s) => String(s.seed_id || "") === pick.seed_id);
+    if (!chosen || !isLivedSelfSeed(chosen)) continue;
+    const cluster = String(chosen.cluster || "");
+    if (!cluster) continue;
+    const chosenT = Date.parse(String(chosen.occurred_at || chosen.published_at || 0)) || 0;
+    const newer = lived
+      .filter((s) => {
+        const id = String(s.seed_id || "");
+        if (!id || id === pick.seed_id || used.has(id)) return false;
+        if (String(s.cluster || "") !== cluster) return false;
+        const t = Date.parse(String(s.occurred_at || s.published_at || 0)) || 0;
+        return t > chosenT;
+      })
+      .slice(0, 6)
+      .map((s) => ({ seed_id: String(s.seed_id), as_of: livedAsOf(String(s.occurred_at || s.published_at || "") || undefined)?.as_of || null }));
+    if (newer.length) {
+      out.push({ slot_id: slot.slot_id, rejected_seed_id: pick.seed_id, cluster, newer });
+    }
+  }
+  return out;
+}
+
 export type ExperienceAssignment = {
   slot_id: string;
   seed_id: string;
