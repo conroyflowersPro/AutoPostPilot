@@ -4,8 +4,8 @@
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** v12.12.14 on **main**. Seed assign is a resumable 5-slot chunk.
-- **main:** v12.12.14. Seed chunks + Timing split. Timeout resumes the same chunk.
+- **this branch:** v12.12.19. lived 개수 ≠ EXPERIENCE 글 개수. 수제글 원문은 Seed가 아님. EXPERIENCE 칸만 lived grounding. 부족하면 코드가 Mode를 안 바꾸고 Agent승이 그 Slot만 재추론.
+- **main:** v12.12.18.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
 - **ORDER 3 (v12.11.0):** Independent Judge · Slot-only REPAIR · 기존 Calendar · 기존 Fedica가 Agent승 `planned_at`을 실행.

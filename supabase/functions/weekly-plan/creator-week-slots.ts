@@ -12,6 +12,7 @@ import {
 } from "./seven-day-planner.ts";
 import { QUOTA_PER_DAY_MIN, QUOTA_DAYS } from "./quota-inference.ts";
 import type { EditorialMode } from "./seed-engine.ts";
+import { isLivedSelfSeed, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
 import {
   audienceStatusBlock,
   type AudienceXStatus,
@@ -84,7 +85,7 @@ function creatorDaySlotsSystem(days: number[], perDay: number[]): string {
     "Complexity/Emergence is a judgment, not a ratio or slot recipe. Keep Creator Identity and long-term account growth together.",
     "REACH: 1 per day_offset, never more than 2. Prefer CASUAL_OBSERVATION or easy INFORMATIVE. PRESENCE is not a role and is not REACH. Do not freeze RETURN/BRIDGE share.",
     "SCENE: consecutive slots must not share the same situation cluster. Driving-family scenes are at most 2 per day_offset. Do not repeat the previous slot's verdict angle.",
-    "EXPERIENCE only within lived_scene_count. Do not force EXPERIENCE share when lived originals are missing or thin. BRIDGE+EXPERIENCE almost never. REACH+EXPERIENCE only if universalized.",
+    "lived_scene_count is grounding supply: enough unused lived facts exist IF an EXPERIENCE slot is needed. It is not an EXPERIENCE post quota. Do not turn a large supply into a large EXPERIENCE share. Infer how many EXPERIENCE slots this week actually needs. Do not force EXPERIENCE when lived originals are missing or thin. BRIDGE+EXPERIENCE almost never. REACH+EXPERIENCE only if universalized.",
     "planner_intent says why the slot exists, not how to write it.",
     "Return strict JSON: { \"slots\": [ ... ] }. Fill every required slot. No prose outside JSON.",
   ].join("\n");
@@ -402,12 +403,32 @@ export async function inferCreatorSlotReplan(args: {
   weekSlots: PlannerSlotIntent[];
   replanSlotId: string;
   judgeReasons: string[];
-  seedPool: Array<{ seed_id: string; concrete_subject?: string; cluster?: string; editorial_mode?: string }>;
+  seedPool: Array<{
+    seed_id: string;
+    concrete_subject?: string;
+    cluster?: string;
+    editorial_mode?: string;
+    owner?: string;
+    seed_source?: string;
+  }>;
+  livedGrounding?: Array<{
+    seed_id: string;
+    concrete_subject?: string;
+    cluster?: string;
+    owner?: string;
+    seed_source?: string;
+    occurred_at?: string;
+  }>;
+  replanReason?: "judge_invalidation" | "lived_grounding_insufficient";
   planEvidence?: AgentSeungPlanEvidence | null;
   occupiedTimes?: string[];
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSlotIntent & { seed_id?: string }>> {
   const current = (args.weekSlots || []).find((slot) => slot.slot_id === args.replanSlotId);
+  const lived = args.livedGrounding || args.seedPool.filter((seed) => isLivedSelfSeed(seed as any));
+  const publicPool = args.seedPool.filter((seed) => !isLivedSelfSeed(seed as any));
+  const allSeeds = [...lived, ...publicPool];
+  const livedInsufficient = args.replanReason === "lived_grounding_insufficient";
   return callPlanner({
     xaiKey: args.xaiKey,
     maxTokens: 1800,
@@ -415,7 +436,9 @@ export async function inferCreatorSlotReplan(args: {
     system: [
       "You are Agent승 replanning ONE AP slot. The rest of the week stays.",
       creatorDnaBlock(),
-      "Judge flagged this slot's strategy as invalid. You infer the replacement Role, Editorial Mode, timestamp, planner_intent, and seed_id from the evidence and seed pool.",
+      livedInsufficient
+        ? `This EXPERIENCE slot has no unused lived grounding. Re-infer this ONE slot from the whole week. Code will not change Editorial Mode. Do not keep EXPERIENCE unless unused lived_grounding still fits. Lived packets are facts for grounding, not a handmade post to rewrite. If you leave EXPERIENCE, seed_id must come from lived_grounding. Otherwise seed_id must come from seed_pool.`
+        : "Judge flagged this slot's strategy as invalid. You infer the replacement Role, Editorial Mode, timestamp, planner_intent, and seed_id from the evidence and seed pool.",
       "Do not rewrite other slots. Do not restart the seven-day plan. Code will not invent Role, Mode, REACH, or time if you omit them.",
       "Every replacement slot needs planned_at and planned_pt. Infer the clock. Minimum 2 hours from adjacent originals, not a 2-hour step. Same calendar day, before the next day.",
       "Return strict JSON: { \"slot\": { slot_id, day_offset, growth_role, editorial_mode, planner_intent, planned_at, planned_pt, seed_id } }.",
@@ -432,9 +455,15 @@ export async function inferCreatorSlotReplan(args: {
         planned_pt: slot.planned_pt || "",
       })),
       replan_slot_id: args.replanSlotId,
+      replan_reason: livedInsufficient ? LIVED_GROUNDING_INSUFFICIENT : "judge_invalidation",
       current_slot: current || null,
       judge_invalidation_reasons: (args.judgeReasons || []).map((r) => s(r, 160)).slice(0, 12),
-      available_seeds: (args.seedPool || []).slice(0, 40),
+      seed_pool: publicPool.slice(0, 40),
+      lived_grounding: lived.slice(0, 40).map((seed) => ({
+        seed_id: seed.seed_id,
+        cluster: seed.cluster || "",
+        owner: "SELF",
+      })),
       occupied_times: (args.occupiedTimes || []).slice(0, 40),
     },
     parse: (raw) => {
@@ -448,8 +477,11 @@ export async function inferCreatorSlotReplan(args: {
       const slot_id = s(item.slot_id || args.replanSlotId, 40);
       if (!role || !editorial_mode || (!planned_at && !planned_pt) || !intent || !slot_id) return null;
       const seed_id = s(item.seed_id, 80);
-      if (args.seedPool.length && !seed_id) return null;
-      if (args.seedPool.length && !args.seedPool.some((seed) => seed.seed_id === seed_id)) return null;
+      if (allSeeds.length && !seed_id) return null;
+      const picked = allSeeds.find((seed) => seed.seed_id === seed_id);
+      if (allSeeds.length && !picked) return null;
+      if (editorial_mode === "EXPERIENCE" && picked && !isLivedSelfSeed(picked as any)) return null;
+      if (editorial_mode !== "EXPERIENCE" && picked && isLivedSelfSeed(picked as any)) return null;
       return {
         slot_id,
         day_offset: Number.isFinite(Number(item.day_offset)) ? Number(item.day_offset) : Number(current?.day_offset || 0),

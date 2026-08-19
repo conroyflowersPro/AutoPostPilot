@@ -1,10 +1,10 @@
 /**
- * Experience seeds from Analytics originals plus sync-gap originals.
- * Generator material — Planner does not extract. No archive fallback mix.
+ * Lived grounding from Analytics originals plus sync-gap originals.
+ * Facts for EXPERIENCE slots only — not recyclable post Seeds. No archive fallback mix.
  */
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { clusterFromText } from "./experience-evidence.ts";
-import { abstractLivedSubject, livedExperienceFacts, sortLivedNewestFirst } from "./seed-ownership.ts";
+import { livedExperienceFacts, livedGroundingLabel, sortLivedNewestFirst } from "./seed-ownership.ts";
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 
 type AnalyticsPost = {
@@ -37,9 +37,9 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
     const body = String(row.content || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
     if (body.length < 20) continue;
     const cluster = clusterFromText(body);
-    const facts = livedExperienceFacts(body);
-    const subject = abstractLivedSubject(body, cluster);
-    if (!subject) continue;
+    const facts = livedExperienceFacts(body).map((c) => c.slice(0, 72));
+    if (!facts.length) continue;
+    const subject = livedGroundingLabel(cluster, String(row.published_at || ""));
     const sig = subjectSignature(`${cluster}|${String(row.post_id || subject)}`);
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -50,7 +50,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: facts[1] || facts[0] || subject,
+      point_or_tension: "factual grounding only; not a post to rewrite",
       experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_ANALYTICS_30D"],
@@ -59,7 +59,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       creator_evidence_available: true,
       experience_required: true,
       source_type: "ANALYTICS_LIVED",
-      source_role: "SEED_SOURCE",
+      source_role: "GROUNDING_EVIDENCE",
       claim_types: ["PERSONAL_EXPERIENCE"],
       owner: "SELF",
       seed_source: "ANALYTICS_LIVED",
@@ -103,9 +103,9 @@ export function syncGapLivedSeeds(args: {
     const body = String(row.text_body || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
     if (body.length < 20) continue;
     const cluster = clusterFromText(body);
-    const facts = livedExperienceFacts(body);
-    const subject = abstractLivedSubject(body, cluster);
-    if (!subject) continue;
+    const facts = livedExperienceFacts(body).map((c) => c.slice(0, 72));
+    if (!facts.length) continue;
+    const subject = livedGroundingLabel(cluster, String(row.published_at || ""));
     const sig = subjectSignature(`${cluster}|${id || subject}`);
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -116,7 +116,7 @@ export function syncGapLivedSeeds(args: {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: facts[1] || facts[0] || subject,
+      point_or_tension: "factual grounding only; not a post to rewrite",
       experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_SYNC_GAP"],
@@ -125,7 +125,7 @@ export function syncGapLivedSeeds(args: {
       creator_evidence_available: true,
       experience_required: true,
       source_type: "ANALYTICS_LIVED",
-      source_role: "SEED_SOURCE",
+      source_role: "GROUNDING_EVIDENCE",
       claim_types: ["PERSONAL_EXPERIENCE"],
       owner: "SELF",
       seed_source: "ANALYTICS_LIVED",

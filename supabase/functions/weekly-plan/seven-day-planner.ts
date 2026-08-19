@@ -14,7 +14,7 @@ import type { PlannerIntelligenceBlocks } from "./planner-intelligence.ts";
 import { MAX_WEEKLY_SLOTS, MIN_WEEKLY_SLOTS, QUOTA_PER_DAY_MAX, QUOTA_PER_DAY_MIN } from "./quota-inference.ts";
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { diversifyAssignments } from "./situation-diversity.ts";
-import { isLivedSelfSeed, livedAsOf } from "./seed-ownership.ts";
+import { isLivedSelfSeed, livedAsOf, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
 
 export const STRATEGY_DAYS_PER_TICK = 2;
 
@@ -785,12 +785,15 @@ function selectionSystem(dayScoped: boolean): string {
       : "Preserve the supplied strategy types. Select one Seed from seed_pool for each strategy slot.",
     "Do not write posts and do not decide prose, tone, thought order, humor, Mechanism, Rail, hook, ending, or sentence form.",
     "Do not judge types. Do not close a type because the pool is empty — leave missing and request Seed Generator.",
+    "Do not change editorial_mode. Code will not change it either.",
     "planner_intent may clarify placement for the selected Seed but must remain strategy, not writing instructions.",
-    "Use only seed_id values present in seed_pool. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
-    "EXPERIENCE slots take ANALYTICS_LIVED owner SELF seeds only. Prefer newer as_of when the situation matches. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take public seeds; viral is already on those seeds.",
+    "Use only seed_id values present in seed_pool or lived_grounding. Do not invent Seeds. Do not assign one Seed to multiple slots. Do not reuse reserved_seed_ids.",
+    "lived_grounding items are unused lived facts. They are not posts to rewrite. A large lived_grounding list is supply, not an EXPERIENCE quota.",
+    "EXPERIENCE slots take lived_grounding owner SELF ids only. Prefer newer as_of when the situation matches. PUBLIC_X owner OTHER never goes on EXPERIENCE. Other slots take seed_pool (public) only. Do not put lived_grounding on INFORMATIVE, OPINION, COMPARE, or CASUAL_OBSERVATION.",
     "Do not place the same situation cluster on consecutive slots. FSD/driving/parking/intersection at most 2 per day. If the pool is overweight on one cluster, prefer another seed. If the seed is not FSD, do not pick a seed that bolts on charging, Uber, or generic driving.",
-    "If no current candidate fits a slot, leave it unassigned and return a bounded exploration_direction describing the field. EXPERIENCE holes request lived SELF scenes only, never public search to invent experience.",
-    "If must_fill is true, do not leave chunk slots in missing. Assign an unused seed_id from seed_pool. If an EXPERIENCE slot has no unused SELF lived, change that slot's editorial_mode to a mode the remaining pool can fill. Do not invent a Seed.",
+    "If no current candidate fits a non-EXPERIENCE slot, leave it unassigned and return a bounded exploration_direction describing the field.",
+    `If an EXPERIENCE slot has no unused lived_grounding, leave it in missing with exploration_direction ${LIVED_GROUNDING_INSUFFICIENT}. Do not assign a public seed. Do not change Mode.`,
+    "If must_fill is true, fill non-EXPERIENCE chunk slots from unused seed_pool. EXPERIENCE without unused lived_grounding still goes to missing as lived_grounding_insufficient. Do not invent a Seed.",
     "Return strict JSON with assignments and missing arrays. Assignment keys: slot_id, seed_id, planner_intent, editorial_mode. Missing keys: slot_id, exploration_direction. No prose outside JSON.",
   ].join("\n");
 }
@@ -812,6 +815,30 @@ function compactSeedForSelect(seed: ConcreteSeed) {
   };
 }
 
+function compactLivedGrounding(seed: ConcreteSeed) {
+  const occurred = String((seed as any).occurred_at || (seed as any).published_at || "");
+  const recency = livedAsOf(occurred || undefined);
+  const facts = Array.isArray((seed as any).experience_facts)
+    ? (seed as any).experience_facts.map((x: unknown) => s(x, 72)).filter(Boolean).slice(0, 3)
+    : [];
+  return {
+    seed_id: seed.seed_id,
+    kind: "LIVED_GROUNDING",
+    cluster: seed.cluster,
+    facts,
+    as_of: recency.as_of,
+    days_ago: recency.days_ago,
+    owner: "SELF",
+  };
+}
+
+function seedFitsSlotMode(seed: ConcreteSeed | undefined, mode: string): boolean {
+  const m = String(mode || "").toUpperCase();
+  const lived = isLivedSelfSeed(seed as any);
+  if (m === "EXPERIENCE") return !!lived;
+  return !lived;
+}
+
 function compactSlotForSelect(slot: PlannerSlotIntent) {
   return {
     slot_id: slot.slot_id,
@@ -822,7 +849,7 @@ function compactSlotForSelect(slot: PlannerSlotIntent) {
   };
 }
 
-function parsePlannerSelection(
+export function parsePlannerSelection(
   raw: any,
   slots: PlannerSlotIntent[],
   validSeedIds: Set<string>,
@@ -833,56 +860,112 @@ function parsePlannerSelection(
   if (!raw || !Array.isArray(raw.assignments)) return null;
   if (!mustFill && !Array.isArray(raw.missing)) return null;
   const validSlotIds = new Set(slots.map((slot) => slot.slot_id));
-  const modes = new Set(["INFORMATIVE", "COMPARE", "OPINION", "EXPERIENCE", "CASUAL_OBSERVATION"]);
+  const seedById = new Map(pool.map((seed) => [String(seed.seed_id || ""), seed]));
   const assignments: PlannerSeedAssignment[] = [];
   const missing: PlannerExplorationRequest[] = [];
   const usedSlots = new Set<string>();
   const usedSeeds = new Set<string>([...reservedSeedIds]);
+  const unusedLivedLeft = () => pool.some((seed) => {
+    const id = String(seed.seed_id || "");
+    return id && validSeedIds.has(id) && !usedSeeds.has(id) && isLivedSelfSeed(seed as any);
+  });
+  const experienceMissingDirection = () =>
+    unusedLivedLeft() ? "EXPERIENCE" : LIVED_GROUNDING_INSUFFICIENT;
   for (const item of raw.assignments) {
     const slotId = s(item?.slot_id, 40);
     const seedId = s(item?.seed_id, 100);
     if (!validSlotIds.has(slotId) || !validSeedIds.has(seedId) || usedSlots.has(slotId) || usedSeeds.has(seedId)) continue;
+    const strategySlot = slots.find((slot) => slot.slot_id === slotId)!;
+    const seed = seedById.get(seedId);
+    if (!seedFitsSlotMode(seed, strategySlot.editorial_mode)) continue;
     usedSlots.add(slotId);
     usedSeeds.add(seedId);
-    const strategySlot = slots.find((slot) => slot.slot_id === slotId)!;
-    const mode = String(item?.editorial_mode || "").toUpperCase();
     assignments.push({
       slot_id: slotId,
       seed_id: seedId,
       planner_intent: s(item?.planner_intent, 240) || strategySlot.planner_intent,
-      editorial_mode: mustFill && modes.has(mode) ? mode as PlannerSeedAssignment["editorial_mode"] : strategySlot.editorial_mode,
+      editorial_mode: strategySlot.editorial_mode,
     });
   }
   if (mustFill) {
-    if (assignments.length !== slots.length) return null;
-    const diversified = pool.length ? diversifyAssignments(assignments, slots, pool) : assignments;
-    return { assignments: diversified, missing: [], version: SEVEN_DAY_PLANNER_VERSION };
+    const unfilledPublic = slots.filter((slot) =>
+      String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE" && !usedSlots.has(slot.slot_id),
+    );
+    if (unfilledPublic.length) return null;
   }
   for (const item of raw.missing || []) {
     const slotId = s(item?.slot_id, 40);
-    const direction = s(item?.exploration_direction, 240);
-    if (!validSlotIds.has(slotId) || usedSlots.has(slotId) || !direction) continue;
+    if (!validSlotIds.has(slotId) || usedSlots.has(slotId)) continue;
+    const strategySlot = slots.find((slot) => slot.slot_id === slotId);
+    const livedHole = String(strategySlot?.editorial_mode || "").toUpperCase() === "EXPERIENCE";
+    const direction = livedHole
+      ? experienceMissingDirection()
+      : s(item?.exploration_direction, 240);
+    if (!direction) continue;
     usedSlots.add(slotId);
     missing.push({ slot_id: slotId, exploration_direction: direction });
   }
   for (const slot of slots) {
     if (!usedSlots.has(slot.slot_id)) {
-      missing.push({ slot_id: slot.slot_id, exploration_direction: slot.planner_intent });
+      missing.push({
+        slot_id: slot.slot_id,
+        exploration_direction: String(slot.editorial_mode || "").toUpperCase() === "EXPERIENCE"
+          ? experienceMissingDirection()
+          : slot.planner_intent,
+      });
     }
   }
+  if (mustFill && missing.some((item) => item.exploration_direction === "EXPERIENCE")) return null;
   const diversified = pool.length
     ? diversifyAssignments(assignments, slots, pool)
     : assignments;
-  return { assignments: diversified, missing, version: SEVEN_DAY_PLANNER_VERSION };
+  const kept: PlannerSeedAssignment[] = [];
+  const usedAfter = new Set<string>();
+  for (const item of diversified) {
+    const strategySlot = slots.find((slot) => slot.slot_id === item.slot_id);
+    const seed = seedById.get(item.seed_id);
+    if (!strategySlot || !seedFitsSlotMode(seed, strategySlot.editorial_mode) || usedAfter.has(item.slot_id)) {
+      if (strategySlot && !usedAfter.has(item.slot_id) && String(strategySlot.editorial_mode || "").toUpperCase() === "EXPERIENCE") {
+        missing.push({ slot_id: item.slot_id, exploration_direction: experienceMissingDirection() });
+        usedAfter.add(item.slot_id);
+      }
+      continue;
+    }
+    usedAfter.add(item.slot_id);
+    kept.push({ ...item, editorial_mode: strategySlot.editorial_mode });
+  }
+  const stillMissing = missing.filter((item) => !kept.some((a) => a.slot_id === item.slot_id));
+  for (const slot of slots) {
+    if (!kept.some((a) => a.slot_id === slot.slot_id) && !stillMissing.some((m) => m.slot_id === slot.slot_id)) {
+      stillMissing.push({
+        slot_id: slot.slot_id,
+        exploration_direction: String(slot.editorial_mode || "").toUpperCase() === "EXPERIENCE"
+          ? experienceMissingDirection()
+          : slot.planner_intent,
+      });
+    }
+  }
+  if (mustFill) {
+    const unfilledPublic = slots.filter((slot) =>
+      String(slot.editorial_mode || "").toUpperCase() !== "EXPERIENCE"
+      && !kept.some((a) => a.slot_id === slot.slot_id),
+    );
+    if (unfilledPublic.length) return null;
+    if (stillMissing.some((item) => item.exploration_direction === "EXPERIENCE")) return null;
+  }
+  return { assignments: kept, missing: stillMissing, version: SEVEN_DAY_PLANNER_VERSION };
 }
 
 export async function selectSeedsForSevenDayPlan(args: {
   xaiKey: string;
   strategy: SevenDayStrategy;
   seedPool: ConcreteSeed[];
+  livedGrounding?: ConcreteSeed[];
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSelection>> {
-  const pool = (args.seedPool || []).slice(0, 96);
+  const publicPool = (args.seedPool || []).filter((seed) => !isLivedSelfSeed(seed as any)).slice(0, 96);
+  const lived = (args.livedGrounding || (args.seedPool || []).filter((seed) => isLivedSelfSeed(seed as any))).slice(0, 80);
+  const pool = [...lived, ...publicPool];
   const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
   return callPlanner({
     xaiKey: args.xaiKey,
@@ -891,7 +974,8 @@ export async function selectSeedsForSevenDayPlan(args: {
     system: selectionSystem(false),
     user: {
       seven_day_strategy: args.strategy,
-      seed_pool: pool.map(compactSeedForSelect),
+      seed_pool: publicPool.map(compactSeedForSelect),
+      lived_grounding: lived.map(compactLivedGrounding),
     },
     parse: (raw) => parsePlannerSelection(raw, args.strategy.slots, validSeedIds, new Set(), pool),
   });
@@ -905,6 +989,7 @@ export async function selectSeedsForChunk(args: {
   chunkSlots: PlannerSlotIntent[];
   alreadyAssigned?: PlannerSeedAssignment[];
   lastLivedReject?: Array<{ slot_id: string; rejected_seed_id: string; cluster: string; newer: Array<{ seed_id: string }> }>;
+  livedGrounding?: ConcreteSeed[];
   mustFill?: boolean;
   timeoutMs?: number;
 }): Promise<PlannerCallResult<PlannerSelection>> {
@@ -915,7 +1000,12 @@ export async function selectSeedsForChunk(args: {
     if (item.rejected_seed_id) reservedSeedIds.add(String(item.rejected_seed_id));
   }
   const slots = (args.chunkSlots || []).filter((slot) => !assignedSlotIds.has(slot.slot_id));
-  const pool = (args.seedPool || []).filter((seed) => !reservedSeedIds.has(String(seed.seed_id || "")));
+  const publicPool = (args.seedPool || []).filter((seed) =>
+    !isLivedSelfSeed(seed as any) && !reservedSeedIds.has(String(seed.seed_id || "")),
+  );
+  const lived = (args.livedGrounding || (args.seedPool || []).filter((seed) => isLivedSelfSeed(seed as any)))
+    .filter((seed) => !reservedSeedIds.has(String(seed.seed_id || "")));
+  const pool = [...lived, ...publicPool];
   const validSeedIds = new Set(pool.map((seed) => String(seed.seed_id || "")));
   const seedById = new Map(pool.map((seed) => [String(seed.seed_id), seed]));
   const week = (args.strategy.slots || []).map((slot) => {
@@ -947,7 +1037,8 @@ export async function selectSeedsForChunk(args: {
       must_fill: args.mustFill === true,
       unassigned_slot_ids: week.filter((s) => s.seed_state !== "ASSIGNED").map((s) => s.slot_id),
       used_clusters: usedClusters,
-      seed_pool: pool.map(compactSeedForSelect),
+      seed_pool: publicPool.map(compactSeedForSelect),
+      lived_grounding: lived.map(compactLivedGrounding),
     },
     parse: (raw) => parsePlannerSelection(raw, slots, validSeedIds, reservedSeedIds, pool, args.mustFill === true),
   });
