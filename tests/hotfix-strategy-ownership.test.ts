@@ -73,6 +73,8 @@ assert.match(job, /inferPlanEvidenceDigest/);
 assert.match(job, /planner_digest_complete/);
 assert.doesNotMatch(job, /applyNewestLivedExperienceAssignments/);
 assert.doesNotMatch(job, /=\s*fillUnassignedPlannerSlotsFromPool/);
+assert.doesNotMatch(job, /locked\.editorial_mode = item\.editorial_mode/);
+assert.doesNotMatch(job, /EXPERIENCE: expPct/);
 
 assert.equal(classifyPlanOrigin(""), "UNKNOWN");
 assert.equal(classifyPlanOrigin(undefined), "UNKNOWN");

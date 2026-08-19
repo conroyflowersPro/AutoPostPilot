@@ -1,13 +1,13 @@
 {
   "name": "autopostpilot",
-    "version": "12.12.19",
+    "version": "12.12.20",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning tests/schedule-resume-occupied.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/agent-seung-theory-search.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order1-plan-evidence-timing.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order2-post-intelligence.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order3-write-regression.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order3-judge-fedica.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/hotfix-strategy-ownership.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/public-exploration-budget.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order4-deep-thesis.test.ts && node tests/lockstep-version.test.mjs"
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning tests/schedule-resume-occupied.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/agent-seung-theory-search.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order1-plan-evidence-timing.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order2-post-intelligence.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order3-write-regression.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order3-judge-fedica.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/hotfix-strategy-ownership.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/public-exploration-budget.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/experience-grounding-not-quota.test.ts && node --experimental-strip-types --disable-warning=ExperimentalWarning tests/order4-deep-thesis.test.ts && node tests/lockstep-version.test.mjs"
   },
   "dependencies": {
     "@netlify/plugin-nextjs": "^5.9.2",

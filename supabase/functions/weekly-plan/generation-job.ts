@@ -56,7 +56,7 @@ import {
 import { audienceBarrierSignalsFromActivityMeta } from "./audience-reaction-intelligence.ts";
 import { buildRecentExperienceCandidates } from "./experience-evidence.ts";
 import { analyticsLivedSeeds, syncGapLivedSeeds } from "./analytics-lived-seeds.ts";
-import { isLivedSelfSeed, publicSearchWindows, staleLivedExperiencePicks, describeStaleLivedPicks } from "./seed-ownership.ts";
+import { isLivedSelfSeed, publicSearchWindows, staleLivedExperiencePicks, describeStaleLivedPicks, LIVED_GROUNDING_INSUFFICIENT } from "./seed-ownership.ts";
 import { publicExplorationBudget, publicExplorationHave, publicExplorationRoundBudget, isPublicExplorationSeed } from "./public-exploration-budget.ts";
 import { fetchOfficialPublicPosts, loadEdgeXAccessToken, OPERATOR_HANDLE } from "./public-x-seed-search.ts";
 import {
@@ -674,6 +674,9 @@ function compactSlotLite(
     evidence_source_ids: seed.evidence_source_ids || [],
     cite_episode_hint: (seed as any).cite_episode_hint || "",
     owner: (seed as any).owner || "OTHER",
+    experience_facts: Array.isArray((seed as any).experience_facts) ? (seed as any).experience_facts : [],
+    source_role: (seed as any).source_role || "",
+    seed_source: (seed as any).seed_source || seed.primary_source || "",
     occurred_at: (seed as any).occurred_at || "",
     viral: !!(seed as any).viral,
     found_form: (seed as any).found_form || "",
@@ -992,7 +995,7 @@ export async function tickWeeklyJob(args: {
       row.label_ko = row.state?.planner_strategy ? "Agent승 Seed 배치…" : "7일 Agent승 전략…";
     }
     else if (row.step === "strategy") await stepStrategy(args.supabase, args.xaiKey, args.userId, row);
-    else if (row.step === "select") await stepPlannerSelect(args.supabase, args.xaiKey, row);
+    else if (row.step === "select") await stepPlannerSelect(args.supabase, args.xaiKey, args.userId, row);
     else if (row.step === "write") await stepWrite(args.supabase, args.xaiKey || "", args.userId, row);
     else if (row.step === "recover") await stepRecover(args.supabase, args.xaiKey || "", args.userId, row);
     else if (quotaFilled(row)) {
@@ -1192,10 +1195,11 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
         ...seed,
         seed_id: seed.seed_id || `lived-30d-${n}`,
         source_trace: {
-          source_role: "SEED_SOURCE",
+          source_role: "GROUNDING_EVIDENCE",
           source_type: "ANALYTICS_LIVED",
           leakage_guard_result: "PASS",
         },
+        source_role: "GROUNDING_EVIDENCE",
       });
       if (seed.concrete_subject && isPublicExplorationSeed(seed as any)) priorSubjects.push(String(seed.concrete_subject));
     }
@@ -1224,10 +1228,11 @@ async function stepExpand(supabase: any, xaiKey: string, row: any) {
       experienceSeeds.push({
         ...seed,
         source_trace: {
-          source_role: "SEED_SOURCE",
+          source_role: "GROUNDING_EVIDENCE",
           source_type: "ANALYTICS_LIVED",
           leakage_guard_result: "PASS",
         },
+        source_role: "GROUNDING_EVIDENCE",
       });
       if (seed.concrete_subject && isPublicExplorationSeed(seed as any)) priorSubjects.push(String(seed.concrete_subject));
     }
@@ -1790,9 +1795,8 @@ async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSe
     if (!seed?.concrete_subject) continue;
     const role = (seed.source_role as SourceRole) || "SEED_SOURCE";
     if (!isSeedEligibleRole(role)) continue;
-    const key = isLivedSelfSeed(seed as any)
-      ? `lived:${String(seed.seed_id || "")}`
-      : subjectKey(String(seed.concrete_subject));
+    if (isLivedSelfSeed(seed as any)) continue;
+    const key = subjectKey(String(seed.concrete_subject));
     if (!key || seen.has(key)) continue;
     const leakage = guardCandidateAgainstManualLeakage({
       source_role: role,
@@ -1805,17 +1809,28 @@ async function plannerSelectablePool(supabase: any, st: any): Promise<ConcreteSe
     seen.add(key);
     pool.push({ ...seed, status: "ELIGIBLE" });
   }
-  const lived = pool.filter((s) => isLivedSelfSeed(s as any));
-  const pub = pool.filter((s) => !isLivedSelfSeed(s as any));
-  lived.sort((a, b) => {
+  return pool;
+}
+
+function plannerLivedGrounding(st: any): ConcreteSeed[] {
+  const out: ConcreteSeed[] = [];
+  const seen = new Set<string>();
+  for (const seed of st.gated || []) {
+    if (!isLivedSelfSeed(seed as any)) continue;
+    const id = String(seed.seed_id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ ...seed, status: "ELIGIBLE" });
+  }
+  out.sort((a, b) => {
     const ta = Date.parse(String((a as any).occurred_at || (a as any).published_at || 0)) || 0;
     const tb = Date.parse(String((b as any).occurred_at || (b as any).published_at || 0)) || 0;
     return tb - ta;
   });
-  return [...lived, ...pub];
+  return out;
 }
 
-async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
+async function stepPlannerSelect(supabase: any, xaiKey: string, userId: string, row: any) {
   const st = row.state;
   const strategy = st.planner_strategy as SevenDayStrategy | null;
   if (!strategy) {
@@ -1826,7 +1841,9 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
   const assigned: PlannerSeedAssignment[] = Array.isArray(st.planner_assignments) ? st.planner_assignments : [];
   const assignedIds = assigned.map((item) => item.slot_id);
   const assigningIds: string[] = Array.isArray(st.planner_assigning_slot_ids) ? st.planner_assigning_slot_ids : [];
-  const pool = await plannerSelectablePool(supabase, st);
+  const publicPool = await plannerSelectablePool(supabase, st);
+  const livedGrounding = plannerLivedGrounding(st);
+  const pool = [...livedGrounding, ...publicPool];
   const chunk = assigningIds.length
     ? strategy.slots.filter((slot) => assigningIds.includes(slot.slot_id) && !assignedIds.includes(slot.slot_id))
     : nextUnassignedSlotChunk(strategy.slots, assignedIds);
@@ -1835,7 +1852,8 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     const result = await selectSeedsForChunk({
       xaiKey,
       strategy,
-      seedPool: pool,
+      seedPool: publicPool,
+      livedGrounding,
       chunkSlots: chunk,
       alreadyAssigned: assigned,
       lastLivedReject: st.last_lived_reject || [],
@@ -1871,10 +1889,6 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         assigned.push(item);
         have.add(item.slot_id);
       }
-      const locked = strategy.slots.find((slot) => slot.slot_id === item.slot_id);
-      if (locked && item.editorial_mode && item.editorial_mode !== locked.editorial_mode) {
-        locked.editorial_mode = item.editorial_mode;
-      }
     }
     const chunkAssigned = assigned.filter((item) => chunk.some((slot) => slot.slot_id === item.slot_id));
     const stale = staleLivedExperiencePicks({
@@ -1906,25 +1920,144 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
     st.planner_assignments = assigned;
     st.planner_assigning_slot_ids = [];
     const missing = result.value.missing || [];
-    if (missing.length > 0) {
-      const direction = missing[0]?.exploration_direction || "";
-      const fingerprint = missingSlotFingerprint(missing);
+    const livedHoles = missing.filter((item) =>
+      /lived_grounding_insufficient/i.test(String(item.exploration_direction || "")),
+    );
+    const searchMissing = missing.filter((item) =>
+      !livedHoles.some((hole) => hole.slot_id === item.slot_id)
+      && !/^EXPERIENCE$/i.test(String(item.exploration_direction || "")),
+    );
+    if (livedHoles.length) {
+      const hole = livedHoles[0];
+      const id = hole.slot_id;
+      st.lived_replan_attempts = st.lived_replan_attempts && typeof st.lived_replan_attempts === "object"
+        ? st.lived_replan_attempts
+        : {};
+      const attempts = Number(st.lived_replan_attempts[id] || 0) + 1;
+      st.lived_replan_attempts[id] = attempts;
+      if (attempts > STRATEGY_REPLAN_ABANDON) {
+        row.status = "error";
+        row.error = `EXPERIENCE 칸 ${id} lived grounding 부족 · 코드가 Mode를 바꾸지 않음`;
+        row.label_ko = "EXPERIENCE 재추론 한도";
+        row.summary = [row.summary, `칸 ${id} Agent승 재추론 한도 · 코드가 Editorial Mode를 바꾸지 않음`].filter(Boolean).join("\n");
+        return;
+      }
+      if (!xaiKey) {
+        holdForXai(row, `xAI 응답 대기 · 칸 ${id} EXPERIENCE 재추론…`, "lived replan needs xAI");
+        return;
+      }
+      const analytics = await loadRecentXAnalyticsPublished(supabase, 30);
+      const audience = st.audience_x_status || await loadAudienceXStatus(supabase, analytics);
+      const planEvidence = await loadAgentSeungPlanEvidence(
+        supabase,
+        userId,
+        String(st.startDate || ""),
+        analytics,
+      );
+      const usedSeedIds = new Set(assigned.map((item) => String(item.seed_id || "")).filter(Boolean));
+      const publicRemain = publicPool
+        .filter((seed) => seed.seed_id && !usedSeedIds.has(String(seed.seed_id)))
+        .map((seed: any) => ({
+          seed_id: String(seed.seed_id || ""),
+          concrete_subject: String(seed.concrete_subject || ""),
+          cluster: String(seed.cluster || ""),
+          editorial_mode: String(seed.editorial_mode || seed.requested_editorial_mode || ""),
+          owner: String(seed.owner || "OTHER"),
+          seed_source: String(seed.seed_source || seed.primary_source || ""),
+        }))
+        .filter((seed: { seed_id: string }) => seed.seed_id);
+      const livedRemain = livedGrounding
+        .filter((seed) => seed.seed_id && !usedSeedIds.has(String(seed.seed_id)))
+        .map((seed: any) => ({
+          seed_id: String(seed.seed_id || ""),
+          concrete_subject: String(seed.concrete_subject || ""),
+          cluster: String(seed.cluster || ""),
+          owner: "SELF",
+          seed_source: String(seed.seed_source || "ANALYTICS_LIVED"),
+          occurred_at: String(seed.occurred_at || seed.published_at || ""),
+          experience_facts: Array.isArray(seed.experience_facts) ? seed.experience_facts : [],
+        }))
+        .filter((seed: { seed_id: string }) => seed.seed_id);
+      const replan = await inferCreatorSlotReplan({
+        xaiKey,
+        audience,
+        weekSlots: strategy.slots,
+        replanSlotId: id,
+        judgeReasons: [LIVED_GROUNDING_INSUFFICIENT],
+        seedPool: publicRemain,
+        livedGrounding: livedRemain,
+        replanReason: "lived_grounding_insufficient",
+        planEvidence,
+        occupiedTimes: planEvidence.occupied_times,
+        timeoutMs: 22000,
+      });
+      if (!replan.ok || !replan.value) {
+        if (isTransientXaiError(replan.error)) {
+          st.lived_replan_attempts[id] = attempts - 1;
+          holdForXai(row, `xAI 응답 대기 · 칸 ${id} EXPERIENCE 재추론…`, String(replan.error || "replan"));
+          return;
+        }
+        row.label_ko = `칸 ${id} EXPERIENCE 재추론 ${attempts}/${STRATEGY_REPLAN_ABANDON}…`;
+        row.summary = [row.summary, `칸 ${id} lived grounding 부족 · Agent승 재추론 · 코드가 Mode를 바꾸지 않음`].filter(Boolean).join("\n");
+        return;
+      }
+      const nextStrategy = replan.value;
+      const stamp = stampPlannerSlotTimes(String(st.startDate || ""), [nextStrategy], planEvidence.occupied_times)[0];
+      const weekPreview = strategy.slots.map((slot) => slot.slot_id === id ? stamp : slot);
+      if (!String(stamp.planned_at || "").trim() || !spacingConstraintHolds(weekPreview, planEvidence.occupied_times)) {
+        row.label_ko = `칸 ${id} 재추론 시각 간격 · Agent승 재시도`;
+        row.summary = [row.summary, `칸 ${id} 재판단 시각 간격 위반 · 코드가 새 시각을 만들지 않음`].filter(Boolean).join("\n");
+        return;
+      }
+      if (!reachDailyConstraintOk(weekPreview)) {
+        row.label_ko = `칸 ${id} 재추론 REACH · Agent승 재시도`;
+        row.summary = [row.summary, `칸 ${id} 재판단 REACH 제약 위반 · 코드가 REACH를 만들지 않음`].filter(Boolean).join("\n");
+        return;
+      }
+      const seedId = String((stamp as any).seed_id || nextStrategy.seed_id || "");
+      const seed = pool.find((s: any) => String(s.seed_id || "") === seedId);
+      if (!seed) {
+        row.label_ko = `칸 ${id} 재추론 Seed 없음 · Agent승 재시도`;
+        row.summary = [row.summary, `칸 ${id} 재판단 Seed가 Pool에 없음 · Agent승 재추론`].filter(Boolean).join("\n");
+        return;
+      }
+      const idx = strategy.slots.findIndex((slot) => slot.slot_id === id);
+      if (idx >= 0) strategy.slots[idx] = { ...strategy.slots[idx], ...stamp, slot_id: id };
+      st.planner_assignments = [
+        ...assigned.filter((item) => item.slot_id !== id),
+        {
+          slot_id: id,
+          seed_id: seedId,
+          planner_intent: stamp.planner_intent,
+          editorial_mode: stamp.editorial_mode,
+        },
+      ];
+      row.label_ko = `Seed 배치 ${st.planner_assignments.length}/${strategy.slots.length} · EXPERIENCE 재추론`;
+      row.summary = [
+        row.summary,
+        `칸 ${id} Agent승 재추론 ${stamp.editorial_mode} · 코드가 Mode를 바꾸지 않음`,
+      ].filter(Boolean).join("\n");
+      return;
+    }
+    if (searchMissing.length > 0) {
+      const direction = searchMissing[0]?.exploration_direction || "";
+      const fingerprint = missingSlotFingerprint(searchMissing);
       st.explored_missing = st.explored_missing && typeof st.explored_missing === "object" ? st.explored_missing : {};
       const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction) || !!st.public_window_exhausted;
       if (!alreadyExplored) {
         st.explored_missing[fingerprint] = true;
-        st.planner_missing_count = missing.length;
-        st.planner_exploration_direction = missing
+        st.planner_missing_count = searchMissing.length;
+        st.planner_exploration_direction = searchMissing
           .map((item) => `${item.slot_id}: ${item.exploration_direction}`)
           .join(" | ")
           .slice(0, 1200);
         recordFieldRefill(st, direction);
-        st.max_expand = Number(st.max_expand || 0) + Math.min(6, missing.length + 1);
+        st.max_expand = Number(st.max_expand || 0) + Math.min(6, searchMissing.length + 1);
         row.step = "expand";
-        row.label_ko = `Agent승 지정 분야 Seed 탐색 ${missing.length}개 슬롯…`;
+        row.label_ko = `Agent승 지정 분야 Seed 탐색 ${searchMissing.length}개 슬롯…`;
         row.summary = [
           row.summary,
-          `Agent승이 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${missing.length}개 분야 추가 탐색 요청`,
+          `Agent승이 기존 Pool에서 ${st.planner_assignments.length}/${strategy.slots.length} 선택 · ${searchMissing.length}개 분야 추가 탐색 요청`,
         ].filter(Boolean).join("\n");
         return;
       }
@@ -1959,7 +2092,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       seed,
       day,
       weekDays[day].posts.length + 1,
-      assignment.editorial_mode,
+      strategySlot.editorial_mode,
       {
         strategic_role: strategySlot.strategic_role,
         planner_intent: assignment.planner_intent || strategySlot.planner_intent,
@@ -2058,6 +2191,8 @@ async function stepRecover(supabase: any, xaiKey: string, userId: string, row: a
         concrete_subject: String(seed.concrete_subject || ""),
         cluster: String(seed.cluster || ""),
         editorial_mode: String(seed.editorial_mode || seed.requested_editorial_mode || ""),
+        owner: String(seed.owner || ""),
+        seed_source: String(seed.seed_source || seed.primary_source || ""),
       })).filter((seed: { seed_id: string }) => seed.seed_id);
       const result = await inferCreatorSlotReplan({
         xaiKey,
@@ -2406,17 +2541,8 @@ async function legacyLocalSelectUnused(supabase: any, row: any) {
     row.label_ko = `초안 생성 ${row.saved_count}/${required}…`;
     return;
   }
-  const expSupply = pool.filter((s) => canServeEditorialMode(s, "EXPERIENCE") && !isAdjacentExpansionSeed(s) && isPersonalInterestSubject(String(s.concrete_subject || ""), String(s.cluster || ""))).length;
-  const expPct = expSupply > 0
-    ? Math.round((Math.min(expSupply, required) / Math.max(required, 1)) * 100)
-    : 0;
-  const mix = allocateEditorialSlots(required, {
-    INFORMATIVE: 35,
-    COMPARE: 15,
-    OPINION: 20,
-    EXPERIENCE: expPct,
-    CASUAL_OBSERVATION: 15,
-  });
+  // Dead path. Do not derive an EXPERIENCE share from lived supply. Live job uses Agent승 PLAN.
+  const mix = allocateEditorialSlots(required, undefined);
   const selectedWeekly: ConcreteSeed[] = [];
   const queue = buildEditorialQueue(mix.allocation as any);
   const outDays: Array<{ dayOffset: number; posts: any[] }> = Array.from({ length: QUOTA_DAYS }, (_, i) => ({

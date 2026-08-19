@@ -127,6 +127,9 @@ export function abstractLivedSubject(text: string, _cluster: string): string {
   return livedMeaningGist(text);
 }
 
+/** Seed select / PLAN: unused lived count is supply, not an EXPERIENCE quota. */
+export const LIVED_GROUNDING_INSUFFICIENT = "lived_grounding_insufficient";
+
 export function livedAsOf(
   occurredAt: string | undefined,
   now: Date = new Date(),

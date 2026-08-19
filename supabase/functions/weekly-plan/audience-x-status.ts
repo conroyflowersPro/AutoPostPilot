@@ -98,8 +98,8 @@ export function audienceStatusBlock(status: AudienceXStatus): string {
     "AUDIENCE DNA (X account status only). Do not decide slots. Do not overwrite Creator DNA.",
     `Analytics window ${status.analytics_from || "?"}–${status.analytics_to || "?"} · originals ${status.analytics_originals}`,
     `Sync-gap originals (not in Analytics ids) ${status.sync_gap_originals}`,
-    `Lived scene count (Analytics + sync gap, unique) ${status.lived_scene_count}`,
-    "Handmade posts are uncertain climate. Do not leave empty AP days for them. Do not reduce handmade.",
+    `Lived scene count (Analytics + sync gap, unique) ${status.lived_scene_count} — grounding supply when an EXPERIENCE slot is needed, not an EXPERIENCE post quota`,
+    "Handmade posts are uncertain climate. Do not leave empty AP days for them. Do not reduce handmade. Do not treat lived count or excerpts as a list of EXPERIENCE posts to make.",
     status.sync_gap_excerpts.length
       ? `Sync gap excerpts: ${status.sync_gap_excerpts.map((g) => `${g.d}:${g.excerpt}`).join(" · ")}`
       : "Sync gap excerpts: none",
