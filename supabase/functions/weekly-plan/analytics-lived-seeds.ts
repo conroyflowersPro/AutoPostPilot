@@ -4,7 +4,14 @@
  */
 import { BUNDLED_X_ANALYTICS_WINDOW } from "./x-analytics-30d-bundled.ts";
 import { clusterFromText } from "./experience-evidence.ts";
-import { abstractLivedSubject, livedExperienceFacts, sortLivedNewestFirst } from "./seed-ownership.ts";
+import {
+  abstractLivedSubject,
+  LIVED_CITE_HINT,
+  LIVED_DIRECTION_TENSION,
+  livedExperienceFacts,
+  sortLivedNewestFirst,
+} from "./seed-ownership.ts";
+import { subjectCopiesOperatorOriginal } from "./operator-original-guard.ts";
 import { subjectSignature, type ConcreteSeed } from "./seed-engine.ts";
 
 type AnalyticsPost = {
@@ -40,6 +47,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
     const facts = livedExperienceFacts(body);
     const subject = abstractLivedSubject(body, cluster);
     if (!subject) continue;
+    if (subjectCopiesOperatorOriginal(subject, [body])) continue;
     const sig = subjectSignature(`${cluster}|${String(row.post_id || subject)}`);
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -50,7 +58,7 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: facts[1] || facts[0] || subject,
+      point_or_tension: LIVED_DIRECTION_TENSION,
       experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_ANALYTICS_30D"],
@@ -69,9 +77,10 @@ export function analyticsLivedSeeds(opts?: { limit?: number }): ConcreteSeed[] {
       do_not_invent: [
         "manual_body_narrative",
         "same_episode_retell",
+        "source_sentence_rewrite",
         "N일_전_시점",
       ],
-      cite_episode_hint: "cite the dated Analytics episode; related follow-up, 동일 내용 금지",
+      cite_episode_hint: LIVED_CITE_HINT,
     } as ConcreteSeed);
     if (out.length >= limit) break;
   }
@@ -106,6 +115,7 @@ export function syncGapLivedSeeds(args: {
     const facts = livedExperienceFacts(body);
     const subject = abstractLivedSubject(body, cluster);
     if (!subject) continue;
+    if (subjectCopiesOperatorOriginal(subject, [body])) continue;
     const sig = subjectSignature(`${cluster}|${id || subject}`);
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -116,7 +126,7 @@ export function syncGapLivedSeeds(args: {
       dimension: "ANALYTICS_LIVED",
       concrete_subject: subject,
       subject_signature: sig,
-      point_or_tension: facts[1] || facts[0] || subject,
+      point_or_tension: LIVED_DIRECTION_TENSION,
       experience_facts: facts,
       primary_source: "ANALYTICS_LIVED",
       supporting_sources: ["X_SYNC_GAP"],
@@ -132,8 +142,8 @@ export function syncGapLivedSeeds(args: {
       occurred_at: String(row.published_at || ""),
       published_at: String(row.published_at || ""),
       evidence_source_ids: [id].filter(Boolean),
-      do_not_invent: ["manual_body_narrative", "same_episode_retell", "N일_전_시점"],
-      cite_episode_hint: "cite the dated published episode; related follow-up, 동일 내용 금지",
+      do_not_invent: ["manual_body_narrative", "same_episode_retell", "source_sentence_rewrite", "N일_전_시점"],
+      cite_episode_hint: LIVED_CITE_HINT,
     } as ConcreteSeed);
     if (out.length >= limit) break;
   }

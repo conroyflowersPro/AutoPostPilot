@@ -107,25 +107,63 @@ function livedClauses(text: string): string[] {
     .filter((c) => c.length >= 10 && !/동일 내용|cite the lived|어떻게 생각|팔로우/i.test(c));
 }
 
-/** Scene / change meaning only. Never the original post. Never cluster+"실사용 후속". */
-export function livedMeaningGist(text: string): string {
-  const stripped = String(text || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
-  if (stripped.length < 12) return "";
-  const clauses = livedClauses(stripped);
-  const picked = clauses.find((c) => c.length <= 72) || clauses[0] || stripped.slice(0, 72);
-  let gist = picked.replace(/^(결국|사실|진짜|솔직히)\s*/i, "").trim().slice(0, 72);
-  if (stripped.length > 90 && gist.length > stripped.length * 0.85) gist = gist.slice(0, 48);
-  if (/실사용 후속/.test(gist)) return "";
-  return gist.length >= 10 ? gist : "";
+/** Scene-type directions. Never an original clause. Never cluster+"실사용 후속". */
+const LIVED_DIRECTIONS: Array<{ re: RegExp; direction: string }> = [
+  { re: /보행자|급제동|갑자기\s*(튀|나왔)/, direction: "야간 보행자 장면에서의 판단" },
+  { re: /충전|슈퍼차저|supercharger/i, direction: "충전 대기 장면에서의 판단" },
+  { re: /주차|티켓/, direction: "주차 장면에서의 판단" },
+  { re: /교차로|신호등|횡단보도/, direction: "교차로 판단 장면에서의 판단" },
+  { re: /차선|핸들|개입/, direction: "주행 개입 장면에서의 판단" },
+  { re: /알림|업데이트|화면/, direction: "휴대폰 알림 장면에서의 판단" },
+  { re: /그록|grok|챗gpt|chatgpt|번역|language\s*detection/i, direction: "일상 AI 사용 장면에서의 판단" },
+  { re: /직관|축구|lafc/i, direction: "경기 직관 장면에서의 판단" },
+  { re: /fsd|오토파일럿|자율주행/i, direction: "FSD 판단 장면에서의 판단" },
+  { re: /사이버트럭|cybertruck/i, direction: "사이버트럭 주행 장면에서의 판단" },
+  { re: /로켓|위성|발사|starlink|spacex/i, direction: "발사체·위성 장면에서의 판단" },
+  { re: /xmoney|결제|수표|디파짓/i, direction: "결제·돈 장면에서의 판단" },
+  { re: /유성|별똥|하늘/, direction: "하늘 장면에서의 판단" },
+  { re: /선착순|현장\s*줄|핀\s*지급/, direction: "현장 줄 장면에서의 판단" },
+  { re: /퍼와서|퍼오|수익|크리에이터/, direction: "창작과 수익 장면에서의 판단" },
+];
+
+const CLUSTER_DIRECTION: Record<string, string> = {
+  FSD: "주행 판단 장면에서의 판단",
+  CYBERTRUCK: "트럭 일상 장면에서의 판단",
+  ROBOTAXI: "승하차 장면에서의 판단",
+  LAFC: "경기 직관 장면에서의 판단",
+  GAMING: "짧은 플레이 장면에서의 판단",
+  AI_TECH: "일상 AI 사용 장면에서의 판단",
+  TESLA: "제품 사용 장면에서의 판단",
+  DAILY: "일상 장면에서의 판단",
+};
+
+/** Direction only. Never the original post. Never cluster+"실사용 후속". */
+export function livedMeaningGist(text: string, cluster = ""): string {
+  return abstractLivedSubject(text, cluster);
 }
 
 export function livedExperienceFacts(text: string): string[] {
   return livedClauses(text).map((c) => c.slice(0, 140)).slice(0, 4);
 }
 
-export function abstractLivedSubject(text: string, _cluster: string): string {
-  return livedMeaningGist(text);
+/** Infer a write direction from lived facts. Never store the original sentence. */
+export function abstractLivedSubject(text: string, cluster = ""): string {
+  const stripped = String(text || "").replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
+  if (stripped.length < 12) return "";
+  for (const row of LIVED_DIRECTIONS) {
+    if (row.re.test(stripped)) {
+      if (/실사용 후속/.test(row.direction)) continue;
+      return row.direction;
+    }
+  }
+  const key = String(cluster || "").toUpperCase();
+  const fallback = CLUSTER_DIRECTION[key] || CLUSTER_DIRECTION.DAILY;
+  return /실사용 후속/.test(fallback) ? "" : fallback;
 }
+
+export const LIVED_DIRECTION_TENSION = "경험 사실에서 새 판단을 추론";
+export const LIVED_CITE_HINT =
+  "Lived text is grounding only. Infer a new post from the direction. Do not rewrite the source sentence. 동일 내용 금지.";
 
 /** Seed select / PLAN: unused lived count is supply, not an EXPERIENCE quota. */
 export const LIVED_GROUNDING_INSUFFICIENT = "lived_grounding_insufficient";

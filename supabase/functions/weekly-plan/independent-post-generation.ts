@@ -476,7 +476,7 @@ export function buildConstraintOnlyWriterInstructions(ctx: DeepGenerationContext
       ? writerLivedTimeLines(String((expBound as any).occurred_at)).join(" ")
       : "",
     s((ctx as any).cite_episode_hint)
-      ? "CITE RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Do not retell or copy the source post. 동일 내용 금지."
+      ? "CITE RELATED EXPERIENCE EVIDENCE: use only as factual grounding. Infer a new post from the direction. Do not rewrite the source sentence. 동일 내용 금지."
       : "",
     "OUTPUT JSON only: {\"core_thought\":\"one judgment sentence\",\"from_current_seed\":true,\"boundary_ok\":true,\"post\":\"korean x post\"}.",
     "core_thought is not the post. post is the post. No chain-of-thought. No English meta in post.",

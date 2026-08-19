@@ -3,7 +3,7 @@
  * Lived originals may become abstract cite-seeds (related follow-up).
  * Never body.slice as seed subject. Same-content clone is forbidden.
  */
-import { livedExperienceFacts, livedMeaningGist } from "./seed-ownership.ts";
+import { LIVED_CITE_HINT, livedExperienceFacts, livedMeaningGist } from "./seed-ownership.ts";
 
 export type ExperienceProvenance =
   | "RECENT_MANUAL_14D"
@@ -78,22 +78,22 @@ export function clusterFromText(text: string): string {
   if (/robotaxi|로보|커브|승하차/.test(t)) return "ROBOTAXI";
   if (/lafc|bmo|직관|경기/.test(t)) return "LAFC";
   if (/게임|컨트롤러|한\s*판/.test(t)) return "GAMING";
-  if (/\bai\b|그록|프롬프트|초안/.test(t)) return "AI_TECH";
+  if (/\bai\b|그록|grok|프롬프트|초안/.test(t)) return "AI_TECH";
   return "DAILY";
 }
 
-const CITE_NOT_CLONE =
-  "Cite the lived episode by situation only. Write a RELATED follow-up. 동일 내용 금지 — do not retell the same events, punchline, or wording.";
+const CITE_NOT_CLONE = LIVED_CITE_HINT;
 
-/** Meaning gist only. Never body.slice. Never a frozen example-post subject. */
+/** Direction only. Never body.slice. Never a frozen example-post subject. */
 export function relatedExperienceSubject(body: string, cluster: string, historical: boolean): {
   subject: string;
   cite_episode_hint: string;
 } {
-  const gist = livedMeaningGist(body);
-  const prefix = historical ? "과거 장면: " : "";
+  const gist = livedMeaningGist(body, cluster);
+  const prefix = historical ? "과거 장면에서의 판단: " : "";
+  const subject = gist ? `${prefix}${gist}`.slice(0, 90) : "일상 장면에서의 판단";
   return {
-    subject: (gist ? prefix + gist : "").slice(0, 90) || `${cluster} 장면`.slice(0, 40),
+    subject,
     cite_episode_hint: CITE_NOT_CLONE,
   };
 }
