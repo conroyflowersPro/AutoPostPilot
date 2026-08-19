@@ -1866,7 +1866,7 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
       const direction = missing[0]?.exploration_direction || "";
       const fingerprint = missingSlotFingerprint(missing);
       st.explored_missing = st.explored_missing && typeof st.explored_missing === "object" ? st.explored_missing : {};
-      const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction);
+      const alreadyExplored = !!st.explored_missing[fingerprint] || !canRefillField(st, direction) || !!st.public_window_exhausted;
       if (!alreadyExplored) {
         st.explored_missing[fingerprint] = true;
         st.planner_missing_count = missing.length;
@@ -1885,9 +1885,10 @@ async function stepPlannerSelect(supabase: any, xaiKey: string, row: any) {
         return;
       }
       st.planner_exploration_direction = "";
+      row.label_ko = `Seed 배치 ${st.planner_assignments.length}/${strategy.slots.length} · 공개 창 끝 · 남은 Pool로`;
       row.summary = [
         row.summary,
-        `추가 탐색 한도 · Agent승이 빈 칸 Seed를 채우지 않아 재추론 ${st.planner_assignments.length}/${strategy.slots.length}`,
+        `공개 창이 끝나 추가 탐색 없음 · Agent승이 남은 Pool로 빈 칸을 채움 ${st.planner_assignments.length}/${strategy.slots.length}`,
       ].filter(Boolean).join("\n");
       return;
     }

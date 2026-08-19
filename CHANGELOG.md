@@ -7,6 +7,11 @@
 
 숫자 출처: `package.json` = `lib/version.ts` = weekly-plan `APP_VERSION`
 
+## 12.12.16 — 2026-08-18
+
+- 공개 창이 끝난 뒤 Agent승이 분야 추가 탐색을 요청해도 공개 검색으로 돌아가지 않습니다
+- 남은 Seed Pool로 빈 칸을 이어서 채웁니다
+
 ## 12.12.15 — 2026-08-18
 
 - 화면의 Planner 라벨을 Agent승 Seed 배치로 바꿉니다. 새 Intelligence가 아닙니다
