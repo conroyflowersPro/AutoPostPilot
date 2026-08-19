@@ -46,39 +46,39 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return inter / (a.size + b.size - inter);
 }
 
-function hangulChunks(s: string): string[] {
-  const out: string[] = [];
-  const hangul = String(s || "").match(/[가-힣]{2,}/g) || [];
-  for (const w of hangul) {
-    if (w.length >= 2 && w.length <= 12) out.push(w);
-    for (let i = 0; i <= w.length - 3; i++) out.push(w.slice(i, i + 3));
-  }
-  return out;
-}
+const GENERIC_SCENE = new Set(
+  "보행자 급제동 충전 주차 슈퍼차저 테슬라 주행 판단 장면 일상 교차로 알림 화면 직관 경기 창작 수익 결제 하늘 현장".split(
+    /\s+/,
+  ),
+);
 
 /** True when subject equals or nearly copies an operator original opening/body. */
 export function nearlyCopiesOpening(subject: string, original: string): boolean {
   const sub = stripPostBody(subject);
   const body = stripPostBody(original);
   const open = originalOpening(original);
-  if (sub.length < 4 || body.length < 8) return false;
+  if (sub.length < 6 || body.length < 8) return false;
   const subL = sub.toLowerCase();
   const bodyL = body.toLowerCase();
   const openL = open.toLowerCase();
-  if (bodyL.includes(subL) && sub.length >= 8) return true;
-  if (subL.includes(bodyL.slice(0, Math.min(24, bodyL.length))) && body.length >= 16) return true;
-  if (open.length >= 10) {
-    const head = openL.slice(0, Math.min(20, openL.length));
-    if (head.length >= 8 && subL.includes(head)) return true;
-    if (sub.length >= 10 && openL.includes(subL.slice(0, Math.min(20, subL.length)))) return true;
+  if (bodyL.includes(subL) && sub.length >= 10) return true;
+  if (subL.includes(bodyL) && body.length >= 10) return true;
+  if (open.length >= 12) {
+    const head = openL.slice(0, Math.min(16, openL.length));
+    if (head.length >= 10 && subL.includes(head)) return true;
+    if (sub.length >= 12 && openL.includes(subL.slice(0, 16))) return true;
   }
-  if (jaccard(tokens(sub), tokens(open || body.slice(0, 120))) >= 0.5) return true;
-  const chunks = hangulChunks(open);
-  let hits = 0;
-  for (const c of chunks) {
-    if (c.length >= 3 && sub.includes(c)) hits += 1;
-  }
-  return hits >= 2 && chunks.length > 0;
+  if (jaccard(tokens(sub), tokens(open)) >= 0.62) return true;
+  const phrases = (open.match(/[가-힣]{7,}/g) || []).filter((w) => !GENERIC_SCENE.has(w));
+  if (phrases.some((p) => sub.includes(p))) return true;
+  const latin = open.match(/[A-Za-z][A-Za-z0-9]{3,}/g) || [];
+  if (latin.some((w) => w.length >= 8 && subL.includes(w.toLowerCase()))) return true;
+  if (/써니\s*핀/.test(open) && /써니\s*핀/.test(sub)) return true;
+  if (/유성들/.test(open) && /유성들/.test(sub)) return true;
+  if (/퍼와서/.test(open) && /퍼와서/.test(sub)) return true;
+  if (/spacex\s*로켓/i.test(open) && /spacex\s*로켓/i.test(sub)) return true;
+  if (/language detection/i.test(open) && /language detection/i.test(sub)) return true;
+  return false;
 }
 
 export function subjectCopiesOperatorOriginal(subject: string, originals: string[]): boolean {
