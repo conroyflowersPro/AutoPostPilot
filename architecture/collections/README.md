@@ -13,4 +13,6 @@
 
 업로드: xAI Console. **청크 경계는 `## Vn` / `## Wn`**. 콘솔이 헤딩 단위로 안 자르면 카드마다 나눠 올린다. 전 이론을 한 프롬프트에 넣지 마라.
 
+아이폰에서 받을 ZIP: `viral-theories.zip`, `writing-theories.zip`. 둘 다 필요하면 `autopostpilot-collections.zip`. 압축을 풀면 위의 `.md`와 같다. ZIP은 업로드용이 아니다. Collection에는 `.md`만 올린다.
+
 최종 조합은 시드 하나 실험에서 한다. 카드 파일끼리 미리 섞지 마라.
