@@ -1,25 +1,27 @@
 /**
  * Korean-track scheduling (America/Los_Angeles).
  *
- * Gap = X Home/For You ranking: same-author originals in one refresh are
- * decayed; out-of-network candidates drop after ~48 hours. Step ~2 hours.
- * Do not compress gaps to fill an afternoon window.
- *
- * 14:00–22:00 PT = this account's Pacific posting hours (audience awake),
- * not an AP "For You" product window.
+ * Personal @Seung4680 lock: 11:00, 15:00, 19:00 PT only.
+ * 3 originals per Pacific day. 4-hour gap. Never a 2-hour 14:00–22:00 step.
+ * Shop/other accounts are not in this repo — this is the default personal cadence.
  */
 
 const TZ = "America/Los_Angeles";
 const MODEL = "grok-4.6";
 
-/** First original of a Pacific calendar day (audience hours). */
-export const FOR_YOU_START_HOUR = 14;
-/** Last original of a Pacific calendar day (audience hours). */
-export const FOR_YOU_END_HOUR = 22;
-/** X For You author-diversity gap between originals. */
-export const FOR_YOU_PREFERRED_GAP_MS = 2 * 60 * 60 * 1000;
-/** Same as preferred — do not tighten to pack 14:00–22:00. */
-export const FOR_YOU_HARD_MIN_GAP_MS = FOR_YOU_PREFERRED_GAP_MS;
+/** Locked personal clocks (America/Los_Angeles). */
+export const PERSONAL_CLOCK_HOURS = [11, 15, 19] as const;
+export const PERSONAL_POSTS_PER_DAY = 3;
+export const PERSONAL_GAP_HOURS = 4;
+export const PERSONAL_GAP_MS = PERSONAL_GAP_HOURS * 60 * 60 * 1000;
+
+/** First personal clock of a Pacific calendar day. */
+export const FOR_YOU_START_HOUR = PERSONAL_CLOCK_HOURS[0];
+/** Last personal clock of a Pacific calendar day. */
+export const FOR_YOU_END_HOUR = PERSONAL_CLOCK_HOURS[PERSONAL_CLOCK_HOURS.length - 1];
+/** Personal @Seung4680 gap between originals. */
+export const FOR_YOU_PREFERRED_GAP_MS = PERSONAL_GAP_MS;
+export const FOR_YOU_HARD_MIN_GAP_MS = PERSONAL_GAP_MS;
 
 const ANCHOR_HOUR = FOR_YOU_START_HOUR;
 
@@ -104,21 +106,31 @@ function dayStartMs(year: number, month: number, day: number, hour: number, minu
   return new Date(laWallTimeToISO(year, month, day, hour, minute)).getTime();
 }
 
-function clampHourToPostingHours(hour: number): number {
-  if (hour < FOR_YOU_START_HOUR) return FOR_YOU_START_HOUR;
-  if (hour > FOR_YOU_END_HOUR) return FOR_YOU_END_HOUR;
-  return hour;
+export function isPersonalClockHour(hour: number): boolean {
+  return (PERSONAL_CLOCK_HOURS as readonly number[]).includes(hour);
 }
 
-/** How many originals fit in [startMs, endMs] at the X author-diversity gap. */
+/** Next locked clock on or after this instant. After 19:00 PT → next day's 11:00. */
+export function nextPersonalClockOnOrAfter(isoOrMs: string | number): string {
+  const ms = typeof isoOrMs === "number" ? isoOrMs : Date.parse(isoOrMs);
+  if (!Number.isFinite(ms)) return computeKRBatchStartISO();
+  const p = getLAParts(new Date(ms));
+  for (const hour of PERSONAL_CLOCK_HOURS) {
+    const clock = dayStartMs(p.year, p.month, p.day, hour, 0);
+    if (clock >= ms - 500) return new Date(clock).toISOString();
+  }
+  const next = addCalendarDays(p.year, p.month, p.day, 1);
+  return laWallTimeToISO(next.year, next.month, next.day, ANCHOR_HOUR, 0);
+}
+
+/** How many originals fit in [startMs, endMs] at the personal 4-hour gap. */
 export function forYouFitCount(startMs: number, endMs: number): number {
   if (!(endMs >= startMs)) return 0;
   return Math.floor((endMs - startMs) / FOR_YOU_HARD_MIN_GAP_MS) + 1;
 }
 
 /**
- * Even-spread helper (tests / callers). Scheduling itself steps +2h
- * instead of densifying to fill 14:00–22:00.
+ * Even-spread helper (tests / callers). Scheduling itself uses locked clocks.
  */
 export function evenSpreadInWindow(firstMs: number, endMs: number, count: number): string[] {
   const n = Math.max(0, Math.floor(count));
@@ -133,8 +145,8 @@ export function evenSpreadInWindow(firstMs: number, endMs: number, count: number
   return slots;
 }
 
-/** +2h from first posting hour until 22:00 PT. Remainder rolls to the next day. */
-function stepXAuthorDiversityDay(
+/** Remaining {11, 15, 19} on this Pacific day from firstHour. */
+function stepPersonalClocksDay(
   year: number,
   month: number,
   day: number,
@@ -142,16 +154,13 @@ function stepXAuthorDiversityDay(
   firstHour: number,
   firstMinute = 0
 ): string[] {
-  const startH = clampHourToPostingHours(firstHour);
-  let ms = dayStartMs(year, month, day, startH, firstMinute);
-  const endMs = dayStartMs(year, month, day, FOR_YOU_END_HOUR, 0);
-  const slots: string[] = [];
   const n = Math.max(0, Math.floor(count));
-  while (slots.length < n && ms <= endMs + 1000) {
-    const p = getLAParts(new Date(ms));
-    if (p.hour > FOR_YOU_END_HOUR) break;
-    slots.push(new Date(ms).toISOString());
-    ms += FOR_YOU_PREFERRED_GAP_MS;
+  const slots: string[] = [];
+  for (const hour of PERSONAL_CLOCK_HOURS) {
+    if (slots.length >= n) break;
+    if (hour < firstHour) continue;
+    if (hour === firstHour && firstMinute > 0) continue;
+    slots.push(laWallTimeToISO(year, month, day, hour, 0));
   }
   return slots;
 }
@@ -180,39 +189,17 @@ export function computeStartISOForDate(
 }
 
 export function computeKRBatchStartISO(now = new Date()): string {
-  const p = getLAParts(now);
-  if (p.hour < ANCHOR_HOUR) {
-    return laWallTimeToISO(p.year, p.month, p.day, ANCHOR_HOUR, 0);
-  }
-  let hour = p.minute > 0 ? p.hour + 1 : p.hour;
-  if (p.minute === 0 && p.hour >= ANCHOR_HOUR) hour = p.hour;
-  if (hour > FOR_YOU_END_HOUR) {
-    const next = addCalendarDays(p.year, p.month, p.day, 1);
-    return laWallTimeToISO(next.year, next.month, next.day, ANCHOR_HOUR, 0);
-  }
-  return laWallTimeToISO(p.year, p.month, p.day, hour, 0);
+  return nextPersonalClockOnOrAfter(now.getTime());
 }
 
-/** Snap into Pacific posting hours (same day 14:00 or next day 14:00). */
+/** Snap onto the next locked personal clock (same day 11/15/19 or next day 11:00). */
 export function snapToForYouWindow(isoOrMs: string | number): string {
-  const ms = typeof isoOrMs === "number" ? isoOrMs : Date.parse(isoOrMs);
-  if (!Number.isFinite(ms)) return computeKRBatchStartISO();
-  const p = getLAParts(new Date(ms));
-  if (p.hour < FOR_YOU_START_HOUR) {
-    return laWallTimeToISO(p.year, p.month, p.day, FOR_YOU_START_HOUR, 0);
-  }
-  if (p.hour > FOR_YOU_END_HOUR) {
-    const next = addCalendarDays(p.year, p.month, p.day, 1);
-    return laWallTimeToISO(next.year, next.month, next.day, FOR_YOU_START_HOUR, 0);
-  }
-  return new Date(ms).toISOString();
+  return nextPersonalClockOnOrAfter(isoOrMs);
 }
 
 /**
- * Continue after times already on AP/Fedica so a retry does not reuse 14:00
- * and make the pipeline dump everything at "now".
- * Always resume after the latest occupied slot when that slot is at/after
- * the requested start (do not fill holes before existing originals).
+ * Continue after times already on AP/Fedica so a retry does not reuse 11:00
+ * and does not pack 20/21/22. Next of {11, 15, 19} today, else next day's 11:00.
  */
 export function nextForYouSlotAfterOccupied(
   startISO: string,
@@ -220,7 +207,7 @@ export function nextForYouSlotAfterOccupied(
   gapMs = FOR_YOU_PREFERRED_GAP_MS,
   hardMs = FOR_YOU_HARD_MIN_GAP_MS
 ): string {
-  let cursor = Date.parse(snapToForYouWindow(startISO));
+  let cursor = Date.parse(nextPersonalClockOnOrAfter(startISO));
   if (!Number.isFinite(cursor)) cursor = Date.parse(computeKRBatchStartISO());
   const occ = occupiedISOs
     .map((x) => Date.parse(x))
@@ -228,19 +215,19 @@ export function nextForYouSlotAfterOccupied(
     .sort((a, b) => a - b);
   const latest = occ.length ? occ[occ.length - 1] : NaN;
   if (Number.isFinite(latest) && latest + hardMs > cursor) {
-    cursor = Date.parse(snapToForYouWindow(latest + gapMs));
+    cursor = Date.parse(nextPersonalClockOnOrAfter(latest + gapMs));
   }
   let guard = 0;
   while (guard++ < 400) {
     const conflict = occ.find((ms) => Math.abs(ms - cursor) < hardMs);
-    if (!conflict) return snapToForYouWindow(cursor);
-    cursor = Date.parse(snapToForYouWindow(conflict + gapMs));
+    if (!conflict) return nextPersonalClockOnOrAfter(cursor);
+    cursor = Date.parse(nextPersonalClockOnOrAfter(conflict + gapMs));
   }
-  return snapToForYouWindow(cursor);
+  return nextPersonalClockOnOrAfter(cursor);
 }
 
 /**
- * Spread posts across Pacific days from startISO.
+ * Spread posts across Pacific days from startISO using 11/15/19 only.
  * Legacy helper for posts that have no Agent승 planned_at.
  * Generation Job and Fedica must not use this to overwrite Agent승 planned_at.
  * Flag lives in `lib/fedica-strategy-contract.ts` (do not re-export with a .ts path — Next build forbids it).
@@ -249,7 +236,7 @@ export function nextForYouSlotAfterOccupied(
 export function buildDaySpreadSlots(
   startISO: string,
   count: number,
-  maxPerDay = 5
+  maxPerDay = PERSONAL_POSTS_PER_DAY
 ): string[] {
   if (count <= 0) return [];
   const slots: string[] = [];
@@ -258,13 +245,13 @@ export function buildDaySpreadSlots(
   let firstHour = parts.hour;
   let firstMinute = parts.minute;
   let remaining = count;
-  const cap = Math.min(5, Math.max(1, maxPerDay));
+  const cap = Math.min(PERSONAL_POSTS_PER_DAY, Math.max(1, maxPerDay));
 
   let guard = 0;
   while (remaining > 0 && guard < 60) {
     guard += 1;
     const want = Math.min(remaining, cap);
-    const daySlots = stepXAuthorDiversityDay(
+    const daySlots = stepPersonalClocksDay(
       parts.year,
       parts.month,
       parts.day,
@@ -290,7 +277,7 @@ export function buildDaySpreadSlots(
 }
 
 export function fallbackSlots(startISO: string, count: number): string[] {
-  return buildDaySpreadSlots(startISO, count, 5);
+  return buildDaySpreadSlots(startISO, count, PERSONAL_POSTS_PER_DAY);
 }
 
 function timesRespectForYou(times: string[], startISO: string, maxPerDay: number): boolean {
@@ -298,15 +285,16 @@ function timesRespectForYou(times: string[], startISO: string, maxPerDay: number
   const startMs = new Date(startISO).getTime();
   let last = startMs - FOR_YOU_HARD_MIN_GAP_MS;
   const perDay = new Map<string, number>();
+  const cap = Math.min(PERSONAL_POSTS_PER_DAY, Math.max(1, maxPerDay));
   for (const t of times) {
     const ms = new Date(t).getTime();
     if (isNaN(ms) || ms < startMs) return false;
     if (ms < last + FOR_YOU_HARD_MIN_GAP_MS) return false;
     const p = getLAParts(new Date(ms));
-    if (p.hour < FOR_YOU_START_HOUR || p.hour > FOR_YOU_END_HOUR) return false;
+    if (!isPersonalClockHour(p.hour) || p.minute !== 0) return false;
     const key = `${p.year}-${p.month}-${p.day}`;
     perDay.set(key, (perDay.get(key) || 0) + 1);
-    if ((perDay.get(key) || 0) > maxPerDay) return false;
+    if ((perDay.get(key) || 0) > cap) return false;
     last = ms;
   }
   return true;
@@ -316,19 +304,21 @@ export async function assignSlotsWithGrok(
   posts: { id: string; content: string }[],
   startISO: string,
   xaiKey: string,
-  maxPerDay = 5
+  maxPerDay = PERSONAL_POSTS_PER_DAY
 ): Promise<string[]> {
   if (posts.length === 0) return [];
 
-  const base = buildDaySpreadSlots(startISO, posts.length, maxPerDay);
+  const cap = Math.min(PERSONAL_POSTS_PER_DAY, Math.max(1, maxPerDay));
+  const base = buildDaySpreadSlots(startISO, posts.length, cap);
 
   const system = `Assign X post times, timezone America/Los_Angeles.
-X Home/For You decays stacked same-author originals in one refresh; OON candidates drop after ~48 hours. Gap originals by about 2 hours. Do not compress gaps to fill the afternoon.
-Pacific posting hours 14:00–22:00 are audience hours, not the algorithm. First at/after ${startISO}; max ${maxPerDay} per calendar day; next day starts 14:00.
+Personal @Seung4680 clocks are 11:00, 15:00, 19:00 PT only. 3 posts per day. 4-hour gap.
+Do not stamp 14:00, 16:00, 18:00, 20:00, or 22:00. Do not step by 2 hours.
+First at/after ${startISO}; max ${cap} per calendar day; next day starts 11:00.
 Do not write captions. Times only.
 Return same order ISO UTC. JSON only: { "times": ["..."] }`;
 
-  const user = `Refine ${posts.length} times (keep ~2h X For You gaps).
+  const user = `Refine ${posts.length} times onto 11/15/19 PT only.
 Base suggestion:
 ${base.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
 
@@ -357,7 +347,7 @@ ${base.map((t, i) => `${i + 1}. ${t}`).join("\n")}`;
     const parsed = JSON.parse(match ? match[0] : raw);
     const times: string[] = parsed.times || [];
     if (times.length !== posts.length) return base;
-    if (!timesRespectForYou(times, startISO, maxPerDay)) return base;
+    if (!timesRespectForYou(times, startISO, cap)) return base;
     return times;
   } catch {
     return base;

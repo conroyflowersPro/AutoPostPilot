@@ -153,8 +153,8 @@ export const PLAN_EVIDENCE_NOTES = [
   "Do not average USER_DIRECT and AP_PIPELINE into one success population. Do not learn Creator Voice from AP_PIPELINE.",
   "Complexity/Emergence is a judgment, not a mix recipe: is planned AP going rigid, where is USER_DIRECT moving, can Identity stay while Growth opens. No fixed USER_DIRECT ratio. No fixed slot pattern.",
   "Date and time are part of the seven-day strategy. Consider freshness, same-author density, and time for each original to earn engagement.",
-  "Adjacent planned originals need at least 2 hours. That is a constraint. Do not emit a repeating clock grid. Do not add jitter to look irregular.",
-  "14:00–22:00 PT are audience hours to consider, not an AP For You window and not a template.",
+  "Personal @Seung4680 planned originals use 11:00, 15:00, 19:00 PT only. 3 per day. 4-hour gap. Infer among those three. Do not emit a 14:00–22:00 2-hour grid.",
+  "Do not invent 14/16/18/20/22. Code may snap onto the three locked clocks.",
   "Fedica Best Posting Time is timing evidence when present. If missing, say so. Do not replace it with a 14:00–22:00 grid.",
   "Do not invent Topic→Role, Topic→time, Editorial Mode→time, or USER_DIRECT-ratio slot mappings. Infer this job from the evidence.",
 ] as const;
@@ -163,7 +163,7 @@ export function emptyFedicaBestPostingTime(): AgentSeungPlanEvidence["fedica_bes
   return {
     status: "missing",
     windows: null,
-    note: "Fedica Best Posting Time not loaded. Missing evidence. Do not substitute a 14:00–22:00 clock.",
+    note: "Fedica Best Posting Time not loaded. Missing evidence. Do not substitute a 14:00–22:00 clock. Personal clocks are 11/15/19 PT.",
   };
 }
 
@@ -385,11 +385,12 @@ export function planEvidenceForVolumeAndSlots(
     timing: {
       fedica_best_posting_time: evidence.fedica_best_posting_time,
       audience_hours_pt: {
-        start: "14:00",
-        end: "22:00",
-        role: "audience_evidence_not_fixed_window",
+        clocks: ["11:00", "15:00", "19:00"],
+        posts_per_day: 3,
+        gap_hours: 4,
+        role: "personal_seung4680_locked_clocks",
       },
-      min_gap_hours: 2,
+      min_gap_hours: 4,
     },
     digest,
     notes: evidence.notes,
@@ -423,11 +424,12 @@ export function planEvidenceForModel(evidence: AgentSeungPlanEvidence): Record<s
     timing: {
       fedica_best_posting_time: evidence.fedica_best_posting_time,
       audience_hours_pt: {
-        start: "14:00",
-        end: "22:00",
-        role: "audience_evidence_not_fixed_window",
+        clocks: ["11:00", "15:00", "19:00"],
+        posts_per_day: 3,
+        gap_hours: 4,
+        role: "personal_seung4680_locked_clocks",
       },
-      min_gap_hours: 2,
+      min_gap_hours: 4,
     },
     notes: evidence.notes,
   };

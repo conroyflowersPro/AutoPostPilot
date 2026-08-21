@@ -1,13 +1,16 @@
 /**
- * X For You author-diversity spacing for Edge (America/Los_Angeles).
- * Min gap is a constraint. 14:00–22:00 PT are audience posting hours, not an AP For You window
- * and not a clock template. Agent승 infers timestamps; this file only enforces min gap.
+ * Personal @Seung4680 timing for Edge (America/Los_Angeles).
+ * Locked clocks: 11:00, 15:00, 19:00 PT. 3 posts/day. 4-hour gap.
+ * Agent승 infers among those three. This file snaps onto them and does not invent other hours.
  * Mirrors lib/schedule.ts helpers without importing Next lib/.
  */
 const TZ = "America/Los_Angeles";
-export const FOR_YOU_START_HOUR = 14;
-export const FOR_YOU_END_HOUR = 22;
-export const MIN_PLANNED_GAP_MS = 2 * 60 * 60 * 1000;
+export const PERSONAL_CLOCK_HOURS = [11, 15, 19] as const;
+export const PERSONAL_POSTS_PER_DAY = 3;
+export const PERSONAL_GAP_HOURS = 4;
+export const FOR_YOU_START_HOUR = PERSONAL_CLOCK_HOURS[0];
+export const FOR_YOU_END_HOUR = PERSONAL_CLOCK_HOURS[PERSONAL_CLOCK_HOURS.length - 1];
+export const MIN_PLANNED_GAP_MS = PERSONAL_GAP_HOURS * 60 * 60 * 1000;
 
 function laParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -134,7 +137,35 @@ export function parsePlannerTimestamp(
   return "";
 }
 
-/** Parse Agent승 timestamps onto slots. Does not invent a replacement time. */
+export function nearestPersonalClockHour(hour: number, minute = 0): (typeof PERSONAL_CLOCK_HOURS)[number] {
+  const mins = Math.max(0, Math.min(23, hour)) * 60 + Math.max(0, Math.min(59, minute));
+  let best: (typeof PERSONAL_CLOCK_HOURS)[number] = PERSONAL_CLOCK_HOURS[0];
+  let bestDist = Infinity;
+  for (const clock of PERSONAL_CLOCK_HOURS) {
+    const dist = Math.abs(mins - clock * 60);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = clock;
+    }
+  }
+  return best;
+}
+
+function clockBlocked(
+  iso: string,
+  occupiedMs: number[],
+  gapMs: number,
+): boolean {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return true;
+  return occupiedMs.some((o) => Math.abs(o - t) < gapMs);
+}
+
+/**
+ * Snap Agent승 timestamps onto {11, 15, 19} PT for that slot day.
+ * Infers among the three when a slot is missing or two slots prefer the same clock.
+ * Does not invent other hours (no 14/16/18/20/22).
+ */
 export function enforceMinGapOnPlannedTimes<T extends {
   day_offset: number;
   planned_at?: string;
@@ -143,20 +174,57 @@ export function enforceMinGapOnPlannedTimes<T extends {
 }>(
   startDate: string,
   slots: T[],
-  _occupiedISOs: string[] = [],
+  occupiedISOs: string[] = [],
 ): T[] {
   const origin = parseStartDate(startDate);
+  const occupiedMs = occupiedISOs
+    .map((x) => Date.parse(x))
+    .filter((ms) => Number.isFinite(ms));
+  const byDay = new Map<number, T[]>();
   for (const slot of slots) {
     const day = Math.max(0, Math.min(6, Math.round(Number(slot.day_offset) || 0)));
+    const list = byDay.get(day) || [];
+    list.push(slot);
+    byDay.set(day, list);
+  }
+  for (const [day, daySlots] of byDay) {
     const cal = addDays(origin.year, origin.month, origin.day, day);
-    const iso =
-      parsePlannerTimestamp(slot.planned_at, cal)
-      || parsePlannerTimestamp(slot.planned_pt, cal)
-      || parsePlannerTimestamp(slot.planned_hour, cal);
-    if (iso) {
-      const pinned = pinTimeToSlotDay(iso, cal);
-      slot.planned_at = pinned;
-      slot.planned_pt = formatPt(pinned);
+    const available = PERSONAL_CLOCK_HOURS.filter((hour) => {
+      const iso = laWallTimeToISO(cal.year, cal.month, cal.day, hour, 0);
+      return !clockBlocked(iso, occupiedMs, MIN_PLANNED_GAP_MS);
+    });
+    const prefs = daySlots.map((slot, index) => {
+      const iso =
+        parsePlannerTimestamp(slot.planned_at, cal)
+        || parsePlannerTimestamp(slot.planned_pt, cal)
+        || parsePlannerTimestamp(slot.planned_hour, cal);
+      const pinned = iso ? pinTimeToSlotDay(iso, cal) : "";
+      const p = pinned ? laParts(new Date(pinned)) : null;
+      return {
+        slot,
+        index,
+        preferred: p ? nearestPersonalClockHour(p.hour, p.minute) : null,
+      };
+    });
+    const remaining = [...available];
+    for (const item of prefs) {
+      let pick: number | undefined;
+      if (item.preferred != null) {
+        pick = remaining.find((h) => h >= item.preferred!) ?? remaining[0];
+      } else {
+        pick = remaining[0];
+      }
+      if (pick == null) {
+        const fallback = item.preferred ?? PERSONAL_CLOCK_HOURS[Math.min(item.index, PERSONAL_CLOCK_HOURS.length - 1)];
+        const stamped = laWallTimeToISO(cal.year, cal.month, cal.day, fallback, 0);
+        item.slot.planned_at = stamped;
+        item.slot.planned_pt = formatPt(stamped);
+        continue;
+      }
+      remaining.splice(remaining.indexOf(pick), 1);
+      const stamped = laWallTimeToISO(cal.year, cal.month, cal.day, pick, 0);
+      item.slot.planned_at = stamped;
+      item.slot.planned_pt = formatPt(stamped);
     }
   }
   return slots;
@@ -188,12 +256,19 @@ export function describeSlotTimeCheck<T extends { slot_id?: string; day_offset: 
       if (gap < gapMs) collisions.push(`${slot.id} ↔ existing (${Math.round(gap / 60000)}m)`);
     }
   }
-  const ok = missing.length === 0 && collisions.length === 0 && stamped.length === (slots || []).length;
+  const offClock = (slots || []).filter((s) => {
+    const ms = Date.parse(String(s.planned_at || ""));
+    if (!Number.isFinite(ms)) return false;
+    const p = laParts(new Date(ms));
+    return !(PERSONAL_CLOCK_HOURS as readonly number[]).includes(p.hour) || p.minute !== 0;
+  }).map((s) => String(s.slot_id || `day_${s.day_offset}`));
+  const ok = missing.length === 0 && collisions.length === 0 && offClock.length === 0 && stamped.length === (slots || []).length;
   const note = ok
     ? "times hold"
     : [
       missing.length ? `unparsed ${missing.join(",")}` : "",
-      collisions.length ? `gap<2h ${collisions.slice(0, 8).join("; ")}` : "",
+      collisions.length ? `gap<4h ${collisions.slice(0, 8).join("; ")}` : "",
+      offClock.length ? `not 11/15/19 ${offClock.join(",")}` : "",
     ].filter(Boolean).join(" · ");
   return { ok, missing, collisions, note };
 }
@@ -213,6 +288,8 @@ export function spacingConstraintHolds<T extends { planned_at?: string }>(
   }
   const occupied = occupiedISOs.map((x) => Date.parse(x)).filter((ms) => Number.isFinite(ms));
   for (const t of times) {
+    const p = laParts(new Date(t));
+    if (!(PERSONAL_CLOCK_HOURS as readonly number[]).includes(p.hour) || p.minute !== 0) return false;
     for (const o of occupied) {
       if (Math.abs(t - o) < gapMs) return false;
     }
@@ -220,7 +297,7 @@ export function spacingConstraintHolds<T extends { planned_at?: string }>(
   return true;
 }
 
-/** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */
+/** Calendar days for slot offsets. Does not stamp 14:00 + 2h. */
 export function slotCalendarDays(startDate: string, days: number[]): Array<{ day_offset: number; date: string }> {
   const origin = parseStartDate(startDate);
   return (days || []).map((d) => {
@@ -232,7 +309,7 @@ export function slotCalendarDays(startDate: string, days: number[]): Array<{ day
   });
 }
 
-/** Constraint pass after Agent승 timestamps. Does not stamp a 14:00 + 2h grid or synthesize missing times. */
+/** Snap Agent승 timestamps onto 11/15/19 PT. Infers among those three only. */
 export function stampPlannerSlotTimes<T extends { day_offset: number; planned_at?: string; planned_pt?: string }>(
   startDate: string,
   slots: T[],

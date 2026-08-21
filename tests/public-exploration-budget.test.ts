@@ -32,27 +32,27 @@ const pub = Array.from({ length: 10 }, (_, i) => ({
 }));
 
 const mixed = publicExplorationBudget({
-  requiredSlots: 39,
+  requiredSlots: 21,
   gated: [...lived, ...pub],
 });
 assert.equal(mixed.have, 10);
-assert.ok(mixed.target > 39 + 10, `target ${mixed.target} should beat 칸+10=49`);
-assert.ok(mixed.target / 39 > 1.25, `multiplier-equivalent ${mixed.target / 39} should beat 1.25`);
+assert.ok(mixed.target > 21 + 10, `target ${mixed.target} should beat 칸+10=31`);
+assert.ok(mixed.target / 21 > 1.25, `multiplier-equivalent ${mixed.target / 21} should beat 1.25`);
 assert.equal(mixed.remaining, mixed.target - 10);
 assert.notEqual(mixed.target, 100);
 assert.ok(mixed.target <= PUBLIC_EXPLORATION_CAP);
 
 const prePlan = publicExplorationBudget({ requiredSlots: 0, gated: lived });
 assert.equal(prePlan.have, 0);
-assert.ok(prePlan.target >= Math.ceil(28 * PUBLIC_EXPLORATION_MIN_MULTIPLIER));
+assert.ok(prePlan.target >= Math.ceil(21 * PUBLIC_EXPLORATION_MIN_MULTIPLIER));
 assert.notEqual(prePlan.target, 10);
 
-const onlyLived = publicExplorationBudget({ requiredSlots: 39, gated: lived });
+const onlyLived = publicExplorationBudget({ requiredSlots: 21, gated: lived });
 assert.equal(onlyLived.have, 0);
 assert.equal(onlyLived.remaining, onlyLived.target);
 
 const burned = publicExplorationBudget({
-  requiredSlots: 39,
+  requiredSlots: 21,
   gated: pub,
   rejectedPublicSeedIds: ["a", "b", "c", "d"],
   abandonedPublicSeedIds: ["c", "e"],

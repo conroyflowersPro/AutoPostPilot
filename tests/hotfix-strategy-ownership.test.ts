@@ -26,12 +26,14 @@ assert.match(creator, /inferCreatorSlotTiming/);
 assert.match(creator, /Do not emit planned_at or planned_pt/);
 assert.match(creator, /Every listed slot needs planned_at/);
 assert.match(creator, /before the next day/);
-assert.match(creator, /minimum, not a 2-hour step/);
+assert.match(creator, /11:00, 15:00, 19:00 PT/);
 assert.match(creator, /hard_occupied and today_published/);
 
 const spread = readFileSync("supabase/functions/weekly-plan/for-you-spread.ts", "utf8");
-assert.match(spread, /Does not invent a replacement time/);
+assert.match(spread, /Does not invent other hours/);
 assert.doesNotMatch(spread, /lastMs \+ gapMs/);
+assert.match(spread, /11:00, 15:00, 19:00/);
+assert.doesNotMatch(spread, /FOR_YOU_START_HOUR = 14/);
 
 const job = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 assert.match(job, /코드가 새 시각을 만들지 않음/);

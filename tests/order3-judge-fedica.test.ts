@@ -66,7 +66,7 @@ const weeklyIndex = readFileSync("supabase/functions/weekly-plan/index.ts", "utf
 assert.doesNotMatch(weeklyIndex, /from ["'].*generate-post/);
 
 assert.equal(FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT, false);
-const planned = "2026-08-19T21:07:00.000Z";
+const planned = "2026-08-19T22:00:00.000Z";
 const ok = resolveFedicaScheduleTime({
   post: { strategy_json: { planned_at: planned } },
   occupiedISOs: ["2026-08-19T18:00:00.000Z"],

@@ -69,7 +69,7 @@ WEEKLY 호출:
 USER_DIRECT는 현재 Identity · 창발 · 직접 의견 · Current Voice다. AP_PIPELINE은 계획된 Portfolio · 간격 · 성과다. 둘을 한 평균 성공 집단으로 합치지 마라. AP_PIPELINE으로 Creator Voice를 배우지 마라.
 Complexity/Emergence: 계획된 AP가 기계적으로 굳는지, USER_DIRECT가 어디로 움직이는지, Identity를 지키며 Growth 기회를 열 수 있는지를 같이 판단하라. 고정 비율·고정 Slot 패턴으로 구현하지 마라. Creator Identity와 장기 Account Growth를 동시에 추구하라.
 날짜·시각은 7일 전략의 일부다. freshness, 같은 작성자 원글 밀도, 각 글이 engagement를 얻을 시간을 고려하라.
-인접 계획 원글은 최소 2시간. 14:00부터 2시간 격자, 120분 반복, 임의 jitter, 고정 하루 시간표로 만들지 마라. 14:00–22:00 PT는 청중이 있는 시간대이지 AP For You 창이 아니다.
+개인 @Seung4680 시각은 11:00, 15:00, 19:00 PT만. 하루 3개, 4시간 간격. 이 셋 중에서 추론하라. 14:00부터 2시간 격자, 14/16/18/20/22, 120분 반복을 만들지 마라.
 Topic→Role, Topic→시간, Editorial Mode→시간, USER_DIRECT 비율→고정 Slot 패턴 규칙을 만들지 마라. 구조와 경계만 지키고 전략은 이번 Job 데이터를 보고 추론하라.
 코드가 Role · Editorial Mode · REACH · 시각을 채우지 않는다. 필수값이 빠지거나 간격 제약을 어기면 그 범위만 다시 추론하라. 전체 7일 재시작이 기본이 아니다.
 UNKNOWN origin은 USER_DIRECT가 아니다. Voice · 창발 · 직접 사고 증거로 쓰지 마라. 성과 지표는 버리지 마라.

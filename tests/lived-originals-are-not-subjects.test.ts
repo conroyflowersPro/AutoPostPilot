@@ -17,10 +17,10 @@ import {
 
 const FORBIDDEN = ["써니 핀", "유성들", "퍼와서", "SpaceX 로켓", "Grok language detection", "language detection"];
 
-assert.equal(APP_VERSION, "12.12.22");
-assert.match(VERSION_SUMMARY_KO, /원문/);
-assert.match(VERSION_SUMMARY_KO, /grounding|경험/);
-assert.match(VERSION_SUMMARY_KO, /Agent승/);
+assert.equal(APP_VERSION, "12.12.23");
+assert.match(VERSION_SUMMARY_KO, /11·15·19/);
+assert.match(VERSION_SUMMARY_KO, /하루 3개/);
+assert.match(VERSION_SUMMARY_KO, /4시간/);
 
 const openings = bundledOperatorOpenings();
 assert.ok(openings.some((o) => /써니\s*핀|선착순/.test(o)), "bundled should include 써니 핀 opening");

@@ -451,8 +451,8 @@ function strategySystem(): string {
     "Use only recent_x_analytics as the recent published-flow record. It contains actual published X Analytics rows, up to 30 days, compacted to date, short text, and outcome metrics. Keep metric columns separate. Do not collapse into one engagement score. Do not substitute drafts, Seed candidates, virtual plans, or estimated missing days.",
     "account_overview_daily is account-level daily context only. Use it for cadence and profile-level trend, never to attribute an account total to an individual post.",
     "handmade_cadence is real published-account rhythm from USER_DIRECT originals. Empty recent_x_analytics does NOT mean the account posts once a day. Do not collapse the week to 7 slots because analytics rows are missing.",
-    "You own weekly volume and placement. There is no separate Quota call. Lock seven calendar days with no empty day. At least 4 originals per day, at most 8. Week floor 28, week ceiling 56. Mode overlap is allowed. 30-day posts inform placement, not a uniqueness ban.",
-    "Date and time are part of seven-day strategy. Adjacent planned originals at least 2 hours. Do not start every day at 14:00. Do not emit a repeating 2-hour grid or add jitter. 14:00–22:00 PT are audience posting hours to consider, not an AP For You window.",
+    "You own weekly volume and placement. There is no separate Quota call. Lock seven calendar days with no empty day. Personal @Seung4680 is 3 originals per day, week 21. Mode overlap is allowed. 30-day posts inform placement, not a uniqueness ban.",
+    "Date and time are part of seven-day strategy. planned_at must be 11:00, 15:00, or 19:00 PT. Infer among those three. Do not stamp 14:00–22:00 stepped by 2 hours. Do not invent 14/16/18/20/22.",
     "Recent repetition is profile-level strategic context. Do not ban or penalize an Editorial Mode merely because it appeared often. Infer whether the account has become monotonously similar overall, then adjust this seven-day composition.",
     "No fixed mode ratio, no fixed topic ratio, no pattern rotation. Infer the strategy for this cycle.",
     "volume_gates are hard. Return exactly final_slot_count slot intents, one per locked cell, covering all seven days.",
@@ -551,9 +551,9 @@ function volumeSystem(): string {
   return [
     "You are the seven-day Planner for @Seung4680.",
     plannerArchitectureLock(),
-    "This call locks weekly volume only. Do not emit slots. Do not inspect Seeds. Do not write posts. Agent승 infers timestamps later from evidence; do not assume a 14:00–22:00 grid.",
+    "This call locks weekly volume only. Do not emit slots. Do not inspect Seeds. Do not write posts. Personal @Seung4680 volume is 3 originals per day at 11/15/19 PT.",
     "Planning Horizon is seven days. Use only recent_x_analytics as the recent published-flow record. handmade_cadence is real published-account rhythm. Empty recent_x_analytics does NOT mean the account posts once a day.",
-    "volume_gates are hard: each day 4-8 originals, week floor 28, week ceiling 56, no empty day.",
+    "volume_gates are hard: each day 3 originals, week 21, no empty day.",
     "Return strict JSON with posts_per_day (7 integers), strategy_summary, profile_diversity_intent, analytics_request_needed, analytics_request_reason. No prose outside JSON.",
   ].join("\n");
 }
@@ -563,7 +563,7 @@ function daySlotsSystem(days: number[]): string {
     "You are the seven-day Planner for @Seung4680.",
     plannerArchitectureLock(),
     `This call fills slot intents for day_offset values ${days.join(", ")} only. Do not emit other days.`,
-    "Each slot contains slot_id, day_offset, strategic_role, editorial_mode, planner_intent, planned_at, and planned_pt. planner_intent says why this slot exists—not how to write it. Infer timestamps from evidence. Min gap 2 hours. No clock grid.",
+    "Each slot contains slot_id, day_offset, strategic_role, editorial_mode, planner_intent, planned_at, and planned_pt. planner_intent says why this slot exists—not how to write it. Infer timestamps among 11:00, 15:00, 19:00 PT. 4-hour gap. Do not invent other hours.",
     "Fill exactly posts_per_day[d] slots for each requested day. Mode overlap is allowed. No fixed mode ratio.",
     "Return strict JSON with slots array. No prose outside JSON.",
   ].join("\n");

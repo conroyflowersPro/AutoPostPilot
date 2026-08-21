@@ -251,7 +251,7 @@ function buildJobReportKo(row: any): string {
   lines.push("", `3. Judge 거절 ${rejectN} · Writer/Judge 시도 중 PASS ${passN}`);
   const planned = (st.planner_strategy?.slots || []).filter((s: any) => s?.planned_pt);
   if (planned.length) {
-    lines.push("", "3b. Planner 예정 시각 (America/Los_Angeles, X For You 원글 간격 약 2시간)");
+    lines.push("", "3b. Planner 예정 시각 (America/Los_Angeles, 개인 계정 11·15·19 PT, 하루 3개, 4시간 간격)");
     for (const slot of planned.slice(0, 56)) {
       lines.push(`   - ${clip(slot.slot_id, 16)} · D${Number(slot.day_offset) + 1} · ${clip(slot.planned_pt, 32)}`);
     }
@@ -874,7 +874,7 @@ export async function startWeeklyJob(args: {
     adjacent_rounds: 0,
     write_started: false,
     write_fill_rounds: 0,
-    posts_per_day: 4,
+    posts_per_day: 3,
     quota: null as any,
     learning: null as any,
     planner_strategy: null as SevenDayStrategy | null,
@@ -2509,7 +2509,7 @@ async function legacySeedJudgeUnused(row: any) {
   const eligibleN = eligibleOf(judged).length;
   if (st.seed_metrics) st.seed_metrics.eligible = eligibleN;
   if (st.write_started) {
-    const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 4));
+    const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 3));
     const seen = new Set((st.write_flat || []).map((p: any) => subjectKey(p.concrete_subject)));
     for (const subject of st.attempted_seed_subjects || []) seen.add(subjectKey(String(subject)));
     const fresh = eligibleOf(judged).filter((s: any) => {
@@ -2563,7 +2563,7 @@ async function legacySeedJudgeUnused(row: any) {
 async function legacyLocalSelectUnused(supabase: any, row: any) {
   const st = row.state;
   const required = Number(row.required_slots) || 0;
-  const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 4));
+  const postsPerDay = Math.min(QUOTA_PER_DAY_MAX, Math.max(QUOTA_PER_DAY_MIN, Number(st.posts_per_day) || 3));
   const since = new Date(Date.now() - COLLISION_DAYS * 24 * 3600 * 1000).toISOString();
   const { data: acts } = await supabase
     .from("account_activities")
