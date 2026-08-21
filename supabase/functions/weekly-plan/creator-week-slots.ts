@@ -233,7 +233,7 @@ export async function inferCreatorWeekVolume(args: {
       audienceStatusBlock(args.audience),
       "Use the Agent승 evidence digest plus counts and occupied times. Raw post dumps are not on this call.",
       "30-day Analytics metrics stay separate. Sync is gap-fill only. USER_DIRECT and AP_PIPELINE stay separate. Do not average them. Complexity/Emergence is a judgment, not a ratio.",
-      "volume_gates: each day 4-8 originals, week 28-56, no empty day. Handmade does not change volume.",
+      "volume_gates: each day 3 originals, week 21, no empty day. Personal clocks 11/15/19 PT. Handmade does not change volume.",
       "Return strict JSON: posts_per_day (7 integers), strategy_summary.",
     ].join("\n"),
     user: {
@@ -295,7 +295,7 @@ export async function inferCreatorSlotsForDays(args: {
 
 export function minSpanHoursForSlotCount(n: number): number {
   const count = Math.max(1, Math.round(Number(n) || 1));
-  return (count - 1) * 2;
+  return (count - 1) * 4;
 }
 
 export function parseCreatorSlotTiming(args: {
@@ -365,10 +365,11 @@ export function buildTimingEvidencePacket(args: {
     user_direct_timing: (args.userDirectTiming || []).slice(0, 24),
     ap_pipeline_timing: (args.apPipelineTiming || []).slice(0, 24),
     fedica_best_posting_time: args.fedicaBestPostingTime || { status: "missing", windows: null, note: "" },
-    min_gap_hours: 2,
+    min_gap_hours: 4,
     last_time_check: args.lastTimeCheck || null,
+    personal_clocks_pt: ["11:00", "15:00", "19:00"],
     note:
-      "Fedica/audience hours are evidence, not a box. If min_span_hours does not fit an 8-hour band, infer outside it. Hard occupied and today_published are collision constraints. Historical times are evidence only.",
+      "Personal @Seung4680 clocks are 11:00, 15:00, 19:00 PT. Infer among those three. Hard occupied and today_published are collision constraints. Historical times are evidence only.",
   };
 }
 
@@ -387,9 +388,9 @@ export async function inferCreatorSlotTiming(args: {
       "You are Agent승 PLAN Timing. Same intelligence. This subtask only infers clocks.",
       "Do not change slot_id, day_offset, Role, Editorial Mode, or planner_intent.",
       "Every listed slot needs planned_at (ISO UTC) and planned_pt (America/Los_Angeles wall time).",
-      "Stay on that slot's calendar date, before the next day. Adjacent originals at least 2 hours — a minimum, not a 2-hour step.",
+      "Stay on that slot's calendar date, before the next day. Infer among 11:00, 15:00, 19:00 PT only. 4-hour gap. Do not stamp 14:00–22:00 or a 2-hour step.",
       "hard_occupied and today_published are collisions. Historical published timing and Fedica are evidence only.",
-      "If a day needs more span than any audience hour band, infer earlier or later that same day. Code will not invent a time.",
+      "Code may snap onto those three clocks. It will not invent other hours.",
       "Return strict JSON: { \"slots\": [ { slot_id, planned_at, planned_pt } ] }. No prose.",
     ].join("\n"),
     user: args.packet,
@@ -441,7 +442,7 @@ export async function inferCreatorSlotReplan(args: {
         ? `This EXPERIENCE slot has no unused lived grounding. Re-infer this ONE slot from the whole week. Code will not change Editorial Mode. Do not keep EXPERIENCE unless unused lived_grounding still fits. Lived packets are facts for grounding, not a handmade post to rewrite. If you leave EXPERIENCE, seed_id must come from lived_grounding. Otherwise seed_id must come from seed_pool.`
         : "Judge flagged this slot's strategy as invalid. You infer the replacement Role, Editorial Mode, timestamp, planner_intent, and seed_id from the evidence and seed pool.",
       "Do not rewrite other slots. Do not restart the seven-day plan. Code will not invent Role, Mode, REACH, or time if you omit them.",
-      "Every replacement slot needs planned_at and planned_pt. Infer the clock. Minimum 2 hours from adjacent originals, not a 2-hour step. Same calendar day, before the next day.",
+      "Every replacement slot needs planned_at and planned_pt. Infer among 11:00, 15:00, 19:00 PT. 4-hour gap. Do not invent other hours. Same calendar day, before the next day.",
       "Return strict JSON: { \"slot\": { slot_id, day_offset, growth_role, editorial_mode, planner_intent, planned_at, planned_pt, seed_id } }.",
     ].join("\n"),
     user: {

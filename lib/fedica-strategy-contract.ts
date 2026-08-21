@@ -3,8 +3,8 @@
  * Safety (duplicate, occupied, API validation) stays. Strategy recalculation does not.
  */
 
-/** Spacing constraint only. Not a timetable and not a jitter recipe. Same value as FOR_YOU_HARD_MIN_GAP_MS. */
-export const MIN_PUBLISH_GAP_MS = 2 * 60 * 60 * 1000;
+/** Personal @Seung4680 gap. Same value as FOR_YOU_HARD_MIN_GAP_MS (4 hours). */
+export const MIN_PUBLISH_GAP_MS = 4 * 60 * 60 * 1000;
 /** After ORDER 3: Fedica must not overwrite Agent승 planned_at. */
 export const FEDICA_OVERWRITES_AGENT_SEUNG_PLANNED_AT = false as const;
 
@@ -75,7 +75,7 @@ export function resolveFedicaScheduleTime(args: {
       return {
         ok: false,
         code: "strategy_spacing_broken",
-        error: "최소 2시간 간격이 깨져 있습니다. 스케줄러가 새 시각을 만들지 않습니다.",
+        error: "최소 4시간 간격이 깨져 있습니다. 스케줄러가 새 시각을 만들지 않습니다.",
       };
     }
     return { ok: true, iso, source: "operator_override" };

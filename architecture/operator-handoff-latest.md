@@ -1,11 +1,11 @@
-# Operator thread handoff — 2026-08-19
+# Operator thread handoff — 2026-08-21
 
 새 채팅/에이전트는 **이 파일을 먼저** 읽고 이어서 작업한다. Writer·Planner·Judge 프롬프트에 넣지 않는다.
 
 ## Current (do not treat older sections as live version)
 
-- **this branch:** **v12.12.22** lived originals are not rewrite subjects. 경험 원문은 grounding만. `concrete_subject`는 방향이고 Agent승이 추론해서 쓴다. 번들 30일·account_activities 원문과 같은 제목은 거절. v12.12.21 공개 방향 추출은 유지.
-- **main / live:** **v12.12.21** (`4787f08`). 공개 Seed 방향. 헤더 `v12.12.21`.
+- **this branch:** **v12.12.23** 개인 @Seung4680 시각은 11·15·19 PT만. 하루 3개, 4시간 간격. 새 계획·재개는 14/16/18/20/22 2시간 격자를 찍지 않는다. v12.12.22 lived 원문 가드는 유지.
+- **main / live:** **v12.12.22** (`34676d8`). lived originals are not rewrite subjects. 헤더 `v12.12.22`.
 - **배포:** 하지 않음. 운영자가 **배포해**라고 할 때까지 `main`에 넣지 않는다. 이 브랜치는 draft PR만.
 - **ORDER 1 (v12.9.0):** 7일 Evidence · Slot 날짜/시각.
 - **ORDER 2 (v12.10.0):** Agent승 Thinking Intelligence · Core Thought · 직접 WRITE.
@@ -26,7 +26,7 @@
 
 ## Shipped on main now
 
-**v12.12.21** (`4787f08`). Header should show `v12.12.21`.
+**v12.12.22** (`34676d8`). Header should show `v12.12.22`.
 
 | Version | What |
 | --- | --- |
@@ -36,27 +36,27 @@
 | 12.12.19 | 공개 X 탐색량에서 lived 제외. 동적 예산. `칸+10` 삭제 |
 | 12.12.20 | EXPERIENCE grounding. 수제글 원문은 Seed가 아님 |
 | 12.12.21 | 공개 추출은 한 번의 raw 0으로 닫지 않음. Seed는 방향 |
+| 12.12.22 | lived 원문은 다시 쓰지 않음. 경험은 grounding만 |
 
-## This branch (v12.12.22)
+## This branch (v12.12.23)
 
 의도:
 
-1. 운영자 원문은 다시 쓸 글이 아니다
-2. lived 텍스트는 grounding 사실만. 글은 Agent승이 방향에서 추론한다
-3. 원문 문장을 `concrete_subject`에 넣지 않는다
-4. 공개 추출에서 @Seung4680을 빼고, 최근 원문과 같은 제목은 거절한다
-5. Mode·Collection 1회/칸은 바꾸지 않는다
+1. 개인 @Seung4680 발행 시각은 11:00, 15:00, 19:00 America/Los_Angeles만
+2. 하루 3개, 4시간 간격
+3. 재개는 그날 {11, 15, 19} 다음 칸, 없으면 다음날 11:00. 20·21·22로 밀어 넣지 않는다
+4. Planner/Agent승 `planned_at`은 이 셋 중 하나. 코드가 다른 시를 만들지 않는다
+5. Mode·원문 Seed 재활용·Collection 1회/칸은 바꾸지 않는다
 
 핵심 파일:
 
-- `supabase/functions/weekly-plan/seed-ownership.ts`
-- `supabase/functions/weekly-plan/analytics-lived-seeds.ts`
-- `supabase/functions/weekly-plan/operator-original-guard.ts`
-- `supabase/functions/weekly-plan/creator-seed-reasoning.ts`
-- `supabase/functions/weekly-plan/generation-job.ts`
-- `tests/lived-originals-are-not-subjects.test.ts`
+- `lib/schedule.ts`
+- `supabase/functions/weekly-plan/for-you-spread.ts`
+- `supabase/functions/weekly-plan/quota-inference.ts`
+- `app/api/fedica/batch-schedule/route.ts`
+- `tests/schedule-resume-occupied.test.ts`
 
-v12.12.21 공개 방향 추출과 v12.12.20 EXPERIENCE grounding은 유지한다.
+v12.12.22 lived 원문 가드는 유지한다.
 
 ## Must not change without Seung
 
@@ -72,4 +72,4 @@ Do **not** treat the full absorb as live until Seung says **반영해** / **넣�
 
 ## Older (not the live problem)
 
-2026-08-17 Fedica 8:29 dump / 14:00 resume. Gaps are X author diversity (~2h), not an AP For You window. See older changelog. Do not re-diagnose unless Seung brings it back.
+2026-08-17 Fedica 8:29 dump / 14:00–22:00 ~2h resume는 닫혔다. 운영자가 개인 계정을 11·15·19 PT로 잠갔다. 예전 2시간 창을 다시 진단하지 마라.

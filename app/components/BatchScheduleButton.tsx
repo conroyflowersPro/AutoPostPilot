@@ -20,7 +20,7 @@ export default function BatchScheduleButton({
     }
     if (
       !confirm(
-        `검수 완료된 한국어 포스트를 Fedica에 일괄 스케줄할까요?\n(태평양시 오후 2시부터, 원글 간격은 X For You 기준 약 2시간)`
+        `검수 완료된 한국어 포스트를 Fedica에 일괄 스케줄할까요?\n(개인 계정 11·15·19시 PT, 하루 3개, 4시간 간격)`
       )
     ) {
       return;
@@ -28,7 +28,7 @@ export default function BatchScheduleButton({
 
     setLoading(true);
     setResult(null);
-    setProgress("업로드 중… X For You 원글 간격(약 2시간)으로 배정하고 Fedica로 전송합니다.");
+    setProgress("업로드 중… 11·15·19 PT 칸으로 배정하고 Fedica로 전송합니다.");
 
     try {
       const res = await fetch("/api/fedica/batch-schedule", {

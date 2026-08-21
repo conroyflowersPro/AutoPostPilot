@@ -79,7 +79,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
   const [livePosts, setLivePosts] = useState<Post[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState(todayLA);
-  const [maxPerDay, setMaxPerDay] = useState(5);
+  const [maxPerDay, setMaxPerDay] = useState(3);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [scheduleResult, setScheduleResult] = useState<any>(null);
@@ -280,7 +280,7 @@ export default function PostList({ posts }: { posts: Post[] }) {
     }
     if (
       !confirm(
-        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\nAgent승이 정한 계획 시각을 사용합니다. 시각이 없는 예전 초안만 기존 occupied-safe 경로입니다.\n최소 2시간은 간격 제약입니다. 스케줄러가 2시간 격자나 jitter로 새 주간 시각을 만들지 않습니다.\n배치 ${SCHEDULE_BATCH_SIZE}개씩`
+        `선택한 ${ids.length}개를 Fedica 지정 파이프라인에 일괄 스케줄할까요?\nAgent승이 정한 계획 시각을 사용합니다. 시각이 없는 예전 초안만 11·15·19 PT occupied-safe 경로입니다.\n개인 계정은 하루 3개, 4시간 간격입니다. 14–22시 2시간 격자를 쓰지 않습니다.\n배치 ${SCHEDULE_BATCH_SIZE}개씩`
       )
     )
       return;
@@ -378,8 +378,8 @@ export default function PostList({ posts }: { posts: Post[] }) {
         <div className="mt-3 space-y-3">
         <p className="text-xs text-zinc-400">
           글에 지정된 Fedica 파이프라인으로 Agent승이 정한 계획 시각을 넣습니다. 시각이 없는
-          예전 초안만 이미 예약된 시각 다음 occupied-safe 경로를 씁니다. 최소 2시간은 간격
-          제약이지 2시간 격자나 jitter가 아닙니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
+          예전 초안만 이미 예약된 시각 다음 11·15·19 PT 칸으로 이어갑니다. 개인 계정은
+          하루 3개, 4시간 간격입니다. {SCHEDULE_BATCH_SIZE}개씩 자동 배치.
         </p>
 
         <div
@@ -406,9 +406,9 @@ export default function PostList({ posts }: { posts: Post[] }) {
             <input
               type="number"
               min={3}
-              max={5}
+              max={3}
               value={maxPerDay}
-              onChange={(e) => setMaxPerDay(Number(e.target.value) || 5)}
+              onChange={(e) => setMaxPerDay(Number(e.target.value) || 3)}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm"
             />
           </div>

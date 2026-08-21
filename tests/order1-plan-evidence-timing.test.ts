@@ -35,8 +35,10 @@ assert.doesNotMatch(job, /Planner가 시각 배정/);
 const spread = readFileSync("supabase/functions/weekly-plan/for-you-spread.ts", "utf8");
 assert.match(spread, /MIN_PLANNED_GAP_MS/);
 assert.match(spread, /enforceMinGapOnPlannedTimes/);
+assert.match(spread, /PERSONAL_CLOCK_HOURS = \[11, 15, 19\]/);
 assert.doesNotMatch(spread, /stepTwoHoursIso/);
 assert.doesNotMatch(spread, /FOR_YOU_START_HOUR, 0\)/);
+assert.doesNotMatch(spread, /FOR_YOU_START_HOUR = 14/);
 
 const compact = compactPlanMetrics({
   post_id: "1",
@@ -151,27 +153,37 @@ const slots = enforceMinGapOnPlannedTimes("2026-08-19", [
   { day_offset: 0, planned_at: "2026-08-19T22:40:00.000Z" },
   { day_offset: 0, planned_at: "2026-08-20T03:11:00.000Z" },
 ]);
-assert.equal(slots[0].planned_at, "2026-08-19T22:07:00.000Z");
-assert.equal(slots[1].planned_at, "2026-08-19T22:40:00.000Z");
-assert.equal(slots[2].planned_at, "2026-08-20T03:11:00.000Z");
-assert.equal(spacingConstraintHolds(slots), false);
-assert.ok(MIN_PLANNED_GAP_MS >= 2 * 60 * 60 * 1000);
+assert.equal(slots[0].planned_at, "2026-08-19T22:00:00.000Z");
+assert.equal(slots[1].planned_at, "2026-08-20T02:00:00.000Z");
+assert.equal(slots[2].planned_at, "2026-08-19T18:00:00.000Z");
+assert.equal(spacingConstraintHolds(slots), true);
+assert.ok(MIN_PLANNED_GAP_MS >= 4 * 60 * 60 * 1000);
+const twoHourGrid = enforceMinGapOnPlannedTimes("2026-08-19", [
+  { day_offset: 0, planned_at: "2026-08-19 14:00 PT" },
+  { day_offset: 0, planned_at: "2026-08-19 16:00 PT" },
+  { day_offset: 0, planned_at: "2026-08-19 18:00 PT" },
+]);
+assert.deepEqual(
+  twoHourGrid.map((s) => s.planned_pt),
+  ["2026-08-19 15:00 PT", "2026-08-19 19:00 PT", "2026-08-19 11:00 PT"],
+);
+assert.ok(!twoHourGrid.some((s) => /14:00|16:00|18:00|20:00|22:00/.test(String(s.planned_pt))));
 const pinned = pinTimeToSlotDay("2026-08-19T22:07:00.000Z", { year: 2026, month: 8, day: 18 });
 assert.match(pinned, /2026-08-1[89]/);
 const check = describeSlotTimeCheck([
-  { slot_id: "a", day_offset: 0, planned_at: "2026-08-18T21:00:00.000Z" },
-  { slot_id: "b", day_offset: 0, planned_at: "2026-08-18T21:30:00.000Z" },
+  { slot_id: "a", day_offset: 0, planned_at: "2026-08-18T22:00:00.000Z" },
+  { slot_id: "b", day_offset: 0, planned_at: "2026-08-18T22:30:00.000Z" },
 ]);
 assert.equal(check.ok, false);
 assert.ok(check.collisions.length > 0);
 assert.ok(spacingConstraintHolds(
-  [{ planned_at: "2026-08-18T21:00:00.000Z" }],
-  ["2026-08-18T14:00:00.000Z", "2026-08-18T14:01:00.000Z"],
+  [{ planned_at: "2026-08-18T22:00:00.000Z" }],
+  ["2026-08-18T18:00:00.000Z"],
 ));
 assert.equal(
   describeSlotTimeCheck(
-    [{ slot_id: "n1", day_offset: 0, planned_at: "2026-08-18T21:00:00.000Z" }],
-    ["2026-08-18T14:00:00.000Z", "2026-08-18T14:01:00.000Z"],
+    [{ slot_id: "n1", day_offset: 0, planned_at: "2026-08-18T22:00:00.000Z" }],
+    ["2026-08-18T18:00:00.000Z"],
   ).ok,
   true,
 );
@@ -254,7 +266,8 @@ assert.equal(nextUnassignedSlotChunk(
 ).map((s) => s.slot_id).join(","), "b,c,d,e,f");
 assert.match(weekly, /planner_slots_pending/);
 assert.match(weekly, /시각만 재추론/);
-assert.equal(minSpanHoursForSlotCount(6), 10);
+assert.equal(minSpanHoursForSlotCount(3), 8);
+assert.equal(minSpanHoursForSlotCount(6), 20);
 const timed = parseCreatorSlotTiming({
   raw: { slots: [{ slot_id: "D1P1", planned_at: "2026-08-18T22:00:00.000Z", planned_pt: "2026-08-18 15:00 PT" }] },
   slots: [{ slot_id: "D1P1", day_offset: 0, strategic_role: "RETURN", editorial_mode: "INFORMATIVE", planner_intent: "keep" }],

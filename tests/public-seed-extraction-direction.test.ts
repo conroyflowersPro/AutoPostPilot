@@ -16,10 +16,10 @@ const reasoning = readFileSync("supabase/functions/weekly-plan/creator-seed-reas
 const job = readFileSync("supabase/functions/weekly-plan/generation-job.ts", "utf8");
 const search = readFileSync("supabase/functions/weekly-plan/public-x-seed-search.ts", "utf8");
 
-assert.equal(APP_VERSION, "12.12.22");
-assert.match(VERSION_SUMMARY_KO, /원문/);
-assert.match(VERSION_SUMMARY_KO, /Agent승/);
-assert.match(VERSION_SUMMARY_KO, /grounding|경험/);
+assert.equal(APP_VERSION, "12.12.23");
+assert.match(VERSION_SUMMARY_KO, /11·15·19/);
+assert.match(VERSION_SUMMARY_KO, /하루 3개/);
+assert.match(VERSION_SUMMARY_KO, /4시간/);
 
 assert.match(reasoning, /tools: \[xSearchTool\]/);
 assert.doesNotMatch(reasoning, /compact \? \{\} : \{ tools/);
